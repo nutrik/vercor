@@ -9,6 +9,7 @@ from vercor.exceptions import CouplerError
 from vercor.grid import RectilinearGrid
 from vercor.types import AllComponentsType
 
+
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 
@@ -25,8 +26,14 @@ def _flatten_fields(
     return flattened
 
 
-def _append_unique(target: List[str], items: List[str]) -> None:
-    target.extend([item for item in items if item not in target])
+def _append_unique(target: List[str], exchange_items: List[str]) -> None:
+    """
+    Arguments:
+        target: List of field names in _fields2export & _fields2import
+                in the component's exchange variable lists.
+        exchange_items: List of field names from exchange rules (exchanger).
+    """
+    target.extend([item for item in exchange_items if item not in target])
 
 
 def grids_identical(g0: RectilinearGrid, g1: RectilinearGrid) -> bool:

@@ -120,13 +120,13 @@ class JAXGCM(Component):
         grid_shape = self.grid.shape
 
         zeros = np.zeros(grid_shape)
-        self.data["sst"] = zeros + 273.15 + 15.0
+        self.data["sea_surface_temperature"] = zeros + 273.15 + 15.0
         self.data["land_surface_temperature"] = zeros
-        self.data["u10m"] = zeros.copy()
-        self.data["v10m"] = zeros.copy()
-        self.data["LHF"] = zeros.copy()
-        self.data["SHF"] = zeros.copy()
-        self.data["TA2M"] = zeros.copy()
+        self.data["u_velocity_10m"] = zeros.copy()
+        self.data["v_velocity_10m"] = zeros.copy()
+        self.data["latent_heat_flux"] = zeros.copy()
+        self.data["sensible_heat_flux"] = zeros.copy()
+        self.data["temperature_2m"] = zeros.copy()
         self._predictions_list = []
 
     def step(
@@ -141,20 +141,24 @@ class JAXGCM(Component):
                 f"dt={str(dt)} must be an integer multiple of coupling_timestep={str(self.coupling_timestep)}."
             )
 
-        print("Mean of sst: ", jnp.asarray(self.data["sst"]).mean())
+        print("Mean of SST: ", jnp.asarray(self.data["sea_surface_temperature"]).mean())
         print(
-            "number of sst that is less than 250: ",
-            np.sum(self.data["sst"] < 250.0),
+            "number of SST that is less than 250: ",
+            np.sum(self.data["sea_surface_temperature"] < 250.0),
         )
 
-        self.data["sst"][self.data["sst"] < 250.0] = 288.15
+        self.data["sea_surface_temperature"][
+            self.data["sea_surface_temperature"] < 250.0
+        ] = 288.15
         self.data["land_surface_temperature"][
             self.data["land_surface_temperature"] < 250.0
         ] = 288.15
 
         forcing = self.forcing.copy(
             stl_am=jnp.asarray(self.data["land_surface_temperature"]).transpose(),
-            sea_surface_temperature=jnp.asarray(self.data["sst"]).transpose(),
+            sea_surface_temperature=jnp.asarray(
+                self.data["sea_surface_temperature"]
+            ).transpose(),
         )
 
         _avg_predictions = []
@@ -176,11 +180,13 @@ class JAXGCM(Component):
         # d = _avg_predictions.dynamics
 
         # All the heat and freshwater fluxes are positive upward
-        self.data["u10m"] = np.array(p.surface_flux.u0).transpose()
-        self.data["v10m"] = np.array(p.surface_flux.v0).transpose()
-        self.data["TA2M"] = np.array(p.surface_flux.t0).transpose()
-        self.data["SHF"] = np.array(p.surface_flux.shf).sum(axis=2).transpose()
-        self.data["LHF"] = (
+        self.data["u_velocity_10m"] = np.array(p.surface_flux.u0).transpose()
+        self.data["v_velocity_10m"] = np.array(p.surface_flux.v0).transpose()
+        self.data["temperature_2m"] = np.array(p.surface_flux.t0).transpose()
+        self.data["sensible_heat_flux"] = (
+            np.array(p.surface_flux.shf).sum(axis=2).transpose()
+        )
+        self.data["latent_heat_flux"] = (
             np.array(p.surface_flux.evap / 1e3 * latent_heat_of_vaporization)
             .sum(axis=2)
             .transpose()

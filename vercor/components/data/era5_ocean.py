@@ -54,9 +54,13 @@ class ERA5Ocean(Component, ComponentForcingData):
 
         self._settings["apply_time_interpolation"] = True
 
-        self.data["sst"] = self._read_forcing("sst", where="surface", flip_y=True)
-        self.data["sst"] *= np.where(binary_mask > 0.0, 1.0, np.nan).T[..., np.newaxis]
-        self.data["fraction_mask"] = fraction_mask
+        self.data["sea_surface_temperature"] = self._read_forcing(
+            "sst", where="surface", flip_y=True
+        )
+        self.data["sea_surface_temperature"] *= np.where(
+            binary_mask > 0.0, 1.0, np.nan
+        ).T[..., np.newaxis]
+        # self.data["fraction_mask"] = fraction_mask
 
     def initialize(self, coupler: "Coupler") -> None:
         pass

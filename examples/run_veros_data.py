@@ -29,12 +29,12 @@ if __name__ == "__main__":
             source="ATM",
             destination="OCN",
             field_names=[
-                ("ubot", "vbot"),
-                "qbot",
-                "zbot",
-                "rbot",
-                "thbot",
-                "tbot",
+                ("u_velocity", "v_velocity"),
+                "specific_humidity",
+                "model_level_height",
+                "density",
+                "potential_temperature",
+                "temperature",
             ],
             regridder_factory=bilinear,
         )
@@ -45,8 +45,8 @@ if __name__ == "__main__":
             source="ATM",
             destination="OCN",
             field_names=[
-                "swr_net",
-                "lwr_dw",
+                "net_shortwave_radiation_flux",
+                "downward_longwave_radiation_flux",
             ],
             regridder_factory=bilinear,
         )
@@ -57,7 +57,7 @@ if __name__ == "__main__":
             source="OCN",
             destination="ATM",
             field_names=[
-                "sst",
+                "sea_surface_temperature",
             ],
             regridder_factory=bilinear,
         )
@@ -68,8 +68,8 @@ if __name__ == "__main__":
             source="ATM",
             destination="LND",
             field_names=[
-                "tbot",
-                "qbot",
+                "temperature",
+                "specific_humidity",
             ],
             regridder_factory=bilinear,
         )
@@ -80,7 +80,7 @@ if __name__ == "__main__":
             source="LND",
             destination="ATM",
             field_names=[
-                "skt",
+                "land_surface_temperature",
             ],
             regridder_factory=bilinear,
         )

@@ -49,13 +49,13 @@ def compute_fluxes(
     ) = new_flux_atmOcn(
         settings,
         np.array(vs.maskT[2:-2, 2:-2, -1].T),
-        cs.data["zbot"],
-        cs.data["ubot"],
-        cs.data["vbot"],
-        cs.data["thbot"],
-        cs.data["qbot"],
-        cs.data["rbot"],
-        cs.data["tbot"],
+        cs.data["model_level_height"],
+        cs.data["u_velocity"],
+        cs.data["v_velocity"],
+        cs.data["potential_temperature"],
+        cs.data["specific_humidity"],
+        cs.data["density"],
+        cs.data["temperature"],
         # u & v have Arakawa-C grid staggering in Veros
         # (need additional interpolation)
         u_tgrid[1:-2, :].T,
@@ -67,7 +67,13 @@ def compute_fluxes(
     # Negative out:           LW_up ↑  SENf ↑  LATf ↑
     # Positive in:  SW_net ↓  LW_dw ↓  SENf ↓  LATf ↓
 
-    qnet = cs.data["swr_net"] + cs.data["lwr_dw"] + lwup + senf + latf
+    qnet = (
+        cs.data["net_shortwave_radiation_flux"]
+        + cs.data["downward_longwave_radiation_flux"]
+        + lwup
+        + senf
+        + latf
+    )
     qnec = -np.where(dqfldt <= -1e10, 0.0, dqfldt)
 
     return (taux, tauy, qnet, qnec)
@@ -185,7 +191,7 @@ class VerosGCM(Component):
                 print(" " * 40 + f"Step {i+1} / {self.spinup_steps}", end="\r")
                 self._veros_state = self._step_function(self._veros_state)
 
-        self.data["sst"] = self._veros_state.variables.temp[
+        self.data["sea_surface_temperature"] = self._veros_state.variables.temp[
             2:-2, 2:-2, -1, self._veros_state.variables.tau
         ].T
 
@@ -212,6 +218,6 @@ class VerosGCM(Component):
             print(" " * 40 + f"Veros sub-step {i+1} / {self.model_substeps}", end="\r")
             self._veros_state = self._step_function(self._veros_state)
 
-        self.data["sst"] = self._veros_state.variables.temp[
+        self.data["sea_surface_temperature"] = self._veros_state.variables.temp[
             2:-2, 2:-2, -1, self._veros_state.variables.tau
         ].T

@@ -6,21 +6,22 @@ import numpy as np
 from vercor.components import Component
 from vercor.grid import RectilinearGrid
 
+
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 
 
 class SeaIce(Component):
-    """Toy thermodynamic sea-ice: diagnostic concentration from sst.
-    Outputs: ICEFRAC [0..1]
-    Inputs: sst [K]
+    """Toy thermodynamic sea-ice: diagnostic concentration from sea_surface_temperature.
+    Outputs: ice_fraction [0..1]
+    Inputs: sea_surface_temperature [K]
     """
 
     def __init__(self, name: str, grid: RectilinearGrid) -> None:
         super().__init__(name, grid)
 
     def initialize(self, coupler: "Coupler") -> None:
-        self.data["ICEFRAC"] = np.zeros(self.grid.shape)
+        self.data["ice_fraction"] = np.zeros(self.grid.shape)
 
     def step(
         self,
@@ -28,7 +29,7 @@ class SeaIce(Component):
         time: datetime,
         coupler: "Coupler",
     ) -> None:
-        sst = self.data.get("sst", None)
+        sst = self.data.get("sea_surface_temperature", None)
         if sst is None:
             return
 
@@ -37,4 +38,4 @@ class SeaIce(Component):
         x = (Tfreeze - sst) / 2.0
         ice = 1.0 / (1.0 + np.exp(-x))
 
-        self.data["ICEFRAC"] = ice
+        self.data["ice_fraction"] = ice

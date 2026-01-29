@@ -78,65 +78,71 @@ class ERA5Atmosphere(Component, ComponentForcingData):
         ]  # L136-L137
 
         lnsp = self._read_forcing("lnsp", where="model_level", flip_y=True)[..., 0, :]
-        self.data["surf_pressure"] = np.exp(lnsp)
-        self.data["specific_humidity"] = self._read_forcing(
+        self.data["surface_pressure"] = np.exp(lnsp)
+        self.data["specific_humidity_3d"] = self._read_forcing(
             "q", where="model_level", flip_y=True
         )[
             ..., 1:, :
         ]  # L136-L137
-        self.data["temperature"] = self._read_forcing(
+        self.data["temperature_3d"] = self._read_forcing(
             "t", where="model_level", flip_y=True
         )[
             ..., 1:, :
         ]  # L136-L137
 
-        self.data["ubot"] = self._read_forcing("u", where="model_level", flip_y=True)[
+        self.data["u_velocity"] = self._read_forcing(
+            "u", where="model_level", flip_y=True
+        )[
             :, :, 1, :
         ]  # L136
-        self.data["vbot"] = self._read_forcing("v", where="model_level", flip_y=True)[
+        self.data["v_velocity"] = self._read_forcing(
+            "v", where="model_level", flip_y=True
+        )[
             :, :, 1, :
         ]  # L136
 
         # tcc = self._read_forcing("tcc", where="surface", flip_y=True)
-        self.data["swr_net"] = self._read_forcing(
+        self.data["net_shortwave_radiation_flux"] = self._read_forcing(
             "msnswrf", where="surface", flip_y=True
         )
-        self.data["lwr_dw"] = self._read_forcing(
+        self.data["downward_longwave_radiation_flux"] = self._read_forcing(
             "msdwlwrf", where="surface", flip_y=True
         )
 
-        self.data["qbot"] = self.data["specific_humidity"][..., 0, :]  # L136
-        self.data["tbot"] = self.data["temperature"][..., 0, :]  # L136
+        self.data["specific_humidity"] = self.data["specific_humidity_3d"][
+            ..., 0, :
+        ]  # L136
+        self.data["temperature"] = self.data["temperature_3d"][..., 0, :]  # L136
 
     def initialize(self, coupler: "Coupler") -> None:
         nlat, nlon = self.grid.shape
         settings = coupler.settings
         ds = self.data
 
-        ds["zbot"] = np.zeros((nlon, nlat, 12))
-        ds["rbot"] = np.zeros((nlon, nlat, 12))
-        ds["thbot"] = np.zeros((nlon, nlat, 12))
+        ds["model_level_height"] = np.zeros((nlon, nlat, 12))
+        ds["density"] = np.zeros((nlon, nlat, 12))
+        ds["potential_temperature"] = np.zeros((nlon, nlat, 12))
 
         for m in range(12):
             ph = compute_pressure_levels(
-                ds["surf_pressure"][..., m], ds["hyai"], ds["hybi"]
+                ds["surface_pressure"][..., m], ds["hyai"], ds["hybi"]
             )
             pf = compute_pressure_levels(
-                ds["surf_pressure"][..., m], ds["hyam"], ds["hybm"]
+                ds["surface_pressure"][..., m], ds["hyam"], ds["hybm"]
             )
-            self.data["zbot"][..., m] = compute_levels_altitudes(
+            self.data["model_level_height"][..., m] = compute_levels_altitudes(
                 settings,
-                ds["temperature"][..., m],
-                ds["specific_humidity"][..., m],
+                ds["temperature_3d"][..., m],
+                ds["specific_humidity_3d"][..., m],
                 ph[...],
             )[
                 ..., 1
             ]  # L136
-            self.data["rbot"][..., m] = compute_air_density(
-                settings, pf[:, :, 0], ds["tbot"][:, :, m]
+            self.data["density"][..., m] = compute_air_density(
+                settings, pf[:, :, 0], ds["temperature"][:, :, m]
             )
-            self.data["thbot"][..., m] = compute_potential_temperature(
-                settings, ds["tbot"][:, :, m], pf[:, :, 0]
+            self.data["potential_temperature"][..., m] = compute_potential_temperature(
+                settings, ds["temperature"][:, :, m], pf[:, :, 0]
             )
 
     def step(
@@ -149,6 +155,6 @@ class ERA5Atmosphere(Component, ComponentForcingData):
         Advance to the next time step in the dataset
         using time interpolation from one month to another.
         """
-        self.data["surface_temperature"] = np.nan_to_num(
-            self.data["skt"], nan=0.0
-        ) + np.nan_to_num(self.data["sst"], nan=0.0)
+        self.data["total_surface_temperature"] = np.nan_to_num(
+            self.data["land_surface_temperature"], nan=0.0
+        ) + np.nan_to_num(self.data["sea_surface_temperature"], nan=0.0)

@@ -76,7 +76,11 @@ if __name__ == "__main__":
         Exchange(
             source="ATM",
             destination="OCN",
-            field_names=[("u10m", "v10m"), "SHF", "LHF"],
+            field_names=[
+                ("u_velocity_10m", "v_velocity_10m"),
+                "sensible_heat_flux",
+                "latent_heat_flux",
+            ],
             regridder_factory=bilinear,
         )
     )
@@ -85,7 +89,7 @@ if __name__ == "__main__":
         Exchange(
             source="OCN",
             destination="ATM",
-            field_names=["sst"],
+            field_names=["sea_surface_temperature"],
             regridder_factory=bilinear,
         )
     )
@@ -94,7 +98,7 @@ if __name__ == "__main__":
         Exchange(
             source="LND",
             destination="ATM",
-            field_names=["SOILM", "land_surface_temperature"],
+            field_names=["soil_moisture", "land_surface_temperature"],
             regridder_factory=bilinear,
         )
     )
@@ -103,7 +107,7 @@ if __name__ == "__main__":
         Exchange(
             source="ATM",
             destination="LND",
-            field_names=["LHF", "SHF"],
+            field_names=["latent_heat_flux", "sensible_heat_flux"],
             regridder_factory=conservative,
         )
     )
@@ -115,15 +119,15 @@ if __name__ == "__main__":
     atm._finalize("JCM-output.nc")
 
     # Inspect a few fields
-    print("sst(OCN) mean:", np.nanmean(ocn.get("sst")))
-    print("sst(ATM) mean:", np.nanmean(atm.get("sst")))
-    print("TA2M mean:", np.nanmean(atm.get("TA2M")))
-    print("u10m mean:", np.nanmean(atm.get("u10m")))
-    print("v10m mean:", np.nanmean(atm.get("v10m")))
-    print("SOILM(LND) mean:", np.nanmean(lnd.get("SOILM")))
-    print("SOILM(ATM) mean:", np.nanmean(atm.get("SOILM")))
-    print("SHF(ATM) mean:", np.nanmean(atm.get("SHF")))
-    print("SHF(LND) mean:", np.nanmean(lnd.get("SHF")))
+    print("sst(OCN) mean:", np.nanmean(ocn.get("sea_surface_temperature")))
+    print("sst(ATM) mean:", np.nanmean(atm.get("sea_surface_temperature")))
+    print("TA2M mean:", np.nanmean(atm.get("temperature_2m")))
+    print("u10m mean:", np.nanmean(atm.get("u_velocity_10m")))
+    print("v10m mean:", np.nanmean(atm.get("v_velocity_10m")))
+    print("SOILM(LND) mean:", np.nanmean(lnd.get("soil_moisture")))
+    print("SOILM(ATM) mean:", np.nanmean(atm.get("soil_moisture")))
+    print("SHF(ATM) mean:", np.nanmean(atm.get("sensible_heat_flux")))
+    print("SHF(LND) mean:", np.nanmean(lnd.get("sensible_heat_flux")))
 
     fig, axs = plt.subplots(2, 2, figsize=(15, 10), layout="constrained")
 
@@ -132,19 +136,18 @@ if __name__ == "__main__":
     longitude_source_2d, latitude_source_2d = np.meshgrid(
         lon_atm, lat_atm, indexing="ij"
     )
-    scalar_source = atm.get("sst").T
-    u_source = atm.get("u10m").T
-    v_source = atm.get("v10m").T
+    scalar_source = atm.get("sea_surface_temperature").T
+    u_source = atm.get("u_velocity_10m").T
+    v_source = atm.get("v_velocity_10m").T
 
     lon_ocn = np.array(ocn.grid.longitude)
     lat_ocn = np.array(ocn.grid.latitude)
     longitude_target_2d, latitude_target_2d = np.meshgrid(
         lon_ocn, lat_ocn, indexing="ij"
     )
-    scalar_target = ocn.get("sst").T
-    u_target = ocn.get("u10m").T
-    v_target = ocn.get("v10m").T
-
+    scalar_target = ocn.get("sea_surface_temperature").T
+    u_target = ocn.get("u_velocity_10m").T
+    v_target = ocn.get("v_velocity_10m").T
     im = axs[0, 0].pcolormesh(
         longitude_source_2d,
         latitude_source_2d,

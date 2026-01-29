@@ -2,9 +2,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-
 from vercor.components import Component, ComponentForcingData
 from vercor.grid import RectilinearGrid
+
 
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
@@ -54,7 +54,9 @@ class ERA5Land(Component, ComponentForcingData):
 
         self._settings["apply_time_interpolation"] = True
 
-        self.data["skt"] = self._read_forcing("skt", where="surface")
+        self.data["land_surface_temperature"] = self._read_forcing(
+            "skt", where="surface"
+        )
 
     def initialize(self, coupler: "Coupler") -> None:
         pass

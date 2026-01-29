@@ -172,28 +172,31 @@ class Coupler:
                     f"Incorrect component name: {name}, must be ATM, OCN, LND, or ICE"
                 )
 
-            # Setup components' import/export field lists based on exchanges
-            for exchange in self.exchanges:
-                if exchange.source not in self.components:
-                    raise CouplerError(
-                        f"Source component '{exchange.source}' not registered in coupler"
-                    )
-                if exchange.destination not in self.components:
-                    raise CouplerError(
-                        f"Destination component '{exchange.destination}' not registered in coupler"
-                    )
+            self.logger.info(f" Initialized {name}")
 
-                source_component = self.components[exchange.source]
-                destination_component = self.components[exchange.destination]
+        # Setup components' import/export field lists based on exchanges
+        for exchange in self.exchanges:
+            if exchange.source not in self.components:
+                raise CouplerError(
+                    f"Source component '{exchange.source}' not registered in coupler"
+                )
+            if exchange.destination not in self.components:
+                raise CouplerError(
+                    f"Destination component '{exchange.destination}' not registered in coupler"
+                )
 
-                flattened_fields = _flatten_fields(exchange.field_names)
-                _append_unique(source_component._fields2export, flattened_fields)
-                _append_unique(destination_component._fields2import, flattened_fields)
+            source_component = self.components[exchange.source]
+            destination_component = self.components[exchange.destination]
 
+            flattened_fields = _flatten_fields(exchange.field_names)
+            _append_unique(source_component._fields2export, flattened_fields)
+            _append_unique(destination_component._fields2import, flattened_fields)
+
+        for name, component in self.components.items():
             component.check_not_empty_import_export_lists()
+            component.check_exchange_field_names()
             # Deposit initial data to be sent from component to coupler
             component.send_fields(self.clock.start, self)
-            self.logger.info(f" Initialized {name}")
 
         self._create_exchange_masks()
         self._validate_land_mask_consistency()
