@@ -120,13 +120,16 @@ class JAXGCM(Component):
         grid_shape = self.grid.shape
 
         zeros = np.zeros(grid_shape)
-        self.data["sea_surface_temperature"] = zeros + 273.15 + 15.0
-        self.data["land_surface_temperature"] = zeros
-        self.data["u_velocity_10m"] = zeros.copy()
-        self.data["v_velocity_10m"] = zeros.copy()
+        self.data["specific_humidity"] = zeros.copy()
+        self.data["net_shortwave_radiation_flux"] = zeros.copy()
+        self.data["downward_longwave_radiation_flux"] = zeros.copy()
+        self.data["sea_surface_temperature"] = zeros.copy() + 273.15 + 15.0
+        self.data["land_surface_temperature"] = zeros.copy()
+        self.data["u_velocity"] = zeros.copy()
+        self.data["v_velocity"] = zeros.copy()
+        self.data["temperature"] = zeros.copy()
         self.data["latent_heat_flux"] = zeros.copy()
         self.data["sensible_heat_flux"] = zeros.copy()
-        self.data["temperature_2m"] = zeros.copy()
         self._predictions_list = []
 
     def step(
@@ -177,12 +180,14 @@ class JAXGCM(Component):
             unwrap_leading_dims(stack_objects(_avg_predictions)), axis=0
         )
         p = _avg_predictions.physics
-        # d = _avg_predictions.dynamics
+        d = _avg_predictions.dynamics
 
         # All the heat and freshwater fluxes are positive upward
-        self.data["u_velocity_10m"] = np.array(p.surface_flux.u0).transpose()
-        self.data["v_velocity_10m"] = np.array(p.surface_flux.v0).transpose()
-        self.data["temperature_2m"] = np.array(p.surface_flux.t0).transpose()
+        self.data["u_velocity"] = np.array(d.u_wind[0, :, :]).transpose()
+        self.data["v_velocity"] = np.array(d.v_wind[0, :, :]).transpose()
+        self.data["temperature"] = np.array(d.temperature[0, :, :]).transpose()
+        self.data["specific_humidity"] = np.array(d.specific_humidity[0, :, :]).transpose()
+
         self.data["sensible_heat_flux"] = (
             np.array(p.surface_flux.shf).sum(axis=2).transpose()
         )

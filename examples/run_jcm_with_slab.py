@@ -77,9 +77,11 @@ if __name__ == "__main__":
             source="ATM",
             destination="OCN",
             field_names=[
-                ("u_velocity_10m", "v_velocity_10m"),
-                "sensible_heat_flux",
-                "latent_heat_flux",
+                ("u_velocity", "v_velocity"),
+                "specific_humidity",
+                "temperature",
+                "net_shortwave_radiation_flux",
+                "downward_longwave_radiation_flux",
             ],
             regridder_factory=bilinear,
         )
@@ -121,9 +123,11 @@ if __name__ == "__main__":
     # Inspect a few fields
     print("sst(OCN) mean:", np.nanmean(ocn.get("sea_surface_temperature")))
     print("sst(ATM) mean:", np.nanmean(atm.get("sea_surface_temperature")))
-    print("TA2M mean:", np.nanmean(atm.get("temperature_2m")))
-    print("u10m mean:", np.nanmean(atm.get("u_velocity_10m")))
-    print("v10m mean:", np.nanmean(atm.get("v_velocity_10m")))
+    print("temp mean:", np.nanmean(atm.get("temperature")))
+    print("u_velocity(ATM) mean:", np.nanmean(atm.get("u_velocity")))
+    print("v_velocity(ATM) mean:", np.nanmean(atm.get("v_velocity")))
+    print("u_velocity(OCN) mean:", np.nanmean(ocn.get("u_velocity")))
+    print("v_velocity(OCN) mean:", np.nanmean(ocn.get("v_velocity")))
     print("SOILM(LND) mean:", np.nanmean(lnd.get("soil_moisture")))
     print("SOILM(ATM) mean:", np.nanmean(atm.get("soil_moisture")))
     print("SHF(ATM) mean:", np.nanmean(atm.get("sensible_heat_flux")))
@@ -137,8 +141,8 @@ if __name__ == "__main__":
         lon_atm, lat_atm, indexing="ij"
     )
     scalar_source = atm.get("sea_surface_temperature").T
-    u_source = atm.get("u_velocity_10m").T
-    v_source = atm.get("v_velocity_10m").T
+    u_source = atm.get("u_velocity").T
+    v_source = atm.get("v_velocity").T
 
     lon_ocn = np.array(ocn.grid.longitude)
     lat_ocn = np.array(ocn.grid.latitude)
@@ -146,8 +150,8 @@ if __name__ == "__main__":
         lon_ocn, lat_ocn, indexing="ij"
     )
     scalar_target = ocn.get("sea_surface_temperature").T
-    u_target = ocn.get("u_velocity_10m").T
-    v_target = ocn.get("v_velocity_10m").T
+    u_target = ocn.get("u_velocity").T
+    v_target = ocn.get("v_velocity").T
     im = axs[0, 0].pcolormesh(
         longitude_source_2d,
         latitude_source_2d,

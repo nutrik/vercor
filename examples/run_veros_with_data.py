@@ -35,16 +35,6 @@ if __name__ == "__main__":
                 "density",
                 "potential_temperature",
                 "temperature",
-            ],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="OCN",
-            field_names=[
                 "net_shortwave_radiation_flux",
                 "downward_longwave_radiation_flux",
             ],
