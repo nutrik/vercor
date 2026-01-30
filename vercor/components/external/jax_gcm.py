@@ -150,12 +150,23 @@ class JAXGCM(Component):
             np.sum(self.data["sea_surface_temperature"] < 250.0),
         )
 
+        self.data["sea_surface_temperature"] = np.nan_to_num(
+            self.data["sea_surface_temperature"], nan=0.0
+        )
+        self.data["land_surface_temperature"] = np.nan_to_num(
+            self.data["land_surface_temperature"], nan=0.0
+        )
+
         self.data["sea_surface_temperature"][
             self.data["sea_surface_temperature"] < 250.0
         ] = 288.15
         self.data["land_surface_temperature"][
             self.data["land_surface_temperature"] < 250.0
         ] = 288.15
+
+        self.data["total_surface_temperature"] = (
+            self.data["land_surface_temperature"] + self.data["sea_surface_temperature"]
+        )
 
         forcing = self.forcing.copy(
             stl_am=jnp.asarray(self.data["land_surface_temperature"]).transpose(),
@@ -186,7 +197,9 @@ class JAXGCM(Component):
         self.data["u_velocity"] = np.array(d.u_wind[0, :, :]).transpose()
         self.data["v_velocity"] = np.array(d.v_wind[0, :, :]).transpose()
         self.data["temperature"] = np.array(d.temperature[0, :, :]).transpose()
-        self.data["specific_humidity"] = np.array(d.specific_humidity[0, :, :]).transpose()
+        self.data["specific_humidity"] = (
+            np.array(d.specific_humidity[0, :, :]).transpose() / 1000.0
+        )  # convert g/kg to kg/kg
 
         self.data["sensible_heat_flux"] = (
             np.array(p.surface_flux.shf).sum(axis=2).transpose()

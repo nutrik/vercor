@@ -39,8 +39,8 @@ def _append_unique(target: List[str], exchange_items: List[str]) -> None:
 def grids_identical(g0: RectilinearGrid, g1: RectilinearGrid) -> bool:
     return (
         g0.shape == g1.shape
-        and np.array_equal(g0.latitude, g1.latitude)
-        and np.array_equal(g0.longitude, g1.longitude)
+        and np.allclose(g0.latitude, g1.latitude, atol=1e-15)
+        and np.allclose(g0.longitude, g1.longitude, atol=1e-15)
     )
 
 

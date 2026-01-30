@@ -40,8 +40,8 @@ class ERA5Ocean(Component, ComponentForcingData):
         longitude = self._read_forcing("longitude", where="surface")
         latitude = self._read_forcing("latitude", where="surface")[::-1]
         fraction_mask = self._read_forcing("lsm", where="surface", flip_y=True).T[0, ::]
-        fraction_mask = 1 - fraction_mask
-        binary_mask = np.where(fraction_mask > 0.0, 1.0, 0.0)
+        fraction_mask = np.where(fraction_mask > 0.0, 1.0, 0.0)
+        binary_mask = 1 - fraction_mask
 
         self.grid = RectilinearGrid(
             name=f"{name.lower()}-grid",

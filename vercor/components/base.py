@@ -291,11 +291,11 @@ class Component(abc.ABC):
             self.outgoing_fields[fld] = (field2send, time, self.name)
 
     def check_exchange_field_names(self) -> None:
-        for field in set(self._fields2import + self._fields2export):
-            if field not in EXCHANGE_FIELD_NAMES:
+        for fld in set(self._fields2import + self._fields2export):
+            if fld not in EXCHANGE_FIELD_NAMES:
                 raise ComponentError(
-                    f"Field name '{field}' in component '{self.name}' is not a recognized exchange variable.\n"
-                    f"Replace field name '{field}' with one of the supported names: {EXCHANGE_FIELD_NAMES}"
+                    f"Field name '{fld}' in component '{self.name}' is not a recognized exchange variable.\n"
+                    f"Replace field name '{fld}' with one of the supported names: {EXCHANGE_FIELD_NAMES}"
                 )
 
     def get(self, field_name: str) -> NDArray:

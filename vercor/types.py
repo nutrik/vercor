@@ -9,6 +9,7 @@ if TYPE_CHECKING:
         SeaIce,
         ERA5Atmosphere,
         ERA5Land,
+        JCMLand,
         ERA5Ocean,
         ERAInterimOcean,
         JAXGCM,
@@ -17,6 +18,6 @@ if TYPE_CHECKING:
 
 
 type OceanType = Union[Ocean, ERA5Ocean, ERAInterimOcean, VerosGCM]
-type LandType = Union[Land, ERA5Land]
+type LandType = Union[Land, ERA5Land, JCMLand]
 type AtmosphereType = Union[Atmosphere, ERA5Atmosphere, JAXGCM]
 type AllComponentsType = Union[OceanType, LandType, AtmosphereType, SeaIce]

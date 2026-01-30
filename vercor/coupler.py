@@ -15,6 +15,7 @@ from vercor.components import (
     ERA5Land,
     ERA5Ocean,
     ERAInterimOcean,
+    JCMLand,
     Land,
     Ocean,
     Shared,
@@ -243,7 +244,11 @@ class Coupler:
         land, ocean, and atmosphere components.
         """
 
-        land_component = get_component(self.components, (Land, ERA5Land), "land")
+        do_not_check_mass = False
+
+        land_component = get_component(
+            self.components, (Land, ERA5Land, JCMLand), "land"
+        )
         atmosphere_component = get_component(
             self.components, (Atmosphere, ERA5Atmosphere, JAXGCM), "atmosphere"
         )
@@ -280,12 +285,24 @@ class Coupler:
         if regridder.interpolator is not None and isinstance(
             regridder.interpolator, ConservativeRectilinearRemapper
         ):
+
+            src_lat = regridder.interpolator.src_lat_b
+            dst_lat = regridder.interpolator.dst_lat_b
+            if src_lat[-1] != dst_lat[-1] and src_lat[0] != dst_lat[0]:
+                do_not_check_mass = True
+                self.logger.warning(
+                    "Warning: Skipping mass conservation check for regridding ocean mask to atmospheric grid "
+                    "due to different latitude bounds.\n"
+                )
+
             src_total_mass = regridder.interpolator.get_src_total_mass(ocean_bmask)
             dst_total_mass = regridder.interpolator.get_dst_total_mass(
                 self.ocn_fmask_on_atm_grid
             )
 
-            if not np.isclose(src_total_mass, dst_total_mass, atol=1e-6):
+            if not do_not_check_mass and not np.isclose(
+                src_total_mass, dst_total_mass, atol=1e-6
+            ):
                 raise RegridderError(
                     "Regridding ocean binary mask to atmospheric grid does not conserve total mass "
                     f"(source mass: {src_total_mass}, destination mass: {dst_total_mass})"
@@ -304,7 +321,9 @@ class Coupler:
             )
 
     def _validate_land_mask_consistency(self) -> None:
-        land_component = get_component(self.components, (Land, ERA5Land), "land")
+        land_component = get_component(
+            self.components, (Land, ERA5Land, JCMLand), "land"
+        )
         lnd_mask_from_component = land_component.grid.binary_mask
         if lnd_mask_from_component is not None:
             component_mask = np.asarray(lnd_mask_from_component)
