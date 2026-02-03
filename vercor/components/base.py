@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
-from vercor.tools import get_field_at_specific_time
+from vercor.tools import get_field_at_specific_time, get_time_slice
 from vercor.exchange import EXCHANGE_FIELD_NAMES
 
 
@@ -159,6 +159,10 @@ class Component(abc.ABC):
     One must implement necessary dimensions check and reshaping of fields
     during import/export if needed.
 
+    Common conventions for exchange fields:
+        - All fields must have SI units.
+        - Surface fluxes are positive downward and negative upward.
+
     Attributes:
         name: component name
         grid: component grid
@@ -285,6 +289,9 @@ class Component(abc.ABC):
             if self._settings.get("apply_time_interpolation", False):
                 # for data models with monthly means
                 field2send = get_field_at_specific_time(fld, self.data, coupler)
+            elif self._settings.get("get_time_slice", False):
+                # for data models with higher frequency data
+                field2send = get_time_slice(fld, self.data, time)
             else:
                 field2send = self.data[fld]
 

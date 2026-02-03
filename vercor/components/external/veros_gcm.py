@@ -28,8 +28,11 @@ def compute_fluxes(
     cs = component_state
     vs = cs._veros_state.variables
 
+    # u & v have Arakawa-C grid staggering in Veros
+    # require additional interpolation
     u_tgrid = 0.5 * (vs.u[1:, 2:-2, -1, vs.tau] + vs.u[:-1, 2:-2, -1, vs.tau])
     v_tgrid = 0.5 * (vs.v[2:-2, 1:, -1, vs.tau] + vs.v[2:-2, :-1, -1, vs.tau])
+
     temp = vs.temp[2:-2, 2:-2, -1, vs.tau].T + 273.15
 
     (
@@ -56,15 +59,13 @@ def compute_fluxes(
         cs.data["specific_humidity"],
         cs.data["density"],
         cs.data["temperature"],
-        # u & v have Arakawa-C grid staggering in Veros
-        # (need additional interpolation)
         u_tgrid[1:-2, :].T,
         v_tgrid[:, 1:-2].T,
         temp,
     )
 
     # Signs & directions convention in Veros
-    # Negative out:           LW_up ↑  SENf ↑  LATf ↑
+    # Negative out:        ↑  LW_up ↑  SENf ↑  LATf ↑
     # Positive in:  SW_net ↓  LW_dw ↓  SENf ↓  LATf ↓
 
     qnet = (
@@ -191,9 +192,13 @@ class VerosGCM(Component):
                 print(" " * 40 + f"Step {i+1} / {self.spinup_steps}", end="\r")
                 self._veros_state = self._step_function(self._veros_state)
 
-        self.data["sea_surface_temperature"] = self._veros_state.variables.temp[
-            2:-2, 2:-2, -1, self._veros_state.variables.tau
-        ].T
+        # Units: [K]
+        self.data["sea_surface_temperature"] = (
+            self._veros_state.variables.temp[
+                2:-2, 2:-2, -1, self._veros_state.variables.tau
+            ].T
+            + 273.15
+        )
 
     def step(
         self,
@@ -218,6 +223,7 @@ class VerosGCM(Component):
             print(" " * 40 + f"Veros sub-step {i+1} / {self.model_substeps}", end="\r")
             self._veros_state = self._step_function(self._veros_state)
 
+        # Units: [K]
         self.data["sea_surface_temperature"] = self._veros_state.variables.temp[
             2:-2, 2:-2, -1, self._veros_state.variables.tau
-        ].T
+        ].T + 273.15

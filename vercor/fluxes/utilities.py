@@ -74,7 +74,7 @@ def compute_levels_altitudes(
     Arguments:
         t (:obj:`ndarray`): Atmospheric temperture [K]
         q (:obj:`ndarray`): Atmospheric specific humidity [kg/kg]
-        ph (:obj:`ndarray`): Pressure at half model levels
+        ph (:obj:`ndarray`): Pressure at half model levels [Pa]
 
     Note:
         The top level of the atmosphere is excluded

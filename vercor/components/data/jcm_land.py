@@ -128,12 +128,14 @@ class JCMLand(Component, ComponentForcingData):
 
         super().__init__(name, grid=self.grid)
 
-        self._settings["apply_time_interpolation"] = True
+        self._settings["get_time_slice"] = True
 
+        # Units: [K]
         self.data["land_surface_temperature"] = self._read_forcing(
             "stl", where="surface"
-        ).T
-        self.data["soil_moisture"] = self._read_forcing("soilw_am", where="surface").T
+        )
+        # Units: [???]
+        self.data["soil_moisture"] = self._read_forcing("soilw_am", where="surface")
 
     def initialize(self, coupler: "Coupler") -> None:
         pass

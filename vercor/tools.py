@@ -140,9 +140,42 @@ def get_forcing_data(file_type: str) -> Path:
     return output[file_type]
 
 
+def get_time_slice(
+    field_name: str,
+    data: Dict[str, NDArray],
+    time: datetime,
+    no_leap: bool = True,
+) -> NDArray:
+    """Retrieve a field from a component data storage dictionary at a specific time index.
+
+    Arguments:
+        field_name: Name of the field to retrieve.
+        data: Dictionary containing the component data with time-dependent fields.
+        time: datetime object representing the time slice to retrieve.
+        no_leap: Whether to ignore leap days (Feb 29) when indexing.
+
+    Returns:
+        NDArray: The field data at the specified time index.
+    """
+
+    tm_yday = time.timetuple().tm_yday
+
+    # Disregard Feb 29 for leap years
+    year = time.year
+    leap = lambda x: (x % 4 == 0 and x % 100 != 0) or (x % 400 == 0)
+
+    if no_leap and leap(year) and tm_yday > 59:
+        tm_yday -= 1
+    time_index = tm_yday - 1
+
+    out: NDArray = data[field_name][time_index, ...]
+
+    return out
+
+
 def get_field_at_specific_time(
     field_name: str,
-    data: Dict,
+    data: Dict[str, NDArray],
     coupler: "Coupler",
     current_time: Optional[datetime] = None,
 ) -> NDArray:

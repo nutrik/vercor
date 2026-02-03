@@ -40,8 +40,8 @@ def old_flux_atmOcn(
         lat  (:obj:`ndarray`): heat flux: latent      (W/m^2)
         lwup (:obj:`ndarray`): heat flux: lw upward   (W/m^2)
         evap (:obj:`ndarray`): water flux: evap  ((kg/s)/m^2)
-        taux (:obj:`ndarray`): surface stress, zonal      (N)
-        tauy (:obj:`ndarray`): surface stress, maridional (N)
+        taux (:obj:`ndarray`): surface stress, zonal      (N/m^2) # original was typo - N
+        tauy (:obj:`ndarray`): surface stress, maridional (N/m^2) # original was typo - N
 
         tref (:obj:`ndarray`): diag:  2m ref height T     (K)
         qref (:obj:`ndarray`): diag:  2m ref humidity (kg/kg)
@@ -281,8 +281,8 @@ def new_flux_atmOcn(
         lat  (:obj:`ndarray`): heat flux: latent      (W/m^2)
         lwup (:obj:`ndarray`): heat flux: lw upward   (W/m^2)
         evap (:obj:`ndarray`): water flux: evap  ((kg/s)/m^2)
-        taux (:obj:`ndarray`): surface stress, zonal      (N)
-        tauy (:obj:`ndarray`): surface stress, maridional (N)
+        taux (:obj:`ndarray`): surface stress, zonal      (N/m^2) # original was typo - N
+        tauy (:obj:`ndarray`): surface stress, maridional (N/m^2) # original was typo - N
         tref (:obj:`ndarray`): diag:  2m ref height T     (K)
         qref (:obj:`ndarray`): diag:  2m ref humidity (kg/kg)
         duu10n(:obj:`ndarray`): diag: 10m wind speed squared (m/s)^2
@@ -569,8 +569,8 @@ def shr_flux_atmIce(
         lat  (:obj:`ndarray`): latent        heat flux  (W/m^2)
         lwup (:obj:`ndarray`): long-wave upward heat flux  (W/m^2)
         evap (:obj:`ndarray`): evaporative water flux ((kg/s)/m^2)
-        taux (:obj:`ndarray`): x surface stress (N)
-        tauy (:obj:`ndarray`): y surface stress (N)
+        taux (:obj:`ndarray`): x surface stress (N/m^2)  # original was typo - N
+        tauy (:obj:`ndarray`): y surface stress (N/m^2)  # original was typo - N
         tref (:obj:`ndarray`): 2m reference height temperature
         qref (:obj:`ndarray`): 2m reference height humidity
 

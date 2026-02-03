@@ -3,6 +3,12 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class VercorSettings:
+    # ------------------------- General settings ------------------------------------
+    apply_time_interpolation: bool = False  # Apply time interpolation to forcing data
+    get_time_slice: bool = (
+        False  # Get only the relevant time slice (daily) from forcing data
+    )
+    # -------------------------------------------------------------------------------
     identifier: str = "UNNAMED"  # Identifier of the current simulation
     output_frequency: int = 1  # Frequency of output in timesteps
     max_steps: int = 1000  # Maximum number of timesteps

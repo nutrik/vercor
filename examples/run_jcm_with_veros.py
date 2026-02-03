@@ -6,8 +6,8 @@ from jcm.model import Model
 from jcm.geometry import Geometry
 
 from vercor import Clock, Coupler, Exchange
-from vercor.components.data.era5_ocean import ERA5Ocean
 from vercor.components.data.jcm_land import JCMLand
+from vercor.components.external.veros_gcm import VerosGCM
 from vercor.components.external.jax_gcm import JAXGCM
 from vercor.components.external.jax_gcm_tools import (
     generate_jcm_forcing_and_topography_files,
@@ -17,7 +17,7 @@ from vercor.regridders import bilinear
 
 
 if __name__ == "__main__":
-    ocn = ERA5Ocean()
+    ocn = VerosGCM()
 
     # Read JCM topography file
     external_files = generate_jcm_forcing_and_topography_files(resolution=31)
@@ -51,6 +51,9 @@ if __name__ == "__main__":
             field_names=[
                 ("u_velocity", "v_velocity"),
                 "specific_humidity",
+                "model_level_height",
+                "density",
+                "potential_temperature",
                 "temperature",
                 "net_shortwave_radiation_flux",
                 "downward_longwave_radiation_flux",
@@ -89,3 +92,5 @@ if __name__ == "__main__":
     cpl.initialize()
     cpl.run()
     cpl.finalize()
+
+    atm._finalize("jcm_veros_output.nc")
