@@ -51,10 +51,10 @@ def create_new_jcm_lnd_mask(
     ):
         src_lat = regridder.interpolator.src_lat_b
         dst_lat = regridder.interpolator.dst_lat_b
-        if src_lat[-1] != dst_lat[-1] and src_lat[0] != dst_lat[0]:
+        if src_lat[-1] != dst_lat[-1] or src_lat[0] != dst_lat[0]:
             do_not_check_mass = True
             print(
-                "\nWarning: Skipping mass conservation check for regridding ocean mask to atmospheric grid "
+                "\nWARNING: Skipping mass conservation check for regridding ocean mask to atmospheric grid "
                 "due to different latitude bounds.\n"
             )
 

@@ -47,18 +47,23 @@ def grids_identical(g0: RectilinearGrid, g1: RectilinearGrid) -> bool:
 def get_component(
     allcomponents: Dict[str, AllComponentsType], types: Tuple[Any, ...], label: str
 ) -> AllComponentsType:
+    """Helper function to retrieve a registered component of a specific type
+    from the coupler's allcomponents dictionary."""
+
     components: List[AllComponentsType] = [
         component
         for component in allcomponents.values()
         if isinstance(component, types)
     ]
+
     if len(components) > 1:
-        names = ", ".join(component.name for component in components)
         raise CouplerError(
-            f"Multiple {label} components registered; only one supported (found: {names})"
+            f"Multiple {components[0].name} components registered; only one supported"
         )
+
     if not components:
         raise CouplerError(f"No {label} component registered")
+
     return components[0]
 
 
@@ -162,7 +167,7 @@ def get_time_slice(
 
     # Disregard Feb 29 for leap years
     year = time.year
-    leap = lambda x: (x % 4 == 0 and x % 100 != 0) or (x % 400 == 0)
+    leap = lambda x: (x % 4 == 0 and x % 100 != 0) or (x % 400 == 0)  # noqa: E731
 
     if no_leap and leap(year) and tm_yday > 59:
         tm_yday -= 1

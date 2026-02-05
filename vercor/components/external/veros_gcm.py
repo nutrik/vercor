@@ -137,8 +137,8 @@ class VerosGCM(Component):
     def __init__(
         self,
         name: str = "OCN",
-        do_spinup: bool = False,
         spinup_days: int = 2,
+        do_spinup: bool = False,
         jitted: bool = False,
     ) -> None:
         """
@@ -183,13 +183,14 @@ class VerosGCM(Component):
                 f"dt_tracer ({self.dt_tracer}) must be a multiple of dt ({dt_seconds})"
             )
 
+        # Initial spinup is performed with ERA-Interim (default) atmospheric forcing
         if self.do_spinup and "ATM" in coupler.run_sequence.order:
             # Do it similar to CESM spinup when coupling with atmosphere is on
-            print(
-                " " * 36 + f"Performing Veros spinup for {self.spinup_days} day(s)..."
+            coupler.logger.info(
+                f" Performing Veros spinup for {self.spinup_days} day(s)..."
             )
             for i in range(self.spinup_steps):
-                print(" " * 40 + f"Step {i+1} / {self.spinup_steps}", end="\r")
+                coupler.logger.info(f" Step {i+1} / {self.spinup_steps}")
                 self._veros_state = self._step_function(self._veros_state)
 
         # Units: [K]
@@ -220,10 +221,13 @@ class VerosGCM(Component):
             )
 
         for i in range(self.model_substeps):
-            print(" " * 40 + f"Veros sub-step {i+1} / {self.model_substeps}", end="\r")
+            coupler.logger.info(f" Veros sub-step {i+1} / {self.model_substeps}")
             self._veros_state = self._step_function(self._veros_state)
 
         # Units: [K]
-        self.data["sea_surface_temperature"] = self._veros_state.variables.temp[
-            2:-2, 2:-2, -1, self._veros_state.variables.tau
-        ].T + 273.15
+        self.data["sea_surface_temperature"] = (
+            self._veros_state.variables.temp[
+                2:-2, 2:-2, -1, self._veros_state.variables.tau
+            ].T
+            + 273.15
+        )

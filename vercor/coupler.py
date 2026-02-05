@@ -204,6 +204,7 @@ class Coupler:
         self.logger.info(" LND <--> ATM & OCN <--> ATM masks initialization complete")
 
         # Build regridders per (source component, destination component) pair
+        # initialize binary and fractional masks for each regridding pair
         for exchange in self.exchanges:
             key = (exchange.source, exchange.destination, exchange.interpolation_type)
 
@@ -268,11 +269,12 @@ class Coupler:
             atmosphere_component.grid,
         )
 
-        ocean_bmask = np.asarray(ocean_component.grid.binary_mask)
-        if ocean_bmask is None:
+        ocean_binary_mask = ocean_component.grid.binary_mask
+        if ocean_binary_mask is None:
             raise ComponentError(
                 f"Ocean component {ocean_component.name} has no binary mask defined"
             )
+        ocean_bmask = np.asarray(ocean_binary_mask)
 
         # Conservative remapping of binary mask to atmosphere grid
         # results to fractional mask on atmosphere grid
@@ -288,10 +290,10 @@ class Coupler:
 
             src_lat = regridder.interpolator.src_lat_b
             dst_lat = regridder.interpolator.dst_lat_b
-            if src_lat[-1] != dst_lat[-1] and src_lat[0] != dst_lat[0]:
+            if src_lat[-1] != dst_lat[-1] or src_lat[0] != dst_lat[0]:
                 do_not_check_mass = True
                 self.logger.warning(
-                    "Warning: Skipping mass conservation check for regridding ocean mask to atmospheric grid "
+                    "Skipping mass conservation check for regridding ocean mask to atmospheric grid "
                     "due to different latitude bounds.\n"
                 )
 

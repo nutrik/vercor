@@ -17,7 +17,7 @@ from vercor.regridders import bilinear
 
 
 if __name__ == "__main__":
-    ocn = VerosGCM()
+    ocn = VerosGCM(do_spinup=True)
 
     # Read JCM topography file
     external_files = generate_jcm_forcing_and_topography_files(resolution=31)
