@@ -128,7 +128,7 @@ class JCMLand(Component, ComponentForcingData):
 
         super().__init__(name, grid=self.grid)
 
-        self._settings["get_time_slice"] = True
+        self._settings["get_field_time_slice"] = True
 
         # Units: [K]
         self.data["land_surface_temperature"] = self._read_forcing(

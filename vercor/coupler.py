@@ -247,14 +247,12 @@ class Coupler:
 
         do_not_check_mass = False
 
-        land_component = get_component(
-            self.components, (Land, ERA5Land, JCMLand), "land"
-        )
+        land_component = get_component(self.components, (Land, ERA5Land, JCMLand))
         atmosphere_component = get_component(
-            self.components, (Atmosphere, ERA5Atmosphere, JAXGCM), "atmosphere"
+            self.components, (Atmosphere, ERA5Atmosphere, JAXGCM)
         )
         ocean_component = get_component(
-            self.components, (Ocean, ERA5Ocean, ERAInterimOcean, VerosGCM), "ocean"
+            self.components, (Ocean, ERA5Ocean, ERAInterimOcean, VerosGCM)
         )
 
         if not grids_identical(land_component.grid, atmosphere_component.grid):
@@ -323,9 +321,7 @@ class Coupler:
             )
 
     def _validate_land_mask_consistency(self) -> None:
-        land_component = get_component(
-            self.components, (Land, ERA5Land, JCMLand), "land"
-        )
+        land_component = get_component(self.components, (Land, ERA5Land, JCMLand))
         lnd_mask_from_component = land_component.grid.binary_mask
         if lnd_mask_from_component is not None:
             component_mask = np.asarray(lnd_mask_from_component)

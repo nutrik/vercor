@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 
 
 def _flatten_fields(
-    field_names: List[str | Tuple[str, str]],
-) -> List[str]:
-    flattened: List[str] = []
+    field_names: list[str | tuple[str, str]],
+) -> list[str]:
+    flattened: list[str] = []
     for item in field_names:
         if isinstance(item, tuple):
             flattened.extend(item)
@@ -26,12 +26,12 @@ def _flatten_fields(
     return flattened
 
 
-def _append_unique(target: List[str], exchange_items: List[str]) -> None:
+def _append_unique(target: list[str], exchange_items: list[str]) -> None:
     """
     Arguments:
-        target: List of field names in _fields2export & _fields2import
+        target: list of field names in _fields2export & _fields2import
                 in the component's exchange variable lists.
-        exchange_items: List of field names from exchange rules (exchanger).
+        exchange_items: list of field names from exchange rules (exchanger).
     """
     target.extend([item for item in exchange_items if item not in target])
 
@@ -45,12 +45,12 @@ def grids_identical(g0: RectilinearGrid, g1: RectilinearGrid) -> bool:
 
 
 def get_component(
-    allcomponents: Dict[str, AllComponentsType], types: Tuple[Any, ...], label: str
+    allcomponents: dict[str, AllComponentsType], types: tuple[Any, ...]
 ) -> AllComponentsType:
     """Helper function to retrieve a registered component of a specific type
     from the coupler's allcomponents dictionary."""
 
-    components: List[AllComponentsType] = [
+    components: list[AllComponentsType] = [
         component
         for component in allcomponents.values()
         if isinstance(component, types)
@@ -62,14 +62,14 @@ def get_component(
         )
 
     if not components:
-        raise CouplerError(f"No {label} component registered")
+        raise CouplerError(f"No component of types ({types}) registered")
 
     return components[0]
 
 
 def get_periodic_interval(
     current_time: float, cycle_length: float, rec_spacing: float, n_rec: int
-) -> Tuple[Tuple[NDArray, NDArray], Tuple[NDArray, NDArray]]:
+) -> tuple[tuple[NDArray, NDArray], tuple[NDArray, NDArray]]:
     """
     Ported from Veros: https://github.com/team-ocean/veros/blob/main/veros/tools/setup.py#L88
 
@@ -102,7 +102,7 @@ def get_periodic_interval(
 
     """
     current_time = current_time % cycle_length
-    # using npx.array works with both NumPy and JAX
+    # use np.array to compute integer indices for the time records
     t_idx_1 = np.array(current_time // rec_spacing, dtype="int")
     t_idx_2 = np.array((1 + t_idx_1) % n_rec, dtype="int")
     weight_2 = (current_time - rec_spacing * t_idx_1) / rec_spacing
@@ -142,16 +142,28 @@ def get_forcing_data(file_type: str) -> Path:
         ).resolve(),
     }
 
+    if file_type not in output:
+        allowed = ", ".join(sorted(output.keys()))
+        raise CouplerError(
+            f"Unknown file_type '{file_type}'. Allowed values are: {allowed}"
+        )
+
     return output[file_type]
 
 
-def get_time_slice(
+def is_leap_year(x: int) -> bool:
+    return (x % 4 == 0 and x % 100 != 0) or (x % 400 == 0)
+
+
+def get_field_time_slice(
     field_name: str,
-    data: Dict[str, NDArray],
+    data: dict[str, NDArray],
     time: datetime,
     no_leap: bool = True,
 ) -> NDArray:
-    """Retrieve a field from a component data storage dictionary at a specific time index.
+    """Retrieve a field from a component data storage dictionary at a specific time index
+    without applying time interpolation. The time index is determined based on the day of the year,
+    with an option to ignore leap days (Feb 29) for leap years.
 
     Arguments:
         field_name: Name of the field to retrieve.
@@ -167,9 +179,8 @@ def get_time_slice(
 
     # Disregard Feb 29 for leap years
     year = time.year
-    leap = lambda x: (x % 4 == 0 and x % 100 != 0) or (x % 400 == 0)  # noqa: E731
 
-    if no_leap and leap(year) and tm_yday > 59:
+    if no_leap and is_leap_year(year) and tm_yday > 59:
         tm_yday -= 1
     time_index = tm_yday - 1
 
@@ -180,7 +191,7 @@ def get_time_slice(
 
 def get_field_at_specific_time(
     field_name: str,
-    data: Dict[str, NDArray],
+    data: dict[str, NDArray],
     coupler: "Coupler",
     current_time: Optional[datetime] = None,
 ) -> NDArray:
@@ -208,9 +219,9 @@ def get_field_at_specific_time(
         n_rec=12,
     )
 
-    # Use transpose to have (lat, lon) ordering
-    out: NDArray = (
-        f1 * data[f"{field_name}"][..., n1] + f2 * data[f"{field_name}"][..., n2]
-    ).transpose()
+    arr = data[field_name]
+
+    # Use swapaxes to have (lat, lon) ordering
+    out: NDArray = (f1 * arr[..., n1] + f2 * arr[..., n2]).swapaxes(-2, -1)
 
     return out

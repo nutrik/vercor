@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class VercorSettings:
     # ------------------------- General settings ------------------------------------
     apply_time_interpolation: bool = False  # Apply time interpolation to forcing data
-    get_time_slice: bool = (
+    get_field_time_slice: bool = (
         False  # Get only the relevant time slice (daily) from forcing data
     )
     # -------------------------------------------------------------------------------
