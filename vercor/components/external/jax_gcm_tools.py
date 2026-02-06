@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, List, Dict, Optional
+from typing import Any, Optional
 import subprocess
 import os
 import sys
@@ -168,7 +168,7 @@ def generate_jcm_geometry_from_orography(
 def generate_jcm_forcing_and_topography_files(
     resolution: int,
     data_directory: Optional[Path] = None,
-) -> Dict[str, Path]:
+) -> dict[str, Path]:
 
     import jcm
 
@@ -196,8 +196,8 @@ def generate_jcm_forcing_and_topography_files(
     )
 
     def check_if_file_exist(
-        file_dict: Dict[str, Path], verbose: bool = True
-    ) -> Dict[Path, bool]:
+        file_dict: dict[str, Path], verbose: bool = True
+    ) -> dict[Path, bool]:
 
         file_status = {file: Path(file).exists() for _, file in file_dict.items()}
 
@@ -245,7 +245,7 @@ def generate_jcm_forcing_and_topography_files(
 
 def mean_leaf(
     tree: Any,
-    axis: int | List[int],
+    axis: int | list[int],
 ) -> Any:
     """
     A tool function that does the jnp.mean to leaf nodes.
@@ -281,7 +281,7 @@ def unwrap_leading_dims(
 
 
 def stack_objects(
-    objs: List[Any],
+    objs: list[Any],
 ) -> Any:
     """
     A tool function that stack dataclasses together.
@@ -298,7 +298,7 @@ def stack_objects(
 
 
 def concat_objects(
-    objs: List[Any],
+    objs: list[Any],
     axis: int,
 ) -> Any:
     """

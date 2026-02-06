@@ -1,4 +1,3 @@
-from typing import Tuple
 import numpy as np
 from numpy.typing import NDArray
 
@@ -19,7 +18,7 @@ def old_flux_atmOcn(
     us: NDArray,
     vs: NDArray,
     ts: NDArray,
-) -> Tuple[NDArray, ...]:
+) -> tuple[NDArray, ...]:
     """atm/ocn fluxes calculation
 
     Arguments:
@@ -240,7 +239,7 @@ def new_flux_atmOcn(
     ts: NDArray,
     use_coldair_outbreak_mod: bool = False,
     missval: float = 0.0,
-) -> Tuple[NDArray, ...]:
+) -> tuple[NDArray, ...]:
     """
     Atm-Ocean flux calculation
 
@@ -547,7 +546,7 @@ def shr_flux_atmIce(
     tbot: NDArray,
     ts: NDArray,
     missval: float = 0.0,
-) -> Tuple[NDArray, ...]:
+) -> tuple[NDArray, ...]:
     """
     Atm-SeaIce flux calculation
 

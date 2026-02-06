@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass
 class VercorSettings:
     # ------------------------- General settings ------------------------------------
     apply_time_interpolation: bool = False  # Apply time interpolation to forcing data

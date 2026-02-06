@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List
 
 import numpy as np
 
@@ -21,7 +20,7 @@ if __name__ == "__main__":
 
     # Coupler
     cpl = Coupler(clock=clock)
-    components: List[ERA5Atmosphere | ERAInterimOcean | ERA5Land] = [atm, ocn, lnd]
+    components: list[ERA5Atmosphere | ERAInterimOcean | ERA5Land] = [atm, ocn, lnd]
     for component in components:
         cpl.register(component)
 

@@ -4,19 +4,19 @@ class CouplerError(Exception):
     pass
 
 
-class ComponentError(Exception):
+class ComponentError(CouplerError):
     """Base class for exceptions inside individual components."""
 
     pass
 
 
-class RegridderError(Exception):
+class RegridderError(CouplerError):
     """Base class for exceptions during regridding operations."""
 
     pass
 
 
-class ExchangerError(Exception):
+class ExchangerError(CouplerError):
     """Base class for exceptions during data exchange between components."""
 
     pass

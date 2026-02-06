@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import numpy as np
 from numpy.typing import NDArray
 
@@ -17,7 +15,7 @@ def bulkf_formula_lanl(
     tsf: NDArray,
     ocn_mask: NDArray,
     iceornot: NDArray,
-) -> Tuple[
+) -> tuple[
     NDArray,
     NDArray,
     NDArray,

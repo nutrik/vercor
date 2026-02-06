@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Callable, List, Tuple, Union
+from typing import Callable, Union
 
 from vercor.grid import Grid
 from vercor.regridders.bilinear import BilinearRectilinearRegridder
@@ -35,7 +35,7 @@ class Exchange:
     source: str
     destination: str
     name: str = field(init=False)
-    field_names: List[Union[str, Tuple[str, str]]]
+    field_names: list[Union[str, tuple[str, str]]]
     regridder_factory: Callable[
         ..., BilinearRectilinearRegridder | ConservativeRectilinearRegridder
     ]

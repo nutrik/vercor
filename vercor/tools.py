@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Mapping
 
 import numpy as np
 from numpy.typing import NDArray
@@ -157,7 +157,7 @@ def is_leap_year(x: int) -> bool:
 
 def get_field_time_slice(
     field_name: str,
-    data: dict[str, NDArray],
+    data: Mapping[str, NDArray],
     time: datetime,
     no_leap: bool = True,
 ) -> NDArray:
@@ -191,7 +191,7 @@ def get_field_time_slice(
 
 def get_field_at_specific_time(
     field_name: str,
-    data: dict[str, NDArray],
+    data: Mapping[str, NDArray],
     coupler: "Coupler",
     current_time: Optional[datetime] = None,
 ) -> NDArray:

@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from logging import Logger
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -62,22 +62,22 @@ class Coupler:
     clock: Clock
     logger: Logger = field(default_factory=setup_logger)
     run_sequence: RunSequence = field(init=False)
-    components: Dict[
+    components: dict[
         str,
         AllComponentsType,
     ] = field(default_factory=dict)
-    exchanges: List[Exchange] = field(default_factory=list)
+    exchanges: list[Exchange] = field(default_factory=list)
     settings: VercorSettings = field(default_factory=VercorSettings)
     ocn_bmask_on_atm_grid: NDArray = field(init=False)
     lnd_bmask_on_atm_grid: NDArray = field(init=False)
     ocn_fmask_on_atm_grid: NDArray = field(init=False)
     lnd_fmask_on_atm_grid: NDArray = field(init=False)
-    _regridders: Dict[
-        Tuple[str, str, str],
+    _regridders: dict[
+        tuple[str, str, str],
         BilinearRectilinearRegridder | ConservativeRectilinearRegridder,
     ] = field(default_factory=dict)
-    _binary_masks: Dict[Tuple[str, str, str], NDArray] = field(default_factory=dict)
-    _fractional_masks: Dict[Tuple[str, str, str], NDArray] = field(default_factory=dict)
+    _binary_masks: dict[tuple[str, str, str], NDArray] = field(default_factory=dict)
+    _fractional_masks: dict[tuple[str, str, str], NDArray] = field(default_factory=dict)
 
     """
     Main coupler class to manage components and exchanges between them.

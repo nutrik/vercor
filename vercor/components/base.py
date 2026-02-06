@@ -2,7 +2,7 @@ import abc
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import h5netcdf
 import numpy as np
@@ -48,7 +48,7 @@ class TimedNamedArray:
 
 @dataclass
 class Shared:
-    _fields: Dict[str, TimedNamedArray] = field(default_factory=dict, init=False)
+    _fields: dict[str, TimedNamedArray] = field(default_factory=dict, init=False)
 
     def _assign_field(self, name: str, value: Any) -> None:
         # internal attributes
@@ -124,19 +124,19 @@ class Shared:
         return len(self._fields) == 0
 
     @property
-    def field_names(self) -> List[str]:
+    def field_names(self) -> list[str]:
         """Return a list of all field names in the Shared object."""
         return list(self._fields.keys())
 
-    def fields(self) -> Dict[str, NDArray]:
+    def fields(self) -> dict[str, NDArray]:
         """Return a dictionary of all fields' data arrays."""
         return {k: v.data for k, v in self._fields.items()}
 
-    def timestamps(self) -> Dict[str, datetime]:
+    def timestamps(self) -> dict[str, datetime]:
         """Return a dictionary of all fields' timestamps."""
         return {k: v.timestamp for k, v in self._fields.items()}
 
-    def component_names(self) -> Dict[str, str]:
+    def component_names(self) -> dict[str, str]:
         """Return a dictionary of all fields' component names."""
         return {k: v.component_name for k, v in self._fields.items()}
 
@@ -147,10 +147,10 @@ class Component(abc.ABC):
     grid: RectilinearGrid
     incoming_fields: Shared = field(default_factory=Shared)
     outgoing_fields: Shared = field(default_factory=Shared)
-    data: Dict[str, NDArray] = field(default_factory=dict)
-    _fields2import: List[str] = field(default_factory=list)
-    _fields2export: List[str] = field(default_factory=list)
-    _settings: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, NDArray] = field(default_factory=dict)
+    _fields2import: list[str] = field(default_factory=list)
+    _fields2export: list[str] = field(default_factory=list)
+    _settings: dict[str, Any] = field(default_factory=dict)
     """A component's default grid dimensions are (nTime, nLev, nLon, nLat)
 
     Some components may have different dimensions, e.g., sea-ice (nTime, nLon, nLat) or
@@ -376,7 +376,7 @@ class Component(abc.ABC):
 
 class ComponentForcingData:
     def __init__(self) -> None:
-        self.DATA_FILES: Dict[str, str] = {}
+        self.DATA_FILES: dict[str, str] = {}
 
     def _read_forcing(self, variable: str, where: str, flip_y: bool = False) -> NDArray:
         """Read a variable from the specified forcing file.

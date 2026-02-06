@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Iterator, Tuple
+from typing import Iterator
 
 
 @dataclass
@@ -9,7 +9,7 @@ class Clock:
     dt_seconds: float
     steps: int
 
-    def iter(self) -> Iterator[Tuple[int, datetime, timedelta]]:
+    def iter(self) -> Iterator[tuple[int, datetime, timedelta]]:
         """
         Iterator over simulation time steps.
 

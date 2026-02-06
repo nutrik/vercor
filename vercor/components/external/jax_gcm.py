@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import jax
 import jax.numpy as jnp
@@ -55,7 +55,7 @@ class JCMState:
 class JAXGCM(Component):
     """JCM Wrapper"""
 
-    _predictions_list: List
+    _predictions_list: list
 
     def __init__(
         self,
@@ -87,10 +87,10 @@ class JAXGCM(Component):
 
     def _generate_step_function(
         self, jitted: bool = True
-    ) -> Callable[[JCMState, ForcingData, jdt.Datetime], Tuple[JCMState, Predictions]]:
+    ) -> Callable[[JCMState, ForcingData, jdt.Datetime], tuple[JCMState, Predictions]]:
         def step_function(
             state: JCMState, forcing: ForcingData, t: jdt.Datetime
-        ) -> Tuple[JCMState, Predictions]:
+        ) -> tuple[JCMState, Predictions]:
             new_atm_modal_state, predictions = self.model.run_from_state(
                 initial_state=state.metadata,
                 save_interval=self.save_interval / timedelta(days=1),
