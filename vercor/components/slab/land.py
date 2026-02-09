@@ -17,7 +17,7 @@ class Land(Component):
     Inputs: latent_heat_flux (proxy for evaporation)
     """
 
-    def __init__(self, name: str, grid: RectilinearGrid) -> None:
+    def __init__(self, grid: RectilinearGrid, name: str = "LND") -> None:
         super().__init__(name, grid)
 
     def initialize(self, coupler: "Coupler") -> None:

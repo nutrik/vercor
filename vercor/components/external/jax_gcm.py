@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 
 import jax
 import jax.numpy as jnp
-import jax_datetime as jdt
 import numpy as np
 import tree_math
 import xarray as xr
 
 from dinosaur import primitive_equations
 from jcm.constants import p0
+from jcm.geometry import Geometry
 from jcm.forcing import default_forcing
 from jcm.model import ForcingData, Model, Predictions
 from jcm.physics.speedy.physics_data import PhysicsData
@@ -30,14 +30,10 @@ from vercor.fluxes.utilities import (
     compute_potential_temperature,
 )
 from vercor.grid import RectilinearGrid
-from vercor.settings import VercorSettings
 
 
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
-
-
-latent_heat_of_vaporization = VercorSettings.latvap
 
 
 def asfloat64(tree: Any) -> Any:
@@ -55,29 +51,41 @@ class JCMState:
 class JAXGCM(Component):
     """JCM Wrapper"""
 
-    _predictions_list: list
+    _predictions_list: list[Predictions]
+    _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, Predictions]]
+    _state: JCMState
+    forcing: ForcingData
 
     def __init__(
         self,
-        name: str,
-        model: Model,
-        coupling_timestep: timedelta = timedelta(days=1),
+        geometry: Geometry,
+        name: str = "ATM",
+        forcing_data: Optional[ForcingData] = None,
+        model_timestep: timedelta = timedelta(days=1),
         save_interval: timedelta = timedelta(hours=24),
+        spinup_time: timedelta = timedelta(days=2),
+        do_spinup: bool = False,
         jitted: bool = True,
     ) -> None:
 
-        self.model = model
-        self.coupling_timestep = coupling_timestep
+        self.model = Model(geometry=geometry)
+        self.forcing_data = forcing_data
+        self.model_timestep = model_timestep
         self.save_interval = save_interval
+        self.spinup_time = spinup_time
+        self.spinup_steps = int(
+            spinup_time.total_seconds() // model_timestep.total_seconds()
+        )
+        self.do_spinup = do_spinup
         self.jitted = jitted
 
-        hgrid = model.coords.horizontal
+        hgrid = self.model.coords.horizontal
         grid = RectilinearGrid(
             name=name,
             longitude=np.rad2deg(hgrid.longitudes),
             latitude=np.rad2deg(hgrid.latitudes),
             binary_mask=np.ones_like(
-                model.geometry.fmask
+                self.model.geometry.fmask
             ).transpose(),  # This is used for interpolation, which all points are valid
         )
 
@@ -87,9 +95,9 @@ class JAXGCM(Component):
 
     def _generate_step_function(
         self, jitted: bool = True
-    ) -> Callable[[JCMState, ForcingData, jdt.Datetime], tuple[JCMState, Predictions]]:
+    ) -> Callable[[JCMState, ForcingData], tuple[JCMState, Predictions]]:
         def step_function(
-            state: JCMState, forcing: ForcingData, t: jdt.Datetime
+            state: JCMState, forcing: ForcingData
         ) -> tuple[JCMState, Predictions]:
             new_atm_modal_state, predictions = self.model.run_from_state(
                 initial_state=state.metadata,
@@ -111,7 +119,38 @@ class JAXGCM(Component):
 
         return jax.jit(step_function) if jitted else step_function
 
+    def do_jcm_steps(self) -> tuple[Any, Any]:
+        _avg_predictions = []
+
+        for _ in range(self.model_substeps):
+
+            _new_state, _predictions = self._step_function(
+                self._state,
+                self.forcing,
+            )
+
+            self._state = _new_state
+
+            _avg_predictions.append(_predictions)
+
+            self._predictions_list.append(_predictions)
+
+        _avg_predictions = mean_leaf(
+            unwrap_leading_dims(stack_objects(_avg_predictions)), axis=0
+        )
+
+        return _avg_predictions.physics, _avg_predictions.dynamics
+
     def initialize(self, coupler: "Coupler") -> None:
+        self.coupling_timestep = timedelta(seconds=coupler.clock.dt_seconds)
+        self.model_substeps = int(self.coupling_timestep // self.model_timestep)
+
+        if self.coupling_timestep % self.model_timestep != timedelta(days=0):
+            raise ValueError(
+                f"model_timestep ({self.model_timestep}) must be a "
+                f"multiple of coupling_timestep ({self.coupling_timestep})"
+            )
+
         _modal_state = self.model._prepare_initial_modal_state()
         self._state = JCMState(
             metadata=_modal_state,
@@ -122,9 +161,13 @@ class JAXGCM(Component):
             prog=dynamics_state_to_physics_state(_modal_state, self.model.primitive),
         )
 
-        self.forcing = default_forcing(self.model.coords.horizontal).copy(
-            lfluxland=True
-        )
+        if self.forcing_data is not None:
+            self.forcing = self.forcing_data
+        else:
+            self.forcing = default_forcing(self.model.coords.horizontal).copy(
+                lfluxland=True
+            )
+
         self._step_function = self._generate_step_function(jitted=self.jitted)
 
         grid_shape = self.grid.shape
@@ -143,6 +186,38 @@ class JAXGCM(Component):
         self.data["latent_heat_flux"] = zeros.copy()
         self.data["sensible_heat_flux"] = zeros.copy()
         self.data["model_level_height"] = zeros.copy()
+
+        self._predictions_list = []
+
+        if self.do_spinup and "OCN" in coupler.run_sequence.order:
+            self.data["sea_surface_temperature"] = np.nan_to_num(
+                self.data["sea_surface_temperature"], nan=0.0
+            )
+            self.data["land_surface_temperature"] = np.nan_to_num(
+                self.data["land_surface_temperature"], nan=0.0
+            )
+
+            self.data["sea_surface_temperature"][
+                self.data["sea_surface_temperature"] < 250.0
+            ] = 288.15
+            self.data["land_surface_temperature"][
+                self.data["land_surface_temperature"] < 250.0
+            ] = 288.15
+
+            self.forcing = self.forcing.copy(
+                stl_am=jnp.asarray(self.data["land_surface_temperature"]).transpose(),
+                sea_surface_temperature=jnp.asarray(
+                    self.data["sea_surface_temperature"]
+                ).transpose(),
+            )
+            coupler.logger.info(
+                f" Performing JCM spinup for {self.spinup_time} day(s)..."
+            )
+            for i in range(self.spinup_steps):
+                coupler.logger.info(f" JCM spinup step {i+1} / {self.spinup_steps}")
+                _, _ = self.do_jcm_steps()
+
+        # Exclude spinup steps from the final output
         self._predictions_list = []
 
     def step(
@@ -152,12 +227,6 @@ class JAXGCM(Component):
         coupler: "Coupler",
     ) -> None:
         settings = coupler.settings
-
-        N = dt / self.coupling_timestep
-        if N % 1 != 0:
-            raise ValueError(
-                f"dt={str(dt)} must be an integer multiple of coupling_timestep={str(self.coupling_timestep)}."
-            )
 
         print(
             "Mean of SST: ",
@@ -187,30 +256,14 @@ class JAXGCM(Component):
             self.data["land_surface_temperature"] + self.data["sea_surface_temperature"]
         )
 
-        forcing = self.forcing.copy(
+        self.forcing = self.forcing.copy(
             stl_am=jnp.asarray(self.data["land_surface_temperature"]).transpose(),
             sea_surface_temperature=jnp.asarray(
                 self.data["sea_surface_temperature"]
             ).transpose(),
         )
 
-        _avg_predictions = []
-        N = int(N)
-        for _ in range(N):
-            _new_state, _predictions = self._step_function(
-                self._state,
-                forcing,
-                jdt.to_datetime(time.strftime("%Y-%m-%d %H:%M:%S")),
-            )
-            self._state = _new_state
-            _avg_predictions.append(_predictions)
-            self._predictions_list.append(_predictions)
-
-        _avg_predictions = mean_leaf(
-            unwrap_leading_dims(stack_objects(_avg_predictions)), axis=0
-        )
-        p = _avg_predictions.physics
-        d = _avg_predictions.dynamics
+        p, d = self.do_jcm_steps()
 
         # !!! All the heat and freshwater fluxes are positive upward !!!
         # Units: [m/s]
@@ -233,7 +286,7 @@ class JAXGCM(Component):
         )
         # Units: [W/m²]
         self.data["latent_heat_flux"] = -(
-            np.array(p.surface_flux.evap / 1e3 * latent_heat_of_vaporization)
+            np.array(p.surface_flux.evap / 1e3 * settings.latvap)
             .sum(axis=2)
             .transpose()
         )

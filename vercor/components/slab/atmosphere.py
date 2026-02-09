@@ -17,7 +17,7 @@ class Atmosphere(Component):
     Outputs: sensible_heat_flux [W/m2], latent_heat_flux [W/m2], temperature_2m [K]
     """
 
-    def __init__(self, name: str, grid: RectilinearGrid) -> None:
+    def __init__(self, grid: RectilinearGrid, name: str = "ATM") -> None:
         super().__init__(name, grid)
 
     def initialize(self, coupler: "Coupler") -> None:

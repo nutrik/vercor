@@ -3,7 +3,6 @@ from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 
-from jcm.model import Model
 from jcm import geometry
 
 from vercor import Clock, Coupler, Exchange
@@ -24,7 +23,7 @@ if __name__ == "__main__":
     geometry = geometry.Geometry.from_file(external_files["terrain"])
 
     # Build components
-    atm = JAXGCM("ATM", Model(geometry=geometry), jitted=True)
+    atm = JAXGCM(geometry, jitted=True)
 
     ocn_binary_mask = np.where(geometry.fmask < 1, 1, 0).transpose()
     lnd_binary_mask = 1 - ocn_binary_mask
@@ -44,8 +43,8 @@ if __name__ == "__main__":
         binary_mask=ocn_binary_mask,
     )
 
-    ocn = Ocean("OCN", ocn_grid)
-    lnd = Land("LND", lnd_grid)
+    ocn = Ocean(ocn_grid)
+    lnd = Land(lnd_grid)
 
     if atm.grid.binary_mask is not None:
         print("Total number of grids = ", atm.grid.binary_mask.size)

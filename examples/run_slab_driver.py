@@ -28,10 +28,10 @@ if __name__ == "__main__":
     lnd_grid = make_rectilinear_grid("lnd-grid", 128, 64, 0.0, 360.0, -90.0, 90.0)
 
     # Build components
-    atm = Atmosphere("ATM", atm_grid)
-    ocn = Ocean("OCN", ocn_grid)
-    ice = SeaIce("ICE", ice_grid)
-    lnd = Land("LND", lnd_grid)
+    atm = Atmosphere(atm_grid)
+    ocn = Ocean(ocn_grid)
+    ice = SeaIce(ice_grid)
+    lnd = Land(lnd_grid)
 
     # Clock and sequence
     clock = Clock(start=datetime(2025, 1, 1, 0, 0, 0), dt_seconds=3600, steps=24)

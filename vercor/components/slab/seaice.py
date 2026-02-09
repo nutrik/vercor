@@ -17,7 +17,7 @@ class SeaIce(Component):
     Inputs: sea_surface_temperature [K]
     """
 
-    def __init__(self, name: str, grid: RectilinearGrid) -> None:
+    def __init__(self, grid: RectilinearGrid, name: str = "ICE") -> None:
         super().__init__(name, grid)
 
     def initialize(self, coupler: "Coupler") -> None:

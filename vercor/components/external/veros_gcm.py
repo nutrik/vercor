@@ -137,7 +137,7 @@ class VerosGCM(Component):
     def __init__(
         self,
         name: str = "OCN",
-        spinup_days: int = 2,
+        spinup_time: timedelta = timedelta(days=2),
         do_spinup: bool = False,
         jitted: bool = False,
     ) -> None:
@@ -155,13 +155,12 @@ class VerosGCM(Component):
             state, jitted=jitted, step=self.model.step
         )
 
-        seconds_per_day = 86400.0
         self.do_spinup = do_spinup
-        self.spinup_days = spinup_days
+        self.spinup_time = spinup_time
         self.jitted = jitted
 
         self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
-        self.spinup_steps = int(seconds_per_day * self.spinup_days // self.dt_tracer)
+        self.spinup_steps = int(self.spinup_time.total_seconds() // self.dt_tracer)
 
         mask = np.where(self._veros_state.variables.maskT[:, :, -1] > 0.0, 1.0, 0.0)
 
@@ -187,7 +186,7 @@ class VerosGCM(Component):
         if self.do_spinup and "ATM" in coupler.run_sequence.order:
             # Do it similar to CESM spinup when coupling with atmosphere is on
             coupler.logger.info(
-                f" Performing Veros spinup for {self.spinup_days} day(s)..."
+                f" Performing Veros spinup for {self.spinup_time} day(s)..."
             )
             for i in range(self.spinup_steps):
                 coupler.logger.info(f" Step {i+1} / {self.spinup_steps}")

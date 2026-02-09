@@ -2,8 +2,8 @@ from datetime import datetime
 
 import numpy as np
 
-from jcm.model import Model
 from jcm.geometry import Geometry
+from jcm.forcing import ForcingData
 
 from vercor import Clock, Coupler, Exchange
 from vercor.components.data.jcm_land import JCMLand
@@ -22,6 +22,7 @@ if __name__ == "__main__":
     # Read JCM topography file
     external_files = generate_jcm_forcing_and_topography_files(resolution=31)
     geometry = Geometry.from_file(external_files["terrain"])
+    forcing = ForcingData.from_file(external_files["forcing"])
 
     lnd = JCMLand(ocn.grid, external_files["forcing"])
 
@@ -29,7 +30,12 @@ if __name__ == "__main__":
     geometry.fmask = np.array(lnd.grid.binary_mask).T  # type: ignore
 
     # Build components
-    atm = JAXGCM("ATM", Model(geometry=geometry), jitted=True)
+    atm = JAXGCM(
+        geometry,
+        forcing_data=forcing,
+        do_spinup=True,
+        jitted=True,
+    )
 
     # Clock and sequence
     clock = Clock(start=datetime(2025, 1, 1, 0, 0, 0), dt_seconds=86400.0, steps=10)

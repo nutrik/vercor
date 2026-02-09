@@ -17,7 +17,9 @@ class Ocean(Component):
     Inputs: sensible_heat_flux, latent_heat_flux
     """
 
-    def __init__(self, name: str, grid: RectilinearGrid, H: float = 30.0) -> None:
+    def __init__(
+        self, grid: RectilinearGrid, name: str = "OCN", H: float = 30.0
+    ) -> None:
         super().__init__(name, grid)
 
         self.H = H  # mixed-layer depth [m]
