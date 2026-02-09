@@ -53,7 +53,7 @@ def compute_pressure_levels(
     return pressure_levels
 
 
-def hypsometric_altitude(
+def get_altitudes_sigma_levels(
     temperature: jnp.ndarray,
     pressure: jnp.ndarray,
     specific_humidity: jnp.ndarray,

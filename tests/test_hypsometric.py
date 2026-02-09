@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from vercor.components.external.jax_gcm import hypsometric_altitude
+from vercor.components.external.jax_gcm import get_altitudes_sigma_levels
 
 
 def _to_jax_numpy(x: jnp.ndarray) -> jnp.ndarray:
@@ -29,7 +29,7 @@ def test_shapes_and_floating_dtype() -> None:
     ] * jnp.ones((1, nlat, nlon), dtype=jnp.float32)
     q = jnp.zeros((nlev, nlat, nlon), dtype=jnp.float32)
 
-    z = hypsometric_altitude(T, p, q)
+    z = get_altitudes_sigma_levels(T, p, q)
 
     z_jnp = _to_jax_numpy(z)
     assert z_jnp.shape == (nlev, nlat, nlon)
@@ -42,7 +42,7 @@ def test_invalid_ndim_raises() -> None:
     q = jnp.zeros((5, 3, 4), dtype=jnp.float32)
 
     try:
-        hypsometric_altitude(T, p, q)
+        get_altitudes_sigma_levels(T, p, q)
         raise AssertionError("Expected ValueError for non-3D input")
     except ValueError:
         pass
@@ -54,7 +54,7 @@ def test_mismatched_shapes_raises() -> None:
     q = jnp.zeros((5, 3, 5), dtype=jnp.float32)  # mismatch
 
     try:
-        hypsometric_altitude(T, p, q)
+        get_altitudes_sigma_levels(T, p, q)
         raise AssertionError("Expected ValueError for mismatched shapes")
     except ValueError:
         pass
@@ -71,7 +71,7 @@ def test_monotonic_pressure_gives_increasing_height() -> None:
     p = p_1d[:, None, None] * jnp.ones((1, nlat, nlon), dtype=jnp.float32)
     q = jnp.zeros((nlev, nlat, nlon), dtype=jnp.float32)
 
-    z = _to_jax_numpy(hypsometric_altitude(T, p, q))
+    z = _to_jax_numpy(get_altitudes_sigma_levels(T, p, q))
     dz = jnp.diff(z, axis=0)
 
     # float32-friendly tolerance
@@ -98,7 +98,7 @@ def test_isothermal_dry_column_matches_analytic() -> None:
     p = p_1d[:, None, None] * jnp.ones((1, nlat, nlon), dtype=jnp.float32)
 
     z0 = jnp.float32(123.0)
-    z = _to_jax_numpy(hypsometric_altitude(T, p, q, z0=z0, g=g, Rd=Rd))
+    z = _to_jax_numpy(get_altitudes_sigma_levels(T, p, q, z0=z0, g=g, Rd=Rd))
 
     dtype = _float_dtype_of(z)
     p0 = dtype.type(p_1d[0])
@@ -124,8 +124,8 @@ def test_humidity_increases_thickness() -> None:
     q_dry = jnp.zeros((nlev, nlat, nlon), dtype=jnp.float32)
     q_moist = jnp.full((nlev, nlat, nlon), 0.02, dtype=jnp.float32)
 
-    z_dry = _to_jax_numpy(hypsometric_altitude(T, p, q_dry))
-    z_moist = _to_jax_numpy(hypsometric_altitude(T, p, q_moist))
+    z_dry = _to_jax_numpy(get_altitudes_sigma_levels(T, p, q_dry))
+    z_moist = _to_jax_numpy(get_altitudes_sigma_levels(T, p, q_moist))
 
     thick_dry = z_dry[-1] - z_dry[0]
     thick_moist = z_moist[-1] - z_moist[0]
@@ -140,16 +140,16 @@ def test_z0_accepts_scalar_and_2d_and_3d() -> None:
     p = p_1d[:, None, None] * jnp.ones((1, nlat, nlon), dtype=jnp.float32)
     q = jnp.zeros((nlev, nlat, nlon), dtype=jnp.float32)
 
-    z_scalar = _to_jax_numpy(hypsometric_altitude(T, p, q, z0=jnp.float32(10.0)))
+    z_scalar = _to_jax_numpy(get_altitudes_sigma_levels(T, p, q, z0=jnp.float32(10.0)))
     assert jnp.allclose(z_scalar[0], 10.0, atol=1e-6)
 
     z0_2d = jnp.array([[0.0, 5.0], [10.0, 20.0]], dtype=jnp.float32)
-    z_2d = _to_jax_numpy(hypsometric_altitude(T, p, q, z0=z0_2d))
+    z_2d = _to_jax_numpy(get_altitudes_sigma_levels(T, p, q, z0=z0_2d))
     assert jnp.allclose(z_2d[0], z0_2d, atol=1e-6)
 
     z0_3d = jnp.zeros((nlev, nlat, nlon), dtype=jnp.float32)
     z0_3d = z0_3d.at[0].set(z0_2d)
-    z_3d = _to_jax_numpy(hypsometric_altitude(T, p, q, z0=z0_3d))
+    z_3d = _to_jax_numpy(get_altitudes_sigma_levels(T, p, q, z0=z0_3d))
     assert jnp.allclose(z_3d[0], z0_2d, atol=1e-6)
 
 
@@ -163,7 +163,7 @@ def test_bad_z0_shape_raises() -> None:
 
     bad = jnp.zeros((nlat, nlon, 2), dtype=jnp.float32)
     try:
-        hypsometric_altitude(T, p, q, z0=bad)
+        get_altitudes_sigma_levels(T, p, q, z0=bad)
         raise AssertionError("Expected ValueError for bad z0 shape")
     except ValueError:
         pass
@@ -199,7 +199,7 @@ def test_reconstruction_from_z_matches_pressure_ratio() -> None:
     ratios = jnp.array([1.0, 0.85, 0.70, 0.55, 0.40], dtype=jnp.float32)[:, None, None]
     p = ratios * p_surface[None, :, :]
 
-    z = _to_jax_numpy(hypsometric_altitude(T, p, q, g=g, Rd=Rd, Rv=Rv)).astype(
+    z = _to_jax_numpy(get_altitudes_sigma_levels(T, p, q, g=g, Rd=Rd, Rv=Rv)).astype(
         jnp.float64
     )
     # Use float64 for the reconstruction arithmetic in NumPy to reduce numerical noise

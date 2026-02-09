@@ -62,7 +62,7 @@ def compute_pressure_levels(
     return result
 
 
-def compute_levels_altitudes(
+def get_altitudes_hybrid_sigma_levels(
     settings: VercorSettings,
     t: NDArray[np.floating[Any]],
     q: NDArray[np.floating[Any]],

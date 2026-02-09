@@ -22,7 +22,7 @@ from vercor.components.external.jax_gcm_tools import (
     mean_leaf,
     stack_objects,
     unwrap_leading_dims,
-    hypsometric_altitude,
+    get_altitudes_sigma_levels,
     compute_pressure_levels,
 )
 from vercor.fluxes.utilities import (
@@ -317,7 +317,7 @@ class JAXGCM(Component):
         )
         # Units: [m]
         self.data["model_level_height"] = np.array(
-            hypsometric_altitude(
+            get_altitudes_sigma_levels(
                 d.temperature.transpose((0, 2, 1))[::-1, :, :],
                 jnp.asarray(self.data["pressure"][::-1, :, :]),
                 d.specific_humidity.transpose((0, 2, 1))[::-1, :, :] / 1000.0,

@@ -7,7 +7,7 @@ import numpy as np
 from vercor.components import Component, ComponentForcingData
 from vercor.fluxes.utilities import (
     compute_air_density,
-    compute_levels_altitudes,
+    get_altitudes_hybrid_sigma_levels,
     compute_pressure_levels,
     compute_potential_temperature,
 )
@@ -140,7 +140,7 @@ class ERA5Atmosphere(Component, ComponentForcingData):
                 ds["surface_pressure"][..., m], ds["hyam"], ds["hybm"]
             )
             # Units: [m]
-            self.data["model_level_height"][..., m] = compute_levels_altitudes(
+            self.data["model_level_height"][..., m] = get_altitudes_hybrid_sigma_levels(
                 settings,
                 ds["temperature_3d"][..., m],
                 ds["specific_humidity_3d"][..., m],
