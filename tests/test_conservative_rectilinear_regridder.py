@@ -2,7 +2,9 @@ import numpy as np
 import pytest
 
 from vercor.grid import RectilinearGrid
-from vercor.interpolators.conservative_remap_rectilinear import ConservativeRectilinearRemapper
+from vercor.interpolators.conservative_remap_rectilinear import (
+    ConservativeRectilinearRemapper,
+)
 from vercor.regridders.conservative import (
     ConservativeRectilinearRegridder,
     conservative,

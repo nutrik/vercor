@@ -8,7 +8,7 @@ from vercor.regridders import bilinear
 
 if __name__ == "__main__":
     atm = ERA5Atmosphere()
-    ocn = VerosGCM()
+    ocn = VerosGCM(restore_to_climatology=True)
     lnd = ERA5Land()
 
     # Clock and sequence

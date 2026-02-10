@@ -228,11 +228,13 @@ class JAXGCM(Component):
     ) -> None:
         settings = coupler.settings
 
-        print(
+        logger = coupler.logger
+
+        logger.debug(
             "Mean of SST: ",
             jnp.nanmean(jnp.asarray(self.data["sea_surface_temperature"])),
         )
-        print(
+        logger.debug(
             "number of SST that is less than 250: ",
             np.sum(self.data["sea_surface_temperature"] < 250.0),
         )
@@ -291,13 +293,13 @@ class JAXGCM(Component):
             .transpose()
         )
         # Units: [W/m²]
-        self.data["net_shortwave_radiation_flux"] = -(
-            np.array(p.shortwave_rad.rsns).transpose()
-        )
+        self.data["net_shortwave_radiation_flux"] = np.array(
+            p.shortwave_rad.rsns
+        ).transpose()
         # Units: [W/m²]
-        self.data["downward_longwave_radiation_flux"] = -(
-            np.array(p.surface_flux.rlds).transpose()
-        )
+        self.data["downward_longwave_radiation_flux"] = np.array(
+            p.surface_flux.rlds
+        ).transpose()
         # Units: [Pa]
         self.data["pressure"] = np.array(
             compute_pressure_levels(

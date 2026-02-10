@@ -138,6 +138,7 @@ class VerosGCM(Component):
         self,
         name: str = "OCN",
         spinup_time: timedelta = timedelta(days=2),
+        restore_to_climatology: bool = False,
         do_spinup: bool = False,
         jitted: bool = False,
     ) -> None:
@@ -157,6 +158,7 @@ class VerosGCM(Component):
 
         self.do_spinup = do_spinup
         self.spinup_time = spinup_time
+        self.restore_to_climatology = restore_to_climatology
         self.jitted = jitted
 
         self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
@@ -208,6 +210,9 @@ class VerosGCM(Component):
     ) -> None:
 
         taux, tauy, qnet, qnec = compute_fluxes(self, coupler.settings)
+
+        if self.restore_to_climatology:
+            qnec = np.zeros_like(qnet)
 
         for variable_name, variable_value in {
             "taux": np.nan_to_num(taux.T[..., np.newaxis]),
