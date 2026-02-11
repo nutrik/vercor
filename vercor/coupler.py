@@ -54,6 +54,7 @@ def setup_logger() -> Logger:
         format="%(asctime)s %(levelname)s [%(name)s]: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    logger.setLevel(logging.INFO)
     return logger
 
 
@@ -157,12 +158,21 @@ class Coupler:
             f" Set coupler components run sequence: {', '.join(self.run_sequence)}"
         )
 
-    def initialize(self) -> None:
+    def initialize(self, enable_x64_computations: Optional[bool] = None) -> None:
         """
         Initialize the coupler and all registered components.
         """
 
         self.logger.info(" Initializing coupler and components")
+
+        self.logger.info(f" Setting default precision for JAX computations: {self.settings.enable_x64}")
+        if enable_x64_computations is not None:
+            self.settings.enable_x64 = enable_x64_computations
+
+        if self.settings.enable_x64:
+            import jax
+
+            jax.config.update("jax_enable_x64", True)
 
         # Initialize each component
         for name, component in self.components.items():
@@ -195,7 +205,7 @@ class Coupler:
 
         for name, component in self.components.items():
             component.check_not_empty_import_export_lists()
-            component.check_exchange_field_names()
+            component.check_valid_exchange_field_names()
             # Deposit initial data to be sent from component to coupler
             component.send_fields(self.clock.start, self)
 

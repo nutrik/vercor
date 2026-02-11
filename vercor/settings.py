@@ -3,6 +3,8 @@ from dataclasses import dataclass
 
 @dataclass
 class VercorSettings:
+    # ------------------------- Runtime settings ------------------------------------
+    enable_x64: bool = False  # Enable 64-bit precision for JAX computations
     # ------------------------- General settings ------------------------------------
     apply_time_interpolation: bool = False  # Apply time interpolation to forcing data
     get_field_time_slice: bool = (

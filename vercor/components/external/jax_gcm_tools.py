@@ -30,17 +30,17 @@ def compute_pressure_levels(
     Returns:
         pressure_levels: Pressure levels p [Pa], 3D array of shape (nlev, nlat, nlon)
     """
-    p0 = jnp.asarray(reference_pressure, dtype=jnp.float64)
-    p_top = jnp.asarray(top_pressure, dtype=jnp.float64)
-    sigma = jnp.asarray(sigma_levels, dtype=jnp.float64)
-    nps = jnp.asarray(normalized_surface_pressure, dtype=jnp.float64)
+    p0 = jnp.asarray(reference_pressure, dtype=jnp.float_)
+    p_top = jnp.asarray(top_pressure, dtype=jnp.float_)
+    sigma = jnp.asarray(sigma_levels, dtype=jnp.float_)
+    nps = jnp.asarray(normalized_surface_pressure, dtype=jnp.float_)
 
     if p_top.ndim != 0:
         raise ValueError("top_pressure must be a scalar array")
     if sigma.ndim != 1:
         raise ValueError("sigma_levels must be a 1D array")
 
-    ps = jnp.asarray(nps * p0, dtype=jnp.float64)[jnp.newaxis, :, :]
+    ps = jnp.asarray(nps * p0, dtype=jnp.float_)[jnp.newaxis, :, :]
 
     # Broadcast p_top to the horizontal grid shape (nlat, nlon)
     p_top_bcast = jnp.broadcast_to(p_top, ps.shape)
@@ -93,9 +93,9 @@ def get_altitudes_sigma_levels(
         (For small q, this is close to T*(1 + 0.61 q).)
       - Tv_bar between adjacent levels is taken as a simple average.
     """
-    T = jnp.asarray(temperature, dtype=jnp.float64)
-    p = jnp.asarray(pressure, dtype=jnp.float64)
-    q = jnp.asarray(specific_humidity, dtype=jnp.float64)
+    T = jnp.asarray(temperature, dtype=jnp.float_)
+    p = jnp.asarray(pressure, dtype=jnp.float_)
+    q = jnp.asarray(specific_humidity, dtype=jnp.float_)
 
     if T.ndim != 3 or p.ndim != 3 or q.ndim != 3:
         raise ValueError(
@@ -124,8 +124,8 @@ def get_altitudes_sigma_levels(
     dz = (Rd / g) * Tv_bar * log_pr  # shape (nlev-1, nlat, nlon)
 
     # Integrate upward from z0 at k=0
-    z = jnp.empty_like(T, dtype=jnp.float64)
-    z0_arr = jnp.asarray(z0, dtype=jnp.float64)
+    z = jnp.empty_like(T, dtype=jnp.float_)
+    z0_arr = jnp.asarray(z0, dtype=jnp.float_)
     if z0_arr.ndim == 0:
         z = z.at[0, :, :].set(z0_arr)
     elif z0_arr.shape == (nlat, nlon):

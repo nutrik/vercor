@@ -36,8 +36,8 @@ if TYPE_CHECKING:
     from vercor.coupler import Coupler
 
 
-def asfloat64(tree: Any) -> Any:
-    return jax.tree_util.tree_map(lambda arr: arr.astype(jnp.float64), tree)
+def asfloat(tree: Any) -> Any:
+    return jax.tree_util.tree_map(lambda arr: arr.astype(jnp.float_), tree)
 
 
 @tree_math.struct
@@ -50,7 +50,6 @@ class JCMState:
 
 class JAXGCM(Component):
     """JCM Wrapper"""
-
     _predictions_list: list[Predictions]
     _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, Predictions]]
     _state: JCMState
@@ -61,21 +60,21 @@ class JAXGCM(Component):
         geometry: Geometry,
         name: str = "ATM",
         forcing_data: Optional[ForcingData] = None,
-        model_timestep: timedelta = timedelta(days=1),
-        save_interval: timedelta = timedelta(hours=24),
+        model_timestep: timedelta = timedelta(minutes=30),
+        save_interval: timedelta = timedelta(hours=1),
         spinup_time: timedelta = timedelta(days=2),
         do_spinup: bool = False,
         jitted: bool = True,
     ) -> None:
 
-        self.model = Model(geometry=geometry)
+        self.model = Model(
+            time_step=model_timestep.total_seconds() / 60.,
+            geometry=geometry
+        )
         self.forcing_data = forcing_data
         self.model_timestep = model_timestep
         self.save_interval = save_interval
         self.spinup_time = spinup_time
-        self.spinup_steps = int(
-            spinup_time.total_seconds() // model_timestep.total_seconds()
-        )
         self.do_spinup = do_spinup
         self.jitted = jitted
 
@@ -110,8 +109,8 @@ class JAXGCM(Component):
             # However, this action will be done by jcm in the new jcm PR.
             return (
                 JCMState(
-                    prog=asfloat64(mean_leaf(predictions.dynamics, axis=0)),
-                    phydata=asfloat64(mean_leaf(predictions.physics, axis=0)),
+                    prog=asfloat(mean_leaf(predictions.dynamics, axis=0)),
+                    phydata=asfloat(mean_leaf(predictions.physics, axis=0)),
                     metadata=new_atm_modal_state,
                 ),
                 predictions,
@@ -123,7 +122,6 @@ class JAXGCM(Component):
         _avg_predictions = []
 
         for _ in range(self.model_substeps):
-
             _new_state, _predictions = self._step_function(
                 self._state,
                 self.forcing,
@@ -144,6 +142,9 @@ class JAXGCM(Component):
     def initialize(self, coupler: "Coupler") -> None:
         self.coupling_timestep = timedelta(seconds=coupler.clock.dt_seconds)
         self.model_substeps = int(self.coupling_timestep // self.model_timestep)
+        self.spinup_steps = int(
+            self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
+        )
 
         if self.coupling_timestep % self.model_timestep != timedelta(days=0):
             raise ValueError(
@@ -213,6 +214,7 @@ class JAXGCM(Component):
             coupler.logger.info(
                 f" Performing JCM spinup for {self.spinup_time} day(s)..."
             )
+
             for i in range(self.spinup_steps):
                 coupler.logger.info(f" JCM spinup step {i+1} / {self.spinup_steps}")
                 _, _ = self.do_jcm_steps()
@@ -339,3 +341,4 @@ class JAXGCM(Component):
             ds.to_netcdf(output, engine="netcdf4")
 
         return ds
+

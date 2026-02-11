@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.tools import get_field_at_specific_time, get_field_time_slice
-from vercor.exchange import EXCHANGE_FIELD_NAMES
+from vercor.exchange import VALID_EXCHANGE_FIELD_NAMES
 
 
 if TYPE_CHECKING:
@@ -297,12 +297,12 @@ class Component(abc.ABC):
 
             self.outgoing_fields[fld] = (field2send, time, self.name)
 
-    def check_exchange_field_names(self) -> None:
+    def check_valid_exchange_field_names(self) -> None:
         for fld in set(self._fields2import + self._fields2export):
-            if fld not in EXCHANGE_FIELD_NAMES:
+            if fld not in VALID_EXCHANGE_FIELD_NAMES:
                 raise ComponentError(
                     f"Field name '{fld}' in component '{self.name}' is not a recognized exchange variable.\n"
-                    f"Replace field name '{fld}' with one of the supported names: {EXCHANGE_FIELD_NAMES}"
+                    f"Replace field name '{fld}' with one of the supported names: {VALID_EXCHANGE_FIELD_NAMES}"
                 )
 
     def get(self, field_name: str) -> NDArray:

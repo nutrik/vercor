@@ -6,7 +6,7 @@ from vercor.regridders.bilinear import BilinearRectilinearRegridder
 from vercor.regridders.conservative import ConservativeRectilinearRegridder
 
 
-EXCHANGE_FIELD_NAMES: list[str] = [
+VALID_EXCHANGE_FIELD_NAMES: list[str] = [
     "specific_humidity",
     "temperature",
     "temperature_2m",
