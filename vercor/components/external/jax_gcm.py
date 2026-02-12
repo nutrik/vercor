@@ -50,6 +50,7 @@ class JCMState:
 
 class JAXGCM(Component):
     """JCM Wrapper"""
+
     _predictions_list: list[Predictions]
     _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, Predictions]]
     _state: JCMState
@@ -61,15 +62,14 @@ class JAXGCM(Component):
         name: str = "ATM",
         forcing_data: Optional[ForcingData] = None,
         model_timestep: timedelta = timedelta(minutes=30),
-        save_interval: timedelta = timedelta(hours=1),
+        save_interval: timedelta = timedelta(days=1),
         spinup_time: timedelta = timedelta(days=2),
         do_spinup: bool = False,
         jitted: bool = True,
     ) -> None:
 
         self.model = Model(
-            time_step=model_timestep.total_seconds() / 60.,
-            geometry=geometry
+            time_step=model_timestep.total_seconds() / 60.0, geometry=geometry
         )
         self.forcing_data = forcing_data
         self.model_timestep = model_timestep
@@ -120,18 +120,18 @@ class JAXGCM(Component):
 
     def do_jcm_steps(self) -> tuple[Any, Any]:
         _avg_predictions = []
+        _predictions: list[Predictions] = []
 
-        for _ in range(self.model_substeps):
-            _new_state, _predictions = self._step_function(
-                self._state,
-                self.forcing,
-            )
+        _new_state, _predictions = self._step_function(
+            self._state,
+            self.forcing,
+        )
 
-            self._state = _new_state
+        self._state = _new_state
 
-            _avg_predictions.append(_predictions)
+        _avg_predictions.append(_predictions)
 
-            self._predictions_list.append(_predictions)
+        self._predictions_list.append(_predictions)
 
         _avg_predictions = mean_leaf(
             unwrap_leading_dims(stack_objects(_avg_predictions)), axis=0
@@ -141,7 +141,6 @@ class JAXGCM(Component):
 
     def initialize(self, coupler: "Coupler") -> None:
         self.coupling_timestep = timedelta(seconds=coupler.clock.dt_seconds)
-        self.model_substeps = int(self.coupling_timestep // self.model_timestep)
         self.spinup_steps = int(
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
@@ -219,8 +218,8 @@ class JAXGCM(Component):
                 coupler.logger.info(f" JCM spinup step {i+1} / {self.spinup_steps}")
                 _, _ = self.do_jcm_steps()
 
-        # Exclude spinup steps from the final output
-        self._predictions_list = []
+            # Exclude spinup steps from the final output
+            self._predictions_list = []
 
     def step(
         self,
@@ -338,7 +337,6 @@ class JAXGCM(Component):
         )
         if output is not None:
             print(f"Output file: {output:s}")
-            ds.to_netcdf(output, engine="netcdf4")
+            ds.to_netcdf(output, engine="h5netcdf")
 
         return ds
-

@@ -165,7 +165,9 @@ class Coupler:
 
         self.logger.info(" Initializing coupler and components")
 
-        self.logger.info(f" Setting default precision for JAX computations: {self.settings.enable_x64}")
+        self.logger.info(
+            f" Setting default precision for JAX computations: {self.settings.enable_x64}"
+        )
         if enable_x64_computations is not None:
             self.settings.enable_x64 = enable_x64_computations
 
