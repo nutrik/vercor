@@ -60,10 +60,12 @@ class JAXGCM(Component):
         self,
         geometry: Geometry,
         name: str = "ATM",
-        forcing_data: Optional[ForcingData] = None,
         model_timestep: timedelta = timedelta(minutes=30),
         save_interval: timedelta = timedelta(days=1),
         spinup_time: timedelta = timedelta(days=2),
+        forcing_data: Optional[ForcingData] = None,
+        # Output frequency in days for saving JCM predictions.
+        output_frequency: Optional[int] = None,
         do_spinup: bool = False,
         jitted: bool = True,
     ) -> None:
@@ -72,6 +74,7 @@ class JAXGCM(Component):
             time_step=model_timestep.total_seconds() / 60.0, geometry=geometry
         )
         self.forcing_data = forcing_data
+        self.output_frequency = output_frequency
         self.model_timestep = model_timestep
         self.save_interval = save_interval
         self.spinup_time = spinup_time
@@ -120,7 +123,7 @@ class JAXGCM(Component):
 
     def do_jcm_steps(self) -> tuple[Any, Any]:
         _avg_predictions = []
-        _predictions: list[Predictions] = []
+        _predictions: Predictions
 
         _new_state, _predictions = self._step_function(
             self._state,
@@ -131,7 +134,16 @@ class JAXGCM(Component):
 
         _avg_predictions.append(_predictions)
 
-        self._predictions_list.append(_predictions)
+        times = jax.device_get(_predictions.times)
+        current_datetime = (
+            times * (np.timedelta64(1, "D") / np.timedelta64(1, "ns"))
+        ).astype("datetime64[ns]")
+        day = current_datetime.astype("datetime64[D]")  # drop time part
+        day_of_month = (day - day.astype("datetime64[M]")).astype(int) + 1
+
+        if self.output_frequency is not None and\
+           day_of_month == self.output_frequency:
+            self._predictions_list.append(_predictions)
 
         _avg_predictions = mean_leaf(
             unwrap_leading_dims(stack_objects(_avg_predictions)), axis=0

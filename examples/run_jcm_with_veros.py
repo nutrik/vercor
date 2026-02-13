@@ -33,6 +33,7 @@ if __name__ == "__main__":
     atm = JAXGCM(
         geometry,
         forcing_data=forcing,
+        output_frequency=30,
         do_spinup=True,
         jitted=True,
     )
