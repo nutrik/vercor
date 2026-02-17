@@ -286,11 +286,10 @@ class Coupler:
             )
         ocean_bmask = np.asarray(ocean_binary_mask)
 
-        # Conservative remapping of binary mask to atmosphere grid
+        # Conservative remapping of binary mask to atmospheric grid
         # results to fractional mask on atmosphere grid
         ocn_fmask_on_atm_grid = np.asarray(regridder(ocean_bmask))
         self.ocn_fmask_on_atm_grid = np.clip(ocn_fmask_on_atm_grid, 0.0, 1.0)
-
         self.lnd_fmask_on_atm_grid = 1.0 - self.ocn_fmask_on_atm_grid
         self.lnd_bmask_on_atm_grid = compute_land_mask(self.ocn_fmask_on_atm_grid)
 
@@ -448,7 +447,7 @@ class Coupler:
                         )
                     source_field_data = getattr(source_fields, field_name).data
                     scalar = np.asarray(regrid(source_field_data))
-                    scalar *= binary_mask * fractional_mask
+                    scalar *= fractional_mask
 
                     setattr(
                         destination_fields,

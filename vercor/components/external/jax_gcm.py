@@ -141,8 +141,7 @@ class JAXGCM(Component):
         day = current_datetime.astype("datetime64[D]")  # drop time part
         day_of_month = (day - day.astype("datetime64[M]")).astype(int) + 1
 
-        if self.output_frequency is not None and\
-           day_of_month == self.output_frequency:
+        if self.output_frequency is not None and day_of_month == self.output_frequency:
             self._predictions_list.append(_predictions)
 
         _avg_predictions = mean_leaf(
@@ -202,30 +201,10 @@ class JAXGCM(Component):
         self._predictions_list = []
 
         if self.do_spinup and "OCN" in coupler.run_sequence.order:
-            self.data["sea_surface_temperature"] = np.nan_to_num(
-                self.data["sea_surface_temperature"], nan=0.0
-            )
-            self.data["land_surface_temperature"] = np.nan_to_num(
-                self.data["land_surface_temperature"], nan=0.0
-            )
-
-            self.data["sea_surface_temperature"][
-                self.data["sea_surface_temperature"] < 250.0
-            ] = 288.15
-            self.data["land_surface_temperature"][
-                self.data["land_surface_temperature"] < 250.0
-            ] = 288.15
-
-            self.forcing = self.forcing.copy(
-                stl_am=jnp.asarray(self.data["land_surface_temperature"]).transpose(),
-                sea_surface_temperature=jnp.asarray(
-                    self.data["sea_surface_temperature"]
-                ).transpose(),
-            )
             coupler.logger.info(
                 f" Performing JCM spinup for {self.spinup_time} day(s)..."
             )
-
+            # Spin-up from the default JCM forcing
             for i in range(self.spinup_steps):
                 coupler.logger.info(f" JCM spinup step {i+1} / {self.spinup_steps}")
                 _, _ = self.do_jcm_steps()
@@ -243,13 +222,10 @@ class JAXGCM(Component):
 
         logger = coupler.logger
 
-        logger.debug(
-            "Mean of SST: ",
-            jnp.nanmean(jnp.asarray(self.data["sea_surface_temperature"])),
-        )
-        logger.debug(
-            "number of SST that is less than 250: ",
-            np.sum(self.data["sea_surface_temperature"] < 250.0),
+        logger.info(
+            " Mean of SST: {}".format(
+                float(jnp.nanmean(jnp.asarray(self.data["sea_surface_temperature"])))
+            )
         )
 
         self.data["sea_surface_temperature"] = np.nan_to_num(
@@ -259,23 +235,37 @@ class JAXGCM(Component):
             self.data["land_surface_temperature"], nan=0.0
         )
 
-        self.data["sea_surface_temperature"][
-            self.data["sea_surface_temperature"] < 250.0
-        ] = 288.15
-        self.data["land_surface_temperature"][
-            self.data["land_surface_temperature"] < 250.0
-        ] = 288.15
-
         # Units: [K]
         self.data["total_surface_temperature"] = (
             self.data["land_surface_temperature"] + self.data["sea_surface_temperature"]
         )
 
+        logger.info(
+            " Number of cells with (SST + SKT) less than 250.0 K: {}".format(
+                int(np.sum(self.data["total_surface_temperature"] < 250.0))
+            ),
+        )
+
+        land_surface_temperature = (
+            self.data["total_surface_temperature"]
+            * self.model.geometry.fmask.transpose()
+        )
+        sea_surface_temperature = self.data["total_surface_temperature"] * (
+            1.0 - self.model.geometry.fmask.transpose()
+        )
+
+        # Replace zero values with a default temperature (e.g., 288.15 K)
+        # to avoid issues in JCM
+        land_surface_temperature[
+            land_surface_temperature == 0.0
+        ] = 288.15
+        sea_surface_temperature[
+            sea_surface_temperature == 0.0
+        ] = 288.15
+
         self.forcing = self.forcing.copy(
-            stl_am=jnp.asarray(self.data["land_surface_temperature"]).transpose(),
-            sea_surface_temperature=jnp.asarray(
-                self.data["sea_surface_temperature"]
-            ).transpose(),
+            stl_am=jnp.asarray(land_surface_temperature).transpose(),
+            sea_surface_temperature=jnp.asarray(sea_surface_temperature).transpose(),
         )
 
         p, d = self.do_jcm_steps()

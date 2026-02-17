@@ -33,7 +33,7 @@ if __name__ == "__main__":
     atm = JAXGCM(
         geometry,
         forcing_data=forcing,
-        output_frequency=30,
+        output_frequency=15,  # every 15th coupler's step (15th day)
         do_spinup=True,
         jitted=True,
     )
