@@ -407,7 +407,6 @@ class Coupler:
             key = (exchange.source, exchange.destination, exchange.interpolation_type)
 
             regrid = self._regridders[key]
-            binary_mask = self._binary_masks[key]
             fractional_mask = self._fractional_masks[key]
 
             source_fields = source_component.export_fields()
