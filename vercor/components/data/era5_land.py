@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from vercor.clock import CustomDateTime
 from vercor.components import Component, ComponentForcingData
 from vercor.grid import RectilinearGrid
 
@@ -65,7 +66,7 @@ class ERA5Land(Component, ComponentForcingData):
     def step(
         self,
         dt: timedelta,
-        time: datetime,
+        time: datetime | CustomDateTime,
         coupler: "Coupler",
     ) -> None:
         """

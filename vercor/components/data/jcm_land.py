@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
+from vercor.clock import CustomDateTime
 from vercor.components import Component, ComponentForcingData
 from vercor.grid import RectilinearGrid
 from vercor.regridders.helpers import compute_land_mask
@@ -143,7 +144,7 @@ class JCMLand(Component, ComponentForcingData):
     def step(
         self,
         dt: timedelta,
-        time: datetime,
+        time: datetime | CustomDateTime,
         coupler: "Coupler",
     ) -> None:
         """

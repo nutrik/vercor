@@ -9,6 +9,7 @@ import numpy as np
 import xarray as xr
 from numpy.typing import NDArray
 
+from vercor.clock import CustomDateTime
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.tools import get_field_at_specific_time, get_field_time_slice
@@ -24,7 +25,7 @@ class TimedNamedArray:
     """Container class for a field (array), its timestamp, and its component name."""
 
     data: NDArray
-    timestamp: datetime
+    timestamp: datetime | CustomDateTime
     component_name: str
 
     def __array__(self, dtype: Optional[NDArray] = None) -> NDArray:
@@ -67,7 +68,7 @@ class Shared:
                     f"Expected tuple of length 3 for field assignment, got length {len(value)}"
                 )
 
-            if not isinstance(timestamp, datetime):
+            if not isinstance(timestamp, datetime | CustomDateTime):
                 raise TypeError(
                     f"When assigning a tuple, the second element must be a datetime, got {type(timestamp)}"
                 )
@@ -132,7 +133,7 @@ class Shared:
         """Return a dictionary of all fields' data arrays."""
         return {k: v.data for k, v in self._fields.items()}
 
-    def timestamps(self) -> dict[str, datetime]:
+    def timestamps(self) -> dict[str, datetime | CustomDateTime]:
         """Return a dictionary of all fields' timestamps."""
         return {k: v.timestamp for k, v in self._fields.items()}
 
@@ -250,7 +251,7 @@ class Component(abc.ABC):
         for name in incoming_fields:
             self.incoming_fields[name] = fields[name]
 
-    def receive_fields(self, time: datetime) -> None:
+    def receive_fields(self, time: datetime | CustomDateTime) -> None:
         """
         Receive interpolated fields from receptor/incoming_fields (from another component(s))
         and store them in data.
@@ -275,7 +276,7 @@ class Component(abc.ABC):
 
         self.data.update(self.incoming_fields.fields())
 
-    def send_fields(self, time: datetime, coupler: "Coupler") -> None:
+    def send_fields(self, time: datetime | CustomDateTime, coupler: "Coupler") -> None:
         """
         Prepare fields from data to be deposited to outgoing_fields,
         to be later sent to another component(s).

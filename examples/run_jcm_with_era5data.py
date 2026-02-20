@@ -6,9 +6,7 @@ from jcm.geometry import Geometry
 from jcm.forcing import ForcingData
 
 from vercor import Clock, Coupler, Exchange
-from vercor.components.data.era5_ocean import ERA5Ocean
-from vercor.components.data.jcm_land import JCMLand
-from vercor.components.external.jax_gcm import JAXGCM
+from vercor.components import ERA5Ocean, JCMLand, JAXGCM
 from vercor.components.external.jax_gcm_tools import (
     generate_jcm_forcing_and_topography_files,
 )

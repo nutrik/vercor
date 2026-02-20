@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from vercor.clock import CustomDateTime
 from vercor.components import Component, ComponentForcingData
 from vercor.grid import RectilinearGrid
 from vercor.tools import get_forcing_data
@@ -67,7 +68,7 @@ class ERA5Ocean(Component, ComponentForcingData):
     def step(
         self,
         dt: timedelta,
-        time: datetime,
+        time: datetime | CustomDateTime,
         coupler: "Coupler",
     ) -> None:
         """

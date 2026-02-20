@@ -17,6 +17,7 @@ from jcm.model import ForcingData, Model, Predictions
 from jcm.physics.speedy.physics_data import PhysicsData
 from jcm.physics_interface import PhysicsState, dynamics_state_to_physics_state
 
+from vercor.clock import CustomDateTime
 from vercor.components.base import Component
 from vercor.components.external.jax_gcm_tools import (
     mean_leaf,
@@ -209,13 +210,10 @@ class JAXGCM(Component):
                 coupler.logger.info(f" JCM spinup step {i+1} / {self.spinup_steps}")
                 _, _ = self.do_jcm_steps()
 
-            # Exclude spinup steps from the final output
-            self._predictions_list = []
-
     def step(
         self,
         dt: timedelta,
-        time: datetime,
+        time: datetime | CustomDateTime,
         coupler: "Coupler",
     ) -> None:
         settings = coupler.settings

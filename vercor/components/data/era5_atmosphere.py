@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from vercor.clock import CustomDateTime
 from vercor.components import Component, ComponentForcingData
 from vercor.fluxes.utilities import (
     compute_air_density,
@@ -160,7 +161,7 @@ class ERA5Atmosphere(Component, ComponentForcingData):
     def step(
         self,
         dt: timedelta,
-        time: datetime,
+        time: datetime | CustomDateTime,
         coupler: "Coupler",
     ) -> None:
         """

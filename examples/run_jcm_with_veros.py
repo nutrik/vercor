@@ -6,9 +6,7 @@ from jcm.geometry import Geometry
 from jcm.forcing import ForcingData
 
 from vercor import Clock, Coupler, Exchange
-from vercor.components.data.jcm_land import JCMLand
-from vercor.components.external.veros_gcm import VerosGCM
-from vercor.components.external.jax_gcm import JAXGCM
+from vercor.components import JCMLand, VerosGCM, JAXGCM
 from vercor.components.external.jax_gcm_tools import (
     generate_jcm_forcing_and_topography_files,
 )
@@ -39,7 +37,12 @@ if __name__ == "__main__":
     )
 
     # Clock and sequence
-    clock = Clock(start=datetime(2025, 1, 1, 0, 0, 0), dt_seconds=86400.0, steps=30)
+    clock = Clock(
+        start=datetime(2000, 1, 1, 0, 0, 0),
+        dt_seconds=86400.0,
+        steps=360,
+        days_per_year=360,
+    )
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
 
     # Coupler

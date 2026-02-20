@@ -2,15 +2,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
+import pytest
 
-from vercor.clock import Clock
+from vercor.clock import Clock, CustomDateTime
+from vercor.exceptions import CouplerError
+from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
 from vercor.tools import (
+    _append_unique,
+    _flatten_fields,
+    datetime_to_seconds_in_year,
+    get_component,
+    get_forcing_data,
     get_field_at_specific_time,
-    get_periodic_interval,
     get_field_time_slice,
+    get_periodic_interval,
+    grids_identical,
+    is_leap_year,
 )
 
 
@@ -21,9 +33,21 @@ class DummyCoupler:
 
 
 def make_coupler(year_in_seconds: float) -> DummyCoupler:
-    clock = Clock(start=datetime(2000, 1, 1), dt_seconds=1.0, steps=1)
+    clock = Clock(
+        start=datetime(2000, 1, 1), dt_seconds=1.0, steps=1, days_per_year=365
+    )
     settings = VercorSettings(year_in_seconds=year_in_seconds)
     return DummyCoupler(clock=clock, settings=settings)
+
+
+@dataclass
+class DummyComponentA:
+    name: str = "a"
+
+
+@dataclass
+class DummyComponentB:
+    name: str = "b"
 
 
 def test_get_field_at_specific_time_weights_and_interpolation() -> None:
@@ -84,6 +108,18 @@ def test_get_field_at_specific_time_axis_ordering() -> None:
     assert np.allclose(out, expected)
 
 
+def test_get_field_at_specific_time_uses_coupler_clock_start_when_time_is_none() -> (
+    None
+):
+    coupler = make_coupler(year_in_seconds=12.0)
+    arr = np.zeros((2, 2, 12), dtype=float)
+    arr[..., 0] = 3.0
+    data = {"foo": arr}
+
+    out = get_field_at_specific_time("foo", data, coupler, current_time=None)  # type: ignore
+    assert np.allclose(out, 3.0)
+
+
 def test_get_field_time_slice_basic_indexing() -> None:
     data = {"foo": np.arange(365 * 2, dtype=float).reshape(365, 2)}
 
@@ -113,3 +149,189 @@ def test_get_field_time_slice_leap_day_retained_when_requested() -> None:
     out = get_field_time_slice("foo", data, time, no_leap=False)
 
     assert np.isclose(out, data["foo"][59])
+
+
+def test_get_field_time_slice_model_datetime_360_maps_to_real_month_lengths() -> None:
+    data = {"foo": np.arange(365, dtype=float)}
+
+    time = CustomDateTime(
+        year=2001,
+        month=1,
+        day=30,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+        day_of_year=30,
+        days_per_year=360,
+    )
+    out = get_field_time_slice("foo", data, time, no_leap=True)
+    assert np.isclose(out, data["foo"][30])
+
+    time = CustomDateTime(
+        year=2001,
+        month=2,
+        day=3,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+        day_of_year=33,
+        days_per_year=360,
+    )
+    out = get_field_time_slice("foo", data, time, no_leap=True)
+    assert np.isclose(out, data["foo"][32])
+
+
+def test_get_field_time_slice_model_datetime_360_february_non_leap() -> None:
+    data = {"foo": np.arange(365, dtype=float)}
+
+    time = CustomDateTime(
+        year=2001,
+        month=2,
+        day=30,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+        day_of_year=60,
+        days_per_year=360,
+    )
+    out = get_field_time_slice("foo", data, time, no_leap=True)
+
+    assert np.isclose(out, data["foo"][58])
+
+
+def test_get_field_time_slice_model_datetime_360_february_leap_allowed() -> None:
+    data = {"foo": np.arange(366, dtype=float)}
+
+    time = CustomDateTime(
+        year=2000,
+        month=2,
+        day=30,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+        day_of_year=60,
+        days_per_year=360,
+    )
+    out = get_field_time_slice("foo", data, time, no_leap=False)
+
+    assert np.isclose(out, data["foo"][59])
+
+
+def test_get_field_time_slice_model_datetime_365_uses_day_of_year_directly() -> None:
+    data = {"foo": np.arange(365, dtype=float)}
+    time = CustomDateTime(
+        year=2001,
+        month=3,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+        day_of_year=60,
+        days_per_year=365,
+    )
+    out = get_field_time_slice("foo", data, time, no_leap=True)
+    assert np.isclose(out, data["foo"][59])
+
+
+def test_datetime_to_seconds_in_year_for_model_datetime_with_arithmetic() -> None:
+    base = CustomDateTime(
+        year=2001,
+        month=1,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+        day_of_year=1,
+        days_per_year=360,
+    )
+    shifted = base + timedelta(days=1, hours=2, minutes=3, seconds=4, microseconds=5)
+    assert shifted - base == timedelta(
+        days=1, hours=2, minutes=3, seconds=4, microseconds=5
+    )
+
+    seconds = datetime_to_seconds_in_year(shifted)
+    assert np.isclose(seconds, 1 * 86400 + 2 * 3600 + 3 * 60 + 4 + 5e-6)
+
+
+def test_get_periodic_interval_wraps_with_time_beyond_cycle() -> None:
+    (n1, f1), (n2, f2) = get_periodic_interval(
+        current_time=13.25,
+        cycle_length=12.0,
+        rec_spacing=1.0,
+        n_rec=12,
+    )
+
+    assert n1 == 1
+    assert n2 == 2
+    assert np.isclose(f1 + f2, 1.0)
+
+
+def test_is_leap_year_cases() -> None:
+    assert is_leap_year(2000)
+    assert not is_leap_year(1900)
+    assert is_leap_year(2004)
+    assert not is_leap_year(2001)
+
+
+def test_get_forcing_data_valid_and_invalid_file_type() -> None:
+    model_level = get_forcing_data("model_level")
+    surface = get_forcing_data("surface")
+
+    assert isinstance(model_level, Path)
+    assert isinstance(surface, Path)
+    assert str(model_level).endswith("era5_198x_ml_4x4deg_monthly_mean.nc")
+    assert str(surface).endswith("era5_198x_sfc_4x4deg_monthly_mean.nc")
+
+    with pytest.raises(CouplerError, match="Unknown file_type"):
+        get_forcing_data("unknown")
+
+
+def test_flatten_fields_and_append_unique() -> None:
+    flattened = _flatten_fields(["a", ("b", "c"), "d"])
+    assert flattened == ["a", "b", "c", "d"]
+
+    target = ["a", "b"]
+    _append_unique(target, ["b", "c", "d", "a"])
+    assert target == ["a", "b", "c", "d"]
+
+
+def test_grids_identical_detects_equal_and_unequal_grids() -> None:
+    lon = np.array([0.0, 1.0, 2.0])
+    lat = np.array([-1.0, 0.0])
+    g0 = RectilinearGrid("g0", longitude=lon, latitude=lat)
+    g1 = RectilinearGrid("g1", longitude=lon.copy(), latitude=lat.copy())
+    g2 = RectilinearGrid("g2", longitude=np.array([0.0, 1.5, 2.0]), latitude=lat.copy())
+
+    assert grids_identical(g0, g1)
+    assert not grids_identical(g0, g2)
+
+
+def test_get_component_returns_single_and_raises_for_ambiguous_or_missing() -> None:
+    allcomponents: dict[str, object] = {
+        "a": DummyComponentA(name="atm"),
+        "b": DummyComponentB(name="ocn"),
+    }
+
+    selected = get_component(cast(Any, allcomponents), (DummyComponentA,))
+    assert isinstance(selected, DummyComponentA)
+
+    with pytest.raises(CouplerError, match="No component"):
+        get_component(cast(Any, allcomponents), (str,))
+
+    with pytest.raises(CouplerError, match="Multiple"):
+        get_component(
+            cast(
+                Any,
+                {
+                    "a": DummyComponentA(name="atm"),
+                    "b": DummyComponentA(name="atm2"),
+                },
+            ),
+            (DummyComponentA,),
+        )

@@ -42,6 +42,7 @@ from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
 from vercor.tools import get_component, grids_identical, _append_unique, _flatten_fields
 from vercor.types import AllComponentsType
+from vercor.clock import CustomDateTime
 
 
 def setup_logger() -> Logger:
@@ -384,7 +385,7 @@ class Coupler:
     def interpolate_and_dispatch_fields(
         self,
         component: AllComponentsType,
-        timestamp: datetime,
+        timestamp: datetime | CustomDateTime,
     ) -> None:
         """
         Interpolate and dispatch fields to the given component at the specified timestamp.

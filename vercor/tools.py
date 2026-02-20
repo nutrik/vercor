@@ -5,6 +5,11 @@ from typing import TYPE_CHECKING, Any, Optional, Mapping
 import numpy as np
 from numpy.typing import NDArray
 
+from vercor.clock import (
+    CustomDateTime,
+    _DAYS_PER_MONTH_GREGORIAN_NO_LEAP,
+    _DAYS_PER_MONTH_GREGORIAN_LEAP,
+)
 from vercor.exceptions import CouplerError
 from vercor.grid import RectilinearGrid
 from vercor.types import AllComponentsType
@@ -110,18 +115,27 @@ def get_periodic_interval(
     return (t_idx_1, weight_1), (t_idx_2, weight_2)
 
 
-def datetime_to_seconds_in_year(dt: datetime) -> float:
+def datetime_to_seconds_in_year(dt: datetime | CustomDateTime) -> float:
     """Convert a datetime object to the number of seconds since the start of the year.
 
     Arguments:
-        dt: datetime object to convert.
+        dt: datetime or CustomDateTime object to convert.
 
     Returns:
         float: Number of seconds since the start of the year.
     """
-    year_start = datetime(dt.year, 1, 1)
-    seconds_since_year_start = (dt - year_start).total_seconds()
-    return seconds_since_year_start
+
+    if isinstance(dt, datetime):
+        year_start = datetime(dt.year, 1, 1)
+        return (dt - year_start).total_seconds()
+
+    return (
+        (dt.day_of_year - 1) * 86_400.0
+        + dt.hour * 3_600.0
+        + dt.minute * 60.0
+        + dt.second
+        + dt.microsecond / 1_000_000.0
+    )
 
 
 def get_forcing_data(file_type: str) -> Path:
@@ -155,10 +169,27 @@ def is_leap_year(x: int) -> bool:
     return (x % 4 == 0 and x % 100 != 0) or (x % 400 == 0)
 
 
+def _custom_360_day_to_gregorian_day_of_year(
+    time: CustomDateTime,
+    no_leap: bool,
+) -> int:
+    if not time.fixed_30_day_months or time.days_per_year != 360:
+        return time.day_of_year
+
+    month_lengths = _DAYS_PER_MONTH_GREGORIAN_NO_LEAP
+    if not no_leap and is_leap_year(time.year):
+        month_lengths = _DAYS_PER_MONTH_GREGORIAN_LEAP
+
+    month_length = month_lengths[time.month - 1]
+    mapped_day_in_month = ((time.day - 1) * (month_length - 1)) // 29 + 1
+    days_before_month = sum(month_lengths[: time.month - 1])
+    return days_before_month + mapped_day_in_month
+
+
 def get_field_time_slice(
     field_name: str,
     data: Mapping[str, NDArray],
-    time: datetime,
+    time: datetime | CustomDateTime,
     no_leap: bool = True,
 ) -> NDArray:
     """Retrieve a field from a component data storage dictionary at a specific time index
@@ -168,20 +199,24 @@ def get_field_time_slice(
     Arguments:
         field_name: Name of the field to retrieve.
         data: Dictionary containing the component data with time-dependent fields.
-        time: datetime object representing the time slice to retrieve.
+        time: datetime or CustomDateTime object representing the time slice to retrieve.
         no_leap: Whether to ignore leap days (Feb 29) when indexing.
 
     Returns:
         NDArray: The field data at the specified time index.
     """
 
-    tm_yday = time.timetuple().tm_yday
+    if isinstance(time, CustomDateTime):
+        tm_yday = _custom_360_day_to_gregorian_day_of_year(time, no_leap=no_leap)
+    else:
+        tm_yday = time.timetuple().tm_yday
 
-    # Disregard Feb 29 for leap years
-    year = time.year
+        # Disregard Feb 29 for leap years
+        year = time.year
 
-    if no_leap and is_leap_year(year) and tm_yday > 59:
-        tm_yday -= 1
+        if no_leap and is_leap_year(year) and tm_yday > 59:
+            tm_yday -= 1
+
     time_index = tm_yday - 1
 
     out: NDArray = data[field_name][time_index, ...]
@@ -193,7 +228,7 @@ def get_field_at_specific_time(
     field_name: str,
     data: Mapping[str, NDArray],
     coupler: "Coupler",
-    current_time: Optional[datetime] = None,
+    current_time: Optional[datetime | CustomDateTime] = None,
 ) -> NDArray:
     """Retrieve a field from a component data storage dictionary at a specific time,
     applying time interpolation if necessary.
@@ -202,7 +237,7 @@ def get_field_at_specific_time(
         field_name: Name of the field to retrieve.
         data: Dictionary containing the component data with time-dependent fields.
         coupler: Coupler instance for time settings.
-        current_time: Optional datetime object representing the current time.
+        current_time: Optional datetime or CustomDateTime object representing the current time.
                       If None, coupler's start time is used.
     Returns:
         NDArray: The field data interpolated to the specified time.

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from vercor.clock import CustomDateTime
 from vercor.components import Component
 from vercor.grid import RectilinearGrid
 
@@ -33,7 +34,7 @@ class Atmosphere(Component):
     def step(
         self,
         dt: timedelta,
-        time: datetime,
+        time: datetime | CustomDateTime,
         coupler: "Coupler",
     ) -> None:
         # Bulk formula toy: flux proportional to (temperature_2m - sea_surface_temperature)

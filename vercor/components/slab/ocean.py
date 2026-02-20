@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from vercor.clock import CustomDateTime
 from vercor.components import Component
 from vercor.grid import RectilinearGrid
 
@@ -35,7 +36,7 @@ class Ocean(Component):
     def step(
         self,
         dt: timedelta,
-        time: datetime,
+        time: datetime | CustomDateTime,
         coupler: "Coupler",
     ) -> None:
         sst = self.data.get("sea_surface_temperature", None)
