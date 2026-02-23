@@ -2,9 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from math import floor
 import time
-from typing import Callable
-from typing import Literal
-from typing import Iterator
+from typing import Callable, Literal, Iterator
 
 
 _DAYS_PER_MONTH_GREGORIAN_LEAP = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
@@ -83,6 +81,36 @@ class CustomDateTime:
                 -1,  # tm_isdst is not applicable for model calendar
             )
         )
+
+    def strftime(self, fmt: str) -> str:
+        """Format the datetime using `datetime.strftime`-style directives.
+
+        Formatting is delegated to `time.strftime` with this object's
+        calendar-aware `timetuple()`, which preserves model-calendar values
+        such as `%j` in 360-day years. `%f` is handled explicitly to match
+        `datetime.strftime` microsecond behavior.
+        """
+        microsecond_token = "__VERCOR_CUSTOMDATETIME_MICROSECOND__"
+
+        processed_fmt_parts: list[str] = []
+        i = 0
+        while i < len(fmt):
+            char = fmt[i]
+            if char != "%" or i + 1 >= len(fmt):
+                processed_fmt_parts.append(char)
+                i += 1
+                continue
+
+            directive = fmt[i + 1]
+            if directive == "f":
+                processed_fmt_parts.append(microsecond_token)
+            else:
+                processed_fmt_parts.append(f"%{directive}")
+            i += 2
+
+        processed_fmt = "".join(processed_fmt_parts)
+        out = time.strftime(processed_fmt, self.timetuple())
+        return out.replace(microsecond_token, f"{self.microsecond:06d}")
 
     def _same_calendar(self, other: "CustomDateTime") -> bool:
         return (

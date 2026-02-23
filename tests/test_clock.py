@@ -57,6 +57,56 @@ def test_model_datetime_repr_is_constructor_style() -> None:
     )
 
 
+def test_model_datetime_strftime_matches_datetime_for_common_directives() -> None:
+    model_time = CustomDateTime(
+        year=2025,
+        month=1,
+        day=2,
+        hour=3,
+        minute=4,
+        second=5,
+        microsecond=123456,
+        day_of_year=2,
+        days_per_year=365,
+    )
+    reference = datetime(2025, 1, 2, 3, 4, 5, 123456)
+    fmt = "%Y-%m-%d %H:%M:%S.%f"
+
+    assert model_time.strftime(fmt) == reference.strftime(fmt)
+
+
+def test_model_datetime_strftime_uses_model_day_of_year_in_360_calendar() -> None:
+    model_time = CustomDateTime(
+        year=2026,
+        month=12,
+        day=30,
+        hour=6,
+        minute=7,
+        second=8,
+        microsecond=900000,
+        day_of_year=360,
+        days_per_year=360,
+    )
+
+    assert model_time.strftime("%j") == "360"
+
+
+def test_model_datetime_strftime_handles_literal_percent_f() -> None:
+    model_time = CustomDateTime(
+        year=2025,
+        month=1,
+        day=2,
+        hour=3,
+        minute=4,
+        second=5,
+        microsecond=123456,
+        day_of_year=2,
+        days_per_year=365,
+    )
+
+    assert model_time.strftime("%%f %f") == "%f 123456"
+
+
 def test_model_datetime_add_timedelta_wraps_360_day_year() -> None:
     model_time = CustomDateTime(
         year=2025,

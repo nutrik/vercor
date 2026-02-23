@@ -31,16 +31,16 @@ if __name__ == "__main__":
     atm = JAXGCM(
         geometry,
         forcing_data=forcing,
-        output_frequency=15,  # every 15th coupler's step (15th day)
         do_spinup=True,
         jitted=True,
+        output_frequency="month",
     )
 
     # Clock and sequence
     clock = Clock(
         start=datetime(2000, 1, 1, 0, 0, 0),
         dt_seconds=86400.0,
-        steps=360,
+        steps=60,
         days_per_year=360,
     )
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
@@ -102,5 +102,3 @@ if __name__ == "__main__":
     cpl.initialize()
     cpl.run()
     cpl.finalize()
-
-    atm._finalize("jcm_veros_output.nc")

@@ -1,9 +1,7 @@
 from pathlib import Path
 from typing import Any, Optional
 import subprocess
-import os
 import sys
-import shutil
 
 import jax
 import jax.numpy as jnp
@@ -169,12 +167,12 @@ def generate_jcm_forcing_and_topography_files(
     resolution: int,
     input_data_directory: Optional[Path] = None,
 ) -> dict[str, Path]:
-    """Generate JCM forcing and topography files at the specified resolution. 
+    """Generate JCM forcing and topography files at the specified resolution.
     If the files already exist in the input_data_directory, it will not regenerate them.
-    
+
     Arguments:
         resolution: The resolution of the JCM files to generate (e.g., 31 for T31)
-        input_data_directory: Optional directory to look for existing files and to save generated files. 
+        input_data_directory: Optional directory to look for existing files and to save generated files.
                               If None, defaults to ~/.vercor/jcm/
 
     Returns:

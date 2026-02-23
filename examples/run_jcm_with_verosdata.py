@@ -90,5 +90,3 @@ if __name__ == "__main__":
     cpl.initialize()
     cpl.run()
     cpl.finalize()
-
-    atm._finalize("jcm_erainterim_output.nc")

@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, Literal, cast
 
 import jax
 import jax.numpy as jnp
@@ -66,7 +66,7 @@ class JAXGCM(Component):
         spinup_time: timedelta = timedelta(days=2),
         forcing_data: Optional[ForcingData] = None,
         # Output frequency in days for saving JCM predictions.
-        output_frequency: Optional[int] = None,
+        output_frequency: Optional[str] = None,
         do_spinup: bool = False,
         jitted: bool = True,
     ) -> None:
@@ -135,15 +135,7 @@ class JAXGCM(Component):
 
         _avg_predictions.append(_predictions)
 
-        times = jax.device_get(_predictions.times)
-        current_datetime = (
-            times * (np.timedelta64(1, "D") / np.timedelta64(1, "ns"))
-        ).astype("datetime64[ns]")
-        day = current_datetime.astype("datetime64[D]")  # drop time part
-        day_of_month = (day - day.astype("datetime64[M]")).astype(int) + 1
-
-        if self.output_frequency is not None and day_of_month == self.output_frequency:
-            self._predictions_list.append(_predictions)
+        self._predictions_list.append(_predictions)
 
         _avg_predictions = mean_leaf(
             unwrap_leading_dims(stack_objects(_avg_predictions)), axis=0
@@ -323,16 +315,63 @@ class JAXGCM(Component):
             )
         )[1, :, :]
 
-    def _finalize(self, output: Optional[str] = None) -> xr.Dataset:
-        # Current JCM returns an Any but is actually an xr.Dataset
+        if self._should_write_output(time=time, dt=dt):
+            date_time = time.strftime("%Y-%m-%d")
+            self._write_output(output=f"jcm.averages.{date_time}.nc")
+
+    def _is_period_end(
+        self,
+        time: datetime | CustomDateTime,
+        dt: timedelta,
+        frequency: Literal["day", "month", "year"],
+    ) -> bool:
+        next_time = time + dt
+
+        if frequency == "day":
+            return (
+                next_time.year != time.year
+                or next_time.month != time.month
+                or next_time.day != time.day
+            )
+        if frequency == "month":
+            return next_time.year != time.year or next_time.month != time.month
+
+        return next_time.year != time.year
+
+    def _should_write_output(
+        self,
+        time: datetime | CustomDateTime,
+        dt: timedelta,
+    ) -> bool:
+        if self.output_frequency is None:
+            return True
+
+        if not isinstance(self.output_frequency, str):
+            return False
+
+        frequency = self.output_frequency.lower()
+        if frequency not in ("day", "month", "year"):
+            return False
+
+        return self._is_period_end(
+            time=time,
+            dt=dt,
+            frequency=cast(Literal["day", "month", "year"], frequency),
+        )
+
+    def _write_output(self, output: str) -> None:
         ds = cast(
             xr.Dataset,
             xr.merge(
                 [_prediction.to_xarray() for _prediction in self._predictions_list]
             ),
         )
-        if output is not None:
-            print(f"Output file: {output:s}")
-            ds.to_netcdf(output, engine="h5netcdf")
 
-        return ds
+        print(f"Output file: {output:s}")
+
+        ds.mean(dim="time", keepdims=True).transpose(
+            "time", "level", "lat", "lon"
+        ).to_netcdf(output, engine="h5netcdf")
+
+        # Clear the predictions list after saving to disk to free up memory
+        self._predictions_list = []

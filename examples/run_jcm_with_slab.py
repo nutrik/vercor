@@ -117,8 +117,6 @@ if __name__ == "__main__":
     cpl.run()
     cpl.finalize()
 
-    atm._finalize("JCM-output.nc")
-
     # Inspect a few fields
     print("sst(OCN) mean:", np.nanmean(ocn.get("sea_surface_temperature")))
     print("sst(ATM) mean:", np.nanmean(atm.get("sea_surface_temperature")))
