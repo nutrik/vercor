@@ -167,33 +167,21 @@ def generate_jcm_geometry_from_orography(
 
 def generate_jcm_forcing_and_topography_files(
     resolution: int,
-    data_directory: Optional[Path] = None,
+    input_data_directory: Optional[Path] = None,
 ) -> dict[str, Path]:
+    """Generate JCM forcing and topography files at the specified resolution. 
+    If the files already exist in the input_data_directory, it will not regenerate them.
+    
+    Arguments:
+        resolution: The resolution of the JCM files to generate (e.g., 31 for T31)
+        input_data_directory: Optional directory to look for existing files and to save generated files. 
+                              If None, defaults to ~/.vercor/jcm/
+
+    Returns:
+        A dictionary with keys "terrain" and "forcing" mapping to the respective file paths.
+    """
 
     import jcm
-
-    if not (isinstance(data_directory, Path) or data_directory is None):
-        raise TypeError("`data_directory` must be of type `Path` or `None`.")
-
-    if data_directory is None:
-        home_data_directory = os.environ.get("HOME", None)
-
-        if home_data_directory is None:
-            data_directory = Path.cwd()
-        else:
-            data_directory = Path(home_data_directory)
-
-        data_directory = data_directory / ".cache/jcm"
-
-        print(f'Using input data directory: "{str(data_directory)}".')
-
-    raw_data_directory = Path(jcm.__file__).parent / "data/bc"
-
-    # Prepare boundary file
-    files_to_check = dict(
-        terrain=(data_directory / f"terrain_t{resolution:d}.nc").resolve(),
-        forcing=(data_directory / f"forcing_t{resolution:d}.nc").resolve(),
-    )
 
     def check_if_file_exist(
         file_dict: dict[str, Path], verbose: bool = True
@@ -210,13 +198,32 @@ def generate_jcm_forcing_and_topography_files(
 
         return file_status
 
-    file_status = check_if_file_exist(files_to_check)
+    if not (isinstance(input_data_directory, Path) or input_data_directory is None):
+        raise TypeError("`input_data_directory` must be of type `Path` or `None`.")
 
-    if not all(list(file_status.values())):
-        print("Some files are missing. Need to generate them.")
+    home_directory = Path.home()
+    raw_jcm_data_directory = Path(jcm.__file__).parent / "data/bc"
 
-        data_directory.mkdir(parents=True, exist_ok=True)
-        interpolation_code = (raw_data_directory / "interpolate.py").resolve()
+    if input_data_directory is None:
+        input_data_directory = home_directory / ".vercor" / "jcm"
+
+    print(f'Using input data directory: "{str(input_data_directory)}".')
+
+    input_forcing_files = dict(
+        terrain=(input_data_directory / f"terrain_t{resolution:d}.nc").resolve(),
+        forcing=(input_data_directory / f"forcing_t{resolution:d}.nc").resolve(),
+    )
+
+    files_status = check_if_file_exist(input_forcing_files)
+
+    for file, status in files_status.items():
+        if not status:
+            print(f"File {str(file)} is missing and will be generated.")
+        else:
+            print(f"File {str(file)} already exists and will be used.")
+
+        input_data_directory.mkdir(parents=True, exist_ok=True)
+        interpolation_code = (raw_jcm_data_directory / "interpolate.py").resolve()
 
         try:
             subprocess.run(
@@ -224,23 +231,12 @@ def generate_jcm_forcing_and_topography_files(
                 check=True,
                 capture_output=True,
                 text=True,
-                cwd=data_directory,
+                cwd=input_data_directory,
             )
         except subprocess.CalledProcessError as e:
             print("Error output:", e.stderr)
 
-        for destination_file in files_to_check.values():
-            source_file = Path(raw_data_directory / destination_file.name)
-            print(f"Copying: {str(source_file):s} => {str(destination_file):s}")
-            shutil.copy(source_file, destination_file)
-
-        new_file_status = check_if_file_exist(files_to_check)
-        if not all(list(new_file_status.values())):
-            raise FileNotFoundError(
-                "Something went wrong. The daily file is not generated. Please check."
-            )
-
-    return files_to_check
+    return input_forcing_files
 
 
 def mean_leaf(
