@@ -315,7 +315,7 @@ class VerosGCM(Component):
 
         taux, tauy, qnet, qnec = compute_fluxes(self, coupler.settings)
 
-        if self.restore_to_climatology:
+        if not self.restore_to_climatology:
             qnec = np.zeros_like(qnet)
 
         for variable_name, variable_value in {

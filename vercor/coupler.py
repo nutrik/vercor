@@ -518,7 +518,6 @@ class Coupler:
                 self.logger.info(f" Run component: {cname}")
                 self.components[cname].receive_fields(time)
 
-                # TODO: add sub-steps for individual components if needed
                 self.components[cname].step(dt, time, self)
 
                 self.components[cname].send_fields(time, self)
