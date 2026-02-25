@@ -103,10 +103,10 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
     @veros_routine
     def set_diagnostics(self, state):  # type: ignore
         settings = state.settings
-        state.diagnostics["snapshot"].output_frequency = 360 * 86400.0
-        state.diagnostics["overturning"].output_frequency = 360 * 86400.0
+        state.diagnostics["snapshot"].output_frequency = 365 * 86400.0
+        state.diagnostics["overturning"].output_frequency = 365 * 86400.0
         state.diagnostics["overturning"].sampling_frequency = settings.dt_tracer
-        state.diagnostics["energy"].output_frequency = 360 * 86400.0
+        state.diagnostics["energy"].output_frequency = 365 * 86400.0
         state.diagnostics["energy"].sampling_frequency = 86400
         average_vars = [
             "temp",
@@ -121,7 +121,7 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
             "qnec",
         ]
         state.diagnostics["averages"].output_variables = average_vars
-        state.diagnostics["averages"].output_frequency = 30 * 86400.0
+        state.diagnostics["averages"].output_frequency = 365 * 86400.0
         state.diagnostics["averages"].sampling_frequency = 86400
 
 
