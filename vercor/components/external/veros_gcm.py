@@ -5,7 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 from datetime import datetime, timedelta
 
-from vercor.clock import CustomDateTime
+from vercor.clock import ModelDateTime
 from vercor.components.external.veros_runtime_settings import *  # noqa: F403,F401
 
 from veros.setups.global_4deg import GlobalFourDegreeSetup
@@ -309,7 +309,7 @@ class VerosGCM(Component):
     def step(
         self,
         dt: timedelta,
-        time: datetime | CustomDateTime,
+        time: datetime | ModelDateTime,
         coupler: "Coupler",
     ) -> None:
 

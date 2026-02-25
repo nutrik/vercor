@@ -8,7 +8,7 @@ from typing import Any, cast
 import numpy as np
 import pytest
 
-from vercor.clock import Clock, CustomDateTime
+from vercor.clock import Clock, DateTime360, DateTime365
 from vercor.exceptions import CouplerError
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
@@ -33,9 +33,7 @@ class DummyCoupler:
 
 
 def make_coupler(year_in_seconds: float) -> DummyCoupler:
-    clock = Clock(
-        start=datetime(2000, 1, 1), dt_seconds=1.0, steps=1, days_per_year=365
-    )
+    clock = Clock(start=datetime(2000, 1, 1), dt_seconds=1.0, steps=1)
     settings = VercorSettings(year_in_seconds=year_in_seconds)
     return DummyCoupler(clock=clock, settings=settings)
 
@@ -154,7 +152,7 @@ def test_get_field_time_slice_leap_day_retained_when_requested() -> None:
 def test_get_field_time_slice_model_datetime_360_maps_to_real_month_lengths() -> None:
     data = {"foo": np.arange(365, dtype=float)}
 
-    time = CustomDateTime(
+    time = DateTime360(
         year=2001,
         month=1,
         day=30,
@@ -163,12 +161,11 @@ def test_get_field_time_slice_model_datetime_360_maps_to_real_month_lengths() ->
         second=0,
         microsecond=0,
         day_of_year=30,
-        days_per_year=360,
     )
     out = get_field_time_slice("foo", data, time, no_leap=True)
     assert np.isclose(out, data["foo"][30])
 
-    time = CustomDateTime(
+    time = DateTime360(
         year=2001,
         month=2,
         day=3,
@@ -177,7 +174,6 @@ def test_get_field_time_slice_model_datetime_360_maps_to_real_month_lengths() ->
         second=0,
         microsecond=0,
         day_of_year=33,
-        days_per_year=360,
     )
     out = get_field_time_slice("foo", data, time, no_leap=True)
     assert np.isclose(out, data["foo"][32])
@@ -186,7 +182,7 @@ def test_get_field_time_slice_model_datetime_360_maps_to_real_month_lengths() ->
 def test_get_field_time_slice_model_datetime_360_february_non_leap() -> None:
     data = {"foo": np.arange(365, dtype=float)}
 
-    time = CustomDateTime(
+    time = DateTime360(
         year=2001,
         month=2,
         day=30,
@@ -195,7 +191,6 @@ def test_get_field_time_slice_model_datetime_360_february_non_leap() -> None:
         second=0,
         microsecond=0,
         day_of_year=60,
-        days_per_year=360,
     )
     out = get_field_time_slice("foo", data, time, no_leap=True)
 
@@ -205,7 +200,7 @@ def test_get_field_time_slice_model_datetime_360_february_non_leap() -> None:
 def test_get_field_time_slice_model_datetime_360_february_leap_allowed() -> None:
     data = {"foo": np.arange(366, dtype=float)}
 
-    time = CustomDateTime(
+    time = DateTime360(
         year=2000,
         month=2,
         day=30,
@@ -214,7 +209,6 @@ def test_get_field_time_slice_model_datetime_360_february_leap_allowed() -> None
         second=0,
         microsecond=0,
         day_of_year=60,
-        days_per_year=360,
     )
     out = get_field_time_slice("foo", data, time, no_leap=False)
 
@@ -223,7 +217,7 @@ def test_get_field_time_slice_model_datetime_360_february_leap_allowed() -> None
 
 def test_get_field_time_slice_model_datetime_365_uses_day_of_year_directly() -> None:
     data = {"foo": np.arange(365, dtype=float)}
-    time = CustomDateTime(
+    time = DateTime365(
         year=2001,
         month=3,
         day=1,
@@ -232,14 +226,13 @@ def test_get_field_time_slice_model_datetime_365_uses_day_of_year_directly() -> 
         second=0,
         microsecond=0,
         day_of_year=60,
-        days_per_year=365,
     )
     out = get_field_time_slice("foo", data, time, no_leap=True)
     assert np.isclose(out, data["foo"][59])
 
 
 def test_datetime_to_seconds_in_year_for_model_datetime_with_arithmetic() -> None:
-    base = CustomDateTime(
+    base = DateTime360(
         year=2001,
         month=1,
         day=1,
@@ -248,7 +241,6 @@ def test_datetime_to_seconds_in_year_for_model_datetime_with_arithmetic() -> Non
         second=0,
         microsecond=0,
         day_of_year=1,
-        days_per_year=360,
     )
     shifted = base + timedelta(days=1, hours=2, minutes=3, seconds=4, microseconds=5)
     assert shifted - base == timedelta(

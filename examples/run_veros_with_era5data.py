@@ -16,7 +16,6 @@ if __name__ == "__main__":
         start=datetime(2025, 1, 1, 0, 0, 0),
         dt_seconds=86400.0,
         steps=360,
-        days_per_year=360,
     )
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
 

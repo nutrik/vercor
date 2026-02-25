@@ -17,7 +17,7 @@ from jcm.model import ForcingData, Model, Predictions
 from jcm.physics.speedy.physics_data import PhysicsData
 from jcm.physics_interface import PhysicsState, dynamics_state_to_physics_state
 
-from vercor.clock import CustomDateTime
+from vercor.clock import ModelDateTime
 from vercor.components.base import Component
 from vercor.components.external.jax_gcm_tools import (
     mean_leaf,
@@ -205,7 +205,7 @@ class JAXGCM(Component):
     def step(
         self,
         dt: timedelta,
-        time: datetime | CustomDateTime,
+        time: datetime | ModelDateTime,
         coupler: "Coupler",
     ) -> None:
         settings = coupler.settings
@@ -321,7 +321,7 @@ class JAXGCM(Component):
 
     def _is_period_end(
         self,
-        time: datetime | CustomDateTime,
+        time: datetime | ModelDateTime,
         dt: timedelta,
         frequency: Literal["day", "month", "year"],
     ) -> bool:
@@ -340,7 +340,7 @@ class JAXGCM(Component):
 
     def _should_write_output(
         self,
-        time: datetime | CustomDateTime,
+        time: datetime | ModelDateTime,
         dt: timedelta,
     ) -> bool:
         if self.output_frequency is None:
@@ -369,9 +369,10 @@ class JAXGCM(Component):
 
         print(f"Output file: {output:s}")
 
-        ds.mean(dim="time", keepdims=True).transpose(
-            "time", "level", "lat", "lon"
-        ).to_netcdf(output, engine="h5netcdf")
+        t_end = ds.time.isel(time=-1)
+        ds.mean(dim="time", keep_attrs=True, keepdims=True).assign_coords(
+            time=[t_end.values]
+        ).transpose("time", "level", "lat", "lon").to_netcdf(output, engine="h5netcdf")
 
         # Clear the predictions list after saving to disk to free up memory
         self._predictions_list = []

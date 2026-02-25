@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from vercor.clock import CustomDateTime
+from vercor.clock import DateTime360
 from vercor.components.external.jax_gcm import JAXGCM
 
 
@@ -50,7 +50,7 @@ def test_should_write_output_for_month_and_year_boundary_datetime() -> None:
 
 def test_should_write_output_for_custom_datetime_boundaries() -> None:
     component = _make_component("day")
-    model_time = CustomDateTime(
+    model_time = DateTime360(
         year=2026,
         month=2,
         day=20,
@@ -59,12 +59,11 @@ def test_should_write_output_for_custom_datetime_boundaries() -> None:
         second=0,
         microsecond=0,
         day_of_year=50,
-        days_per_year=360,
     )
     assert component._should_write_output(model_time, timedelta(hours=1))
 
     component.output_frequency = "month"
-    month_end_time = CustomDateTime(
+    month_end_time = DateTime360(
         year=2026,
         month=2,
         day=30,
@@ -73,12 +72,11 @@ def test_should_write_output_for_custom_datetime_boundaries() -> None:
         second=0,
         microsecond=0,
         day_of_year=60,
-        days_per_year=360,
     )
     assert component._should_write_output(month_end_time, timedelta(hours=1))
 
     component.output_frequency = "year"
-    year_end_time = CustomDateTime(
+    year_end_time = DateTime360(
         year=2026,
         month=12,
         day=30,
@@ -87,7 +85,6 @@ def test_should_write_output_for_custom_datetime_boundaries() -> None:
         second=0,
         microsecond=0,
         day_of_year=360,
-        days_per_year=360,
     )
     assert component._should_write_output(year_end_time, timedelta(hours=1))
 

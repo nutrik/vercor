@@ -6,7 +6,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 from vercor.clock import (
-    CustomDateTime,
+    DateTime360,
+    DateTime365,
+    ModelDateTime,
     _DAYS_PER_MONTH_GREGORIAN_NO_LEAP,
     _DAYS_PER_MONTH_GREGORIAN_LEAP,
 )
@@ -115,11 +117,11 @@ def get_periodic_interval(
     return (t_idx_1, weight_1), (t_idx_2, weight_2)
 
 
-def datetime_to_seconds_in_year(dt: datetime | CustomDateTime) -> float:
+def datetime_to_seconds_in_year(dt: datetime | ModelDateTime) -> float:
     """Convert a datetime object to the number of seconds since the start of the year.
 
     Arguments:
-        dt: datetime or CustomDateTime object to convert.
+        dt: datetime or ModelDateTime object to convert.
 
     Returns:
         float: Number of seconds since the start of the year.
@@ -129,8 +131,12 @@ def datetime_to_seconds_in_year(dt: datetime | CustomDateTime) -> float:
         year_start = datetime(dt.year, 1, 1)
         return (dt - year_start).total_seconds()
 
+    day_of_year = dt.day_of_year
+    if day_of_year is None:
+        raise ValueError("ModelDateTime.day_of_year is not initialized")
+
     return (
-        (dt.day_of_year - 1) * 86_400.0
+        (day_of_year - 1) * 86_400.0
         + dt.hour * 3_600.0
         + dt.minute * 60.0
         + dt.second
@@ -170,12 +176,9 @@ def is_leap_year(x: int) -> bool:
 
 
 def _custom_360_day_to_gregorian_day_of_year(
-    time: CustomDateTime,
+    time: datetime | ModelDateTime,
     no_leap: bool,
 ) -> int:
-    if not time.fixed_30_day_months or time.days_per_year != 360:
-        return time.day_of_year
-
     month_lengths = _DAYS_PER_MONTH_GREGORIAN_NO_LEAP
     if not no_leap and is_leap_year(time.year):
         month_lengths = _DAYS_PER_MONTH_GREGORIAN_LEAP
@@ -189,7 +192,7 @@ def _custom_360_day_to_gregorian_day_of_year(
 def get_field_time_slice(
     field_name: str,
     data: Mapping[str, NDArray],
-    time: datetime | CustomDateTime,
+    time: datetime | ModelDateTime,
     no_leap: bool = True,
 ) -> NDArray:
     """Retrieve a field from a component data storage dictionary at a specific time index
@@ -199,15 +202,19 @@ def get_field_time_slice(
     Arguments:
         field_name: Name of the field to retrieve.
         data: Dictionary containing the component data with time-dependent fields.
-        time: datetime or CustomDateTime object representing the time slice to retrieve.
+        time: datetime or ModelDateTime object representing the time slice to retrieve.
         no_leap: Whether to ignore leap days (Feb 29) when indexing.
 
     Returns:
         NDArray: The field data at the specified time index.
     """
 
-    if isinstance(time, CustomDateTime):
+    if isinstance(time, DateTime360):
         tm_yday = _custom_360_day_to_gregorian_day_of_year(time, no_leap=no_leap)
+    elif isinstance(time, DateTime365):
+        if time.day_of_year is None:
+            raise ValueError("DateTime365.day_of_year is not initialized")
+        tm_yday = time.day_of_year
     else:
         tm_yday = time.timetuple().tm_yday
 
@@ -228,7 +235,7 @@ def get_field_at_specific_time(
     field_name: str,
     data: Mapping[str, NDArray],
     coupler: "Coupler",
-    current_time: Optional[datetime | CustomDateTime] = None,
+    current_time: Optional[datetime | ModelDateTime] = None,
 ) -> NDArray:
     """Retrieve a field from a component data storage dictionary at a specific time,
     applying time interpolation if necessary.

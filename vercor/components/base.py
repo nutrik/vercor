@@ -9,7 +9,7 @@ import numpy as np
 import xarray as xr
 from numpy.typing import NDArray
 
-from vercor.clock import CustomDateTime
+from vercor.clock import ModelDateTime, CustomDateTime
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.tools import get_field_at_specific_time, get_field_time_slice
@@ -25,7 +25,7 @@ class TimedNamedArray:
     """Container class for a field (array), its timestamp, and its component name."""
 
     data: NDArray
-    timestamp: datetime | CustomDateTime
+    timestamp: datetime | ModelDateTime
     component_name: str
 
     def __array__(self, dtype: Optional[NDArray] = None) -> NDArray:
@@ -68,7 +68,7 @@ class Shared:
                     f"Expected tuple of length 3 for field assignment, got length {len(value)}"
                 )
 
-            if not isinstance(timestamp, datetime | CustomDateTime):
+            if not isinstance(timestamp, datetime | ModelDateTime):
                 raise TypeError(
                     f"When assigning a tuple, the second element must be a datetime, got {type(timestamp)}"
                 )
@@ -276,7 +276,7 @@ class Component(abc.ABC):
 
         self.data.update(self.incoming_fields.fields())
 
-    def send_fields(self, time: datetime | CustomDateTime, coupler: "Coupler") -> None:
+    def send_fields(self, time: datetime | ModelDateTime, coupler: "Coupler") -> None:
         """
         Prepare fields from data to be deposited to outgoing_fields,
         to be later sent to another component(s).

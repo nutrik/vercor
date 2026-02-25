@@ -8,7 +8,7 @@ from typing import Optional
 import numpy as np
 from numpy.typing import NDArray
 
-from vercor.clock import Clock
+from vercor.clock import Clock, ModelDateTime
 from vercor.components import (
     Atmosphere,
     ERA5Atmosphere,
@@ -42,7 +42,6 @@ from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
 from vercor.tools import get_component, grids_identical, _append_unique, _flatten_fields
 from vercor.types import AllComponentsType
-from vercor.clock import CustomDateTime
 
 
 def setup_logger() -> Logger:
@@ -385,7 +384,7 @@ class Coupler:
     def interpolate_and_dispatch_fields(
         self,
         component: AllComponentsType,
-        timestamp: datetime | CustomDateTime,
+        timestamp: datetime | ModelDateTime,
     ) -> None:
         """
         Interpolate and dispatch fields to the given component at the specified timestamp.

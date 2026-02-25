@@ -40,8 +40,8 @@ if __name__ == "__main__":
     clock = Clock(
         start=datetime(2000, 1, 1, 0, 0, 0),
         dt_seconds=86400.0,
-        steps=60,
-        days_per_year=360,
+        steps=90,
+        year_type="noleap",
     )
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
 
