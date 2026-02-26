@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 from vercor.clock import CustomDateTime
 from vercor.components import Component, ComponentForcingData
 from vercor.grid import RectilinearGrid
+from vercor.tools import get_forcing_data
 
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
@@ -17,12 +18,7 @@ class ERAInterimOcean(Component, ComponentForcingData):
     def __init__(
         self,
         name: str = "OCN",
-        model_level_file: Path = (
-            Path(__file__).parent.parent.parent
-            / ".."
-            / "forcing"
-            / "forcing_4deg_global_open_itf.nc"
-        ).resolve(),
+        model_level_file: Optional[Path] = None,
     ) -> None:
         """
         Read all necessary fields from the provided forcing files.
@@ -39,6 +35,9 @@ class ERAInterimOcean(Component, ComponentForcingData):
                 name: str
                 grid: RectilinearGrid
         """
+
+        if model_level_file is None:
+            model_level_file = get_forcing_data("erainterim_ocean")
 
         self.DATA_FILES = {
             "model_level": str(model_level_file),

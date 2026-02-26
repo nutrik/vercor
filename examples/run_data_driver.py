@@ -15,7 +15,7 @@ if __name__ == "__main__":
     lnd = ERA5Land()
 
     # Clock and sequence
-    clock = Clock(start=datetime(2025, 1, 1, 0, 0, 0), dt_seconds=3600, steps=720)
+    clock = Clock(start=datetime(2025, 1, 1, 0, 0, 0), dt_seconds=3600, steps=10)
     run_sequence = RunSequence(order=["OCN", "ATM", "LND"])
 
     # Coupler

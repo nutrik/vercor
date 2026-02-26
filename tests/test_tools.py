@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+import hashlib
 from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
 import pytest
+import vercor.tools as tools_module
 
 from vercor.clock import Clock, DateTime360, DateTime365
-from vercor.exceptions import CouplerError
+from vercor.exceptions import AssetError, CouplerError
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
 from vercor.tools import (
@@ -271,16 +273,42 @@ def test_is_leap_year_cases() -> None:
     assert not is_leap_year(2001)
 
 
-def test_get_forcing_data_valid_and_invalid_file_type() -> None:
-    model_level = get_forcing_data("model_level")
-    surface = get_forcing_data("surface")
+def test_get_forcing_data_valid_and_invalid_file_type(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_name = "model.nc"
+    surface_name = "surface.nc"
+    model_bytes = b"model-level-data"
+    surface_bytes = b"surface-data"
+
+    (tmp_path / model_name).write_bytes(model_bytes)
+    (tmp_path / surface_name).write_bytes(surface_bytes)
+
+    monkeypatch.setattr(tools_module, "_ASSETS_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(
+        tools_module,
+        "_FORCING_ASSETS",
+        {
+            "era5_model_levels": {
+                "filename": model_name,
+                "md5": hashlib.md5(model_bytes).hexdigest(),
+            },
+            "era5_surface": {
+                "filename": surface_name,
+                "md5": hashlib.md5(surface_bytes).hexdigest(),
+            },
+        },
+    )
+
+    model_level = get_forcing_data("era5_model_levels")
+    surface = get_forcing_data("era5_surface")
 
     assert isinstance(model_level, Path)
     assert isinstance(surface, Path)
-    assert str(model_level).endswith("era5_198x_ml_4x4deg_monthly_mean.nc")
-    assert str(surface).endswith("era5_198x_sfc_4x4deg_monthly_mean.nc")
+    assert str(model_level).endswith(model_name)
+    assert str(surface).endswith(surface_name)
 
-    with pytest.raises(CouplerError, match="Unknown file_type"):
+    with pytest.raises(AssetError, match="Unknown file_type"):
         get_forcing_data("unknown")
 
 

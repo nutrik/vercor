@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
@@ -17,7 +17,7 @@ class ERA5Ocean(Component, ComponentForcingData):
     def __init__(
         self,
         name: str = "OCN",
-        surface_file: Path = get_forcing_data("surface"),
+        surface_file: Optional[Path] = None,
     ) -> None:
         """
         Read all necessary fields from the provided forcing files.
@@ -33,6 +33,9 @@ class ERA5Ocean(Component, ComponentForcingData):
                 name: str
                 grid: RectilinearGrid
         """
+
+        if surface_file is None:
+            surface_file = get_forcing_data("era5_surface")
 
         self.DATA_FILES = {
             "surface": str(surface_file),

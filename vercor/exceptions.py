@@ -1,3 +1,9 @@
+class AssetError(Exception):
+    """Base class for exceptions related to assets."""
+
+    pass
+
+
 class CouplerError(Exception):
     """Base class for exceptions inside Coupler."""
 

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
@@ -23,8 +23,8 @@ class ERA5Atmosphere(Component, ComponentForcingData):
     def __init__(
         self,
         name: str = "ATM",
-        model_level_file: Path = get_forcing_data("model_level"),
-        surface_file: Path = get_forcing_data("surface"),
+        model_level_file: Optional[Path] = None,
+        surface_file: Optional[Path] = None,
     ) -> None:
         """
         Read all necessary fields from the provided forcing files.
@@ -46,6 +46,11 @@ class ERA5Atmosphere(Component, ComponentForcingData):
                 name: str
                 grid: RectilinearGrid
         """
+
+        if model_level_file is None:
+            model_level_file = get_forcing_data("era5_model_levels")
+        if surface_file is None:
+            surface_file = get_forcing_data("era5_surface")
 
         self.DATA_FILES = {
             "model_level": str(model_level_file),

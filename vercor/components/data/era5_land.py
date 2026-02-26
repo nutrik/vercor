@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from vercor.clock import CustomDateTime
 from vercor.components import Component, ComponentForcingData
 from vercor.grid import RectilinearGrid
+from vercor.tools import get_forcing_data
 
 
 if TYPE_CHECKING:
@@ -15,12 +16,7 @@ class ERA5Land(Component, ComponentForcingData):
     def __init__(
         self,
         name: str = "LND",
-        surface_file: Path = (
-            Path(__file__).parent.parent.parent
-            / ".."
-            / "forcing"
-            / "era5_lnd_skt_masked_1980.nc"
-        ).resolve(),
+        surface_file: Optional[Path] = None,
     ) -> None:
         """
         Read all necessary fields from the provided forcing files.
@@ -36,6 +32,9 @@ class ERA5Land(Component, ComponentForcingData):
                 name: str
                 grid: RectilinearGrid
         """
+
+        if surface_file is None:
+            surface_file = get_forcing_data("era5_land_masked")
 
         self.DATA_FILES = {
             "surface": str(surface_file),

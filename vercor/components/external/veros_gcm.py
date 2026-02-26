@@ -30,7 +30,7 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
         vs = state.variables
         settings = state.settings
 
-        year_in_seconds = 360 * 86400.0
+        year_in_seconds = 365 * 86400.0
         (n1, f1), (n2, f2) = get_periodic_interval(
             vs.time, year_in_seconds, year_in_seconds / 12.0, 12
         )
