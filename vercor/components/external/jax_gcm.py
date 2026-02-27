@@ -6,16 +6,22 @@ from typing import TYPE_CHECKING, Any, Optional, Literal, cast
 import jax
 import jax.numpy as jnp
 import numpy as np
+from numpy.typing import NDArray
 import tree_math
 import xarray as xr
 
 from dinosaur import primitive_equations
+from dinosaur.coordinate_systems import CoordinateSystem
+
 from jcm.constants import p0
-from jcm.geometry import Geometry
 from jcm.forcing import default_forcing
 from jcm.model import ForcingData, Model, Predictions
 from jcm.physics.speedy.physics_data import PhysicsData
-from jcm.physics_interface import PhysicsState, dynamics_state_to_physics_state
+from jcm.physics_interface import (
+    PhysicsState,
+    TerrainData,
+    dynamics_state_to_physics_state,
+)
 
 from vercor.clock import ModelDateTime
 from vercor.components.base import Component
@@ -59,7 +65,8 @@ class JAXGCM(Component):
 
     def __init__(
         self,
-        geometry: Geometry,
+        coords: CoordinateSystem,
+        terrain: TerrainData,
         name: str = "ATM",
         model_timestep: timedelta = timedelta(minutes=30),
         save_interval: timedelta = timedelta(days=1),
@@ -72,7 +79,7 @@ class JAXGCM(Component):
     ) -> None:
 
         self.model = Model(
-            time_step=model_timestep.total_seconds() / 60.0, geometry=geometry
+            coords, time_step=model_timestep.total_seconds() / 60.0, terrain=terrain
         )
         self.forcing_data = forcing_data
         self.output_frequency = output_frequency
@@ -88,11 +95,11 @@ class JAXGCM(Component):
             longitude=np.rad2deg(hgrid.longitudes),
             latitude=np.rad2deg(hgrid.latitudes),
             binary_mask=np.ones_like(
-                self.model.geometry.fmask
+                self.model.terrain.fmask
             ).transpose(),  # This is used for interpolation, which all points are valid
         )
 
-        self.sigma_levels = self.model.geometry.fsg
+        self.sigma_levels: NDArray = self.model.coords.vertical.centers
 
         super().__init__(name, grid)
 
@@ -238,10 +245,10 @@ class JAXGCM(Component):
 
         land_surface_temperature = (
             self.data["total_surface_temperature"]
-            * self.model.geometry.fmask.transpose()
+            * self.model.terrain.fmask.transpose()
         )
         sea_surface_temperature = self.data["total_surface_temperature"] * (
-            1.0 - self.model.geometry.fmask.transpose()
+            1.0 - self.model.terrain.fmask.transpose()
         )
 
         # Replace zero values with a default temperature (e.g., 288.15 K)
@@ -372,7 +379,9 @@ class JAXGCM(Component):
         t_end = ds.time.isel(time=-1)
         ds.mean(dim="time", keep_attrs=True, keepdims=True).assign_coords(
             time=[t_end.values]
-        ).transpose("time", "level", "lat", "lon").to_netcdf(output, engine="h5netcdf")
+        ).transpose("time", "wvi_id", "hsg_level", "level", "lat", "lon").to_netcdf(
+            output, engine="h5netcdf"
+        )
 
         # Clear the predictions list after saving to disk to free up memory
         self._predictions_list = []

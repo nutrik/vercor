@@ -1,18 +1,22 @@
 from pathlib import Path
-from typing import Any, Optional
-import subprocess
-import sys
+from typing import Any, Optional, Tuple
+from importlib import resources
 
 import jax
 import jax.numpy as jnp
 
-from jcm.geometry import Geometry, get_terrain
+from dinosaur.coordinate_systems import CoordinateSystem
+
+from jcm.forcing import ForcingData
+from jcm.terrain import TerrainData
+from jcm.physics.speedy.speedy_coords import get_speedy_coords
+from numpy.typing import NDArray
 
 
 def compute_pressure_levels(
     reference_pressure: jnp.ndarray,
     top_pressure: jnp.ndarray,
-    sigma_levels: jnp.ndarray,
+    sigma_levels: NDArray | jnp.ndarray,
     normalized_surface_pressure: jnp.ndarray,
 ) -> jnp.ndarray:
     """
@@ -137,104 +141,41 @@ def get_altitudes_sigma_levels(
     return z
 
 
-def generate_jcm_geometry_from_orography(
-    orography: jnp.ndarray,
-    num_levels: int = 8,
-    truncation_number: Optional[int] = None,
-) -> Geometry:
-    """Initialize all of the speedy model geometry variables from a given terrain file containing orog and lsm.
-
-    Arguments:
-        orography: A 2-dimensional array of orography
-        num_levels (optional): Number of vertical levels `kx` (default 8).
-        truncation_number (optional): Spectral truncation number for surface geopotential.
-                                      If None, inferred from nodal_shape.
-
-    Returns:
-        Geometry object
-    """
-    orography, fmask = get_terrain(orography=orography)
-    return Geometry.from_grid_shape(
-        nodal_shape=orography.shape,
-        num_levels=num_levels,
-        orography=orography,
-        fmask=fmask,
-        truncation_number=truncation_number,
-    )
-
-
-def generate_jcm_forcing_and_topography_files(
-    resolution: int,
+def generate_jcm_coords_forcing_topography_files(
+    resolution: int = 31,
     input_data_directory: Optional[Path] = None,
-) -> dict[str, Path]:
-    """Generate JCM forcing and topography files at the specified resolution.
-    If the files already exist in the input_data_directory, it will not regenerate them.
+) -> Tuple[CoordinateSystem, TerrainData, ForcingData]:
+    """Generate JCM coordinates, forcing and topography files at the specified resolution.
 
     Arguments:
-        resolution: The resolution of the JCM files to generate (e.g., 31 for T31)
+        resolution: Optional resolution of the JCM files to generate (e.g., 31 for T31)
         input_data_directory: Optional directory to look for existing files and to save generated files.
                               If None, defaults to ~/.vercor/jcm/
 
     Returns:
-        A dictionary with keys "terrain" and "forcing" mapping to the respective file paths.
+        A tuple of (coords, terrain, forcing) objects.
     """
 
-    import jcm
+    coords = get_speedy_coords(
+        spectral_truncation=resolution
+    )  # T31 spectral resolution with 8 vertical levels
 
-    def check_if_file_exist(
-        file_dict: dict[str, Path], verbose: bool = True
-    ) -> dict[Path, bool]:
-
-        file_status = {file: Path(file).exists() for _, file in file_dict.items()}
-
-        if verbose:
-            for file, result in file_status.items():
-                print(
-                    f"Check file: {str(file):s}...",
-                    "found." if result else "not found.",
-                )
-
-        return file_status
-
-    if not (isinstance(input_data_directory, Path) or input_data_directory is None):
-        raise TypeError("`input_data_directory` must be of type `Path` or `None`.")
-
-    home_directory = Path.home()
-    raw_jcm_data_directory = Path(jcm.__file__).parent / "data/bc"
-
+    # Read JCM topography file
+    # Load realistic orography and land-sea mask, interpolated to T31 grid
     if input_data_directory is None:
-        input_data_directory = home_directory / ".vercor" / "jcm"
+        data_dir = resources.files("jcm.data.bc.t30.clim")
+    else:
+        data_dir = Path(input_data_directory)
 
-    print(f'Using input data directory: "{str(input_data_directory)}".')
+    terrain_file = data_dir / "terrain.nc"
+    terrain = TerrainData.from_file(terrain_file, coords=coords)
 
-    input_forcing_files = dict(
-        terrain=(input_data_directory / f"terrain_t{resolution:d}.nc").resolve(),
-        forcing=(input_data_directory / f"forcing_t{resolution:d}.nc").resolve(),
-    )
+    # Load realistic forcing data (SST, sea ice, soil moisture, etc.) interpolated to T31 grid
+    forcing_file = data_dir / "forcing.nc"
+    forcing = ForcingData.from_file(forcing_file, coords=coords)
+    print(type(coords), type(terrain), type(forcing))
 
-    files_status = check_if_file_exist(input_forcing_files)
-
-    for file, status in files_status.items():
-        if not status:
-            print(f"File {str(file)} is missing and will be generated.")
-        else:
-            print(f"File {str(file)} already exists and will be used.")
-
-        input_data_directory.mkdir(parents=True, exist_ok=True)
-        interpolation_code = (raw_jcm_data_directory / "interpolate.py").resolve()
-
-        try:
-            subprocess.run(
-                [sys.executable, str(interpolation_code), f"{resolution:d}"],
-                check=True,
-                capture_output=True,
-                text=True,
-                cwd=input_data_directory,
-            )
-        except subprocess.CalledProcessError as e:
-            print("Error output:", e.stderr)
-
-    return input_forcing_files
+    return (coords, terrain, forcing)
 
 
 def mean_leaf(

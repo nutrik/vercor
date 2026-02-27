@@ -2,13 +2,10 @@ from datetime import datetime
 
 import numpy as np
 
-from jcm.geometry import Geometry
-from jcm.forcing import ForcingData
-
 from vercor import Clock, Coupler, Exchange
 from vercor.components import ERAInterimOcean, JCMLand, JAXGCM
 from vercor.components.external.jax_gcm_tools import (
-    generate_jcm_forcing_and_topography_files,
+    generate_jcm_coords_forcing_topography_files,
 )
 from vercor.coupler import RunSequence
 from vercor.regridders import bilinear
@@ -18,18 +15,15 @@ if __name__ == "__main__":
     # This ocean data & grid is identical to Veros global 4deg. setup
     ocn = ERAInterimOcean()
 
-    # Read JCM topography file
-    external_files = generate_jcm_forcing_and_topography_files(resolution=31)
-    geometry = Geometry.from_file(external_files["terrain"])
-    forcing = ForcingData.from_file(external_files["forcing"])
+    coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()
 
-    lnd = JCMLand(ocn.grid, external_files["forcing"])
+    lnd = JCMLand(coords, forcing, ocn.grid)
 
     # Swap mask in JAXGCM with ocean/land masks from ocean model
-    geometry.fmask = np.array(lnd.grid.binary_mask).T  # type: ignore
+    terrain.fmask = np.array(lnd.grid.binary_mask).T  # type: ignore
 
     # Build components
-    atm = JAXGCM(geometry, forcing_data=forcing, do_spinup=True, jitted=True)
+    atm = JAXGCM(coords, terrain, forcing_data=forcing, do_spinup=True, jitted=True)
 
     # Clock and sequence
     clock = Clock(

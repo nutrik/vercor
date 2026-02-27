@@ -3,8 +3,6 @@ from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 
-from jcm import geometry
-
 from vercor import Clock, Coupler, Exchange
 from vercor.components import JAXGCM, Land, Ocean
 from vercor.coupler import RunSequence
@@ -12,20 +10,18 @@ from vercor.grid import RectilinearGrid
 from vercor.regridders import bilinear, conservative
 
 from vercor.components.external.jax_gcm_tools import (
-    generate_jcm_forcing_and_topography_files,
+    generate_jcm_coords_forcing_topography_files,
 )
 
 
 if __name__ == "__main__":
 
-    # Read JCM topography file
-    external_files = generate_jcm_forcing_and_topography_files(resolution=31)
-    geometry = geometry.Geometry.from_file(external_files["terrain"])
+    coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()
 
     # Build components
-    atm = JAXGCM(geometry, jitted=True)
+    atm = JAXGCM(coords, terrain, forcing_data=forcing, jitted=True)
 
-    ocn_binary_mask = np.where(geometry.fmask < 1, 1, 0).transpose()
+    ocn_binary_mask = np.where(terrain.fmask < 1, 1, 0).transpose()
     lnd_binary_mask = 1 - ocn_binary_mask
 
     hgrid = atm.model.coords.horizontal

@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
 
+from dinosaur.coordinate_systems import CoordinateSystem
+from jcm.forcing import ForcingData
+
 from vercor.clock import CustomDateTime
-from vercor.components import Component, ComponentForcingData
+from vercor.components import Component
 from vercor.grid import RectilinearGrid
 from vercor.regridders.helpers import compute_land_mask
 
@@ -86,11 +88,12 @@ def create_new_jcm_lnd_mask(
     return lnd_bmask_on_atm_grid, lnd_fmask_on_atm_grid
 
 
-class JCMLand(Component, ComponentForcingData):
+class JCMLand(Component):
     def __init__(
         self,
+        jcm_coords: CoordinateSystem,
+        jcm_forcing: ForcingData,
         ocn_grid: RectilinearGrid,
-        surface_file: Path,
         name: str = "LND",
     ) -> None:
         """
@@ -98,22 +101,17 @@ class JCMLand(Component, ComponentForcingData):
 
         Arguments:
             name (str): component name
-            surface_file (Path): path to netCDF file with data at surface level
+            jcm_coords (CoordinateSystem): JCM coordinate system object
+            jcm_forcing (ForcingData): JCM forcing data object
 
         Attributes of parent classes to be initialized:
-            ComponentForcingData
-                DATA_FILES: dict [str, str]
             Component
                 name: str
                 grid: RectilinearGrid
         """
 
-        self.DATA_FILES = {
-            "surface": str(surface_file),
-        }
-
-        longitude = self._read_forcing("lon", where="surface")
-        latitude = self._read_forcing("lat", where="surface")
+        longitude = np.rad2deg(jcm_coords.horizontal.longitudes)
+        latitude = np.rad2deg(jcm_coords.horizontal.latitudes)
         lnd_bmask, _ = create_new_jcm_lnd_mask(
             atm_lat=latitude,
             atm_lon=longitude,
@@ -132,11 +130,9 @@ class JCMLand(Component, ComponentForcingData):
         self._settings["get_field_time_slice"] = True
 
         # Units: [K]
-        self.data["land_surface_temperature"] = self._read_forcing(
-            "stl", where="surface"
-        )
+        self.data["land_surface_temperature"] = jcm_forcing.stl_am.T
         # Units: [???]
-        self.data["soil_moisture"] = self._read_forcing("soilw_am", where="surface")
+        self.data["soil_moisture"] = jcm_forcing.soilw_am.T
 
     def initialize(self, coupler: "Coupler") -> None:
         pass

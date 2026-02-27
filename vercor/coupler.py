@@ -445,8 +445,7 @@ class Coupler:
                             f"Field {field_name} not present in source fields"
                         )
                     source_field_data = getattr(source_fields, field_name).data
-                    scalar = np.asarray(regrid(source_field_data))
-                    scalar *= fractional_mask
+                    scalar = np.asarray(regrid(source_field_data)) * fractional_mask
 
                     setattr(
                         destination_fields,
