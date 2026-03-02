@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     # Clock and sequence
     clock = Clock(
-        start=datetime(2000, 1, 1, 0, 0, 0),
+        start=datetime(2000, 1, 3, 0, 0, 0),
         dt_seconds=86400.0,
         steps=90,
         year_type="noleap",

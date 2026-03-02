@@ -26,21 +26,24 @@ from vercor.components.external.veros_gcm import VerosGCM
 from vercor.exceptions import (
     CouplerError,
     ComponentError,
-    RegridderError,
     ExchangerError,
 )
 from vercor.exchange import Exchange
-from vercor.interpolators.conservative_remap_rectilinear import (
-    ConservativeRectilinearRemapper,
-)
 from vercor.regridders import (
     BilinearRectilinearRegridder,
     ConservativeRectilinearRegridder,
 )
-from vercor.regridders.helpers import compute_land_mask
 from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
-from vercor.tools import get_component, grids_identical, _append_unique, _flatten_fields
+from vercor.tools import (
+    check_total_lnd_ocn_mask_sum,
+    get_component,
+    grids_identical,
+    _append_unique,
+    _flatten_fields,
+    check_remap_conservation,
+    compute_ocn_lnd_masks_on_atm_grid,
+)
 from vercor.types import AllComponentsType
 
 
@@ -257,8 +260,6 @@ class Coupler:
         land, ocean, and atmosphere components.
         """
 
-        do_not_check_mass = False
-
         land_component = get_component(self.components, (Land, ERA5Land, JCMLand))
         atmosphere_component = get_component(
             self.components, (Atmosphere, ERA5Atmosphere, JAXGCM)
@@ -284,52 +285,22 @@ class Coupler:
             raise ComponentError(
                 f"Ocean component {ocean_component.name} has no binary mask defined"
             )
-        ocean_bmask = np.asarray(ocean_binary_mask)
 
-        # Conservative remapping of binary mask to atmospheric grid
-        # results to fractional mask on atmosphere grid
-        ocn_fmask_on_atm_grid = np.asarray(regridder(ocean_bmask))
-        self.ocn_fmask_on_atm_grid = np.clip(ocn_fmask_on_atm_grid, 0.0, 1.0)
-        self.lnd_fmask_on_atm_grid = 1.0 - self.ocn_fmask_on_atm_grid
-        self.lnd_bmask_on_atm_grid = compute_land_mask(self.ocn_fmask_on_atm_grid)
+        (
+            self.ocn_fmask_on_atm_grid,
+            self.lnd_fmask_on_atm_grid,
+            self.lnd_bmask_on_atm_grid,
+        ) = compute_ocn_lnd_masks_on_atm_grid(ocean_binary_mask, regridder)
 
-        if regridder.interpolator is not None and isinstance(
-            regridder.interpolator, ConservativeRectilinearRemapper
-        ):
+        check_remap_conservation(
+            regridder,
+            np.asarray(ocean_binary_mask),
+            self.ocn_fmask_on_atm_grid,
+        )
 
-            src_lat = regridder.interpolator.src_lat_b
-            dst_lat = regridder.interpolator.dst_lat_b
-            if src_lat[-1] != dst_lat[-1] or src_lat[0] != dst_lat[0]:
-                do_not_check_mass = True
-                self.logger.warning(
-                    "Skipping mass conservation check for regridding ocean mask to atmospheric grid "
-                    "due to different latitude bounds.\n"
-                )
-
-            src_total_mass = regridder.interpolator.get_src_total_mass(ocean_bmask)
-            dst_total_mass = regridder.interpolator.get_dst_total_mass(
-                self.ocn_fmask_on_atm_grid
-            )
-
-            if not do_not_check_mass and not np.isclose(
-                src_total_mass, dst_total_mass, atol=1e-6
-            ):
-                raise RegridderError(
-                    "Regridding ocean binary mask to atmospheric grid does not conserve total mass "
-                    f"(source mass: {src_total_mass}, destination mass: {dst_total_mass})"
-                )
-
-        fmask_sum = self.lnd_fmask_on_atm_grid + self.ocn_fmask_on_atm_grid
-        min_fsum = fmask_sum.min()
-        max_fsum = fmask_sum.max()
-        if not (
-            np.isclose(min_fsum, 1.0, atol=1e-3)
-            and np.isclose(max_fsum, 1.0, atol=1e-3)
-        ):
-            raise RegridderError(
-                "Fractional land and ocean masks on atmospheric grid must sum to approx. 1 everywhere "
-                f"(minimum sum {min_fsum}, maximum sum {max_fsum})"
-            )
+        check_total_lnd_ocn_mask_sum(
+            self.lnd_fmask_on_atm_grid, self.ocn_fmask_on_atm_grid
+        )
 
     def _validate_land_mask_consistency(self) -> None:
         land_component = get_component(self.components, (Land, ERA5Land, JCMLand))

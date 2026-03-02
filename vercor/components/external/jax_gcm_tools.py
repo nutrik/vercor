@@ -173,7 +173,6 @@ def generate_jcm_coords_forcing_topography_files(
     # Load realistic forcing data (SST, sea ice, soil moisture, etc.) interpolated to T31 grid
     forcing_file = data_dir / "forcing.nc"
     forcing = ForcingData.from_file(forcing_file, coords=coords)
-    print(type(coords), type(terrain), type(forcing))
 
     return (coords, terrain, forcing)
 

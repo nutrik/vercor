@@ -10,7 +10,11 @@ from jcm.forcing import ForcingData
 from vercor.clock import CustomDateTime
 from vercor.components import Component
 from vercor.grid import RectilinearGrid
-from vercor.regridders.helpers import compute_land_mask
+from vercor.tools import (
+    check_remap_conservation,
+    check_total_lnd_ocn_mask_sum,
+    compute_ocn_lnd_masks_on_atm_grid,
+)
 
 
 if TYPE_CHECKING:
@@ -23,12 +27,6 @@ def create_new_jcm_lnd_mask(
     """Create a new land mask from Ocean & JCM geometry object."""
 
     from vercor.regridders.conservative import ConservativeRectilinearRegridder
-    from vercor.interpolators.conservative_remap_rectilinear import (
-        ConservativeRectilinearRemapper,
-    )
-    from vercor.exceptions import (
-        RegridderError,
-    )
 
     atmosphere_grid = RectilinearGrid(
         name="ATM",
@@ -41,49 +39,20 @@ def create_new_jcm_lnd_mask(
         atmosphere_grid,
     )
 
-    ocean_bmask = np.asarray(ocn_grid.binary_mask)
-    ocn_fmask_on_atm_grid = np.asarray(regridder(ocean_bmask))
-    ocn_fmask_on_atm_grid = np.clip(ocn_fmask_on_atm_grid, 0.0, 1.0)
-    lnd_fmask_on_atm_grid = 1.0 - ocn_fmask_on_atm_grid
-    lnd_bmask_on_atm_grid = compute_land_mask(ocn_fmask_on_atm_grid)
+    ocean_binary_mask = np.asarray(ocn_grid.binary_mask)
 
-    do_not_check_mass = False
+    (
+        ocn_fmask_on_atm_grid,
+        lnd_fmask_on_atm_grid,
+        lnd_bmask_on_atm_grid,
+    ) = compute_ocn_lnd_masks_on_atm_grid(ocean_binary_mask, regridder)
 
-    if regridder.interpolator is not None and isinstance(
-        regridder.interpolator, ConservativeRectilinearRemapper
-    ):
-        src_lat = regridder.interpolator.src_lat_b
-        dst_lat = regridder.interpolator.dst_lat_b
-        if src_lat[-1] != dst_lat[-1] or src_lat[0] != dst_lat[0]:
-            do_not_check_mass = True
-            print(
-                "\nWARNING: Skipping mass conservation check for regridding ocean mask to atmospheric grid "
-                "due to different latitude bounds.\n"
-            )
+    check_remap_conservation(regridder, ocean_binary_mask, ocn_fmask_on_atm_grid)
 
-        src_total_mass = regridder.interpolator.get_src_total_mass(ocean_bmask)
-        dst_total_mass = regridder.interpolator.get_dst_total_mass(
-            ocn_fmask_on_atm_grid
-        )
-
-        if not do_not_check_mass and not np.isclose(
-            src_total_mass, dst_total_mass, atol=1e-7
-        ):
-            raise RegridderError(
-                "Regridding ocean binary mask to atmospheric grid does not conserve total mass "
-                f"(source mass: {src_total_mass}, destination mass: {dst_total_mass})"
-            )
-
-    fmask_sum = lnd_fmask_on_atm_grid + ocn_fmask_on_atm_grid
-    min_fsum = fmask_sum.min()
-    max_fsum = fmask_sum.max()
-    if not (
-        np.isclose(min_fsum, 1.0, atol=1e-3) and np.isclose(max_fsum, 1.0, atol=1e-3)
-    ):
-        raise RegridderError(
-            "Fractional land and ocean masks on atmospheric grid must sum to approx. 1 everywhere "
-            f"(minimum sum {min_fsum}, maximum sum {max_fsum})"
-        )
+    check_total_lnd_ocn_mask_sum(
+        lnd_fmask_on_atm_grid,
+        ocn_fmask_on_atm_grid,
+    )
 
     return lnd_bmask_on_atm_grid, lnd_fmask_on_atm_grid
 
