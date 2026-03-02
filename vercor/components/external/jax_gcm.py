@@ -43,6 +43,14 @@ if TYPE_CHECKING:
     from vercor.coupler import Coupler
 
 
+try:
+    import jcm  # noqa: F401
+except ImportError:
+    raise ImportError(
+        "The JAXGCM component requires the jcm package. Please install it with `pip install jcm`."
+    )
+
+
 def asfloat(tree: Any) -> Any:
     return jax.tree_util.tree_map(lambda arr: arr.astype(jnp.float_), tree)
 

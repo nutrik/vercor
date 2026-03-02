@@ -367,11 +367,11 @@ def compute_ocn_lnd_masks_on_atm_grid(
     ocean_binary_mask: NDArray, regridder: ConservativeRectilinearRegridder
 ) -> tuple[NDArray, NDArray, NDArray]:
     """Compute ocean and land fractional & binary masks on the atmospheric grid by conservative remapping
-    
+
     Arguments:
         ocean_binary_mask: binary ocean mask on ocean grid (1 for ocean, 0 for land)
         regridder: conservative regridder from ocean grid to atmospheric grid
-    
+
     Returns:
         ocn_fmask_on_atm_grid: fractional ocean mask on atmospheric grid (values between 0 and 1)
         lnd_fmask_on_atm_grid: fractional land mask on atmospheric grid (values between 0 and 1)
@@ -395,7 +395,7 @@ def check_total_lnd_ocn_mask_sum(
     lnd_fmask_on_atm_grid: NDArray, ocn_fmask_on_atm_grid: NDArray
 ) -> None:
     """Check that the fractional land and ocean masks on the atmospheric grid sum to approximately 1 everywhere.
-    
+
     Arguments:
         lnd_fmask_on_atm_grid: fractional land mask on atmospheric grid (values between 0 and 1)
         ocn_fmask_on_atm_grid: fractional ocean mask on atmospheric grid (values between 0 and 1)
@@ -418,12 +418,14 @@ def check_remap_conservation(
     ocean_binary_mask_on_ocn_grid: NDArray,
     ocn_fmask_on_atm_grid: NDArray,
 ) -> None:
-    """Check that the conservative regridding of the ocean binary mask from ocean grid to atmospheric grid conserves total mass (ocean area).    
+    """Check that the conservative regridding of the ocean binary mask from ocean grid
+    to atmospheric grid conserves total mass (ocean area).
 
     Arguments:
         regridder: conservative regridder from ocean grid to atmospheric grid
         ocean_binary_mask_on_ocn_grid: binary ocean mask on ocean grid (1 for ocean, 0 for land)
-        ocn_fmask_on_atm_grid: fractional ocean mask on atmospheric grid (values between 0 and 1) obtained by regridding ocean_binary_mask_on_ocn_grid with the provided regridder
+        ocn_fmask_on_atm_grid: fractional ocean mask on atmospheric grid (values between 0 and 1) obtained
+            by regridding ocean_binary_mask_on_ocn_grid with the provided regridder
     """
 
     do_not_check_mass = False

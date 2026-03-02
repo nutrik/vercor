@@ -24,6 +24,14 @@ if TYPE_CHECKING:
     from vercor.coupler import Coupler
 
 
+try:
+    import veros  # noqa: F401
+except ImportError:
+    raise ImportError(
+        "The VerosGCM component requires the Veros package. Please install it with `pip install veros`."
+    )
+
+
 class CustomGlobalFourDegree(GlobalFourDegreeSetup):
     @veros_kernel
     def set_forcing_kernel(state):  # type: ignore
