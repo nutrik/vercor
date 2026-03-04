@@ -3,7 +3,7 @@ import hashlib
 import os
 from pathlib import Path
 import shutil
-from typing import TYPE_CHECKING, Any, Optional, Mapping
+from typing import TYPE_CHECKING, Optional, Mapping
 from urllib.request import urlopen
 
 import numpy as np
@@ -158,15 +158,13 @@ def grids_identical(g0: RectilinearGrid, g1: RectilinearGrid) -> bool:
 
 
 def get_component(
-    allcomponents: dict[str, AllComponentsType], types: tuple[Any, ...]
+    allcomponents: dict[str, AllComponentsType], types: str
 ) -> AllComponentsType:
     """Helper function to retrieve a registered component of a specific type
     from the coupler's allcomponents dictionary."""
 
     components: list[AllComponentsType] = [
-        component
-        for component in allcomponents.values()
-        if isinstance(component, types)
+        component for component in allcomponents.values() if component.name == types
     ]
 
     if len(components) > 1:

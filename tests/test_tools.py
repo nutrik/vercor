@@ -334,24 +334,24 @@ def test_grids_identical_detects_equal_and_unequal_grids() -> None:
 
 def test_get_component_returns_single_and_raises_for_ambiguous_or_missing() -> None:
     allcomponents: dict[str, object] = {
-        "a": DummyComponentA(name="atm"),
-        "b": DummyComponentB(name="ocn"),
+        "a": DummyComponentA(name="ATM"),
+        "b": DummyComponentB(name="OCN"),
     }
 
-    selected = get_component(cast(Any, allcomponents), (DummyComponentA,))
+    selected = get_component(cast(Any, allcomponents), "ATM")
     assert isinstance(selected, DummyComponentA)
 
     with pytest.raises(CouplerError, match="No component"):
-        get_component(cast(Any, allcomponents), (str,))
+        get_component(cast(Any, allcomponents), "UNKNOWN")
 
     with pytest.raises(CouplerError, match="Multiple"):
         get_component(
             cast(
                 Any,
                 {
-                    "a": DummyComponentA(name="atm"),
-                    "b": DummyComponentA(name="atm2"),
+                    "a": DummyComponentA(name="OCN"),
+                    "b": DummyComponentA(name="OCN"),
                 },
             ),
-            (DummyComponentA,),
+            "OCN",
         )

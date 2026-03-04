@@ -9,20 +9,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from vercor.clock import Clock, ModelDateTime
-from vercor.components import (
-    Atmosphere,
-    ERA5Atmosphere,
-    ERA5Land,
-    ERA5Ocean,
-    ERAInterimOcean,
-    JCMLand,
-    Land,
-    Ocean,
-    Shared,
-    JAXGCM,
-)
+from vercor.components import Shared
 from vercor.components import TimedNamedArray as TNA
-from vercor.components.external.veros_gcm import VerosGCM
 from vercor.exceptions import (
     CouplerError,
     ComponentError,
@@ -260,13 +248,9 @@ class Coupler:
         land, ocean, and atmosphere components.
         """
 
-        land_component = get_component(self.components, (Land, ERA5Land, JCMLand))
-        atmosphere_component = get_component(
-            self.components, (Atmosphere, ERA5Atmosphere, JAXGCM)
-        )
-        ocean_component = get_component(
-            self.components, (Ocean, ERA5Ocean, ERAInterimOcean, VerosGCM)
-        )
+        land_component = get_component(self.components, "LND")
+        atmosphere_component = get_component(self.components, "ATM")
+        ocean_component = get_component(self.components, "OCN")
 
         if not grids_identical(land_component.grid, atmosphere_component.grid):
             raise CouplerError(
@@ -303,7 +287,7 @@ class Coupler:
         )
 
     def _validate_land_mask_consistency(self) -> None:
-        land_component = get_component(self.components, (Land, ERA5Land, JCMLand))
+        land_component = get_component(self.components, "LND")
         lnd_mask_from_component = land_component.grid.binary_mask
         if lnd_mask_from_component is not None:
             component_mask = np.asarray(lnd_mask_from_component)
