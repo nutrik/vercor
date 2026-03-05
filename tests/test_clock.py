@@ -334,3 +334,18 @@ def test_clock_noleap_rejects_feb_29_start() -> None:
             steps=1,
             year_type="noleap",
         )
+
+
+def test_clock_noleap_100_year_daily_run_reaches_year_100() -> None:
+    clock = Clock(
+        start=datetime(2000, 1, 3, 0, 0, 0),
+        dt_seconds=86400.0,
+        steps=365 * 100 - 2,
+        year_type="noleap",
+    )
+
+    values = list(clock.iter())
+    _, last_time, _ = values[-1]
+
+    assert isinstance(last_time, DateTime365)
+    assert last_time.year - 2000 + 1 == 100

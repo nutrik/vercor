@@ -53,7 +53,7 @@ if __name__ == "__main__":
         print("Sum of ocn.grid.binary_mask = ", np.sum(ocn.grid.binary_mask))
 
     # Clock and sequence
-    clock = Clock(start=datetime(2025, 1, 1, 0, 0, 0), dt_seconds=86400.0, steps=10)
+    clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=86400.0, steps=10)
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
 
     # Coupler

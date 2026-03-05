@@ -34,7 +34,7 @@ if __name__ == "__main__":
     lnd = Land(lnd_grid)
 
     # Clock and sequence
-    clock = Clock(start=datetime(2025, 1, 1, 0, 0, 0), dt_seconds=3600, steps=24)
+    clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=3600, steps=24)
     run_sequence = RunSequence(order=["OCN", "ATM", "ICE", "LND"])
 
     # Coupler

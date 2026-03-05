@@ -32,10 +32,16 @@ if __name__ == "__main__":
     )
 
     # Clock and sequence
+    # Note that the number of steps is set to 365*100-2,
+    # which corresponds to 100 years of simulation with a daily time step,
+    # starting from January 3rd, 2000.
+    # The -2 accounts for the fact that the simulation starts on January 3rd,
+    # because of 2 days spinup of JCM & Veros models,
+    # so it will end on December 31st, 2099.
     clock = Clock(
         start=datetime(2000, 1, 3, 0, 0, 0),
         dt_seconds=86400.0,
-        steps=90,
+        steps=365 * 100 - 2,
         year_type="noleap",
     )
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
