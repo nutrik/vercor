@@ -56,7 +56,8 @@ class ERA5Ocean(Component, ComponentForcingData):
 
         super().__init__(name, grid=self.grid)
 
-        self._settings["apply_time_interpolation"] = True
+        self.settings.apply_time_interpolation = True
+
         # Units: [K]
         self.data["sea_surface_temperature"] = self._read_forcing(
             "sst", where="surface", flip_y=True

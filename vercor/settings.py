@@ -5,16 +5,8 @@ from dataclasses import dataclass
 class VercorSettings:
     # ------------------------- Runtime settings ------------------------------------
     enable_x64: bool = False  # Enable 64-bit precision for JAX computations
-    # ------------------------- General settings ------------------------------------
-    apply_time_interpolation: bool = False  # Apply time interpolation to forcing data
-    get_field_time_slice: bool = (
-        False  # Get only the relevant time slice (daily) from forcing data
-    )
     # -------------------------------------------------------------------------------
     identifier: str = "UNNAMED"  # Identifier of the current simulation
-    output_frequency: int = 1  # Frequency of output in timesteps
-    max_steps: int = 1000  # Maximum number of timesteps
-    dt: float = 60.0  # Timestep size in seconds
     missval: float = 0.0  # Missing value for fields
     # ------------------------- Physical constants ----------------------------------
     earth_radius: float = 6.371e6  # Earth radius [m]
@@ -46,4 +38,12 @@ class VercorSettings:
     zref: float = 10.0  # reference height           (m)
     ztref: float = 2.0  # reference height for air T (m)
     # --------------------------------------------------------------------------------
-    year_in_seconds: float = 360 * 86400.0
+    year_in_seconds: float = 365 * 86400.0
+
+
+@dataclass
+class ComponentSettings:
+    apply_time_interpolation: bool = False  # Apply time interpolation to forcing data
+    get_field_time_slice: bool = (
+        False  # Get only the relevant time slice (daily) from forcing data
+    )

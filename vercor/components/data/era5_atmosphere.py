@@ -60,15 +60,15 @@ class ERA5Atmosphere(Component, ComponentForcingData):
         longitude = self._read_forcing("longitude", where="model_level")
         latitude = self._read_forcing("latitude", where="model_level")[::-1]
 
-        self.grid = RectilinearGrid(
+        grid = RectilinearGrid(
             name=f"{name.lower()}-grid",
             longitude=longitude,
             latitude=latitude,
         )
 
-        super().__init__(name, grid=self.grid)
+        super().__init__(name, grid=grid)
 
-        self._settings["apply_time_interpolation"] = True
+        self.settings.apply_time_interpolation = True
 
         self.data["hyai"] = self._read_forcing("hyai", where="model_level")[
             -3:

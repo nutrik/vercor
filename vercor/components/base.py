@@ -12,6 +12,7 @@ from numpy.typing import NDArray
 from vercor.clock import ModelDateTime, CustomDateTime
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
+from vercor.settings import ComponentSettings
 from vercor.tools import get_field_at_specific_time, get_field_time_slice
 from vercor.exchange import VALID_EXCHANGE_FIELD_NAMES
 
@@ -149,9 +150,9 @@ class Component(abc.ABC):
     incoming_fields: Shared = field(default_factory=Shared)
     outgoing_fields: Shared = field(default_factory=Shared)
     data: dict[str, NDArray] = field(default_factory=dict)
+    settings: ComponentSettings = field(default_factory=ComponentSettings)
     _fields2import: list[str] = field(default_factory=list)
     _fields2export: list[str] = field(default_factory=list)
-    _settings: dict[str, Any] = field(default_factory=dict)
     """A component's default grid dimensions are (nTime, nLev, nLon, nLat)
 
     Some components may have different dimensions, e.g., sea-ice (nTime, nLon, nLat) or
@@ -173,7 +174,7 @@ class Component(abc.ABC):
                          to another component(s)
         data: internal storage for component data arrays to/from which fields
                         are imported/exported
-        _settings: component-specific settings
+        settings: component-specific settings
         _fields2import: list of field names to import from other components to data
         _fields2export: list of field names to export to other components from data
     """
@@ -287,10 +288,10 @@ class Component(abc.ABC):
         """
 
         for fld in self._fields2export:
-            if self._settings.get("apply_time_interpolation", False):
+            if self.settings.apply_time_interpolation:
                 # for data models with monthly means
                 field2send = get_field_at_specific_time(fld, self.data, coupler)
-            elif self._settings.get("get_field_time_slice", False):
+            elif self.settings.get_field_time_slice:
                 # for data models with higher frequency data
                 field2send = get_field_time_slice(fld, self.data, time)
             else:

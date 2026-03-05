@@ -52,7 +52,7 @@ class ERA5Land(Component, ComponentForcingData):
 
         super().__init__(name, grid=self.grid)
 
-        self._settings["apply_time_interpolation"] = True
+        self.settings.apply_time_interpolation = True
 
         # Units: [K]
         self.data["land_surface_temperature"] = self._read_forcing(

@@ -62,7 +62,7 @@ class ERAInterimOcean(Component, ComponentForcingData):
 
         super().__init__(name, grid=self.grid)
 
-        self._settings["apply_time_interpolation"] = True
+        self.settings.apply_time_interpolation = True
 
         sst[:, 3:-3, :] = self._read_forcing("sst", where="model_level") + 273.15
         sst *= np.where(binary_mask > 0.0, 1.0, np.nan).T[..., np.newaxis]
