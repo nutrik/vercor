@@ -1,5 +1,7 @@
 from datetime import datetime
+from typing import Any, cast
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from vercor import Clock, Coupler, Exchange
@@ -9,6 +11,10 @@ from vercor.regridders import (
     make_rectilinear_grid,
     bilinear,
     conservative,
+)
+from vercor.tools import (
+    plot_component_scalar_vector_comparison,
+    print_component_field_means_table,
 )
 
 if __name__ == "__main__":
@@ -119,84 +125,43 @@ if __name__ == "__main__":
     cpl.run()
     cpl.finalize()
 
-    # Inspect a few fields
-    print("sst(OCN) mean:", np.nanmean(ocn.get("sea_surface_temperature")))
-    print("sst(ATM) mean:", np.nanmean(atm.get("sea_surface_temperature")))
-    print("TA2M mean:", np.nanmean(atm.get("temperature_2m")))
-    print("u10m mean:", np.nanmean(atm.get("u_velocity_10m")))
-    print("v10m mean:", np.nanmean(atm.get("v_velocity_10m")))
-    print("SOILM(LND) mean:", np.nanmean(lnd.get("soil_moisture")))
-    print("SOILM(ATM) mean:", np.nanmean(atm.get("soil_moisture")))
-    print("ICEFRAC mean:", np.nanmean(ice.get("ice_fraction")))
-    print("SHF(ATM) mean:", np.nanmean(atm.get("sensible_heat_flux")))
-    print("SHF(LND) mean:", np.nanmean(lnd.get("sensible_heat_flux")))
-
-    import matplotlib.pyplot as plt
-
-    fig, axs = plt.subplots(2, 2, figsize=(15, 10), layout="constrained")
-
-    lon_atm = np.array(atm.grid.longitude)
-    lat_atm = np.array(atm.grid.latitude)
-    longitude_source_2d, latitude_source_2d = np.meshgrid(
-        lon_atm, lat_atm, indexing="ij"
+    # Inspect a few fields in a component-wise table.
+    print_component_field_means_table(
+        components={"ATM": atm, "OCN": ocn, "LND": lnd},
+        fields=[
+            ("sea_surface_temperature", "sst"),
+            ("temperature_2m", "temperature_2m"),
+            ("u_velocity_10m", "u_velocity_10m"),
+            ("v_velocity_10m", "v_velocity_10m"),
+            ("soil_moisture", "soil_moisture"),
+            ("sensible_heat_flux", "sensible_heat_flux"),
+        ],
+        component_order=["ATM", "OCN", "LND"],
     )
-    scalar_source = atm.get("sea_surface_temperature").T
-    u_source = atm.get("u_velocity_10m").T
-    v_source = atm.get("v_velocity_10m").T
+    print("ICE ice_fraction mean:", np.nanmean(ice.get("ice_fraction")))
 
-    lon_ocn = np.array(ocn.grid.longitude)
-    lat_ocn = np.array(ocn.grid.latitude)
-    longitude_target_2d, latitude_target_2d = np.meshgrid(
-        lon_ocn, lat_ocn, indexing="ij"
-    )
-    scalar_target = ocn.get("sea_surface_temperature").T
-    u_target = ocn.get("u_velocity_10m").T
-    v_target = ocn.get("v_velocity_10m").T
-
-    im = axs[0, 0].pcolormesh(
-        longitude_source_2d,
-        latitude_source_2d,
-        scalar_source,
-        shading="auto",
+    fig, axs, scalar_mappable = plot_component_scalar_vector_comparison(
+        rows=[
+            (
+                "ATM",
+                atm,
+                "sea_surface_temperature",
+                "u_velocity_10m",
+                "v_velocity_10m",
+            ),
+            (
+                "OCN",
+                ocn,
+                "sea_surface_temperature",
+                "u_velocity_10m",
+                "v_velocity_10m",
+            ),
+        ],
+        figsize=(15, 10),
+        quiver_scale=100,
         cmap="coolwarm",
     )
-    axs[0, 0].set_title("Initial Scalar Field")
-    axs[0, 0].set_xlabel("Longitude")
-    axs[0, 0].set_ylabel("Latitude")
 
-    axs[0, 1].quiver(
-        longitude_source_2d,
-        latitude_source_2d,
-        u_source,
-        v_source,
-        scale=100,
-    )
-    axs[0, 1].set_title("Initial Vector Field")
-    axs[0, 1].set_xlabel("Longitude")
-    axs[0, 1].set_ylabel("Latitude")
-
-    axs[1, 0].pcolormesh(
-        longitude_target_2d,
-        latitude_target_2d,
-        scalar_target,
-        shading="auto",
-        cmap="coolwarm",
-    )
-    axs[1, 0].set_title("Interpolated Scalar Field")
-    axs[1, 0].set_xlabel("Longitude")
-    axs[1, 0].set_ylabel("Latitude")
-
-    axs[1, 1].quiver(
-        longitude_target_2d,
-        latitude_target_2d,
-        u_target,
-        v_target,
-        scale=100,
-    )
-    axs[1, 1].set_title("Interpolated Vector Field")
-    axs[1, 1].set_xlabel("Longitude")
-    axs[1, 1].set_ylabel("Latitude")
-
-    fig.colorbar(im, ax=axs, shrink=0.6)
+    fig.colorbar(cast(Any, scalar_mappable), ax=axs, shrink=0.6)
 
     plt.show()

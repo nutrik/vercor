@@ -1,11 +1,19 @@
+from typing import Any, Callable
 from datetime import datetime
 
 import numpy as np
+from numpy.typing import NDArray
 
 from vercor import Clock, Coupler, Exchange
 from vercor.components import ERA5Atmosphere, ERA5Land, ERAInterimOcean
 from vercor.coupler import RunSequence
 from vercor.regridders import bilinear, conservative
+from vercor.tools import (
+    plot_component_scalar_vector_comparison,
+    print_component_field_means_table,
+)
+
+import matplotlib.pyplot as plt
 
 
 if __name__ == "__main__":
@@ -108,92 +116,35 @@ if __name__ == "__main__":
     cpl.run()
     cpl.finalize()
 
-    print("sst(OCN) mean:", np.nanmin(ocn.get("sea_surface_temperature")))
-    print("sst(ERA) mean:", np.nanmin(atm.get("sea_surface_temperature")))
-    print("qbot(ERA) mean:", np.nanmin(atm.get("specific_humidity")))
-    print("qbot(OCN) mean:", np.nanmin(ocn.get("specific_humidity")))
-    print("tbot(ERA) mean:", np.nanmin(atm.get("potential_temperature")))
-    print("tbot(OCN) mean:", np.nanmin(ocn.get("potential_temperature")))
-    print("zbot(ERA) mean:", np.nanmin(atm.get("model_level_height")))
-    print("zbot(OCN) mean:", np.nanmin(ocn.get("model_level_height")))
-    print(
-        "speed(ERA) mean:",
-        np.nanmean(np.sqrt(atm.get("u_velocity") ** 2 + atm.get("v_velocity") ** 2)),
-    )
-    print(
-        "speed(OCN) mean:",
-        np.nanmean(np.sqrt(ocn.get("u_velocity") ** 2 + ocn.get("v_velocity") ** 2)),
-    )
-    import matplotlib.pyplot as plt
+    Metric = str | Callable[[Any], NDArray | float]
 
-    fig, axs = plt.subplots(2, 2, figsize=(15, 10), layout="constrained")
+    variables: list[tuple[Metric, str]] = [
+        ("sea_surface_temperature", "sst"),
+        ("specific_humidity", "qbot"),
+        ("potential_temperature", "tbot"),
+        ("model_level_height", "zbot"),
+        (
+            lambda c: np.sqrt(c.get("u_velocity") ** 2 + c.get("v_velocity") ** 2),
+            "speed",
+        ),
+    ]
 
-    lon_atm = np.array(atm.grid.longitude)
-    lat_atm = np.array(atm.grid.latitude)
-    longitude_source_2d, latitude_source_2d = np.meshgrid(
-        lon_atm, lat_atm, indexing="ij"
+    print_component_field_means_table(
+        components={"ATM": atm, "OCN": ocn},
+        fields=variables,
+        component_order=["ATM", "OCN"],
     )
-    scalar_source = atm.get("total_surface_temperature").T
-    # scalar_source = atm.get("net_shortwave_radiation_flux").T
-    u_source = atm.get("u_velocity").T
-    v_source = atm.get("v_velocity").T
 
-    lon_ocn = np.array(ocn.grid.longitude)
-    lat_ocn = np.array(ocn.grid.latitude)
-    longitude_target_2d, latitude_target_2d = np.meshgrid(
-        lon_ocn, lat_ocn, indexing="ij"
-    )
-    scalar_target = ocn.get("sea_surface_temperature").T
-    u_target = ocn.get("u_velocity").T
-    v_target = ocn.get("v_velocity").T
-    im = axs[0, 0].pcolormesh(
-        longitude_source_2d,
-        latitude_source_2d,
-        scalar_source,
-        shading="auto",
+    fig, axs, scalar_mappable = plot_component_scalar_vector_comparison(
+        rows=[
+            ("ATM", atm, "total_surface_temperature", "u_velocity", "v_velocity"),
+            ("OCN", ocn, "sea_surface_temperature", "u_velocity", "v_velocity"),
+        ],
+        figsize=(15, 10),
+        quiver_scale=150,
         cmap="coolwarm",
-        vmin=220,
-        vmax=310,
     )
-    axs[0, 0].set_title("Initial Scalar Field")
-    axs[0, 0].set_xlabel("Longitude")
-    axs[0, 0].set_ylabel("Latitude")
 
-    axs[0, 1].quiver(
-        longitude_source_2d,
-        latitude_source_2d,
-        u_source,
-        v_source,
-        scale=150,
-    )
-    axs[0, 1].set_title("Initial Vector Field")
-    axs[0, 1].set_xlabel("Longitude")
-    axs[0, 1].set_ylabel("Latitude")
-
-    axs[1, 0].pcolormesh(
-        longitude_target_2d,
-        latitude_target_2d,
-        scalar_target,
-        shading="auto",
-        cmap="coolwarm",
-        vmin=220,
-        vmax=310,
-    )
-    axs[1, 0].set_title("Interpolated Scalar Field")
-    axs[1, 0].set_xlabel("Longitude")
-    axs[1, 0].set_ylabel("Latitude")
-
-    axs[1, 1].quiver(
-        longitude_target_2d,
-        latitude_target_2d,
-        u_target,
-        v_target,
-        scale=150,
-    )
-    axs[1, 1].set_title("Interpolated Vector Field")
-    axs[1, 1].set_xlabel("Longitude")
-    axs[1, 1].set_ylabel("Latitude")
-
-    fig.colorbar(im, ax=axs, shrink=0.6)
+    fig.colorbar(scalar_mappable, ax=axs, shrink=0.6)
 
     plt.show()

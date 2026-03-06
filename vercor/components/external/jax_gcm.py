@@ -261,8 +261,15 @@ class JAXGCM(Component):
 
         # Replace zero values with a default temperature (e.g., 288.15 K)
         # to avoid issues in JCM
-        land_surface_temperature[land_surface_temperature == 0.0] = 288.15
-        sea_surface_temperature[sea_surface_temperature == 0.0] = 288.15
+        mask_zero_land_surface_temperature = land_surface_temperature == 0.0
+        mask_zero_sea_surface_temperature = sea_surface_temperature == 0.0
+
+        land_surface_temperature = np.where(
+            mask_zero_land_surface_temperature, 288.15, land_surface_temperature
+        )
+        sea_surface_temperature = np.where(
+            mask_zero_sea_surface_temperature, 288.15, sea_surface_temperature
+        )
 
         self.forcing = self.forcing.copy(
             stl_am=jnp.asarray(land_surface_temperature).transpose(),
