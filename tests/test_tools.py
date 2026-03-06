@@ -3,20 +3,28 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import hashlib
+from io import BytesIO
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
+import matplotlib
 import numpy as np
 import pytest
 import vercor.tools as tools_module
 
 from vercor.clock import Clock, DateTime360, DateTime365
-from vercor.exceptions import AssetError, CouplerError
+from vercor.exceptions import AssetError, CouplerError, RegridderError
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
 from vercor.tools import (
+    _asset_base_url,
     _append_unique,
+    _download_asset,
+    _ensure_forcing_asset,
     _flatten_fields,
+    check_remap_conservation,
+    check_total_lnd_ocn_mask_sum,
+    compute_ocn_lnd_masks_on_atm_grid,
     datetime_to_seconds_in_year,
     get_component,
     get_forcing_data,
@@ -25,7 +33,11 @@ from vercor.tools import (
     get_periodic_interval,
     grids_identical,
     is_leap_year,
+    plot_component_scalar_vector_comparison,
+    print_component_field_means_table,
+    safe_component_nanmean,
 )
+matplotlib.use("Agg")
 
 
 @dataclass
@@ -48,6 +60,17 @@ class DummyComponentA:
 @dataclass
 class DummyComponentB:
     name: str = "b"
+
+
+@dataclass
+class DummyGridComponent:
+    grid: RectilinearGrid
+    fields: dict[str, np.ndarray]
+
+    def get(self, field_name: str) -> np.ndarray:
+        if field_name not in self.fields:
+            raise KeyError(field_name)
+        return self.fields[field_name]
 
 
 def test_get_field_at_specific_time_weights_and_interpolation() -> None:
@@ -354,4 +377,319 @@ def test_get_component_returns_single_and_raises_for_ambiguous_or_missing() -> N
                 },
             ),
             "OCN",
+        )
+
+
+def test_safe_component_nanmean_returns_nan_for_missing_fields() -> None:
+    grid = RectilinearGrid(
+        "dummy",
+        longitude=np.array([0.0, 1.0]),
+        latitude=np.array([0.0, 1.0]),
+    )
+    comp = DummyGridComponent(grid=grid, fields={"foo": np.array([[1.0, np.nan], [3.0, 5.0]])})
+
+    assert np.isclose(safe_component_nanmean(comp, "foo"), 3.0)
+    assert np.isnan(safe_component_nanmean(comp, "does_not_exist"))
+
+
+def test_print_component_field_means_table_with_callable_metric(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    grid = RectilinearGrid(
+        "dummy",
+        longitude=np.array([0.0, 1.0]),
+        latitude=np.array([0.0, 1.0]),
+    )
+    atm = DummyGridComponent(
+        grid=grid,
+        fields={
+            "u": np.array([[3.0, 4.0], [0.0, 0.0]]),
+            "v": np.array([[4.0, 3.0], [0.0, 0.0]]),
+            "temp": np.array([[280.0, 282.0], [284.0, 286.0]]),
+        },
+    )
+    ocn = DummyGridComponent(
+        grid=grid,
+        fields={
+            "u": np.array([[1.0, 2.0], [0.0, 0.0]]),
+            "v": np.array([[2.0, 1.0], [0.0, 0.0]]),
+            "temp": np.array([[270.0, 271.0], [272.0, 273.0]]),
+        },
+    )
+
+    print_component_field_means_table(
+        components={"ATM": atm, "OCN": ocn},
+        fields=[
+            ("temp", "temp"),
+            (lambda c: np.sqrt(c.get("u") ** 2 + c.get("v") ** 2), "speed"),
+        ],
+        component_order=["ATM", "OCN"],
+    )
+
+    captured = capsys.readouterr().out
+    assert "Variable" in captured
+    assert "ATM" in captured
+    assert "OCN" in captured
+    assert "temp" in captured
+    assert "speed" in captured
+
+
+def test_plot_component_scalar_vector_comparison_aligns_axes_and_shapes() -> None:
+    import matplotlib.pyplot as plt
+
+    atm_grid = RectilinearGrid(
+        "atm",
+        longitude=np.array([0.0, 1.0, 2.0]),
+        latitude=np.array([-1.0, 1.0]),
+    )
+    ocn_grid = RectilinearGrid(
+        "ocn",
+        longitude=np.array([0.0, 2.0]),
+        latitude=np.array([-2.0, 0.0, 2.0]),
+    )
+
+    atm = DummyGridComponent(
+        grid=atm_grid,
+        fields={
+            "scalar": np.array([[1.0, 3.0, 5.0], [2.0, 4.0, 6.0]]),
+            "u": np.ones((2, 3)),
+            "v": np.zeros((2, 3)),
+        },
+    )
+    ocn = DummyGridComponent(
+        grid=ocn_grid,
+        fields={
+            "scalar": np.array([[7.0, 10.0], [8.0, 11.0], [9.0, 12.0]]),
+            "u": np.zeros((3, 2)),
+            "v": np.ones((3, 2)),
+        },
+    )
+
+    fig, axs, scalar_mappable = plot_component_scalar_vector_comparison(
+        rows=[
+            ("ATM", atm, "scalar", "u", "v"),
+            ("OCN", ocn, "scalar", "u", "v"),
+        ],
+        figsize=(8.0, 5.0),
+        quiver_scale=10.0,
+    )
+
+    assert axs.shape == (2, 2)
+    assert scalar_mappable is not None
+    assert np.allclose(axs[0, 0].get_xlim(), axs[1, 0].get_xlim())
+    assert np.allclose(axs[0, 1].get_xlim(), axs[1, 1].get_xlim())
+    assert np.allclose(axs[0, 0].get_ylim(), axs[1, 0].get_ylim())
+
+    plt.close(fig)
+
+
+def test_plot_component_scalar_vector_comparison_rejects_empty_rows() -> None:
+    with pytest.raises(ValueError, match="at least one component"):
+        plot_component_scalar_vector_comparison(rows=[])
+
+
+def test_asset_base_url_normalizes_and_handles_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", " https://example.test/assets// ")
+    assert _asset_base_url() == "https://example.test/assets"
+
+    monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", "   ")
+    assert _asset_base_url() is None
+
+    monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", None)
+    assert _asset_base_url() is None
+
+
+def test_download_asset_writes_response_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload = b"forcing-content"
+
+    class DummyResponse:
+        def __enter__(self) -> BytesIO:
+            return BytesIO(payload)
+
+        def __exit__(
+            self, exc_type: Any, exc_val: Any, exc_tb: Any
+        ) -> Literal[False]:
+            return False
+
+    monkeypatch.setattr(tools_module, "urlopen", lambda _url: DummyResponse())
+
+    target = tmp_path / "nested" / "asset.nc"
+    _download_asset("https://example.test/asset.nc", target)
+
+    assert target.exists()
+    assert target.read_bytes() == payload
+
+
+def test_ensure_forcing_asset_uses_valid_cached_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    filename = "cached.nc"
+    payload = b"valid-cached"
+    (tmp_path / filename).write_bytes(payload)
+
+    monkeypatch.setattr(tools_module, "_ASSETS_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(
+        tools_module,
+        "_FORCING_ASSETS",
+        {"k": {"filename": filename, "md5": hashlib.md5(payload).hexdigest()}},
+    )
+
+    # Must not be called when cache hash is valid.
+    monkeypatch.setattr(
+        tools_module,
+        "_download_asset",
+        lambda _url, _target: (_ for _ in ()).throw(AssertionError("unexpected download")),
+    )
+
+    resolved = _ensure_forcing_asset("k")
+    assert resolved == tmp_path / filename
+
+
+def test_ensure_forcing_asset_downloads_when_cached_md5_invalid(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    filename = "downloaded.nc"
+    cached = tmp_path / filename
+    cached.write_bytes(b"stale")
+
+    downloaded = b"fresh-content"
+
+    monkeypatch.setattr(tools_module, "_ASSETS_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(
+        tools_module,
+        "_FORCING_ASSETS",
+        {"k": {"filename": filename, "md5": hashlib.md5(downloaded).hexdigest()}},
+    )
+    monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", "https://example.test/base")
+
+    def fake_download(url: str, target: Path) -> None:
+        assert url == "https://example.test/base/downloaded.nc"
+        target.write_bytes(downloaded)
+
+    monkeypatch.setattr(tools_module, "_download_asset", fake_download)
+
+    resolved = _ensure_forcing_asset("k")
+    assert resolved == cached
+    assert cached.read_bytes() == downloaded
+
+
+def test_ensure_forcing_asset_errors_without_base_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(tools_module, "_ASSETS_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(
+        tools_module,
+        "_FORCING_ASSETS",
+        {"k": {"filename": "missing.nc", "md5": hashlib.md5(b"x").hexdigest()}},
+    )
+    monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", None)
+
+    with pytest.raises(AssetError, match="no remote base URL configured"):
+        _ensure_forcing_asset("k")
+
+
+def test_ensure_forcing_asset_raises_and_deletes_on_md5_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    filename = "bad.nc"
+    target = tmp_path / filename
+
+    monkeypatch.setattr(tools_module, "_ASSETS_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(
+        tools_module,
+        "_FORCING_ASSETS",
+        {"k": {"filename": filename, "md5": hashlib.md5(b"expected").hexdigest()}},
+    )
+    monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", "https://example.test")
+    monkeypatch.setattr(tools_module, "_download_asset", lambda _url, tgt: tgt.write_bytes(b"wrong"))
+
+    with pytest.raises(AssetError, match="MD5 mismatch"):
+        _ensure_forcing_asset("k")
+
+    assert not target.exists()
+
+
+def test_compute_ocn_lnd_masks_on_atm_grid_clips_and_builds_binary_land_mask() -> None:
+    class DummyRegridder:
+        def __call__(self, _arr: np.ndarray) -> np.ndarray:
+            return np.array([[1.2, -0.2], [0.4, 0.0]])
+
+    ocean_binary_mask = np.array([[1.0, 0.0], [1.0, 0.0]])
+    ocn_fmask, lnd_fmask, lnd_bmask = compute_ocn_lnd_masks_on_atm_grid(
+        ocean_binary_mask,
+        cast(Any, DummyRegridder()),
+    )
+
+    assert np.allclose(ocn_fmask, np.array([[1.0, 0.0], [0.4, 0.0]]))
+    assert np.allclose(lnd_fmask, np.array([[0.0, 1.0], [0.6, 1.0]]))
+    assert np.array_equal(lnd_bmask, np.array([[0, 1], [1, 1]]))
+
+
+def test_check_total_lnd_ocn_mask_sum_success_and_failure() -> None:
+    lnd_good = np.array([[0.3, 1.0], [0.0, 0.8]])
+    ocn_good = np.array([[0.7, 0.0], [1.0, 0.2]])
+    check_total_lnd_ocn_mask_sum(lnd_good, ocn_good)
+
+    lnd_bad = np.array([[0.3, 1.0], [0.0, 0.8]])
+    ocn_bad = np.array([[0.7, 0.0], [1.0, 0.0]])
+    with pytest.raises(RegridderError, match="must sum to approx. 1"):
+        check_total_lnd_ocn_mask_sum(lnd_bad, ocn_bad)
+
+
+def test_check_remap_conservation_handles_skip_and_mismatch(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    class DummyRemapper:
+        def __init__(
+            self,
+            src_lat_b: np.ndarray,
+            dst_lat_b: np.ndarray,
+            src_mass: float,
+            dst_mass: float,
+        ) -> None:
+            self.src_lat_b = src_lat_b
+            self.dst_lat_b = dst_lat_b
+            self._src_mass = src_mass
+            self._dst_mass = dst_mass
+
+        def get_src_total_mass(self, _arr: np.ndarray) -> float:
+            return self._src_mass
+
+        def get_dst_total_mass(self, _arr: np.ndarray) -> float:
+            return self._dst_mass
+
+    class DummyRegridder:
+        def __init__(self, interpolator: Any) -> None:
+            self.interpolator = interpolator
+
+    monkeypatch.setattr(tools_module, "ConservativeRectilinearRemapper", DummyRemapper)
+
+    # Different lat bounds: should skip strict conservation check and not raise.
+    skip_interp = DummyRemapper(
+        src_lat_b=np.array([-90.0, 0.0, 90.0]),
+        dst_lat_b=np.array([-80.0, 0.0, 80.0]),
+        src_mass=10.0,
+        dst_mass=1.0,
+    )
+    check_remap_conservation(
+        cast(Any, DummyRegridder(skip_interp)),
+        np.ones((2, 2)),
+        np.ones((2, 2)),
+    )
+    assert "Skipping mass conservation check" in capsys.readouterr().out
+
+    # Same bounds with unequal mass: must raise.
+    mismatch_interp = DummyRemapper(
+        src_lat_b=np.array([-90.0, 0.0, 90.0]),
+        dst_lat_b=np.array([-90.0, 0.0, 90.0]),
+        src_mass=10.0,
+        dst_mass=9.0,
+    )
+    with pytest.raises(RegridderError, match="does not conserve total mass"):
+        check_remap_conservation(
+            cast(Any, DummyRegridder(mismatch_interp)),
+            np.ones((2, 2)),
+            np.ones((2, 2)),
         )
