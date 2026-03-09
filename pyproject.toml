@@ -17,6 +17,7 @@ dependencies = [
 "h5py>=3.11.0",
 "h5netcdf>=1.4.1",
 "xarray>=2025.1.2",
+"matplotlib>=3.8.1",
 "jax",
 "jax-datetime",
 "tree-math",
