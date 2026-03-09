@@ -37,6 +37,7 @@ from vercor.tools import (
     print_component_field_means_table,
     safe_component_nanmean,
 )
+
 matplotlib.use("Agg")
 
 
@@ -386,7 +387,9 @@ def test_safe_component_nanmean_returns_nan_for_missing_fields() -> None:
         longitude=np.array([0.0, 1.0]),
         latitude=np.array([0.0, 1.0]),
     )
-    comp = DummyGridComponent(grid=grid, fields={"foo": np.array([[1.0, np.nan], [3.0, 5.0]])})
+    comp = DummyGridComponent(
+        grid=grid, fields={"foo": np.array([[1.0, np.nan], [3.0, 5.0]])}
+    )
 
     assert np.isclose(safe_component_nanmean(comp, "foo"), 3.0)
     assert np.isnan(safe_component_nanmean(comp, "does_not_exist"))
@@ -488,8 +491,12 @@ def test_plot_component_scalar_vector_comparison_rejects_empty_rows() -> None:
         plot_component_scalar_vector_comparison(rows=[])
 
 
-def test_asset_base_url_normalizes_and_handles_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", " https://example.test/assets// ")
+def test_asset_base_url_normalizes_and_handles_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        tools_module, "VERCOR_ASSETS_BASE_URL", " https://example.test/assets// "
+    )
     assert _asset_base_url() == "https://example.test/assets"
 
     monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", "   ")
@@ -508,9 +515,7 @@ def test_download_asset_writes_response_bytes(
         def __enter__(self) -> BytesIO:
             return BytesIO(payload)
 
-        def __exit__(
-            self, exc_type: Any, exc_val: Any, exc_tb: Any
-        ) -> Literal[False]:
+        def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Literal[False]:
             return False
 
     monkeypatch.setattr(tools_module, "urlopen", lambda _url: DummyResponse())
@@ -540,7 +545,9 @@ def test_ensure_forcing_asset_uses_valid_cached_file(
     monkeypatch.setattr(
         tools_module,
         "_download_asset",
-        lambda _url, _target: (_ for _ in ()).throw(AssertionError("unexpected download")),
+        lambda _url, _target: (_ for _ in ()).throw(
+            AssertionError("unexpected download")
+        ),
     )
 
     resolved = _ensure_forcing_asset("k")
@@ -562,7 +569,9 @@ def test_ensure_forcing_asset_downloads_when_cached_md5_invalid(
         "_FORCING_ASSETS",
         {"k": {"filename": filename, "md5": hashlib.md5(downloaded).hexdigest()}},
     )
-    monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", "https://example.test/base")
+    monkeypatch.setattr(
+        tools_module, "VERCOR_ASSETS_BASE_URL", "https://example.test/base"
+    )
 
     def fake_download(url: str, target: Path) -> None:
         assert url == "https://example.test/base/downloaded.nc"
@@ -603,7 +612,9 @@ def test_ensure_forcing_asset_raises_and_deletes_on_md5_mismatch(
         {"k": {"filename": filename, "md5": hashlib.md5(b"expected").hexdigest()}},
     )
     monkeypatch.setattr(tools_module, "VERCOR_ASSETS_BASE_URL", "https://example.test")
-    monkeypatch.setattr(tools_module, "_download_asset", lambda _url, tgt: tgt.write_bytes(b"wrong"))
+    monkeypatch.setattr(
+        tools_module, "_download_asset", lambda _url, tgt: tgt.write_bytes(b"wrong")
+    )
 
     with pytest.raises(AssetError, match="MD5 mismatch"):
         _ensure_forcing_asset("k")
