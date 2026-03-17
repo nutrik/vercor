@@ -617,3 +617,39 @@ def check_remap_conservation(
                 "Regridding ocean binary mask to atmospheric grid does not conserve total mass "
                 f"(source mass: {src_total_mass}, destination mass: {dst_total_mass})"
             )
+
+
+def create_lnd_mask_from_ocn(
+    atm_lat: NDArray, atm_lon: NDArray, ocn_grid: RectilinearGrid
+) -> tuple[NDArray, NDArray]:
+    """Create a new land mask from Ocean & JCM geometry object."""
+
+    from vercor.regridders.conservative import ConservativeRectilinearRegridder
+
+    atmosphere_grid = RectilinearGrid(
+        name="ATM",
+        longitude=atm_lon,
+        latitude=atm_lat,
+    )
+
+    regridder = ConservativeRectilinearRegridder(
+        ocn_grid,
+        atmosphere_grid,
+    )
+
+    ocean_binary_mask = np.asarray(ocn_grid.binary_mask)
+
+    (
+        ocn_fmask_on_atm_grid,
+        lnd_fmask_on_atm_grid,
+        lnd_bmask_on_atm_grid,
+    ) = compute_ocn_lnd_masks_on_atm_grid(ocean_binary_mask, regridder)
+
+    check_remap_conservation(regridder, ocean_binary_mask, ocn_fmask_on_atm_grid)
+
+    check_total_lnd_ocn_mask_sum(
+        lnd_fmask_on_atm_grid,
+        ocn_fmask_on_atm_grid,
+    )
+
+    return lnd_bmask_on_atm_grid, lnd_fmask_on_atm_grid

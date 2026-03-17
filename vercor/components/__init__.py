@@ -16,6 +16,7 @@ from vercor.components.slab.ocean import Ocean
 from vercor.components.slab.seaice import SeaIce
 from vercor.components.external.jax_gcm import JAXGCM
 from vercor.components.external.veros_gcm import VerosGCM
+from vercor.components.external.camulator import CAMulatorGCM
 
 __all__ = [
     "TimedNamedArray",
@@ -34,4 +35,5 @@ __all__ = [
     "JCMLand",
     "JAXGCM",
     "VerosGCM",
+    "CAMulatorGCM",
 ]

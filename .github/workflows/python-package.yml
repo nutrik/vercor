@@ -38,6 +38,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
+        python -m pip install torch torchvision
         pip install vendor/jax-gcm -r vendor/jax-gcm/requirements.txt
         pip install vendor/veros -r vendor/veros/requirements.txt
         pip install .
@@ -52,6 +53,7 @@ jobs:
     - name: Type checking with mypy
       run: |
         pip install mypy
+        pip install types-PyYAML
         mypy vercor tests examples
     - name: Test with pytest
       run: |

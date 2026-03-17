@@ -278,14 +278,14 @@ class VerosGCM(Component):
 
         mask = np.where(self._veros_state.variables.maskT[:, :, -1] > 0.0, 1.0, 0.0)
 
-        self.grid = RectilinearGrid(
+        grid = RectilinearGrid(
             name=name,
             longitude=self._veros_state.variables.xt[2:-2],
             latitude=self._veros_state.variables.yt[2:-2],
             binary_mask=mask[2:-2, 2:-2].T,
         )
 
-        super().__init__(name, grid=self.grid)
+        super().__init__(name, grid=grid)
 
     def initialize(self, coupler: "Coupler") -> None:
         dt_seconds = coupler.clock.dt_seconds

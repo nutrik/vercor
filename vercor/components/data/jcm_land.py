@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 import numpy as np
-from numpy.typing import NDArray
 
 from dinosaur.coordinate_systems import CoordinateSystem
 from jcm.forcing import ForcingData
@@ -10,51 +9,11 @@ from jcm.forcing import ForcingData
 from vercor.clock import CustomDateTime
 from vercor.components import Component
 from vercor.grid import RectilinearGrid
-from vercor.tools import (
-    check_remap_conservation,
-    check_total_lnd_ocn_mask_sum,
-    compute_ocn_lnd_masks_on_atm_grid,
-)
+from vercor.tools import create_lnd_mask_from_ocn
 
 
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
-
-
-def create_new_jcm_lnd_mask(
-    atm_lat: NDArray, atm_lon: NDArray, ocn_grid: RectilinearGrid
-) -> tuple[NDArray, NDArray]:
-    """Create a new land mask from Ocean & JCM geometry object."""
-
-    from vercor.regridders.conservative import ConservativeRectilinearRegridder
-
-    atmosphere_grid = RectilinearGrid(
-        name="ATM",
-        longitude=atm_lon,
-        latitude=atm_lat,
-    )
-
-    regridder = ConservativeRectilinearRegridder(
-        ocn_grid,
-        atmosphere_grid,
-    )
-
-    ocean_binary_mask = np.asarray(ocn_grid.binary_mask)
-
-    (
-        ocn_fmask_on_atm_grid,
-        lnd_fmask_on_atm_grid,
-        lnd_bmask_on_atm_grid,
-    ) = compute_ocn_lnd_masks_on_atm_grid(ocean_binary_mask, regridder)
-
-    check_remap_conservation(regridder, ocean_binary_mask, ocn_fmask_on_atm_grid)
-
-    check_total_lnd_ocn_mask_sum(
-        lnd_fmask_on_atm_grid,
-        ocn_fmask_on_atm_grid,
-    )
-
-    return lnd_bmask_on_atm_grid, lnd_fmask_on_atm_grid
 
 
 class JCMLand(Component):
@@ -81,7 +40,7 @@ class JCMLand(Component):
 
         longitude = np.rad2deg(jcm_coords.horizontal.longitudes)
         latitude = np.rad2deg(jcm_coords.horizontal.latitudes)
-        lnd_bmask, _ = create_new_jcm_lnd_mask(
+        lnd_bmask, _ = create_lnd_mask_from_ocn(
             atm_lat=latitude,
             atm_lon=longitude,
             ocn_grid=ocn_grid,
