@@ -97,7 +97,7 @@ def wind_filter(
 
     # Apply filtering
     field_smooth = F.conv2d(field, gaussian_2d, padding=kernel_size // 2)
-    field_filtered = smooth_blend_mask * field_smooth + (1 - smooth_blend_mask) * field
+    field_filtered: torch.Tensor = smooth_blend_mask * field_smooth + (1 - smooth_blend_mask) * field
 
     if squeeze_output:
         return field_filtered.squeeze()

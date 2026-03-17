@@ -1,5 +1,4 @@
-from typing import TYPE_CHECKING, Union
-
+from typing import TYPE_CHECKING, TypeAlias, Union
 
 if TYPE_CHECKING:
     from vercor.components import (
@@ -17,8 +16,8 @@ if TYPE_CHECKING:
         CAMulatorGCM,
     )
 
+OceanType: TypeAlias = Union["Ocean", "ERA5Ocean", "ERAInterimOcean", "VerosGCM"]
+LandType: TypeAlias = Union["Land", "ERA5Land", "JCMLand"]
+AtmosphereType: TypeAlias = Union["Atmosphere", "ERA5Atmosphere", "JAXGCM", "CAMulatorGCM"]
+AllComponentsType: TypeAlias = Union[OceanType, LandType, AtmosphereType, "SeaIce"]
 
-type OceanType = Union[Ocean, ERA5Ocean, ERAInterimOcean, VerosGCM]
-type LandType = Union[Land, ERA5Land, JCMLand]
-type AtmosphereType = Union[Atmosphere, ERA5Atmosphere, JAXGCM, CAMulatorGCM]
-type AllComponentsType = Union[OceanType, LandType, AtmosphereType, SeaIce]

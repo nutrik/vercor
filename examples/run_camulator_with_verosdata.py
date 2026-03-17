@@ -73,7 +73,7 @@ if __name__ == "__main__":
     ocn = ERAInterimOcean()
 
     atm = CAMulatorGCM(
-        config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yaml",
+        config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",
         model_weights_path="/glade/u/home/rnuterman/veros_coupling/climate/checkpoint.pt00091.pt",
         output_subfolder_name="test_veros_00091",
     )

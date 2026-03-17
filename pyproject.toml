@@ -9,7 +9,7 @@ maintainers = [
 ]
 description = "Versatile Earth-system coupler for atmosphere, ocean, sea-ice, and land components"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
 "numpy>=2.2.6",
 "scipy>=1.9.3",
@@ -25,8 +25,8 @@ dependencies = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache-2.0",
     "Operating System :: POSIX",
