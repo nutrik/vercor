@@ -177,12 +177,12 @@ class CAMulatorGCM(Component):
         self.chunk_size = self.conf["data"].get("forcing_chunk_size", 32)
         # post_conf = self.conf["model"]["post_conf"]
         # lon_lat_level_names = post_conf["global_mass_fixer"]["lon_lat_level_name"]
-
+  
         grid = RectilinearGrid(
             name=name,
             longitude=self.latlons.longitude.values,
             latitude=self.latlons.latitude.values,
-            binary_mask=np.ones_like(
+            binary_mask=np.ones(
                 (
                     self.latlons.latitude.values.shape[0],
                     self.latlons.longitude.values.shape[0],
