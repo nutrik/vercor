@@ -25,7 +25,6 @@ from vercor.interpolators.conservative_remap_rectilinear import (
 from vercor.regridders.helpers import compute_land_mask
 from vercor.types import AllComponentsType
 
-
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 

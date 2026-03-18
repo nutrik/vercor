@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 OceanType: TypeAlias = Union["Ocean", "ERA5Ocean", "ERAInterimOcean", "VerosGCM"]
 LandType: TypeAlias = Union["Land", "ERA5Land", "JCMLand"]
-AtmosphereType: TypeAlias = Union["Atmosphere", "ERA5Atmosphere", "JAXGCM", "CAMulatorGCM"]
+AtmosphereType: TypeAlias = Union[
+    "Atmosphere", "ERA5Atmosphere", "JAXGCM", "CAMulatorGCM"
+]
 AllComponentsType: TypeAlias = Union[OceanType, LandType, AtmosphereType, "SeaIce"]
-

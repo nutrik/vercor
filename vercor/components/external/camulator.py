@@ -47,7 +47,6 @@ from vercor.clock import ModelDateTime
 from vercor.components.base import Component
 from vercor.grid import RectilinearGrid
 
-
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 
@@ -137,9 +136,6 @@ class CAMulatorGCM(Component):
         self.spinup_time = spinup_time
         self.do_spinup = do_spinup
 
-        # Create multiprocessing context for parallel I/O
-        self.ctx = mp.get_context("spawn")
-
         context = initialize_camulator(
             config_path=self.config_path,
             model_name=self.model_weights_path,
@@ -177,7 +173,7 @@ class CAMulatorGCM(Component):
         self.chunk_size = self.conf["data"].get("forcing_chunk_size", 32)
         # post_conf = self.conf["model"]["post_conf"]
         # lon_lat_level_names = post_conf["global_mass_fixer"]["lon_lat_level_name"]
-  
+
         grid = RectilinearGrid(
             name=name,
             longitude=self.latlons.longitude.values,
@@ -199,7 +195,7 @@ class CAMulatorGCM(Component):
         self.spinup_steps = int(
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
-        self.model_timestep = timedelta(minutes=self.lead_time_periods)
+        self.model_timestep = timedelta(hours=self.lead_time_periods)
         self.model_substeps = int(
             self.coupling_timestep.total_seconds()
             // self.model_timestep.total_seconds()
@@ -268,6 +264,21 @@ class CAMulatorGCM(Component):
         self.forecast_hour = 1
         self.timestep_counter = 0
 
+        zeros = np.zeros(self.grid.shape)
+        self.data["specific_humidity"] = zeros.copy()
+        self.data["net_shortwave_radiation_flux"] = zeros.copy()
+        self.data["downward_longwave_radiation_flux"] = zeros.copy()
+        self.data["sea_surface_temperature"] = zeros.copy()
+        self.data["land_surface_temperature"] = zeros.copy()
+        self.data["u_velocity"] = zeros.copy()
+        self.data["v_velocity"] = zeros.copy()
+        self.data["temperature"] = zeros.copy()
+        self.data["potential_temperature"] = zeros.copy()
+        self.data["density"] = zeros.copy()
+        self.data["latent_heat_flux"] = zeros.copy()
+        self.data["sensible_heat_flux"] = zeros.copy()
+        self.data["model_level_height"] = zeros.copy()
+
     def step(
         self,
         dt: timedelta,
@@ -276,6 +287,7 @@ class CAMulatorGCM(Component):
     ) -> None:
 
         settings = coupler.settings
+        logger = coupler.logger
         data = self.data
 
         prediction = None
@@ -318,10 +330,9 @@ class CAMulatorGCM(Component):
                     time_obj.second,
                 )
 
-            # if (self.timestep_counter + 1) % 10 == 0:
-            #     logger.info(
-            #         f"CAMulator step: {self.timestep_counter + 1:05}, time: {utc_datetime}"
-            #     )
+            logger.info(
+                f"    CAMulator step: {self.timestep_counter + 1:05}, time: {utc_datetime}"
+            )
 
             dynamic_forcing_t = gpu_forcing_chunk[t].unsqueeze(0)
 
@@ -375,25 +386,15 @@ class CAMulatorGCM(Component):
                 self.conf,
             )
 
-            # Async save to NetCDF (runs in background pool)
-            with self.ctx.Pool(self.output_cpus_number) as pool:
-                result = pool.apply_async(
-                    save_netcdf_increment,
-                    (
-                        upper_air,
-                        single_level,
-                        self.init_str,
-                        self.lead_time_periods * self.forecast_hour,
-                        self.metadata,
-                        self.conf,
-                    ),
-                )
-
-                # Safely wait and surface exceptions
-                result.get()
-
-                # Ensure workers exit cleanly
-                pool.join()
+            # save to NetCDF (runs in background pool)
+            save_netcdf_increment(
+                upper_air,
+                single_level,
+                self.init_str,
+                self.lead_time_periods * self.forecast_hour,
+                self.metadata,
+                self.conf,
+            )
 
             # ================================================================
             # SHIFT STATE FORWARD FOR NEXT TIMESTEP
@@ -421,23 +422,27 @@ class CAMulatorGCM(Component):
 
         # Units: [m/s]
         data["u_velocity"] = np.asarray(
-            self.accessor_output.get_state_var(prediction_out, "U").squeeze()[-1, :, :]
+            self.accessor_output.get_state_var(prediction_out, "U")
+            .cpu()
+            .squeeze()[-1, :, :]
         )
         # Units: [m/s]
         data["v_velocity"] = np.asarray(
-            self.accessor_output.get_state_var(prediction_out, "V").squeeze()[-1, :, :]
+            self.accessor_output.get_state_var(prediction_out, "V")
+            .cpu()
+            .squeeze()[-1, :, :]
         )
         # Units: [K]
         TS = np.asarray(
-            self.accessor_output.get_state_var(prediction_out, "TS")
+            self.accessor_output.get_state_var(prediction_out, "TS").cpu()
         )  # surface temp
         # Units: [K]
         data["temperature_3d"] = np.asarray(
-            self.accessor_output.get_state_var(prediction_out, "T").squeeze()
+            self.accessor_output.get_state_var(prediction_out, "T").cpu().squeeze()
         )  # temperature
         # Units: [kg/kg]
         data["specific_humidity_3d"] = np.asarray(
-            self.accessor_output.get_state_var(prediction_out, "Qtot").squeeze()
+            self.accessor_output.get_state_var(prediction_out, "Qtot").cpu().squeeze()
         )  # specific humidty
         # Near surface temperature
         data["temperature"] = data["temperature_3d"][-1, ...]
@@ -445,10 +450,10 @@ class CAMulatorGCM(Component):
         # average radiative flux during 6-hour period in [J/m²] convert to [W/m²]
         # 6 × 3600 = 21600
         FSNS /= 21600
-        data["net_shortwave_radiation_flux"] = np.asarray(FSNS.squeeze())
+        data["net_shortwave_radiation_flux"] = np.asarray(FSNS.cpu().squeeze())
 
-        FLNS = self.accessor_output.get_state_var(
-            prediction_out, "FLNS"
+        FLNS = np.asarray(
+            self.accessor_output.get_state_var(prediction_out, "FLNS").cpu()
         )  # FLDS≈εσTs{^4}−FLNS  # will have to approximate it. where emissivity in CAM = 1
         FLNS /= -21600  # J/m² back in CAM units [W/m2]
         FLDS = settings.stefBoltz * TS[...] ** 4 - FLNS
@@ -461,19 +466,19 @@ class CAMulatorGCM(Component):
             prediction_out, "PS"
         )  # surface pressure
         Pmid = np.asarray(
-            (self.hyam * self.P0 + self.hybm * PS).squeeze()
+            (self.hyam * self.P0 + self.hybm * PS).cpu().squeeze()
         )  # pm(k) = Am(k) P0 + Bm(k) PS
         Pint = np.asarray(
-            (self.hyai * self.P0 + self.hybi * PS).squeeze()
+            (self.hyai * self.P0 + self.hybi * PS).cpu().squeeze()
         )  # pi(k) = Ai(k) P0 + Bi(k) PS
 
         # Units: [m]
         data["model_level_height"] = get_altitudes_hybrid_sigma_levels(
             settings,
-            data["temperature_3d"],
-            data["specific_humidity_3d"],
-            Pint[...],
-        )[-1, ...]
+            data["temperature_3d"].T,
+            data["specific_humidity_3d"].T,
+            Pint[...].T,
+        )[..., -1].T
         # Units: [kg/m³]
         data["density"] = compute_air_density(
             settings, Pmid[-1, :, :], data["temperature"][:, :]

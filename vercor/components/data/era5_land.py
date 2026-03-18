@@ -7,7 +7,6 @@ from vercor.components import Component, ComponentForcingData
 from vercor.grid import RectilinearGrid
 from vercor.tools import get_forcing_data
 
-
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 

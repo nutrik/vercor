@@ -11,7 +11,6 @@ from vercor.components import Component
 from vercor.grid import RectilinearGrid
 from vercor.tools import create_lnd_mask_from_ocn
 
-
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 

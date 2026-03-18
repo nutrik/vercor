@@ -5,7 +5,6 @@ from vercor.components import ERA5Atmosphere, ERA5Land, VerosGCM
 from vercor.coupler import RunSequence
 from vercor.regridders import bilinear
 
-
 if __name__ == "__main__":
     atm = ERA5Atmosphere()
     ocn = VerosGCM(restore_to_climatology=True)

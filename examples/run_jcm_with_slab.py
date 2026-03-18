@@ -17,7 +17,6 @@ from vercor.components.external.jax_gcm_tools import (
     generate_jcm_coords_forcing_topography_files,
 )
 
-
 if __name__ == "__main__":
 
     coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()

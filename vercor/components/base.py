@@ -16,7 +16,6 @@ from vercor.settings import ComponentSettings
 from vercor.tools import get_field_at_specific_time, get_field_time_slice
 from vercor.exchange import VALID_EXCHANGE_FIELD_NAMES
 
-
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 

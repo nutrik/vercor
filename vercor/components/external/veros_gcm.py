@@ -19,7 +19,6 @@ from vercor.grid import RectilinearGrid
 from vercor.fluxes.bulk_formula_cesm import new_flux_atmOcn
 from vercor.settings import VercorSettings
 
-
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 

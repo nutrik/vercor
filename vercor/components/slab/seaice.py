@@ -7,7 +7,6 @@ from vercor.clock import CustomDateTime
 from vercor.components import Component
 from vercor.grid import RectilinearGrid
 
-
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 

@@ -4,7 +4,6 @@ from math import floor
 import time
 from typing import Callable, ClassVar, Iterator, Literal, Self
 
-
 _DAYS_PER_MONTH_GREGORIAN_LEAP = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 _DAYS_PER_MONTH_GREGORIAN_NO_LEAP = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 _MICROSECONDS_PER_DAY = 86_400_000_000

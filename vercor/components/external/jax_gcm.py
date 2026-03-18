@@ -38,7 +38,6 @@ from vercor.fluxes.utilities import (
 )
 from vercor.grid import RectilinearGrid
 
-
 if TYPE_CHECKING:
     from vercor.coupler import Coupler
 

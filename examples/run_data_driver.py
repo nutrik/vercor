@@ -15,7 +15,6 @@ from vercor.tools import (
 
 import matplotlib.pyplot as plt
 
-
 if __name__ == "__main__":
     # Build components
     atm = ERA5Atmosphere()
