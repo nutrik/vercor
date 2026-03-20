@@ -1,71 +1,10 @@
-from datetime import datetime, timedelta
-
-import numpy as np
+from datetime import datetime
 
 from vercor import Clock, Coupler, Exchange
-from vercor.components import ERAInterimOcean, CAMulatorGCM
+from vercor.components import ERAInterimOcean, CAMulatorGCM, CAMulatorLand
 
 from vercor.coupler import RunSequence
-from vercor.grid import RectilinearGrid
 from vercor.regridders import bilinear
-from vercor.components import Component
-from vercor.tools import create_lnd_mask_from_ocn
-from vercor.clock import CustomDateTime
-
-
-class CAMulatorLand(Component):
-    def __init__(
-        self,
-        camulator_grid: RectilinearGrid,
-        ocn_grid: RectilinearGrid,
-        name: str = "LND",
-    ) -> None:
-        """
-        Read all necessary fields from the provided forcing files.
-
-        Arguments:
-            name (str): component name
-            camulator_grid (RectilinearGrid): CAMulator grid object
-            ocn_grid (RectilinearGrid): Ocean component grid object
-
-        Attributes of parent classes to be initialized:
-            Component
-                name: str
-                grid: RectilinearGrid
-        """
-
-        longitude = camulator_grid.longitude
-        latitude = camulator_grid.latitude
-        lnd_bmask, _ = create_lnd_mask_from_ocn(
-            atm_lat=latitude,
-            atm_lon=longitude,
-            ocn_grid=ocn_grid,
-        )
-
-        grid = RectilinearGrid(
-            name=f"{name.lower()}-grid",
-            longitude=longitude,
-            latitude=latitude,
-            binary_mask=lnd_bmask,
-        )
-
-        super().__init__(name, grid=grid)
-
-        # Units: [K]
-        self.data["land_surface_temperature"] = np.full(
-            self.grid.shape, 283.0, dtype=np.float32
-        )
-
-    def initialize(self, coupler: "Coupler") -> None:
-        pass
-
-    def step(
-        self,
-        dt: timedelta,
-        time: datetime | CustomDateTime,
-        coupler: "Coupler",
-    ) -> None:
-        pass
 
 
 if __name__ == "__main__":
@@ -78,7 +17,12 @@ if __name__ == "__main__":
         output_subfolder_name="test_veros_00091",
     )
 
-    lnd = CAMulatorLand(atm.grid, ocn.grid)
+    lnd = CAMulatorLand(
+        config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",
+        camulator_grid=atm.grid,
+        ocn_grid=ocn.grid,
+        model_weights_path="/glade/u/home/rnuterman/veros_coupling/climate/checkpoint.pt00091.pt",
+    )
 
     clock = Clock(
         start=datetime(1981, 1, 1, 0, 0, 0),

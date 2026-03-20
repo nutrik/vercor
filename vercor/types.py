@@ -14,10 +14,11 @@ if TYPE_CHECKING:
         JAXGCM,
         VerosGCM,
         CAMulatorGCM,
+        CAMulatorLand,
     )
 
 OceanType: TypeAlias = Union["Ocean", "ERA5Ocean", "ERAInterimOcean", "VerosGCM"]
-LandType: TypeAlias = Union["Land", "ERA5Land", "JCMLand"]
+LandType: TypeAlias = Union["Land", "ERA5Land", "JCMLand", "CAMulatorLand"]
 AtmosphereType: TypeAlias = Union[
     "Atmosphere", "ERA5Atmosphere", "JAXGCM", "CAMulatorGCM"
 ]

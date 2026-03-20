@@ -15,7 +15,6 @@ import os
 
 from typing import TYPE_CHECKING, Optional
 from pathlib import Path
-import multiprocessing as mp
 
 from vercor.components.external.camulator_state import (
     initialize_camulator,
