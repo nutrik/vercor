@@ -357,8 +357,8 @@ class CAMulatorGCM(Component):
             rescaled_sst = (sst - np.nanmean(sst)) / np.nanstd(sst)
             rescaled_sst = np.nan_to_num(rescaled_sst, nan=0.0)
 
-            skt = self.data["land_surface_temperature"]
-            rescaled_skt = (skt - np.nanmean(skt)) / np.nanstd(skt)
+            # Land surface temperature is already rescaled in the same way as sst
+            rescaled_skt = self.data["land_surface_temperature"]
             rescaled_skt = np.nan_to_num(rescaled_skt, nan=0.0)
 
             # Units: [K]
