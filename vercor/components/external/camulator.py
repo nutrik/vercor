@@ -355,14 +355,25 @@ class CAMulatorGCM(Component):
             # !!! NOTE this needs to be rescaled for our ML model. !!!
             sst = self.data["sea_surface_temperature"]
             rescaled_sst = (sst - np.nanmean(sst)) / np.nanstd(sst)
-            rescaled_sst = np.nan_to_num(rescaled_sst, nan=283.0)
+            rescaled_sst = np.nan_to_num(rescaled_sst, nan=0.0)
+
+            skt = self.data["land_surface_temperature"]
+            rescaled_skt = (skt - np.nanmean(skt)) / np.nanstd(skt)
+            rescaled_skt = np.nan_to_num(rescaled_skt, nan=0.0)
+
+            # Units: [K]
+            self.data["total_surface_temperature"] = (
+                rescaled_sst + rescaled_skt
+            )
 
             self.accessor_input.set_state_var(
                 model_input,
                 "SST",
-                torch.tensor(rescaled_sst[np.newaxis, np.newaxis, np.newaxis, ...]).to(
-                    self.device
-                ),
+                torch.tensor(
+                    self.data["total_surface_temperature"][
+                        np.newaxis, np.newaxis, np.newaxis, ...
+                    ]
+                ).to(self.device),
             )
 
             # Run model
