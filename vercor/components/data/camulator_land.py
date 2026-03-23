@@ -127,6 +127,6 @@ class CAMulatorLand(Component):
         idx = self.start_ix + self.timestep_counter * self.model_substeps
         ts = self.dynamic_ds.isel(time=idx).load()
 
-        self.data["land_surface_temperature"] = ts.values
+        self.data["land_surface_temperature"] = ts["TS"].values
 
         self.timestep_counter += 1
