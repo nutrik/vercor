@@ -362,9 +362,7 @@ class CAMulatorGCM(Component):
             rescaled_skt = np.nan_to_num(rescaled_skt, nan=0.0)
 
             # Units: [K]
-            self.data["total_surface_temperature"] = (
-                rescaled_sst + rescaled_skt
-            )
+            self.data["total_surface_temperature"] = rescaled_sst + rescaled_skt
 
             self.accessor_input.set_state_var(
                 model_input,

@@ -18,7 +18,7 @@ if __name__ == "__main__":
     )
 
     lnd = CAMulatorLand(
-        config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",
+        config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_land_config.yml",
         camulator_grid=atm.grid,
         ocn_grid=ocn.grid,
         model_weights_path="/glade/u/home/rnuterman/veros_coupling/climate/checkpoint.pt00091.pt",
