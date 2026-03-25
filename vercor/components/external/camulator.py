@@ -234,6 +234,7 @@ class CAMulatorGCM(Component):
         self.hybm = torch.tensor(ds_physics["hybm"].values).to(self.device)[
             None, :, None, None
         ]
+        self.LANDM_COSLAT = ds_physics["LANDM_COSLAT"].values
 
         # Get forcing data subset
         self.dynamic_ds = self.forcing_ds_norm[self.df_vars]
@@ -360,18 +361,24 @@ class CAMulatorGCM(Component):
             # Land surface temperature is already rescaled in the same way as sst
             rescaled_skt = self.data["land_surface_temperature"]
             rescaled_skt = np.nan_to_num(rescaled_skt, nan=0.0)
+            logger.info(
+                f"    Rescaled SST stats - max: {rescaled_sst.max():.4f}, min: {rescaled_sst.min():.4f}"
+            )
+            logger.info(
+                f"    Rescaled SKT stats - max: {rescaled_skt.max():.4f}, min: {rescaled_skt.min():.4f}"
+            )
 
             # Units: [K]
-            self.data["total_surface_temperature"] = rescaled_sst + rescaled_skt
+            total_surface_temperature = rescaled_sst + rescaled_skt
+
+            sst = np.where(self.LANDM_COSLAT < 1.0, total_surface_temperature, 283.0)
 
             self.accessor_input.set_state_var(
                 model_input,
                 "SST",
-                torch.tensor(
-                    self.data["total_surface_temperature"][
-                        np.newaxis, np.newaxis, np.newaxis, ...
-                    ]
-                ).to(self.device),
+                torch.tensor(sst[np.newaxis, np.newaxis, np.newaxis, ...]).to(
+                    self.device
+                ),
             )
 
             # Run model
@@ -452,6 +459,7 @@ class CAMulatorGCM(Component):
         data["specific_humidity_3d"] = np.asarray(
             self.accessor_output.get_state_var(prediction_out, "Qtot").cpu().squeeze()
         )  # specific humidty
+        data["specific_humidity"] = data["specific_humidity_3d"][-1, ...]
         # Near surface temperature
         data["temperature"] = data["temperature_3d"][-1, ...]
         FSNS = self.accessor_output.get_state_var(prediction_out, "FSNS")
@@ -486,7 +494,7 @@ class CAMulatorGCM(Component):
             data["temperature_3d"].T,
             data["specific_humidity_3d"].T,
             Pint[...].T,
-        )[..., -1].T
+        )[..., 0].T
         # Units: [kg/m³]
         data["density"] = compute_air_density(
             settings, Pmid[-1, :, :], data["temperature"][:, :]
