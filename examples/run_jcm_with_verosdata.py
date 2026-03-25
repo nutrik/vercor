@@ -11,8 +11,8 @@ from vercor.coupler import RunSequence
 from vercor.regridders import bilinear
 
 if __name__ == "__main__":
-    # This ocean data & grid is identical to Veros global 4deg. setup
-    ocn = ERAInterimOcean()
+    # This ocean data & grid is identical to Veros global setup (1deg. or 4deg.)
+    ocn = ERAInterimOcean(resolution="4deg")
 
     coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()
 

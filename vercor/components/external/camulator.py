@@ -39,7 +39,7 @@ try:
     from credit.output import make_xarray, save_netcdf_increment
 except ModuleNotFoundError:
     print(
-        "Credit module not found. Please install credit to enable NetCDF output functionality."
+        "Credit module not found. Please install credit to use CAMulator."
     )
 
 from vercor.clock import ModelDateTime
@@ -370,15 +370,16 @@ class CAMulatorGCM(Component):
 
             # Units: [K]
             total_surface_temperature = rescaled_sst + rescaled_skt
-
-            sst = np.where(self.LANDM_COSLAT < 1.0, total_surface_temperature, 283.0)
+            total_surface_temperature = np.where(
+                self.LANDM_COSLAT < 1.0, total_surface_temperature, 283.0
+            )
 
             self.accessor_input.set_state_var(
                 model_input,
                 "SST",
-                torch.tensor(sst[np.newaxis, np.newaxis, np.newaxis, ...]).to(
-                    self.device
-                ),
+                torch.tensor(
+                    total_surface_temperature[np.newaxis, np.newaxis, np.newaxis, ...]
+                ).to(self.device),
             )
 
             # Run model

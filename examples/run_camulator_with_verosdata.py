@@ -8,8 +8,8 @@ from vercor.regridders import bilinear
 
 
 if __name__ == "__main__":
-    # This ocean data & grid is identical to Veros global 4deg. setup
-    ocn = ERAInterimOcean()
+    # This ocean data & grid is identical to Veros global 1deg. setup
+    ocn = ERAInterimOcean(resolution="1deg")
 
     atm = CAMulatorGCM(
         config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",

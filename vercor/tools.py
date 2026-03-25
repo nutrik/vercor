@@ -53,9 +53,13 @@ _FORCING_ASSETS: dict[str, dict[str, str]] = {
         "filename": "era5_lnd_skt_masked_1980.nc",
         "md5": "cea9349ee88f1ecb55572f87f065ff9b",
     },
-    "erainterim_ocean": {
+    "erainterim_ocean_4deg": {
         "filename": "forcing_4deg_global_open_itf.nc",
         "md5": "cfcc6d8cde8da5a74ecec00309d92dd7",
+    },
+    "erainterim_ocean_1deg": {
+        "filename": "forcing_1deg_global.nc",
+        "md5": "1fc86f88acd820da078c8da5873cfa01",
     },
     "ecmwf_4deg_monthly": {
         "filename": "ecmwf_4deg_monthly_nc4.nc",
