@@ -26,8 +26,8 @@ class ERAInterimOcean(Component, ComponentForcingData):
 
         Arguments:
             name (str): component name
+            resolution (str): dataset resolution (4deg or 1deg)
             model_level_file (Path): path to netCDF file with data at model levels
-            surface_file (Path): path to netCDF file with data at surface level
 
         Attributes of parent classes to be initialized:
             ComponentForcingData
@@ -56,7 +56,9 @@ class ERAInterimOcean(Component, ComponentForcingData):
 
         latitude[latitude_slice] = self._read_forcing("yt", where="model_level")
         longitude = longitude - 90.0 if grid_step == 1 else longitude
+
         sss[:, latitude_slice, :] = self._read_forcing("sss", where="model_level")
+        sss = np.roll(sss, 90, axis=0) if grid_step == 1 else sss
         binary_mask = np.where(sss > 0.0, 1.0, 0.0)[..., 0].T
 
         self.grid = RectilinearGrid(
@@ -73,7 +75,9 @@ class ERAInterimOcean(Component, ComponentForcingData):
         sst[:, latitude_slice, :] = (
             self._read_forcing("sst", where="model_level") + 273.15
         )
+        sst = np.roll(sst, 90, axis=0) if grid_step == 1 else sst
         sst *= np.where(binary_mask > 0.0, 1.0, np.nan).T[..., np.newaxis]
+
         # Units: [K]
         self.data["sea_surface_temperature"] = sst
 
