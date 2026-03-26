@@ -945,6 +945,7 @@ def initialize_camulator(
         "conf": conf,
         "state_transformer": state_transformer,
         "forcing_dataset": forcing_ds_norm,
+        "forcing_dataset_raw": forcing_ds.chunk({"time": chunk_size}),
         "static_forcing": static_forcing,
         "initial_state": initial_state,
         "latlons": latlons,

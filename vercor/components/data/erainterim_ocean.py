@@ -70,7 +70,9 @@ class ERAInterimOcean(Component, ComponentForcingData):
 
         self.settings.apply_time_interpolation = True
 
-        sst[:, latitude_slice, :] = self._read_forcing("sst", where="model_level") + 273.15
+        sst[:, latitude_slice, :] = (
+            self._read_forcing("sst", where="model_level") + 273.15
+        )
         sst *= np.where(binary_mask > 0.0, 1.0, np.nan).T[..., np.newaxis]
         # Units: [K]
         self.data["sea_surface_temperature"] = sst

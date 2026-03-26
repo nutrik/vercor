@@ -38,9 +38,7 @@ import torch
 try:
     from credit.output import make_xarray, save_netcdf_increment
 except ModuleNotFoundError:
-    print(
-        "Credit module not found. Please install credit to use CAMulator."
-    )
+    print("Credit module not found. Please install credit to use CAMulator.")
 
 from vercor.clock import ModelDateTime
 from vercor.components.base import Component
@@ -354,31 +352,22 @@ class CAMulatorGCM(Component):
 
             # once the coupler has run, set the variable: NOTE this needs to be rescaled for our ML model.
             # !!! NOTE this needs to be rescaled for our ML model. !!!
-            sst = self.data["sea_surface_temperature"]
-            rescaled_sst = (sst - np.nanmean(sst)) / np.nanstd(sst)
-            rescaled_sst = np.nan_to_num(rescaled_sst, nan=0.0)
+            sst = np.nan_to_num(self.data["sea_surface_temperature"], nan=0.0)
+            skt = np.nan_to_num(self.data["land_surface_temperature"], nan=0.0)
+
+            total_ts = np.where(self.LANDM_COSLAT < 1.0, sst + skt, 283.0)
+            rescaled_total_ts = (total_ts - np.nanmean(total_ts)) / np.nanstd(total_ts)
 
             # Land surface temperature is already rescaled in the same way as sst
-            rescaled_skt = self.data["land_surface_temperature"]
-            rescaled_skt = np.nan_to_num(rescaled_skt, nan=0.0)
             logger.info(
-                f"    Rescaled SST stats - max: {rescaled_sst.max():.4f}, min: {rescaled_sst.min():.4f}"
-            )
-            logger.info(
-                f"    Rescaled SKT stats - max: {rescaled_skt.max():.4f}, min: {rescaled_skt.min():.4f}"
-            )
-
-            # Units: [K]
-            total_surface_temperature = rescaled_sst + rescaled_skt
-            total_surface_temperature = np.where(
-                self.LANDM_COSLAT < 1.0, total_surface_temperature, 283.0
+                f"    Rescaled ts stats - max: {rescaled_total_ts.max():.4f}, min: {rescaled_total_ts.min():.4f}"
             )
 
             self.accessor_input.set_state_var(
                 model_input,
                 "SST",
                 torch.tensor(
-                    total_surface_temperature[np.newaxis, np.newaxis, np.newaxis, ...]
+                    rescaled_total_ts[np.newaxis, np.newaxis, np.newaxis, ...]
                 ).to(self.device),
             )
 

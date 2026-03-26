@@ -57,7 +57,7 @@ class CAMulatorLand(Component):
         )
 
         self.conf = context["conf"]
-        self.forcing_ds_norm = context["forcing_dataset"]
+        self.forcing_ds = context["forcing_dataset_raw"]
         self.lead_time_periods = self.conf["data"]["lead_time_periods"]
 
         grid = RectilinearGrid(
@@ -86,7 +86,7 @@ class CAMulatorLand(Component):
                 f"multiple of coupling_timestep ({self.coupling_timestep})"
             )
 
-        self.dynamic_ds = self.forcing_ds_norm[
+        self.dynamic_ds = self.forcing_ds[
             [
                 "TS",
             ]
