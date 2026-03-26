@@ -438,7 +438,7 @@ class CAMulatorGCM(Component):
             .squeeze()[-1, :, :]
         )
         # Units: [K]
-        TS = np.asarray(
+        ts = np.asarray(
             self.accessor_output.get_state_var(prediction_out, "TS").cpu()
         )  # surface temp
         # Units: [K]
@@ -452,29 +452,29 @@ class CAMulatorGCM(Component):
         data["specific_humidity"] = data["specific_humidity_3d"][-1, ...]
         # Near surface temperature
         data["temperature"] = data["temperature_3d"][-1, ...]
-        FSNS = self.accessor_output.get_state_var(prediction_out, "FSNS")
+        fsns = self.accessor_output.get_state_var(prediction_out, "FSNS")
         # average radiative flux during 6-hour period in [J/m²] convert to [W/m²]
         # 6 × 3600 = 21600
-        FSNS /= 21600
-        data["net_shortwave_radiation_flux"] = np.asarray(FSNS.cpu().squeeze())
+        fsns /= 21600
+        data["net_shortwave_radiation_flux"] = np.asarray(fsns.cpu().squeeze())
 
-        FLNS = np.asarray(
+        flns = np.asarray(
             self.accessor_output.get_state_var(prediction_out, "FLNS").cpu()
-        )  # FLDS≈εσTs{^4}−FLNS  # will have to approximate it. where emissivity in CAM = 1
-        FLNS /= -21600  # J/m² back in CAM units [W/m2]
-        FLDS = settings.stefBoltz * TS[...] ** 4 - FLNS
+        )  # flds ≈ εσTs{^4}flns  # will have to approximate it. where emissivity in CAM = 1
+        flns /= -21600  # J/m² back in CAM units [W/m²]
+        flds = settings.stefBoltz * ts[...] ** 4 - flns
         # Units: [W/m²]
-        data["downward_longwave_radiation_flux"] = np.asarray(FLDS.squeeze())
+        data["downward_longwave_radiation_flux"] = np.asarray(flds.squeeze())
 
         # Pressure model levels:
         # Units: [Pa]
         PS = self.accessor_output.get_state_var(
             prediction_out, "PS"
         )  # surface pressure
-        Pmid = np.asarray(
+        p_mid = np.asarray(
             (self.hyam * self.P0 + self.hybm * PS).cpu().squeeze()
         )  # pm(k) = Am(k) P0 + Bm(k) PS
-        Pint = np.asarray(
+        p_int = np.asarray(
             (self.hyai * self.P0 + self.hybi * PS).cpu().squeeze()
         )  # pi(k) = Ai(k) P0 + Bi(k) PS
 
@@ -483,13 +483,13 @@ class CAMulatorGCM(Component):
             settings,
             data["temperature_3d"].T,
             data["specific_humidity_3d"].T,
-            Pint[...].T,
+            p_int[...].T,
         )[..., 0].T
         # Units: [kg/m³]
         data["density"] = compute_air_density(
-            settings, Pmid[-1, :, :], data["temperature"][:, :]
+            settings, p_mid[-1, :, :], data["temperature"][:, :]
         )
         # Units: [K]
         data["potential_temperature"] = compute_potential_temperature(
-            settings, data["temperature"][:, :], Pmid[-1, :, :]
+            settings, data["temperature"][:, :], p_mid[-1, :, :]
         )

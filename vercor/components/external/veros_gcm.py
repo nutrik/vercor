@@ -260,7 +260,7 @@ class VerosGCM(Component):
             name (str): component name
         """
 
-        self.model = CustomGlobalFourDegree(override={"dt_tracer": 21600.})
+        self.model = CustomGlobalFourDegree(override={"dt_tracer": 21600.0})
         self.model.setup()
         self._veros_state = copy_state(self.model.state, jitted=jitted)
         self._step_function = lambda state: pure(
