@@ -1,15 +1,14 @@
 from datetime import datetime
 
 from vercor import Clock, Coupler, Exchange
-from vercor.components import ERAInterimOcean, CAMulatorGCM, CAMulatorLand
+from vercor.components import CAMulatorGCM, CAMulatorLand, VerosGCM
 
 from vercor.coupler import RunSequence
 from vercor.regridders import bilinear
 
 
 if __name__ == "__main__":
-    # This ocean data & grid is identical to Veros global 1deg. setup
-    ocn = ERAInterimOcean(resolution="1deg")
+    ocn = VerosGCM(do_spinup=True)
 
     atm = CAMulatorGCM(
         config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",
@@ -25,9 +24,9 @@ if __name__ == "__main__":
     )
 
     clock = Clock(
-        start=datetime(1981, 1, 1, 0, 0, 0),
-        dt_seconds=86400.0,
-        steps=10,
+        start=datetime(1981, 1, 3, 0, 0, 0),
+        dt_seconds=86400.0 // 4,
+        steps=100 - 2 * 4,
         year_type="noleap",
     )
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
@@ -48,8 +47,10 @@ if __name__ == "__main__":
             field_names=[
                 ("u_velocity", "v_velocity"),
                 "specific_humidity",
-                "temperature",
                 "model_level_height",
+                "density",
+                "potential_temperature",
+                "temperature",
                 "net_shortwave_radiation_flux",
                 "downward_longwave_radiation_flux",
             ],
