@@ -248,6 +248,7 @@ class VerosGCM(Component):
     def __init__(
         self,
         name: str = "OCN",
+        time_step: timedelta = timedelta(hours=6),
         spinup_time: timedelta = timedelta(days=2),
         restore_to_climatology: bool = False,
         do_spinup: bool = False,
@@ -258,9 +259,17 @@ class VerosGCM(Component):
 
         Arguments:
             name (str): component name
+            time_step (timedelta): internal time step of the Veros model
+            spinup_time (timedelta): duration of the initial Veros spinup
+            restore_to_climatology (bool): whether to apply restoring to climatology in
+                                           the surface temperature (add salinity later) tendency
+            do_spinup (bool): whether to perform the initial spinup with ERA-Interim forcing
+            jitted (bool): whether to use JIT compilation for the Veros model step function
         """
 
-        self.model = CustomGlobalFourDegree(override={"dt_tracer": 21600.0})
+        self.model = CustomGlobalFourDegree(
+            override={"dt_tracer": time_step.total_seconds()}
+        )
         self.model.setup()
         self._veros_state = copy_state(self.model.state, jitted=jitted)
         self._step_function = lambda state: pure(
