@@ -248,7 +248,6 @@ class VerosGCM(Component):
     def __init__(
         self,
         name: str = "OCN",
-        time_step: timedelta = timedelta(hours=6),
         spinup_time: timedelta = timedelta(days=2),
         custom_parameters: dict[str, Any] | None = None,
         restore_to_climatology: bool = False,
@@ -260,7 +259,6 @@ class VerosGCM(Component):
 
         Arguments:
             name (str): component name
-            time_step (timedelta): internal time step of the Veros model
             spinup_time (timedelta): duration of the initial Veros spinup
             custom_parameters (dict[str, Any]): dictionary of custom parameter values to override
                                                 the default settings in the GlobalFourDegreeSetup
@@ -270,10 +268,7 @@ class VerosGCM(Component):
             jitted (bool): whether to use JIT compilation for the Veros model step function
         """
 
-        override = {"dt_tracer": time_step.total_seconds()}
-
-        if custom_parameters is not None:
-            override.update(custom_parameters)
+        override = custom_parameters or {}
 
         self.model = CustomGlobalFourDegree(override=override)
         self.model.setup()

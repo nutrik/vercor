@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from vercor import Clock, Coupler, Exchange
 from vercor.components import CAMulatorGCM, CAMulatorLand, VerosGCM
@@ -8,7 +8,10 @@ from vercor.regridders import bilinear
 
 
 if __name__ == "__main__":
-    ocn = VerosGCM(do_spinup=True)
+    ocn = VerosGCM(
+        do_spinup=True,
+        custom_parameters={"dt_tracer": timedelta(hours=6).total_seconds()},
+    )
 
     atm = CAMulatorGCM(
         config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",
