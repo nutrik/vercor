@@ -6,11 +6,30 @@ from vercor import Clock, Coupler, Exchange
 from vercor.components import JCMLand, VerosGCM, JAXGCM
 from vercor.components.external.jax_gcm_tools import (
     generate_jcm_coords_forcing_topography_files,
+    get_default_parameter_values,
 )
 from vercor.coupler import RunSequence
 from vercor.regridders import bilinear
 
+from jcm.physics.speedy.params import Parameters
+
+
 if __name__ == "__main__":
+    optimized_parameters: list = [
+        "surface_flux.vgust",
+        "convection.rhbl",
+        "condensation.rhlsc",
+        "surface_flux.cds",
+    ]
+
+    custom_jcm_parameters: dict[str, float] = get_default_parameter_values(
+        parameters=optimized_parameters,
+        default_parameters=Parameters.default(),
+    )
+
+    # change the values of the parameters to be optimized here
+    # custom_jcm_parameters['surface_flux.vgust'] = 5.01
+
     ocn = VerosGCM(do_spinup=True)
 
     coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()
@@ -24,6 +43,7 @@ if __name__ == "__main__":
     atm = JAXGCM(
         coords,
         terrain,
+        custom_parameters=custom_jcm_parameters,
         forcing_data=forcing,
         do_spinup=True,
         jitted=True,

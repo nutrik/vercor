@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from vercor.clock import DateTime360
-from vercor.components.external.jax_gcm import JAXGCM
+from vercor.components import JAXGCM
 
 
 def _make_component(output_frequency: str | None) -> JAXGCM:

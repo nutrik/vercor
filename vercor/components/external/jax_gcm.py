@@ -16,6 +16,8 @@ from dinosaur.coordinate_systems import CoordinateSystem
 from jcm.constants import p0
 from jcm.forcing import default_forcing
 from jcm.model import ForcingData, Model, Predictions
+from jcm.physics.speedy.params import Parameters
+from jcm.physics.speedy.speedy_physics import SpeedyPhysics
 from jcm.physics.speedy.physics_data import PhysicsData
 from jcm.physics_interface import (
     PhysicsState,
@@ -26,6 +28,7 @@ from jcm.physics_interface import (
 from vercor.clock import ModelDateTime
 from vercor.components.base import Component
 from vercor.components.external.jax_gcm_tools import (
+    change_jcm_parameter_values,
     mean_leaf,
     stack_objects,
     unwrap_leading_dims,
@@ -75,6 +78,7 @@ class JAXGCM(Component):
         coords: CoordinateSystem,
         terrain: TerrainData,
         name: str = "ATM",
+        custom_parameters: Optional[dict[str, float]] = None,
         model_timestep: timedelta = timedelta(minutes=30),
         save_interval: timedelta = timedelta(days=1),
         spinup_time: timedelta = timedelta(days=2),
@@ -85,9 +89,6 @@ class JAXGCM(Component):
         jitted: bool = True,
     ) -> None:
 
-        self.model = Model(
-            coords, time_step=model_timestep.total_seconds() / 60.0, terrain=terrain
-        )
         self.forcing_data = forcing_data
         self.output_frequency = output_frequency
         self.model_timestep = model_timestep
@@ -95,6 +96,23 @@ class JAXGCM(Component):
         self.spinup_time = spinup_time
         self.do_spinup = do_spinup
         self.jitted = jitted
+
+        jcm_parameters = Parameters.default()
+
+        if custom_parameters is not None:
+            change_jcm_parameter_values(
+                parameters=custom_parameters,
+                default_parameters=jcm_parameters,
+            )
+
+        physics = SpeedyPhysics(parameters=jcm_parameters)
+
+        self.model = Model(
+            coords,
+            time_step=model_timestep.total_seconds() / 60.0,
+            terrain=terrain,
+            physics=physics,
+        )
 
         hgrid = self.model.coords.horizontal
         grid = RectilinearGrid(

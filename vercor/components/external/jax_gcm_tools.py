@@ -10,7 +10,33 @@ from dinosaur.coordinate_systems import CoordinateSystem
 from jcm.forcing import ForcingData
 from jcm.terrain import TerrainData
 from jcm.physics.speedy.speedy_coords import get_speedy_coords
+from jcm.physics.speedy.params import Parameters
 from numpy.typing import NDArray
+
+
+def change_jcm_parameter_values(
+    parameters: dict[str, float], default_parameters: Parameters
+) -> None:
+
+    for key, value in parameters.items():
+        parameter_group_name, parameter_name = key.split(".")
+        default_parameters.__getattribute__(parameter_group_name).__setattr__(
+            parameter_name, jnp.array(value)
+        )
+
+
+def get_default_parameter_values(
+    parameters: list[str], default_parameters: Parameters
+) -> dict[str, float]:
+    output = {}
+
+    for parameter in parameters:
+        parameter_group_name, parameter_name = parameter.split(".")
+        output[parameter] = default_parameters.__getattribute__(
+            parameter_group_name
+        ).__getattribute__(parameter_name)
+
+    return output
 
 
 def compute_pressure_levels(
