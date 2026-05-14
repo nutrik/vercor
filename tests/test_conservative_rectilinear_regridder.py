@@ -1,3 +1,4 @@
+from inspect import signature
 from typing import Any
 
 import jax.numpy as jnp
@@ -40,6 +41,11 @@ def test_regridder_constructor_sets_interpolator_and_grids() -> None:
     assert regridder.source_grid is src
     assert regridder.destination_grid is dst
     assert regridder.interpolator is not None
+
+
+def test_conservative_regridder_api_does_not_expose_noop_fill_value() -> None:
+    assert "fill_value" not in signature(ConservativeRectilinearRegridder).parameters
+    assert "fill_value" not in signature(conservative).parameters
 
 
 def test_regridder_constructor_uses_provided_edges_when_available() -> None:

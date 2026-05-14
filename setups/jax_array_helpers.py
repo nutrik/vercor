@@ -3,19 +3,14 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
+from vercor.host_arrays import runtime_array_to_host
 from vercor.types import RuntimeArray
-
-
-def to_host_array(array: RuntimeArray) -> Any:
-    """Transfer a runtime array to a host array for external runtime boundaries."""
-
-    return jax.device_get(jnp.asarray(array))
 
 
 def transposed_host_array(array: RuntimeArray) -> Any:
     """Transfer a transposed runtime array to host memory."""
 
-    return to_host_array(jnp.asarray(array).T)
+    return runtime_array_to_host(jnp.asarray(array).T)
 
 
 def component_vector_speed(

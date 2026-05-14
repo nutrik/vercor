@@ -7,9 +7,9 @@ from jax.typing import ArrayLike
 
 from vercor.components.base import DataComponent, data_component
 from vercor.dtypes import as_jax_real_array, jax_arange
-from vercor.field_layout import canonicalize_time_last_surface_field
 from vercor.grid import RectilinearGrid
 from vercor.assets import get_forcing_data
+from setups.data._field_helpers import mask_time_last_surface_field
 from setups.data.forcing import read_forcing as _read_forcing
 
 _ERAINTERIM_OCEAN_FIELD_NAMES = ("sea_surface_temperature",)
@@ -56,21 +56,6 @@ def _assemble_erainterim_field(
 def _binary_ocean_mask_from_salinity(salinity: ArrayLike) -> jax.Array:
     """Create a binary ocean mask from a full-grid salinity field."""
     return jnp.where(as_jax_real_array(salinity) > 0.0, 1.0, 0.0)[..., 0].T
-
-
-def _mask_sea_surface_temperature(
-    sea_surface_temperature: ArrayLike,
-    binary_mask: ArrayLike,
-) -> jax.Array:
-    """Apply the binary ocean mask and return a `(nTime, nLat, nLon)` SST field."""
-    return (
-        canonicalize_time_last_surface_field(sea_surface_temperature)
-        * jnp.where(
-            as_jax_real_array(binary_mask) > 0.0,
-            1.0,
-            jnp.nan,
-        )[jnp.newaxis, ...]
-    )
 
 
 def make_erainterim_ocean(
@@ -120,7 +105,7 @@ def make_erainterim_ocean(
         binary_mask=binary_mask,
     )
 
-    sst = _mask_sea_surface_temperature(
+    sst = mask_time_last_surface_field(
         _assemble_erainterim_field(
             _read_forcing(data_files, "sst", where="model_level"),
             int(full_latitude.size),

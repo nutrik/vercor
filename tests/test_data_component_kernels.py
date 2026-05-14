@@ -10,10 +10,8 @@ from setups.data.era5_atmosphere import (
     _compute_monthly_diagnostics,
     _decode_surface_pressure,
 )
+from setups.data._field_helpers import mask_time_last_surface_field
 from setups.data.era5_land import _prepare_era5_land_runtime_fields
-from setups.data.era5_ocean import (
-    _mask_sea_surface_temperature as _mask_era5_sea_surface_temperature,
-)
 from setups.data.era5_ocean import (
     _ocean_binary_mask_from_land_fraction,
 )
@@ -21,7 +19,6 @@ from setups.data.erainterim_ocean import (
     _assemble_erainterim_field,
     _assemble_erainterim_latitude,
     _binary_ocean_mask_from_salinity,
-    _mask_sea_surface_temperature as _mask_erainterim_sea_surface_temperature,
 )
 from setups.data.camulator_land import (
     _prepare_camulator_land_surface_temperature,
@@ -201,7 +198,7 @@ def test_ocean_mask_helpers_accept_jax_arrays() -> None:
     )
 
     binary_mask = jax.jit(_ocean_binary_mask_from_land_fraction)(land_fraction)
-    masked_sst = jax.jit(_mask_era5_sea_surface_temperature)(
+    masked_sst = jax.jit(mask_time_last_surface_field)(
         sea_surface_temperature,
         binary_mask,
     )
@@ -212,6 +209,39 @@ def test_ocean_mask_helpers_accept_jax_arrays() -> None:
     assert np.isnan(np.asarray(masked_sst)[0, 0, 0])
     assert np.isclose(np.asarray(masked_sst)[0, 1, 0], 282.0)
     assert masked_sst.shape == (2, 2, 2)
+
+
+def test_shared_masked_surface_field_helper_supports_jit_and_gradients() -> None:
+    sea_surface_temperature = jnp.asarray(
+        [
+            [[280.0, 281.0], [282.0, 283.0]],
+            [[284.0, 285.0], [286.0, 287.0]],
+        ]
+    )
+    binary_mask = jnp.asarray([[0.0, 1.0], [1.0, 0.0]])
+
+    masked = jax.jit(mask_time_last_surface_field)(
+        sea_surface_temperature,
+        binary_mask,
+    )
+
+    assert isinstance(masked, jax.Array)
+    assert masked.shape == (2, 2, 2)
+    assert np.isnan(np.asarray(masked)[0, 0, 0])
+    assert_allclose_compact(
+        jnp.nan_to_num(masked, nan=-1.0),
+        np.asarray([[[-1.0, 284.0], [282.0, -1.0]], [[-1.0, 285.0], [283.0, -1.0]]]),
+    )
+
+    gradient = jax.grad(
+        lambda temperature: jnp.nansum(
+            mask_time_last_surface_field(temperature, binary_mask)
+        )
+    )(sea_surface_temperature)
+    assert_allclose_compact(
+        gradient,
+        np.asarray([[[0.0, 0.0], [1.0, 1.0]], [[1.0, 1.0], [0.0, 0.0]]]),
+    )
 
 
 def test_erainterim_helpers_prepare_jax_backed_grid_and_masked_fields() -> None:
@@ -227,7 +257,7 @@ def test_erainterim_helpers_prepare_jax_backed_grid_and_masked_fields() -> None:
     )
     salinity = _assemble_erainterim_field(core_field, 46, 3, 5)
     binary_mask = _binary_ocean_mask_from_salinity(salinity)
-    sea_surface_temperature = _mask_erainterim_sea_surface_temperature(
+    sea_surface_temperature = mask_time_last_surface_field(
         _assemble_erainterim_field(core_field, 46, 3, 5, offset=273.15),
         binary_mask,
     )
