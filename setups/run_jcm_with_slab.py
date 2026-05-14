@@ -4,9 +4,9 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from vercor import Clock, Coupler, Exchange, RunSequence
-from vercor.components.external.jax_gcm import JAXGCM
-from vercor.components.slab.land import Land
-from vercor.components.slab.ocean import Ocean
+from setups.external.jax_gcm import make_jax_gcm
+from setups.slab.land import make_slab_land
+from setups.slab.ocean import make_slab_ocean
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
 from vercor.regridders import bilinear, conservative
@@ -15,7 +15,7 @@ from vercor.diagnostics import (
     print_component_field_means_table,
 )
 
-from vercor.components.external.jax_gcm_tools import (
+from setups.external.jax_gcm_tools import (
     generate_jcm_coords_forcing_topography_files,
 )
 
@@ -24,12 +24,12 @@ if __name__ == "__main__":
     coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()
 
     # Build components
-    atm = JAXGCM(coords, terrain, forcing_data=forcing, jitted=True)
+    atm = make_jax_gcm(coords, terrain, forcing_data=forcing, jitted=True)
 
     ocn_binary_mask = jnp.where(as_jax_real_array(terrain.fmask) < 1, 1, 0).T
     lnd_binary_mask = 1 - ocn_binary_mask
 
-    hgrid = atm.model.coords.horizontal
+    hgrid = getattr(atm, "model").coords.horizontal
     lnd_grid = RectilinearGrid(
         name="LND",
         longitude=jnp.rad2deg(as_jax_real_array(hgrid.longitudes)),
@@ -44,8 +44,8 @@ if __name__ == "__main__":
         binary_mask=ocn_binary_mask,
     )
 
-    ocn = Ocean(ocn_grid)
-    lnd = Land(lnd_grid)
+    ocn = make_slab_ocean(ocn_grid)
+    lnd = make_slab_land(lnd_grid)
 
     if atm.grid.binary_mask is not None:
         print("Total number of grids = ", atm.grid.binary_mask.size)

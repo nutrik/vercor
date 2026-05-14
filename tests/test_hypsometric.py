@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import pytest
 
 from tests.assertions import assert_allclose_compact
-from vercor.components.external.jax_gcm import get_altitudes_sigma_levels
+from setups.external.jax_gcm import get_altitudes_sigma_levels
 
 
 def _to_jax_numpy(x: jnp.ndarray) -> jnp.ndarray:

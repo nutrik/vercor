@@ -10,10 +10,10 @@ import numpy as np
 
 from tests._coverage_support import make_test_grid
 from vercor.clock import Clock
-from vercor.components.slab.atmosphere import Atmosphere
-from vercor.components.slab.land import Land
-from vercor.components.slab.ocean import Ocean
-from vercor.components.slab.seaice import SeaIce
+from setups.slab.atmosphere import make_slab_atmosphere
+from setups.slab.land import make_slab_land
+from setups.slab.ocean import make_slab_ocean
+from setups.slab.seaice import make_slab_seaice
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
 from vercor.run_sequence import RunSequence
@@ -62,10 +62,10 @@ def _make_coupler(steps: int) -> Coupler:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=steps)
     )
     coupler.components = {
-        "ATM": Atmosphere(grid),
-        "OCN": Ocean(grid),
-        "LND": Land(grid),
-        "ICE": SeaIce(grid),
+        "ATM": make_slab_atmosphere(grid),
+        "OCN": make_slab_ocean(grid),
+        "LND": make_slab_land(grid),
+        "ICE": make_slab_seaice(grid),
     }
     coupler.run_sequence = RunSequence(order=["ATM", "OCN", "LND", "ICE"])
     coupler.exchanges = [
@@ -261,7 +261,7 @@ def test_non_donating_run_preserves_runtime_treedef() -> None:
 
 
 def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
-    profile_runtime = importlib.import_module("examples.profile_runtime")
+    profile_runtime = importlib.import_module("setups.profile_runtime")
 
     assert callable(profile_runtime.main)
     parser = profile_runtime.build_parser()
@@ -272,7 +272,7 @@ def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
 
 
 def test_runtime_profile_harness_runs_small_slab_profile() -> None:
-    profile_runtime = importlib.import_module("examples.profile_runtime")
+    profile_runtime = importlib.import_module("setups.profile_runtime")
 
     result = profile_runtime.profile_runtime(
         steps=1,

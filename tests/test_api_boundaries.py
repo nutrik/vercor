@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from inspect import signature
 from pathlib import Path
+import ast
 
 import pytest
 
 import vercor
 import vercor.components as components_module
 from tests._coverage_support import make_test_grid
-from vercor.components.base import Component, HostRuntimeComponent
+from vercor.components.base import Component, DataComponent, HostRuntimeComponent
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.run_sequence import RunSequence
 from vercor.runtime import RuntimeComponentState, RuntimeFieldStore
@@ -215,7 +216,7 @@ def test_runtime_state_is_separate_from_public_component_objects() -> None:
 
 @pytest.mark.fast_always
 def test_examples_import_run_sequence_from_top_level_public_api() -> None:
-    for path in Path("examples").glob("run_*.py"):
+    for path in Path("setups").glob("run_*.py"):
         source = path.read_text(encoding="utf-8")
         assert "from vercor.coupler import RunSequence" not in source
         if "RunSequence" in source:
@@ -225,3 +226,60 @@ def test_examples_import_run_sequence_from_top_level_public_api() -> None:
                 if line.startswith("from vercor import ")
             ]
             assert any("RunSequence" in line for line in public_import_lines), path
+
+
+@pytest.mark.fast_always
+def test_setup_factories_are_primary_concrete_component_api() -> None:
+    from setups.slab import (
+        make_slab_atmosphere,
+        make_slab_land,
+        make_slab_ocean,
+        make_slab_seaice,
+    )
+
+    grid = make_test_grid(name="setup-api")
+    assert isinstance(make_slab_atmosphere(grid), Component)
+    assert isinstance(make_slab_ocean(grid), Component)
+    assert isinstance(make_slab_land(grid), Component)
+    assert isinstance(make_slab_seaice(grid), Component)
+
+    from setups.data.era5_land import make_era5_land
+    from setups.external.veros_gcm import make_veros_gcm
+
+    assert callable(make_era5_land)
+    assert callable(make_veros_gcm)
+
+
+@pytest.mark.fast_always
+def test_old_concrete_component_packages_are_removed() -> None:
+    assert not Path("vercor/components/slab").exists()
+    assert not Path("vercor/components/data").exists()
+    assert not Path("vercor/components/external").exists()
+
+
+@pytest.mark.fast_always
+def test_setup_modules_do_not_subclass_component_contracts() -> None:
+    forbidden_bases = {"Component", "DataComponent", "HostRuntimeComponent"}
+    for path in Path("setups").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                base_names = {
+                    base.id for base in node.bases if isinstance(base, ast.Name)
+                } | {
+                    base.attr for base in node.bases if isinstance(base, ast.Attribute)
+                }
+                assert forbidden_bases.isdisjoint(
+                    base_names
+                ), f"{path}:{node.lineno} subclasses a core component contract"
+
+
+@pytest.mark.fast_always
+def test_data_and_host_factories_return_core_contract_instances() -> None:
+    from setups.data.era5_land import make_era5_land
+    from setups.external.camulator import make_camulator_gcm
+
+    assert callable(make_era5_land)
+    assert callable(make_camulator_gcm)
+    assert issubclass(DataComponent, Component)
+    assert issubclass(HostRuntimeComponent, Component)

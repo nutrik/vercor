@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from tests.assertions import assert_allclose_compact
-from vercor.components.external.jax_gcm import JAXGCMRuntimePayload
+from setups.external.jax_gcm import JAXGCMRuntimePayload
 from vercor.grid import RectilinearGrid
 from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 from vercor.interpolators.conservative_remap_rectilinear import (

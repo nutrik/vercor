@@ -1,27 +1,28 @@
 from datetime import datetime
 
-from examples.jax_array_helpers import transposed_host_array
+from setups.jax_array_helpers import transposed_host_array
 from vercor import Clock, Coupler, Exchange, RunSequence
-from vercor.components.data.era5_ocean import ERA5Ocean
-from vercor.components.data.jcm_land import JCMLand
-from vercor.components.external.jax_gcm import JAXGCM
-from vercor.components.external.jax_gcm_tools import (
+from setups.data.erainterim_ocean import make_erainterim_ocean
+from setups.data.jcm_land import make_jcm_land
+from setups.external.jax_gcm import make_jax_gcm
+from setups.external.jax_gcm_tools import (
     generate_jcm_coords_forcing_topography_files,
 )
 from vercor.regridders import bilinear
 
 if __name__ == "__main__":
-    ocn = ERA5Ocean()
+    # This ocean data & grid is identical to Veros global setup (1deg. or 4deg.)
+    ocn = make_erainterim_ocean(resolution="4deg")
 
     coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()
 
-    lnd = JCMLand(coords, forcing, ocn.grid)
+    lnd = make_jcm_land(coords, forcing, ocn.grid)
 
     # Swap mask in JAXGCM with ocean/land masks from ocean model
     terrain.fmask = transposed_host_array(lnd.grid.binary_mask)  # type: ignore
 
     # Build components
-    atm = JAXGCM(
+    atm = make_jax_gcm(
         coords,
         terrain,
         forcing_data=forcing,

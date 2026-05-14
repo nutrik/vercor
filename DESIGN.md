@@ -182,7 +182,7 @@ immutable runtime containers used during traced integration.
   `step_runtime_state()`. Use `DataComponent` for forcing/static data adapters
   that intentionally keep the shared no-op runtime step and do not create
   plotting-only runtime fields. Derived diagnostics, such as a combined land/sea
-  surface temperature used only for plots, belong in diagnostics or examples.
+  surface temperature used only for plots, belong in diagnostics or setups.
   Use `HostRuntimeComponent` for non-differentiable adapters and implement
   `step_host_runtime_state()`; host-backed adapters must run through
   `Coupler.run()` so VerCOR can select the Python host runtime path. Optional
@@ -394,7 +394,7 @@ For each module, pre-generate reference data and check agreement.
 
 For each module, verify that AD gradients match finite-difference gradients.
 
-**level 5**: End-to-end integration tests (from examples in `examples/`)
+**level 5**: End-to-end integration tests (from runnable setups in `setups/`)
 
 ---
 

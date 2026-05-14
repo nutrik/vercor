@@ -3,11 +3,11 @@ from typing import Any, Callable
 
 import jax
 
-from examples.jax_array_helpers import component_vector_speed
+from setups.jax_array_helpers import component_vector_speed
 from vercor import Clock, Coupler, Exchange, RunSequence
-from vercor.components.data.era5_atmosphere import ERA5Atmosphere
-from vercor.components.data.era5_land import ERA5Land
-from vercor.components.data.erainterim_ocean import ERAInterimOcean
+from setups.data.era5_atmosphere import make_era5_atmosphere
+from setups.data.era5_land import make_era5_land
+from setups.data.erainterim_ocean import make_erainterim_ocean
 from vercor.regridders import bilinear, conservative
 from vercor.diagnostics import (
     plot_component_scalar_vector_comparison,
@@ -19,9 +19,9 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     # Build components
-    atm = ERA5Atmosphere()
-    ocn = ERAInterimOcean()
-    lnd = ERA5Land()
+    atm = make_era5_atmosphere()
+    ocn = make_erainterim_ocean()
+    lnd = make_era5_land()
 
     # Clock and sequence
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=3600, steps=10)
@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     # Coupler
     cpl = Coupler(clock=clock)
-    components: list[ERA5Atmosphere | ERAInterimOcean | ERA5Land] = [atm, ocn, lnd]
+    components: list[Any] = [atm, ocn, lnd]
     for component in components:
         cpl.register(component)
 

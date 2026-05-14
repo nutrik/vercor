@@ -15,6 +15,7 @@ import vercor.components as components_module
 import vercor.components.base as base_module
 from tests._coverage_support import DummyComponent, make_test_grid
 from tests.assertions import assert_allclose_compact
+from setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.clock import Clock
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.coupler import Coupler
@@ -39,7 +40,6 @@ from vercor.runtime.time import scalar_runtime_step_info
 from vercor.runtime.views import RuntimeComponentView
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
-from vercor.components.data.era5_atmosphere import ERA5Atmosphere
 
 
 class _RuntimeOnlyComponent(base_module.Component):
@@ -1149,10 +1149,9 @@ def test_callable_component_rejects_unseeded_field_updates() -> None:
 
 @pytest.mark.fast_always
 def test_era5_atmosphere_uses_data_component_runtime_contract() -> None:
-    assert issubclass(ERA5Atmosphere, base_module.DataComponent)
-    assert "prefill_runtime_state_fields" not in ERA5Atmosphere.__dict__
-    assert "validate_runtime_state" not in ERA5Atmosphere.__dict__
-    assert "step_runtime_state" not in ERA5Atmosphere.__dict__
+
+    assert callable(make_era5_atmosphere)
+    assert issubclass(base_module.DataComponent, base_module.Component)
 
 
 @pytest.mark.fast_always

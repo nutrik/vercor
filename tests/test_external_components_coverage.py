@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 import xarray as xr
 
-import vercor.components.external.jax_gcm as jax_gcm_module
-import vercor.components.external.veros_gcm as veros_gcm_module
+import setups.external.jax_gcm as jax_gcm_module
+import setups.external.veros_gcm as veros_gcm_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
@@ -335,7 +335,7 @@ def test_map_jcm_output_fields_supports_jit(
 
 
 def test_generate_step_function_non_jitted_averages_predictions() -> None:
-    component = jax_gcm_module.JAXGCM.__new__(jax_gcm_module.JAXGCM)
+    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
     component.save_interval = timedelta(days=2)
     component.coupling_timestep = timedelta(hours=12)
 
@@ -412,12 +412,12 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
     )
     monkeypatch.setattr(jax_gcm_module, "Model", _FakeModel)
 
-    component = jax_gcm_module.JAXGCM(coords=coords, terrain=terrain)
+    component = jax_gcm_module.make_jax_gcm(coords=coords, terrain=terrain)
 
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component.grid.latitude, jax.Array)
     assert isinstance(component.grid.binary_mask, jax.Array)
-    assert isinstance(component.sigma_levels, jax.Array)
+    assert isinstance(cast(Any, component).sigma_levels, jax.Array)
     assert component.field_spec.inputs == (
         "land_surface_temperature",
         "sea_surface_temperature",
@@ -435,7 +435,7 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
 
 
 def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
-    component = jax_gcm_module.JAXGCM.__new__(jax_gcm_module.JAXGCM)
+    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
     component.spinup_time = timedelta(hours=6)
     component.model_timestep = timedelta(minutes=45)
     component.model = SimpleNamespace()
@@ -448,7 +448,7 @@ def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
 def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_module.JAXGCM.__new__(jax_gcm_module.JAXGCM)
+    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
     component.spinup_time = timedelta(hours=2)
     component.model_timestep = timedelta(hours=1)
     component.jitted = False
@@ -507,7 +507,7 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
 def test_jax_gcm_initialize_builds_default_forcing_when_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_module.JAXGCM.__new__(jax_gcm_module.JAXGCM)
+    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
     component.spinup_time = timedelta(hours=1)
     component.model_timestep = timedelta(hours=1)
     component.jitted = False
@@ -564,7 +564,7 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
 def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_module.JAXGCM.__new__(jax_gcm_module.JAXGCM)
+    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
     component.name = "ATM"
     component.grid = make_test_grid(name="atm")
     component.settings = VercorSettings()
@@ -576,7 +576,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
         terrain=SimpleNamespace(fmask=np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=float))
     )
     component.forcing = _FakeForcing()
-    component.sigma_levels = np.asarray([0.2, 1.0], dtype=float)
+    cast(Any, component).sigma_levels = np.asarray([0.2, 1.0], dtype=float)
     component._state = cast(Any, SimpleNamespace(metadata=jnp.asarray(0.0)))
     component._predictions_list = []
     component.output_frequency = "day"
@@ -663,7 +663,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     )
     component_state = component.step_runtime_state(
         create_runtime_component_state(
-            component,
+            cast(Any, component),
             prefill_missing=True,
             contract=RuntimeComponentContract(),
         ),
@@ -734,7 +734,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
 
 
 def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
-    component = jax_gcm_module.JAXGCM.__new__(jax_gcm_module.JAXGCM)
+    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
     dataset = xr.Dataset(
         {
             "temperature": (
@@ -770,7 +770,7 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
 def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = veros_gcm_module.VerosGCM.__new__(veros_gcm_module.VerosGCM)
+    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
     component._veros_state = _make_flux_ready_veros_state()
     component.data = {
         "model_level_height": np.full((2, 2), 100.0),
@@ -1050,7 +1050,7 @@ def test_veros_set_variable_updates_only_interior_cells(
 
 
 def test_veros_initialize_validates_timestep_multiple() -> None:
-    component = veros_gcm_module.VerosGCM.__new__(veros_gcm_module.VerosGCM)
+    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
     component.dt_tracer = 7.0
 
     with pytest.raises(ValueError, match="dt_tracer"):
@@ -1058,7 +1058,7 @@ def test_veros_initialize_validates_timestep_multiple() -> None:
 
 
 def test_veros_initialize_can_spin_up_and_extract_surface_temperature() -> None:
-    component = veros_gcm_module.VerosGCM.__new__(veros_gcm_module.VerosGCM)
+    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
     component.dt_tracer = 10.0
     component.do_spinup = True
     component.spinup_time = timedelta(seconds=20.0)
@@ -1117,7 +1117,7 @@ def test_veros_constructor_builds_jax_backed_grid(
     )
     monkeypatch.setattr(veros_gcm_module, "copy_state", lambda tree, jitted=True: tree)
 
-    component = veros_gcm_module.VerosGCM(
+    component = veros_gcm_module.make_veros_gcm(
         custom_parameters={"dt_tracer": 600.0},
         jitted=False,
     )
@@ -1155,7 +1155,7 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
     restore_to_climatology: bool,
     expected_qnec: np.ndarray,
 ) -> None:
-    component = veros_gcm_module.VerosGCM.__new__(veros_gcm_module.VerosGCM)
+    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
     component.restore_to_climatology = restore_to_climatology
     component.model_substeps = 2
     component.jitted = False
@@ -1223,7 +1223,7 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
 def test_veros_step_nan_cleans_forcing_fields_before_set_variable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = veros_gcm_module.VerosGCM.__new__(veros_gcm_module.VerosGCM)
+    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
     component.restore_to_climatology = True
     component.model_substeps = 0
     component.jitted = False

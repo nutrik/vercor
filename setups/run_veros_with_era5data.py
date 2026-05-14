@@ -1,34 +1,21 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from vercor import Clock, Coupler, Exchange, RunSequence
-from vercor.components.data.camulator_land import CAMulatorLand
-from vercor.components.external.camulator import CAMulatorGCM
-from vercor.components.external.veros_gcm import VerosGCM
-
+from setups.data.era5_atmosphere import make_era5_atmosphere
+from setups.data.era5_land import make_era5_land
+from setups.external.veros_gcm import make_veros_gcm
 from vercor.regridders import bilinear
 
 if __name__ == "__main__":
-    ocn = VerosGCM(
-        do_spinup=True,
-        custom_parameters={"dt_tracer": timedelta(hours=6).total_seconds()},
-    )
+    atm = make_era5_atmosphere()
+    ocn = make_veros_gcm(restore_to_climatology=True)
+    lnd = make_era5_land()
 
-    atm = CAMulatorGCM(
-        config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",
-        model_weights_path="/glade/u/home/rnuterman/veros_coupling/climate/checkpoint.pt00091.pt",
-        output_subfolder_name="test_veros_00091",
-    )
-
-    lnd = CAMulatorLand(
-        config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_land_config.yml",
-        camulator_grid=atm.grid,
-        ocn_grid=ocn.grid,
-    )
-
+    # Clock and sequence
     clock = Clock(
-        start=datetime(1981, 1, 3, 0, 0, 0),
-        dt_seconds=86400.0 // 4,
-        steps=100 - 2 * 4,
+        start=datetime(2000, 1, 1, 0, 0, 0),
+        dt_seconds=86400.0,
+        steps=365,
         year_type="noleap",
     )
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
@@ -64,16 +51,9 @@ if __name__ == "__main__":
         Exchange(
             source="OCN",
             destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="LND",
-            destination="ATM",
-            field_names=["land_surface_temperature"],
+            field_names=[
+                "sea_surface_temperature",
+            ],
             regridder_factory=bilinear,
         )
     )
@@ -83,8 +63,19 @@ if __name__ == "__main__":
             source="ATM",
             destination="LND",
             field_names=[
-                "net_shortwave_radiation_flux",
-                "downward_longwave_radiation_flux",
+                "temperature",
+                "specific_humidity",
+            ],
+            regridder_factory=bilinear,
+        )
+    )
+
+    cpl.add_exchange(
+        Exchange(
+            source="LND",
+            destination="ATM",
+            field_names=[
+                "land_surface_temperature",
             ],
             regridder_factory=bilinear,
         )

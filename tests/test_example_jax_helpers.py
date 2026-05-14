@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from examples.jax_array_helpers import (
+from setups.jax_array_helpers import (
     component_vector_speed,
     to_host_array,
     transposed_host_array,

@@ -4,10 +4,10 @@
 4. `vercor/fluxes/utilities.py` - JAX-native scalar/array thermodynamic helpers, shared virtual-temperature conversion, and hybrid-sigma altitude kernels built on (1, 3)
 5. `vercor/fluxes/bulk_formula_cesm.py` - JAX-native atmosphere-ocean / atmosphere-ice bulk flux kernels built on (1, 3, 4)
 6. `vercor/host_arrays.py` - explicit JAX/NumPy host-transfer boundary for non-differentiable adapters and output
-7. `vercor/components/external/jax_gcm_tools.py` - existing JAX helper layer used by the JCM adapter; validated for `jax.jit` and built on (1, 4)
-8. `vercor/components/external/jax_gcm.py` - JCM adapter boundary that stores translated kernel outputs built on (1, 2, 7)
-9. `vercor/components/external/veros_runtime_settings.py` and `vercor/components/external/veros_gcm.py` - explicit Veros host-runtime configuration plus the Veros adapter boundary that converts translated flux outputs back to NumPy for Veros state updates built on (1, 5, 6)
-10. `vercor/components/external/camulator.py` - CAMulator adapter boundary with JAX-backed runtime-field helpers, shared hybrid-sigma altitude diagnostics, and explicit Torch / xarray output boundaries built on (1, 4, 6)
+7. `setups/external/jax_gcm_tools.py` - existing JAX helper layer used by the JCM adapter; validated for `jax.jit` and built on (1, 4)
+8. `setups/external/jax_gcm.py` - JCM adapter boundary that stores translated kernel outputs built on (1, 2, 7)
+9. `setups/external/veros_runtime_settings.py` and `setups/external/veros_gcm.py` - explicit Veros host-runtime configuration plus the Veros adapter boundary that converts translated flux outputs back to NumPy for Veros state updates built on (1, 5, 6)
+10. `setups/external/camulator.py` - CAMulator adapter boundary with JAX-backed runtime-field helpers, shared hybrid-sigma altitude diagnostics, and explicit Torch / xarray output boundaries built on (1, 4, 6)
 11. `vercor/grid.py` - JAX-friendly `RectilinearGrid` holder with eager validation and PyTree registration built on (2)
 12. `vercor/field_layout.py` - canonical component data-field layout validation and time-last forcing normalization helpers built on (11)
 13. `vercor/regridders/helpers.py` - JAX-native rectilinear helper kernels built on (1, 11)
@@ -18,16 +18,16 @@
 18. `vercor/assets.py` - forcing asset cache/download/checksum boundary for data components
 19. `vercor/forcing_data.py` - NetCDF forcing-file read boundary for data components
 20. `vercor/time_selection.py` - calendar, day-slice, and periodic interpolation index helpers
-21. `vercor/components/slab/atmosphere.py` - slab atmosphere wrapper over pure JAX bulk-flux, default-SST, and wind kernels built on (1, 11)
-22. `vercor/components/slab/ocean.py` - slab ocean wrapper over pure JAX SST tendency kernel built on (1, 11)
-23. `vercor/components/slab/land.py` - slab land wrapper over pure JAX soil-moisture update kernel built on (1, 11)
-24. `vercor/components/slab/seaice.py` - slab sea-ice wrapper over pure JAX ice-fraction diagnostic kernel built on (1, 11)
-25. `vercor/components/data/era5_atmosphere.py` - pure ERA5 atmospheric data component with canonical data-field layout and JAX-backed pressure/model-level diagnostic initialization built on (4, 11, 12, 18, 19)
-26. `vercor/components/data/era5_ocean.py` - ERA5 ocean forcing adapter with canonical data-field layout, JAX-backed mask, and SST application built on (11, 12, 18, 19)
-27. `vercor/components/data/era5_land.py` - ERA5 land forcing adapter with canonical data-field layout, JAX-backed mask preparation, and runtime temperature storage built on (11, 12, 18, 19)
-28. `vercor/components/data/erainterim_ocean.py` - ERA-Interim ocean forcing adapter with canonical data-field layout and JAX-backed global field assembly built on (11, 12, 18, 19)
-29. `vercor/components/data/jcm_land.py` - JCM land forcing adapter with canonical data-field layout, JAX-backed coordinate conversion, and runtime storage built on (11, 12, 17)
-30. `vercor/components/data/camulator_land.py` - CAMulator land forcing adapter with JAX-backed runtime temperature storage and forcing-only CAMulator config loading built on (1, 10, 11, 17)
+21. `setups/slab/atmosphere.py` - slab atmosphere wrapper over pure JAX bulk-flux, default-SST, and wind kernels built on (1, 11)
+22. `setups/slab/ocean.py` - slab ocean wrapper over pure JAX SST tendency kernel built on (1, 11)
+23. `setups/slab/land.py` - slab land wrapper over pure JAX soil-moisture update kernel built on (1, 11)
+24. `setups/slab/seaice.py` - slab sea-ice wrapper over pure JAX ice-fraction diagnostic kernel built on (1, 11)
+25. `setups/data/era5_atmosphere.py` - pure ERA5 atmospheric data component with canonical data-field layout and JAX-backed pressure/model-level diagnostic initialization built on (4, 11, 12, 18, 19)
+26. `setups/data/era5_ocean.py` - ERA5 ocean forcing adapter with canonical data-field layout, JAX-backed mask, and SST application built on (11, 12, 18, 19)
+27. `setups/data/era5_land.py` - ERA5 land forcing adapter with canonical data-field layout, JAX-backed mask preparation, and runtime temperature storage built on (11, 12, 18, 19)
+28. `setups/data/erainterim_ocean.py` - ERA-Interim ocean forcing adapter with canonical data-field layout and JAX-backed global field assembly built on (11, 12, 18, 19)
+29. `setups/data/jcm_land.py` - JCM land forcing adapter with canonical data-field layout, JAX-backed coordinate conversion, and runtime storage built on (11, 12, 17)
+30. `setups/data/camulator_land.py` - CAMulator land forcing adapter with JAX-backed runtime temperature storage and forcing-only CAMulator config loading built on (1, 10, 11, 17)
 31. `vercor/jax_logging.py` - callback-backed logger protocol and setup helper for Python and traced JAX runtime diagnostics
 32. `vercor/runtime/interrupts.py` - internal terminal-signal runtime cancellation controller with host and JAX callback checkpoints, plus wakeup-fd polling for compiled runtime signals, built on JAX callback errors and Python signal handling
 33. `vercor/runtime/contexts.py` - immutable component initialization and runtime step context payloads built on clock, run-sequence, settings helpers, and (31)
@@ -42,5 +42,5 @@
 42. `vercor/runtime/coupler_state.py` and `vercor/runtime/topology.py` - runtime coupler-state assembly, contract refresh, dispatch-context construction, outgoing priming adapter, output-mask lookup, and exchange topology mask/regridder setup built on (11, 16, 17, 33, 36, 37, 38, 40, 41)
 43. `vercor/runtime/runner.py` - host/scanned runtime loops, callback-safe progress logging, compiled-runtime cache keys, JIT wrapping, donation checks, and interrupt translation built on (31, 32, 39, 41)
 44. `vercor/output.py` - runtime-view NetCDF output boundary built on (6, 11, 34, 38)
-45. `vercor/components/external/jax_gcm.py` runtime payload path - immutable JCM state/forcing runtime integration built on (2, 8, 33, 36, 38, 40)
+45. `setups/external/jax_gcm.py` runtime payload path - immutable JCM state/forcing runtime integration built on (2, 8, 33, 36, 38, 40)
 46. `vercor/coupler.py` unified runtime facade - canonical `run()` / `create_runtime_state()` path, component registration through the base component contract, runtime component views, final output, callback-backed logging setup, and thin delegation to runtime-owned state/topology/runner adapters built on (1, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43, 44, 45)

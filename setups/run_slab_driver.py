@@ -5,10 +5,10 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from vercor import Clock, Coupler, Exchange, RunSequence
-from vercor.components.slab.atmosphere import Atmosphere
-from vercor.components.slab.land import Land
-from vercor.components.slab.ocean import Ocean
-from vercor.components.slab.seaice import SeaIce
+from setups.slab.atmosphere import make_slab_atmosphere
+from setups.slab.land import make_slab_land
+from setups.slab.ocean import make_slab_ocean
+from setups.slab.seaice import make_slab_seaice
 from vercor.dtypes import jax_ones
 from vercor.regridders import (
     make_rectilinear_grid,
@@ -36,10 +36,10 @@ if __name__ == "__main__":
     lnd_grid = make_rectilinear_grid("lnd-grid", 128, 64, 0.0, 360.0, -90.0, 90.0)
 
     # Build components
-    atm = Atmosphere(atm_grid)
-    ocn = Ocean(ocn_grid)
-    ice = SeaIce(ice_grid)
-    lnd = Land(lnd_grid)
+    atm = make_slab_atmosphere(atm_grid)
+    ocn = make_slab_ocean(ocn_grid)
+    ice = make_slab_seaice(ice_grid)
+    lnd = make_slab_land(lnd_grid)
 
     # Clock and sequence
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=3600, steps=24)
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     # Coupler
     cpl = Coupler(clock=clock)
-    components: list[Atmosphere | Ocean | SeaIce | Land] = [atm, ocn, ice, lnd]
+    components: list[Any] = [atm, ocn, ice, lnd]
     for component in components:
         cpl.register(component)
 

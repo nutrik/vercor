@@ -1,4 +1,6 @@
-from collections.abc import Callable
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Optional, Literal, cast
@@ -24,9 +26,14 @@ from jcm.physics_interface import (
 )
 
 from vercor.clock import ModelDateTime
-from vercor.components.base import Component, ComponentStepResult
+from vercor.components.base import (
+    Component,
+    ComponentStepContext,
+    ComponentStepResult,
+    differentiable_component,
+)
 from vercor.exceptions import ComponentError, CouplerError
-from vercor.components.external.jax_gcm_tools import (
+from setups.external.jax_gcm_tools import (
     change_jcm_parameter_values,
     mean_leaf,
     stack_objects,
@@ -43,7 +50,7 @@ from vercor.dtypes import (
 from vercor.grid import RectilinearGrid
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.pytree import PyTreeNodeMixin
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
+from vercor.runtime.contexts import ComponentInitContext
 from vercor.runtime.validation import (
     validate_runtime_data_field_exists,
     validate_runtime_grid_data_field,
@@ -253,13 +260,17 @@ class JAXGCMRuntimePayload(PyTreeNodeMixin):
     forcing: Any
 
 
-class JAXGCM(Component):
+class _JAXGCMState:
     """JCM Wrapper"""
 
     _predictions_list: list[Predictions]
     _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, Predictions]]
     _state: JCMState
     forcing: ForcingData
+    data: dict[str, RuntimeArray]
+    grid_field_defaults = Component.grid_field_defaults
+    seed_fields = Component.seed_fields
+    prefill_runtime_fields = Component.prefill_runtime_fields
 
     def __init__(
         self,
@@ -314,25 +325,9 @@ class JAXGCM(Component):
 
         self.sigma_levels: RuntimeArray = self.model.coords.vertical.centers
 
-        super().__init__(name, grid)
-        self.declare_fields(
-            inputs=("land_surface_temperature", "sea_surface_temperature"),
-            outputs=(
-                "land_surface_temperature",
-                "sea_surface_temperature",
-                "total_surface_temperature",
-                *_JAXGCM_OUTPUT_GRID_FIELD_NAMES,
-                "pressure",
-            ),
-            default_fields=self.grid_field_defaults(
-                _jax_gcm_default_field_names(
-                    include_total_surface_temperature=True,
-                ),
-                overrides={
-                    "sea_surface_temperature": _REFERENCE_SURFACE_TEMPERATURE,
-                },
-            ),
-        )
+        self.name = name
+        self.grid = grid
+        self.settings: Any | None = None
 
     def _generate_step_function(
         self, jitted: bool = True
@@ -367,7 +362,16 @@ class JAXGCM(Component):
 
         return jax.jit(step_function) if jitted else step_function
 
-    def initialize(self, context: ComponentInitContext) -> None:
+    def initialize(
+        self,
+        component: Component | ComponentInitContext,
+        context: ComponentInitContext | None = None,
+    ) -> None:
+        if context is None:
+            context = cast(ComponentInitContext, component)
+            component = cast(Component, self)
+        component = cast(Component, component)
+        self.settings = context.settings
         self.coupling_timestep = timedelta(seconds=context.dt_seconds)
         self.spinup_steps = int(
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
@@ -398,8 +402,8 @@ class JAXGCM(Component):
 
         self._step_function = self._generate_step_function(jitted=self.jitted)
 
-        self.seed_fields(
-            self.grid_field_defaults(
+        component.seed_fields(
+            component.grid_field_defaults(
                 _jax_gcm_default_field_names(
                     include_total_surface_temperature=False,
                 ),
@@ -448,16 +452,25 @@ class JAXGCM(Component):
 
     def prefill_runtime_state_fields(
         self,
-        data: dict[str, RuntimeArray],
-        incoming: dict[str, RuntimeArray],
-        outgoing: dict[str, RuntimeArray],
-        contract: "RuntimeComponentContract",
+        component: Component | dict[str, RuntimeArray],
+        data: dict[str, RuntimeArray] | None = None,
+        incoming: dict[str, RuntimeArray] | None = None,
+        outgoing: dict[str, RuntimeArray] | None = None,
+        contract: "RuntimeComponentContract | None" = None,
     ) -> None:
         """Pre-seed JAXGCM output fields so scan carry structure is stable."""
 
-        self.prefill_runtime_fields(
+        if contract is None:
+            contract = cast("RuntimeComponentContract", outgoing)
+            outgoing = cast(dict[str, RuntimeArray], incoming)
+            incoming = cast(dict[str, RuntimeArray], data)
+            data = cast(dict[str, RuntimeArray], component)
+            component = cast(Component, self)
+        component = cast(Component, component)
+        data = cast(dict[str, RuntimeArray], data)
+        component.prefill_runtime_fields(
             data,
-            default_fields=self.grid_field_defaults(
+            default_fields=component.grid_field_defaults(
                 _jax_gcm_default_field_names(
                     include_total_surface_temperature=True,
                 ),
@@ -469,65 +482,73 @@ class JAXGCM(Component):
         sigma_levels = jnp.asarray(self.sigma_levels)
         data.setdefault(
             "pressure",
-            jax_zeros((sigma_levels.shape[0], *self.grid.shape), self.settings),
+            jax_zeros(
+                (sigma_levels.shape[0], *component.grid.shape), component.settings
+            ),
         )
         _ = incoming, outgoing, contract
 
     def validate_runtime_state(
         self,
-        component_state: "RuntimeComponentState",
-        contract: "RuntimeComponentContract",
+        component: Component | "RuntimeComponentState",
+        component_state: "RuntimeComponentState | RuntimeComponentContract",
+        contract: "RuntimeComponentContract | None" = None,
     ) -> None:
         """Validate JAXGCM runtime payload and pre-seeded output fields."""
 
+        if contract is None:
+            contract = cast("RuntimeComponentContract", component_state)
+            component_state = cast("RuntimeComponentState", component)
+            component = cast(Component, self)
+        component = cast(Component, component)
+        component_state = cast("RuntimeComponentState", component_state)
         _ = contract
         if not isinstance(component_state.runtime_payload, JAXGCMRuntimePayload):
             raise ComponentError(
                 "JAXGCM runtime requires an initialized immutable runtime payload "
-                f"for component '{self.name}'"
+                f"for component '{component.name}'"
             )
 
         for field_name in _JAXGCM_REQUIRED_GRID_FIELD_NAMES:
             validate_runtime_grid_data_field(
-                self,
+                component,
                 component_state,
                 field_name,
             )
 
-        validate_runtime_data_field_exists(self, component_state, "pressure")
+        validate_runtime_data_field_exists(component, component_state, "pressure")
         pressure_shape = jnp.asarray(component_state.data.get("pressure")).shape
         sigma_levels = jnp.asarray(self.sigma_levels)
-        expected_pressure_shape = (sigma_levels.shape[0], *self.grid.shape)
+        expected_pressure_shape = (sigma_levels.shape[0], *component.grid.shape)
         if pressure_shape != expected_pressure_shape:
             raise CouplerError(
                 "Runtime required data field 'pressure' "
-                f"for component '{self.name}' has shape {pressure_shape}, "
+                f"for component '{component.name}' has shape {pressure_shape}, "
                 f"expected {expected_pressure_shape}"
             )
 
     def _step_jax_gcm_component_state(
         self,
-        component_state: "RuntimeComponentState",
+        fields: Mapping[str, Any],
+        payload: Any | None,
         settings: Any,
-    ) -> tuple["RuntimeComponentState", Predictions, Any]:
+    ) -> tuple[ComponentStepResult, Predictions, Any]:
         """Advance JAXGCM runtime state and return the raw prediction."""
 
-        payload = component_state.runtime_payload
         if not isinstance(payload, JAXGCMRuntimePayload):
             raise ComponentError(
                 "JAXGCM runtime requires an initialized immutable runtime payload "
                 f"for component '{self.name}'"
             )
 
-        data = component_state.data
         (
             land_surface_temperature,
             sea_surface_temperature,
             total_surface_temperature,
             _,
         ) = _cleanup_surface_temperature_fields(
-            data.get("land_surface_temperature"),
-            data.get("sea_surface_temperature"),
+            fields.get("land_surface_temperature"),
+            fields.get("sea_surface_temperature"),
         )
 
         land_surface_temperature_forcing, sea_surface_temperature_forcing = (
@@ -567,33 +588,31 @@ class JAXGCM(Component):
             averaged_prediction.dynamics.specific_humidity,
         )
 
-        updated_state = self.apply_step_result(
-            component_state,
-            ComponentStepResult(
-                fields={
-                    "land_surface_temperature": land_surface_temperature,
-                    "sea_surface_temperature": sea_surface_temperature,
-                    "total_surface_temperature": total_surface_temperature,
-                    **mapped_fields,
-                },
-                payload=JAXGCMRuntimePayload(
-                    jcm_state=jcm_state,
-                    forcing=payload.forcing,
-                ),
+        step_result = ComponentStepResult(
+            fields={
+                "land_surface_temperature": land_surface_temperature,
+                "sea_surface_temperature": sea_surface_temperature,
+                "total_surface_temperature": total_surface_temperature,
+                **mapped_fields,
+            },
+            payload=JAXGCMRuntimePayload(
+                jcm_state=jcm_state,
+                forcing=payload.forcing,
             ),
         )
 
         return (
-            updated_state,
+            step_result,
             prediction,
             applied_forcing,
         )
 
-    def step_runtime_state(
+    def step(
         self,
-        component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
-    ) -> "RuntimeComponentState":
+        fields: Mapping[str, Any],
+        context: ComponentStepContext,
+        payload: Any | None,
+    ) -> ComponentStepResult:
         """Advance JAXGCM on immutable runtime state."""
 
         time = context.time
@@ -601,32 +620,30 @@ class JAXGCM(Component):
         if logger is not None:
             logger.info(
                 " Mean of SST: {}",
-                jnp.nanmean(
-                    jnp.asarray(component_state.data.get("sea_surface_temperature"))
-                ),
+                jnp.nanmean(jnp.asarray(fields.get("sea_surface_temperature"))),
             )
 
         (
-            stepped_state,
+            step_result,
             prediction,
             applied_forcing,
         ) = self._step_jax_gcm_component_state(
-            component_state,
+            fields,
+            payload,
             context.settings,
         )
 
         if time is None:
-            return stepped_state
+            return step_result
 
-        payload = stepped_state.runtime_payload
-        if isinstance(payload, JAXGCMRuntimePayload):
-            self._state = payload.jcm_state
+        if isinstance(step_result.payload, JAXGCMRuntimePayload):
+            self._state = step_result.payload.jcm_state
             self.forcing = applied_forcing
         self._predictions_list.append(prediction)
 
         _, _, _, cold_surface_cells = _cleanup_surface_temperature_fields(
-            stepped_state.data.get("land_surface_temperature"),
-            stepped_state.data.get("sea_surface_temperature"),
+            step_result.fields.get("land_surface_temperature"),
+            step_result.fields.get("sea_surface_temperature"),
         )
         if logger is not None:
             logger.info(
@@ -644,7 +661,23 @@ class JAXGCM(Component):
                 logger=logger,
             )
 
-        return stepped_state
+        return step_result
+
+    def step_runtime_state(
+        self,
+        component_state: Any,
+        context: ComponentStepContext,
+    ) -> Any:
+        """Compatibility helper for state-level unit tests."""
+
+        result = self.step(
+            component_state.data.to_mapping(),
+            context,
+            component_state.runtime_payload,
+        )
+        return component_state.with_data(
+            component_state.data.set_many(result.fields)
+        ).with_runtime_payload(result.payload)
 
     def _is_period_end(
         self,
@@ -710,3 +743,63 @@ class JAXGCM(Component):
 
         # Clear the predictions list after saving to disk to free up memory
         self._predictions_list = []
+
+
+def make_jax_gcm(
+    coords: CoordinateSystem,
+    terrain: TerrainData,
+    name: str = "ATM",
+    custom_parameters: Optional[dict[str, float]] = None,
+    model_timestep: timedelta = timedelta(minutes=30),
+    save_interval: timedelta = timedelta(days=1),
+    spinup_time: timedelta = timedelta(days=2),
+    forcing_data: Optional[ForcingData] = None,
+    output_frequency: Optional[str] = None,
+    do_spinup: bool = False,
+    jitted: bool = True,
+) -> Component:
+    """Return a differentiable JAXGCM/JCM atmosphere component."""
+
+    state = _JAXGCMState(
+        coords=coords,
+        terrain=terrain,
+        name=name,
+        custom_parameters=custom_parameters,
+        model_timestep=model_timestep,
+        save_interval=save_interval,
+        spinup_time=spinup_time,
+        forcing_data=forcing_data,
+        output_frequency=output_frequency,
+        do_spinup=do_spinup,
+        jitted=jitted,
+    )
+    default_fields = {
+        field_name: 0.0
+        for field_name in _jax_gcm_default_field_names(
+            include_total_surface_temperature=True
+        )
+    }
+    default_fields["sea_surface_temperature"] = _REFERENCE_SURFACE_TEMPERATURE
+    component = differentiable_component(
+        name=name,
+        grid=state.grid,
+        step=state.step,
+        inputs=("land_surface_temperature", "sea_surface_temperature"),
+        outputs=(
+            "land_surface_temperature",
+            "sea_surface_temperature",
+            "total_surface_temperature",
+            *_JAXGCM_OUTPUT_GRID_FIELD_NAMES,
+            "pressure",
+        ),
+        default_fields=default_fields,
+        initialize=state.initialize,
+        create_runtime_payload=lambda component: state.create_runtime_payload(),
+        prefill_runtime_state_fields=state.prefill_runtime_state_fields,
+        validate_runtime_state=state.validate_runtime_state,
+    )
+    component_any = cast(Any, component)
+    component_any.model = state.model
+    component_any.sigma_levels = state.sigma_levels
+    component_any._setup_state = state
+    return component

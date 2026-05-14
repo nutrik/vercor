@@ -10,14 +10,14 @@ import numpy as np
 import torch
 import xarray as xr
 
-import vercor.components.data.camulator_land as camulator_land_module
-import vercor.components.external.camulator as camulator_module
-import vercor.components.external.camulator_state as camulator_state_module
+import setups.data.camulator_land as camulator_land_module
+import setups.external.camulator as camulator_module
+import setups.external.camulator_state as camulator_state_module
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
-from vercor.components.external.camulator import (
-    CAMulatorGCM,
+from setups.external.camulator import (
+    make_camulator_gcm,
     _initialize_camulator_runtime_fields,
     _prepare_camulator_dynamic_forcing_chunk,
     _prepare_camulator_sst_input,
@@ -311,7 +311,7 @@ def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
         },
     )
 
-    component = CAMulatorGCM(config_path="dummy.yaml", device="cpu")
+    component = make_camulator_gcm(config_path="dummy.yaml", device="cpu")
 
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component.grid.latitude, jax.Array)
@@ -356,7 +356,7 @@ def test_camulator_constructor_logs_save_forecast_path(monkeypatch: Any) -> None
         },
     )
     with capture_logger_output(DEFAULT_LOGGER_NAME) as stream:
-        CAMulatorGCM(
+        make_camulator_gcm(
             config_path="dummy.yaml",
             device="cpu",
             output_subfolder_name="member-001",
@@ -533,7 +533,7 @@ def test_camulator_land_stores_jax_runtime_arrays(
         latitude=jnp.asarray([0.0, 1.0]),
         binary_mask=jnp.ones((2, 2)),
     )
-    component = camulator_land_module.CAMulatorLand(
+    component = camulator_land_module.make_camulator_land(
         config_path="dummy.yaml",
         camulator_grid=camulator_grid,
         ocn_grid=ocean_grid,
@@ -634,7 +634,12 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
             _ = state, variable_name
             return torch.ones((1, 2, 2, 2), dtype=torch.float32)
 
-    component = cast(Any, CAMulatorGCM.__new__(CAMulatorGCM))
+    component = cast(
+        Any,
+        camulator_module._CAMulatorGCMState.__new__(
+            camulator_module._CAMulatorGCMState
+        ),
+    )
     component.start_ix = 0
     component.timestep_counter = 1
     component.model_substeps = 1

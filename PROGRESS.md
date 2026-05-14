@@ -1,3 +1,52 @@
+# 2026-05-14
+
+## Factory-Based Setup Components Refactor
+
+- Added a top-level `setups` package and moved runnable setup scripts plus
+  slab, data, and external concrete component definitions out of
+  `vercor.components`.
+- Converted slab, forcing-data, JAXGCM, Veros, CAMulator, and CAMulator-land
+  definitions to snake_case factory functions backed by `data_component(...)`,
+  `differentiable_component(...)`, and `host_component(...)`.
+- Extended core component factories with optional lifecycle hooks for
+  initialization, runtime payload creation, runtime-state prefill, and runtime
+  validation, so concrete setup modules no longer subclass `Component`,
+  `DataComponent`, or `HostRuntimeComponent`.
+- Removed the old concrete `vercor/components/slab`, `vercor/components/data`,
+  and `vercor/components/external` packages as primary/public implementation
+  locations.
+- Updated tests, runnable setup imports, coverage source, and dependency notes
+  to use `setups`.
+- Failed approaches / corrections:
+  - Initial moved external adapters still relied on class-style state fixtures;
+    private state objects now expose compatibility helpers only for targeted
+    unit tests while public construction uses factories.
+  - The first full-suite run exposed stale tests expecting old class aliases and
+    `examples.*` imports; those tests now exercise factory components and
+    `setups.*`.
+
+## Validation (Factory-Based Setup Components Refactor, 2026-05-14)
+
+- `conda run -n scipy pytest tests/test_api_boundaries.py::test_setup_factories_are_primary_concrete_component_api tests/test_api_boundaries.py::test_old_concrete_component_packages_are_removed tests/test_api_boundaries.py::test_setup_modules_do_not_subclass_component_contracts tests/test_api_boundaries.py::test_data_and_host_factories_return_core_contract_instances -q --tb=short`
+  - failed as expected before implementation on missing `setups` package and
+    old concrete component directories still existing
+  - passed after moving setup modules and converting concrete components to
+    factories
+- `conda run -n scipy black vercor setups tests`
+  - passed
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning and left all 123 files unchanged on the final run
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - passed (`123 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 # 2026-05-13
 
 ## Canonical VerCOR Logging Format

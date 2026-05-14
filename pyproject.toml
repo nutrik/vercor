@@ -54,7 +54,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 branch = true
-source = ["vercor"]
+source = ["vercor", "setups"]
 
 [tool.flake8]
 exclude = [

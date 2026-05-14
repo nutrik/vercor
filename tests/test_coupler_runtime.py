@@ -11,20 +11,18 @@ import pytest
 from tests._coverage_support import DummyComponent, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.clock import Clock
-from vercor.components import data_component
-from vercor.components.data.camulator_land import CAMulatorLand
-from vercor.components.data.era5_atmosphere import ERA5Atmosphere
-from vercor.components.data.era5_land import ERA5Land
-from vercor.components.data.era5_ocean import ERA5Ocean
-from vercor.components.data.erainterim_ocean import ERAInterimOcean
-from vercor.components.data.jcm_land import JCMLand
-from vercor.components.external.camulator import CAMulatorGCM
-from vercor.components.external.jax_gcm import JAXGCM, JCMState
-from vercor.components.external.veros_gcm import VerosGCM
-from vercor.components.slab.atmosphere import Atmosphere
-from vercor.components.slab.land import Land
-from vercor.components.slab.ocean import Ocean
-from vercor.components.slab.seaice import SeaIce
+from vercor.components import data_component, differentiable_component, host_component
+from setups.data.era5_atmosphere import make_era5_atmosphere
+from setups.data.era5_land import make_era5_land
+from setups.data.era5_ocean import make_era5_ocean
+from setups.data.erainterim_ocean import make_erainterim_ocean
+from setups.data.jcm_land import make_jcm_land
+from setups.external import jax_gcm as jax_gcm_module
+from setups.external.jax_gcm import JCMState
+from setups.slab.atmosphere import make_slab_atmosphere
+from setups.slab.land import make_slab_land
+from setups.slab.ocean import make_slab_ocean
+from setups.slab.seaice import make_slab_seaice
 from vercor.coupler import Coupler
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.exchange import Exchange
@@ -95,7 +93,7 @@ class _FakePrediction(NamedTuple):
 
 
 def _make_data_component(
-    component_type: type[Any],
+    component_type: Any,
     *,
     name: str,
     grid: RectilinearGrid,
@@ -104,12 +102,14 @@ def _make_data_component(
     exports: tuple[str, ...] = (),
     settings: VercorSettings | None = None,
 ) -> Any:
-    component = object.__new__(component_type)
-    component.name = name
-    component.grid = grid
-    component.data = data
-    component.settings = settings or VercorSettings()
-    _ = imports, exports
+    _ = component_type
+    component = data_component(
+        name=name,
+        grid=grid,
+        fields=data,
+        settings=settings or VercorSettings(),
+    )
+    component.declare_fields(inputs=imports, outputs=exports)
     return component
 
 
@@ -172,17 +172,16 @@ def _fake_jcm_step(
     return updated_state, prediction
 
 
-def _make_jax_gcm_component(grid: RectilinearGrid) -> JAXGCM:
-    component = JAXGCM.__new__(JAXGCM)
-    component_any = cast(Any, component)
-    component.name = "ATM"
-    component.grid = grid
-    component.settings = VercorSettings()
-    component.data = {
+def _make_jax_gcm_component(grid: RectilinearGrid) -> Any:
+    state = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
+    state.name = "ATM"
+    state.grid = grid
+    state.settings = VercorSettings()
+    state.data = {
         "sea_surface_temperature": jnp.full(grid.shape, 281.0, dtype=jnp.float64),
         "land_surface_temperature": jnp.full(grid.shape, 3.0, dtype=jnp.float64),
     }
-    component_any.model = type(
+    state.model = type(
         "_FakeJCMModel",
         (),
         {
@@ -193,20 +192,49 @@ def _make_jax_gcm_component(grid: RectilinearGrid) -> JAXGCM:
             )()
         },
     )()
-    component_any.sigma_levels = jnp.asarray([0.2, 1.0], dtype=jnp.float64)
-    component_any._state = JCMState(
+    state.sigma_levels = jnp.asarray([0.2, 1.0], dtype=jnp.float64)
+    state._state = JCMState(
         prog={"marker": jnp.asarray(0.0)},
         phydata={},
         metadata=jnp.asarray(0.0),
     )
-    component_any.forcing = _FakeJCMForcing(
+    state.forcing = _FakeJCMForcing(
         stl_am=jnp.zeros((grid.shape[1], grid.shape[0]), dtype=jnp.float64),
         sea_surface_temperature=jnp.zeros(
             (grid.shape[1], grid.shape[0]),
             dtype=jnp.float64,
         ),
     )
-    component_any._step_function = _fake_jcm_step
+    state._step_function = _fake_jcm_step
+    state._predictions_list = []
+    state.output_frequency = None
+    component = differentiable_component(
+        name="ATM",
+        grid=grid,
+        step=state.step,
+        inputs=("land_surface_temperature", "sea_surface_temperature"),
+        outputs=(
+            "land_surface_temperature",
+            "sea_surface_temperature",
+            "total_surface_temperature",
+            *jax_gcm_module._JAXGCM_OUTPUT_GRID_FIELD_NAMES,
+            "pressure",
+        ),
+        default_fields={
+            field_name: 0.0
+            for field_name in jax_gcm_module._jax_gcm_default_field_names(
+                include_total_surface_temperature=True
+            )
+        },
+        create_runtime_payload=lambda component: state.create_runtime_payload(),
+        prefill_runtime_state_fields=state.prefill_runtime_state_fields,
+        validate_runtime_state=state.validate_runtime_state,
+    )
+    component.seed_fields(state.data)
+    component_any = cast(Any, component)
+    component_any.model = state.model
+    component_any.sigma_levels = state.sigma_levels
+    component_any._setup_state = state
     return component
 
 
@@ -240,10 +268,10 @@ def _make_coupler(steps: int) -> Coupler:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=steps)
     )
     coupler.components = {
-        "ATM": Atmosphere(grid),
-        "OCN": Ocean(grid),
-        "LND": Land(grid),
-        "ICE": SeaIce(grid),
+        "ATM": make_slab_atmosphere(grid),
+        "OCN": make_slab_ocean(grid),
+        "LND": make_slab_land(grid),
+        "ICE": make_slab_seaice(grid),
     }
     coupler.run_sequence = RunSequence(order=["ATM", "OCN", "LND", "ICE"])
     coupler.exchanges = [
@@ -320,10 +348,10 @@ def _make_initialized_slab_coupler(steps: int) -> Coupler:
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=steps)
     )
-    coupler.register(Atmosphere(atmosphere_grid))
-    coupler.register(Ocean(ocean_grid))
-    coupler.register(Land(land_grid))
-    coupler.register(SeaIce(ice_grid))
+    coupler.register(make_slab_atmosphere(atmosphere_grid))
+    coupler.register(make_slab_ocean(ocean_grid))
+    coupler.register(make_slab_land(land_grid))
+    coupler.register(make_slab_seaice(ice_grid))
     coupler.add_exchange(
         Exchange(
             source="OCN",
@@ -436,10 +464,10 @@ def _make_initialized_mixed_grid_slab_coupler(steps: int) -> Coupler:
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=steps)
     )
-    coupler.register(Atmosphere(atmosphere_grid))
-    coupler.register(Ocean(ocean_grid))
-    coupler.register(Land(land_grid))
-    coupler.register(SeaIce(ice_grid))
+    coupler.register(make_slab_atmosphere(atmosphere_grid))
+    coupler.register(make_slab_ocean(ocean_grid))
+    coupler.register(make_slab_land(land_grid))
+    coupler.register(make_slab_seaice(ice_grid))
     coupler.add_exchange(
         Exchange(
             source="OCN",
@@ -759,7 +787,7 @@ def test_data_forcing_components_run_inside_runtime() -> None:
     coupler.settings.year_in_seconds = 12.0
     coupler.components = {
         "OCN": _make_data_component(
-            ERA5Ocean,
+            make_era5_ocean,
             name="OCN",
             grid=grid,
             data={"sea_surface_temperature": monthly_ocean},
@@ -767,7 +795,7 @@ def test_data_forcing_components_run_inside_runtime() -> None:
             settings=VercorSettings(apply_time_interpolation=True),
         ),
         "LND": _make_data_component(
-            ERA5Land,
+            make_era5_land,
             name="LND",
             grid=grid,
             data={"land_surface_temperature": monthly_land},
@@ -775,7 +803,7 @@ def test_data_forcing_components_run_inside_runtime() -> None:
             settings=VercorSettings(apply_time_interpolation=True),
         ),
         "ATM": _make_data_component(
-            ERA5Atmosphere,
+            make_era5_atmosphere,
             name="ATM",
             grid=grid,
             data={
@@ -862,7 +890,7 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
         fields={"sea_surface_temperature": monthly_ocean},
         settings=VercorSettings(apply_time_interpolation=True),
     )
-    atmosphere = Atmosphere(grid)
+    atmosphere = make_slab_atmosphere(grid)
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
@@ -907,9 +935,9 @@ def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridd
     grid = make_test_grid(name="daily")
     forcing = jnp.zeros((365, 2, 2), dtype=jnp.float64)
     forcing = forcing.at[1].set(jnp.asarray([[286.0, 287.0], [288.0, 289.0]]))
-    atmosphere = Atmosphere(grid)
+    atmosphere = make_slab_atmosphere(grid)
     ocean = _make_data_component(
-        ERA5Ocean,
+        make_era5_ocean,
         name="OCN",
         grid=grid,
         data={"sea_surface_temperature": forcing},
@@ -974,9 +1002,9 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
     )
     monthly_ocean = monthly_ocean.at[0].set(first_month)
     monthly_ocean = monthly_ocean.at[1].set(first_month + 12.0)
-    atmosphere = Atmosphere(atmosphere_grid)
+    atmosphere = make_slab_atmosphere(atmosphere_grid)
     ocean = _make_data_component(
-        ERAInterimOcean,
+        make_erainterim_ocean,
         name="OCN",
         grid=ocean_grid,
         data={"sea_surface_temperature": monthly_ocean},
@@ -1051,7 +1079,7 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
     forcing = jnp.zeros((365, 2, 2), dtype=jnp.float64)
     forcing = forcing.at[2].set(jnp.asarray([[286.0, 287.0], [288.0, 289.0]]))
     land = _make_data_component(
-        JCMLand,
+        make_jcm_land,
         name="LND",
         grid=grid,
         data={"land_surface_temperature": forcing},
@@ -1059,7 +1087,7 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
         settings=VercorSettings(get_field_time_slice=True),
     )
     atmosphere = _make_data_component(
-        ERA5Atmosphere,
+        make_era5_atmosphere,
         name="ATM",
         grid=grid,
         data={
@@ -1121,7 +1149,7 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
     grid = make_test_grid(name="noleap-daily")
     forcing = jnp.arange(365 * 2 * 2, dtype=jnp.float64).reshape((365, 2, 2))
     land = _make_data_component(
-        JCMLand,
+        make_jcm_land,
         name="LND",
         grid=grid,
         data={"land_surface_temperature": forcing},
@@ -1129,7 +1157,7 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
         settings=VercorSettings(get_field_time_slice=True),
     )
     atmosphere = _make_data_component(
-        ERA5Atmosphere,
+        make_era5_atmosphere,
         name="ATM",
         grid=grid,
         data={
@@ -1195,7 +1223,7 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
     grid = make_test_grid(name="360-daily")
     forcing = jnp.arange(365 * 2 * 2, dtype=jnp.float64).reshape((365, 2, 2))
     land = _make_data_component(
-        JCMLand,
+        make_jcm_land,
         name="LND",
         grid=grid,
         data={"land_surface_temperature": forcing},
@@ -1203,7 +1231,7 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
         settings=VercorSettings(get_field_time_slice=True),
     )
     atmosphere = _make_data_component(
-        ERA5Atmosphere,
+        make_era5_atmosphere,
         name="ATM",
         grid=grid,
         data={
@@ -1278,7 +1306,7 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
     monthly_ocean = monthly_ocean.at[0].set(month_zero)
     monthly_ocean = monthly_ocean.at[11].set(month_eleven)
     ocean = _make_data_component(
-        ERA5Ocean,
+        make_era5_ocean,
         name="OCN",
         grid=grid,
         data={"sea_surface_temperature": monthly_ocean},
@@ -1286,7 +1314,7 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
         settings=VercorSettings(apply_time_interpolation=True),
     )
     atmosphere = _make_data_component(
-        ERA5Atmosphere,
+        make_era5_atmosphere,
         name="ATM",
         grid=grid,
         data={
@@ -1356,8 +1384,8 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
 def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
     grid = make_test_grid(name="jcm-runtime")
     component = _make_jax_gcm_component(grid)
-    original_state = component._state
-    original_forcing = component.forcing
+    original_state = cast(Any, component)._setup_state._state
+    original_forcing = cast(Any, component)._setup_state.forcing
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
@@ -1372,8 +1400,8 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
     temperature = atmosphere_state.data.get("temperature")
     sensible_heat_flux = atmosphere_state.data.get("sensible_heat_flux")
 
-    assert component._state is original_state
-    assert component.forcing is original_forcing
+    assert cast(Any, component)._setup_state._state is original_state
+    assert cast(Any, component)._setup_state.forcing is original_forcing
     assert temperature.shape == grid.shape
     assert sensible_heat_flux.shape == grid.shape
     assert isinstance(temperature, jax.Array)
@@ -1409,7 +1437,7 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
         stl_am=jnp.zeros((*grid.shape, 365), dtype=jnp.float64),
         sea_surface_temperature=jnp.zeros((*grid.shape, 365), dtype=jnp.float64),
     )
-    cast(Any, component).forcing = forcing_template
+    cast(Any, component)._setup_state.forcing = forcing_template
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
@@ -1438,7 +1466,7 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
         [[280.0, 281.0], [282.0, 283.0]], dtype=jnp.float64
     )
     ocean = _make_data_component(
-        ERA5Ocean,
+        make_era5_ocean,
         name="OCN",
         grid=grid,
         data={"sea_surface_temperature": sea_surface_temperature},
@@ -1504,7 +1532,7 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
 def test_jax_gcm_runtime_requires_initialized_payload() -> None:
     grid = make_test_grid(name="jcm-uninitialized")
     component = _make_jax_gcm_component(grid)
-    del component._state
+    del cast(Any, component)._setup_state._state
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
@@ -1548,12 +1576,16 @@ def test_run_accepts_default_runtime_component() -> None:
 
 def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
     grid = make_test_grid(name="camulator")
-    camulator_land = _make_data_component(
-        CAMulatorLand,
+    camulator_land = host_component(
         name="LND",
         grid=grid,
-        data={"land_surface_temperature": jnp.zeros(grid.shape, dtype=jnp.float64)},
+        step=lambda fields, context, payload: {},
+        outputs=("land_surface_temperature",),
+        default_fields={
+            "land_surface_temperature": jnp.zeros(grid.shape, dtype=jnp.float64)
+        },
     )
+    camulator_land.seed_declared_defaults()
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
@@ -1569,12 +1601,14 @@ def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
 
 def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
     grid = make_test_grid(name="camulator-gcm")
-    camulator = _make_data_component(
-        CAMulatorGCM,
+    camulator = host_component(
         name="ATM",
         grid=grid,
-        data={"temperature": jnp.ones(grid.shape, dtype=jnp.float64)},
+        step=lambda fields, context, payload: {},
+        outputs=("temperature",),
+        default_fields={"temperature": jnp.ones(grid.shape, dtype=jnp.float64)},
     )
+    camulator.seed_declared_defaults()
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
@@ -1590,12 +1624,16 @@ def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
 
 def test_scanned_runtime_rejects_veros_runtime_boundary() -> None:
     grid = make_test_grid(name="veros")
-    veros = _make_data_component(
-        VerosGCM,
+    veros = host_component(
         name="OCN",
         grid=grid,
-        data={"sea_surface_temperature": jnp.zeros(grid.shape, dtype=jnp.float64)},
+        step=lambda fields, context, payload: {},
+        outputs=("sea_surface_temperature",),
+        default_fields={
+            "sea_surface_temperature": jnp.zeros(grid.shape, dtype=jnp.float64)
+        },
     )
+    veros.seed_declared_defaults()
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )

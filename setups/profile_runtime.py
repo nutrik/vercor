@@ -9,10 +9,10 @@ from typing import Sequence
 import jax
 
 from vercor import Clock, Coupler, Exchange, RunSequence
-from vercor.components.slab.atmosphere import Atmosphere
-from vercor.components.slab.land import Land
-from vercor.components.slab.ocean import Ocean
-from vercor.components.slab.seaice import SeaIce
+from setups.slab.atmosphere import make_slab_atmosphere
+from setups.slab.land import make_slab_land
+from setups.slab.ocean import make_slab_ocean
+from setups.slab.seaice import make_slab_seaice
 from vercor.dtypes import jax_ones
 from vercor.regridders import bilinear, conservative, make_rectilinear_grid
 from vercor.runtime import RuntimeCouplerState
@@ -123,10 +123,10 @@ def build_slab_coupler(
         log_level=log_level,
     )
     for component in (
-        Atmosphere(atm_grid),
-        Ocean(ocn_grid),
-        Land(lnd_grid),
-        SeaIce(ice_grid),
+        make_slab_atmosphere(atm_grid),
+        make_slab_ocean(ocn_grid),
+        make_slab_land(lnd_grid),
+        make_slab_seaice(ice_grid),
     ):
         coupler.register(component)
     coupler.set_components_run_sequence(RunSequence(order=["OCN", "ATM", "LND", "ICE"]))

@@ -5,7 +5,7 @@ from jax.typing import ArrayLike
 from dinosaur.coordinate_systems import CoordinateSystem
 from jcm.forcing import ForcingData
 
-from vercor.components.base import DataComponent
+from vercor.components.base import DataComponent, data_component
 from vercor.dtypes import as_jax_real_array
 from vercor.field_layout import canonicalize_time_last_surface_field
 from vercor.grid import RectilinearGrid
@@ -65,58 +65,47 @@ def _prepare_jcm_land_runtime_fields(
     )
 
 
-class JCMLand(DataComponent):
-    def __init__(
-        self,
-        jcm_coords: CoordinateSystem,
-        jcm_forcing: ForcingData,
-        ocn_grid: RectilinearGrid,
-        name: str = "LND",
-    ) -> None:
-        """
-        Read all necessary fields from the provided forcing files.
+def make_jcm_land(
+    jcm_coords: CoordinateSystem,
+    jcm_forcing: ForcingData,
+    ocn_grid: RectilinearGrid,
+    name: str = "LND",
+) -> DataComponent:
+    """Return a JCM land forcing component."""
 
-        Arguments:
-            name (str): component name
-            jcm_coords (CoordinateSystem): JCM coordinate system object
-            jcm_forcing (ForcingData): JCM forcing data object
+    (
+        longitude,
+        latitude,
+        land_surface_temperature,
+        soil_moisture,
+    ) = _prepare_jcm_land_runtime_fields(
+        jcm_coords.horizontal.longitudes,
+        jcm_coords.horizontal.latitudes,
+        jcm_forcing.stl_am,
+        jcm_forcing.soilw_am,
+    )
+    lnd_bmask, _ = create_lnd_mask_from_ocn(
+        atm_lat=latitude,
+        atm_lon=longitude,
+        ocn_grid=ocn_grid,
+    )
 
-        Attributes of parent classes to be initialized:
-            Component
-                name: str
-                grid: RectilinearGrid
-        """
+    grid = RectilinearGrid(
+        name=f"{name.lower()}-grid",
+        longitude=longitude,
+        latitude=latitude,
+        binary_mask=lnd_bmask,
+    )
 
-        (
-            longitude,
-            latitude,
-            land_surface_temperature,
-            soil_moisture,
-        ) = _prepare_jcm_land_runtime_fields(
-            jcm_coords.horizontal.longitudes,
-            jcm_coords.horizontal.latitudes,
-            jcm_forcing.stl_am,
-            jcm_forcing.soilw_am,
-        )
-        lnd_bmask, _ = create_lnd_mask_from_ocn(
-            atm_lat=latitude,
-            atm_lon=longitude,
-            ocn_grid=ocn_grid,
-        )
+    component = data_component(
+        name=name,
+        grid=grid,
+        fields={
+            "land_surface_temperature": land_surface_temperature,
+            "soil_moisture": soil_moisture,
+        },
+    )
+    component.declare_fields(outputs=_JCM_LAND_FIELD_NAMES)
+    component.update_settings(get_field_time_slice=True)
 
-        grid = RectilinearGrid(
-            name=f"{name.lower()}-grid",
-            longitude=longitude,
-            latitude=latitude,
-            binary_mask=lnd_bmask,
-        )
-
-        super().__init__(name, grid=grid)
-        self.declare_fields(outputs=_JCM_LAND_FIELD_NAMES)
-
-        self.update_settings(get_field_time_slice=True)
-
-        # Units: [K]
-        self.seed_field("land_surface_temperature", land_surface_temperature)
-        # Units: [???]
-        self.seed_field("soil_moisture", soil_moisture)
+    return component

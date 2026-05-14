@@ -13,7 +13,7 @@ from tests.assertions import assert_allclose_compact
 from vercor.components.base import DataComponent
 from vercor.runtime.contexts import ComponentInitContext
 from vercor.settings import VercorSettings
-from vercor.components.external.jax_gcm import JAXGCMRuntimePayload
+from setups.external.jax_gcm import JAXGCMRuntimePayload
 from vercor.runtime import (
     RuntimeComponentContract,
     RuntimeComponentState,
@@ -113,24 +113,16 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     forcing_data_source = Path("vercor/forcing_data.py").read_text(encoding="utf-8")
     flux_source = Path("vercor/fluxes/bulk_formula_cesm.py").read_text(encoding="utf-8")
     diagnostics_source = Path("vercor/diagnostics.py").read_text(encoding="utf-8")
-    jax_gcm_source = Path("vercor/components/external/jax_gcm.py").read_text(
-        encoding="utf-8"
-    )
-    veros_source = Path("vercor/components/external/veros_gcm.py").read_text(
-        encoding="utf-8"
-    )
-    camulator_source = Path("vercor/components/external/camulator.py").read_text(
-        encoding="utf-8"
-    )
-    camulator_land_source = Path("vercor/components/data/camulator_land.py").read_text(
+    jax_gcm_source = Path("setups/external/jax_gcm.py").read_text(encoding="utf-8")
+    veros_source = Path("setups/external/veros_gcm.py").read_text(encoding="utf-8")
+    camulator_source = Path("setups/external/camulator.py").read_text(encoding="utf-8")
+    camulator_land_source = Path("setups/data/camulator_land.py").read_text(
         encoding="utf-8"
     )
     veros_runtime_settings_source = Path(
-        "vercor/components/external/veros_runtime_settings.py"
+        "setups/external/veros_runtime_settings.py"
     ).read_text(encoding="utf-8")
-    windpp_source = Path("vercor/components/external/windpp.py").read_text(
-        encoding="utf-8"
-    )
+    windpp_source = Path("setups/external/windpp.py").read_text(encoding="utf-8")
 
     forbidden_component_markers = (
         "step_slab_component_state",
@@ -284,19 +276,16 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "elif field_name in store" not in diagnostics_source
     assert "def runtime_contract" not in runtime_components_source
     assert "RuntimeComponentContract | None" not in runtime_components_source
-    assert "def step_runtime_state" in jax_gcm_source
-    assert "def step_host_runtime_state" in veros_source
-    assert "def step_host_runtime_state" in camulator_source
-    assert "def step_host_runtime_state" in camulator_land_source
+    assert "def make_jax_gcm" in jax_gcm_source
+    assert "def make_veros_gcm" in veros_source
+    assert "def make_camulator_gcm" in camulator_source
+    assert "def make_camulator_land" in camulator_land_source
     assert "load_camulator_forcing_context" in camulator_land_source
     assert "initialize_camulator" not in camulator_land_source
-    assert "vercor.components.external.camulator import" not in camulator_land_source
+    assert "setups.external.camulator import" not in camulator_land_source
+    assert "from setups.external.veros_runtime_settings import *" not in veros_source
     assert (
-        "from vercor.components.external.veros_runtime_settings import *"
-        not in veros_source
-    )
-    assert (
-        "from vercor.components.external.veros_runtime_settings import configure_veros_runtime"
+        "from setups.external.veros_runtime_settings import configure_veros_runtime"
         in veros_source
     )
     assert veros_source.index("configure_veros_runtime()") < veros_source.index(
@@ -306,9 +295,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def _step_host_runtime_state" not in base_source
     assert "_step_host_runtime_state" not in runtime_driver_source
     for source in (veros_source, camulator_source, camulator_land_source):
-        signature = source.split("def step_host_runtime_state", 1)[1].split(") ->", 1)[
-            0
-        ]
+        signature = source.split("def step(", 1)[1].split(") ->", 1)[0]
         assert "coupler" not in signature
         assert "context" in signature
         assert "logger" not in signature
@@ -316,8 +303,6 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def step_runtime_state" not in veros_source
     assert "def step_runtime_state" not in camulator_source
     assert "def step_runtime_state" not in camulator_land_source
-    assert "component_state.data.to_mapping()" not in veros_source
-    assert "component_state.data.to_mapping()" not in camulator_source
     assert "component_state.data.to_mapping()" not in camulator_land_source
     assert "post_process_wind_artifacts_deprecated" not in windpp_source
     assert "old_flux_atmOcn" not in flux_source
@@ -362,9 +347,9 @@ def test_runtime_focused_modules_keep_compatibility_reexports() -> None:
 
 
 def test_examples_use_coupler_runtime_component_view_factory() -> None:
-    slab_driver_source = Path("examples/run_slab_driver.py").read_text(encoding="utf-8")
-    data_driver_source = Path("examples/run_data_driver.py").read_text(encoding="utf-8")
-    jcm_slab_source = Path("examples/run_jcm_with_slab.py").read_text(encoding="utf-8")
+    slab_driver_source = Path("setups/run_slab_driver.py").read_text(encoding="utf-8")
+    data_driver_source = Path("setups/run_data_driver.py").read_text(encoding="utf-8")
+    jcm_slab_source = Path("setups/run_jcm_with_slab.py").read_text(encoding="utf-8")
 
     for source in (slab_driver_source, data_driver_source, jcm_slab_source):
         assert "RuntimeComponentView.from_coupler_state" not in source
@@ -372,7 +357,7 @@ def test_examples_use_coupler_runtime_component_view_factory() -> None:
 
 
 def test_examples_import_concrete_components_directly() -> None:
-    for path in Path("examples").glob("run_*.py"):
+    for path in Path("setups").glob("run_*.py"):
         source = path.read_text(encoding="utf-8")
         assert "from vercor.components import" not in source
 

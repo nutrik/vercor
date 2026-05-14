@@ -1,23 +1,26 @@
 from copy import deepcopy
 
-from typing import TYPE_CHECKING, Any, Callable, cast
+from collections.abc import Mapping
+from typing import Any, Callable, cast
 import jax
 import jax.numpy as jnp
 from datetime import timedelta
 
-from vercor.components.external.veros_runtime_settings import configure_veros_runtime
-from vercor.components.base import HostRuntimeComponent
+from setups.external.veros_runtime_settings import configure_veros_runtime
+from vercor.components.base import (
+    Component,
+    ComponentStepContext,
+    HostRuntimeComponent,
+    host_component,
+)
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor.grid import RectilinearGrid
 from vercor.fluxes.bulk_formula_cesm import compute_ocean_surface_fluxes
 from vercor.runtime import RuntimeFieldStore
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
+from vercor.runtime.contexts import ComponentInitContext
 from vercor.settings import VercorSettings
 from vercor.host_arrays import runtime_array_to_host
 from vercor.types import RuntimeArray
-
-if TYPE_CHECKING:
-    from vercor.runtime import RuntimeComponentState
 
 configure_veros_runtime()
 
@@ -372,7 +375,13 @@ def _advance_veros_substeps(
     return updated_state
 
 
-class VerosGCM(HostRuntimeComponent):
+class _VerosGCMState:
+    name: str
+    data: dict[str, RuntimeArray]
+    settings: VercorSettings
+    seed_field = Component.seed_field
+    seed_fields = Component.seed_fields
+
     def __init__(
         self,
         name: str = "OCN",
@@ -396,6 +405,7 @@ class VerosGCM(HostRuntimeComponent):
             jitted (bool): whether to use JIT compilation for the Veros model step function
         """
 
+        self.name = name
         override = custom_parameters or {}
 
         self.model = CustomGlobalFourDegree(override=override)
@@ -426,17 +436,17 @@ class VerosGCM(HostRuntimeComponent):
             binary_mask=mask[2:-2, 2:-2].T,
         )
 
-        super().__init__(name, grid=grid)
-        self.declare_fields(
-            inputs=_VEROS_INPUT_FIELD_NAMES,
-            outputs=("sea_surface_temperature",),
-            default_fields=self.grid_field_defaults(
-                ("sea_surface_temperature",),
-                overrides=_VEROS_FIELD_DEFAULTS,
-            ),
-        )
+        self.grid = grid
 
-    def initialize(self, context: ComponentInitContext) -> None:
+    def initialize(
+        self,
+        component: HostRuntimeComponent | ComponentInitContext,
+        context: ComponentInitContext | None = None,
+    ) -> None:
+        if context is None:
+            context = cast(ComponentInitContext, component)
+            component = cast(HostRuntimeComponent, self)
+        component = cast(HostRuntimeComponent, component)
         dt_seconds = context.dt_seconds
         self.model_substeps = int(dt_seconds // self.dt_tracer)
 
@@ -455,24 +465,26 @@ class VerosGCM(HostRuntimeComponent):
                 context.logger.info(f" Step {i+1} / {self.spinup_steps}")
                 self._veros_state = self._step_function(self._veros_state)
 
-        self.seed_field(
+        component.seed_field(
             "sea_surface_temperature",
             _extract_veros_runtime_sst(self._veros_state),
         )
 
-    def step_host_runtime_state(
+    def step(
         self,
-        component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
-    ) -> "RuntimeComponentState":
+        fields: Mapping[str, Any],
+        context: ComponentStepContext,
+        payload: Any | None,
+    ) -> Mapping[str, Any]:
         """Advance the private host-backed Veros boundary."""
 
+        _ = payload
         time = context.time
         logger = context.logger
         if time is None:
-            return component_state
+            return {}
 
-        runtime_fields = component_state.data
+        runtime_fields = RuntimeFieldStore.from_mapping(fields)
 
         taux, tauy, qnet, qnec = compute_fluxes(
             self._veros_state,
@@ -495,7 +507,49 @@ class VerosGCM(HostRuntimeComponent):
             logger=logger,
         )
 
-        return self.with_runtime_fields(
-            component_state,
-            {"sea_surface_temperature": _extract_veros_runtime_sst(self._veros_state)},
-        )
+        return {
+            "sea_surface_temperature": _extract_veros_runtime_sst(self._veros_state)
+        }
+
+    def step_host_runtime_state(
+        self,
+        component_state: Any,
+        context: ComponentStepContext,
+    ) -> Any:
+        """Compatibility helper for state-level unit tests."""
+
+        updates = self.step(component_state.data.to_mapping(), context, None)
+        return component_state.with_data(component_state.data.set_many(updates))
+
+
+def make_veros_gcm(
+    name: str = "OCN",
+    spinup_time: timedelta = timedelta(days=2),
+    custom_parameters: dict[str, Any] | None = None,
+    restore_to_climatology: bool = False,
+    do_spinup: bool = False,
+    jitted: bool = False,
+) -> HostRuntimeComponent:
+    """Return a host-backed Veros GCM component."""
+
+    state = _VerosGCMState(
+        name=name,
+        spinup_time=spinup_time,
+        custom_parameters=custom_parameters,
+        restore_to_climatology=restore_to_climatology,
+        do_spinup=do_spinup,
+        jitted=jitted,
+    )
+    defaults = {
+        field_name: _VEROS_FIELD_DEFAULTS.get(field_name, 0.0)
+        for field_name in ("sea_surface_temperature",)
+    }
+    return host_component(
+        name=name,
+        grid=state.grid,
+        step=state.step,
+        inputs=_VEROS_INPUT_FIELD_NAMES,
+        outputs=("sea_surface_temperature",),
+        default_fields=defaults,
+        initialize=state.initialize,
+    )

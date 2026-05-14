@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Self, cast, final
 
@@ -39,6 +39,19 @@ if TYPE_CHECKING:
 
 ComponentSetupContext = ComponentInitContext
 ComponentStepContext = RuntimeStepContext
+ComponentInitializeHook = Callable[[Any, ComponentInitContext], None]
+ComponentCreatePayloadHook = Callable[[Any], Any | None]
+ComponentPrefillHook = Callable[
+    [
+        Any,
+        dict[str, RuntimeArray],
+        dict[str, RuntimeArray],
+        dict[str, RuntimeArray],
+        Any,
+    ],
+    None,
+]
+ComponentValidateHook = Callable[[Any, Any, Any], None]
 
 __all__ = [
     "Component",
@@ -70,6 +83,30 @@ def _author_field_spec(
     )
 
 
+def _install_lifecycle_hooks(
+    component: "Component",
+    *,
+    initialize: ComponentInitializeHook | None = None,
+    create_runtime_payload: ComponentCreatePayloadHook | None = None,
+    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+    validate_runtime_state: ComponentValidateHook | None = None,
+) -> None:
+    """Attach optional lifecycle hooks to a factory-created component."""
+
+    if initialize is not None:
+        setattr(component, "_initialize_hook", initialize)
+    if create_runtime_payload is not None:
+        setattr(component, "_create_runtime_payload_hook", create_runtime_payload)
+    if prefill_runtime_state_fields is not None:
+        setattr(
+            component,
+            "_prefill_runtime_state_fields_hook",
+            prefill_runtime_state_fields,
+        )
+    if validate_runtime_state is not None:
+        setattr(component, "_validate_runtime_state_hook", validate_runtime_state)
+
+
 def _callable_component_from_model(
     *,
     runtime_kind: str,
@@ -81,6 +118,10 @@ def _callable_component_from_model(
     inputs: _FieldNames = (),
     outputs: _FieldNames = (),
     default_fields: _AuthorFieldValues = None,
+    initialize: ComponentInitializeHook | None = None,
+    create_runtime_payload: ComponentCreatePayloadHook | None = None,
+    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+    validate_runtime_state: ComponentValidateHook | None = None,
 ) -> "Component":
     """Create a callable-backed component from the shared author facade."""
 
@@ -98,6 +139,10 @@ def _callable_component_from_model(
             outputs=outputs,
             default_fields=default_fields,
         ),
+        initialize=initialize,
+        create_runtime_payload=create_runtime_payload,
+        prefill_runtime_state_fields=prefill_runtime_state_fields,
+        validate_runtime_state=validate_runtime_state,
     )
 
 
@@ -150,6 +195,10 @@ class Component(ABC):
         inputs: _FieldNames = (),
         outputs: _FieldNames = (),
         default_fields: _AuthorFieldValues = None,
+        initialize: ComponentInitializeHook | None = None,
+        create_runtime_payload: ComponentCreatePayloadHook | None = None,
+        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+        validate_runtime_state: ComponentValidateHook | None = None,
     ) -> "Component":
         """Create a differentiable component from a user model callable.
 
@@ -170,6 +219,10 @@ class Component(ABC):
             inputs=inputs,
             outputs=outputs,
             default_fields=default_fields,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
         )
 
     def declare_fields(
@@ -470,6 +523,10 @@ class Component(ABC):
         time, coupling timestep, run sequence, settings, or logger.
         """
 
+        hook = getattr(self, "_initialize_hook", None)
+        if hook is not None:
+            hook(self, context)
+            return
         self.seed_declared_defaults(context.settings)
 
     def create_runtime_payload(self) -> Any | None:
@@ -479,6 +536,9 @@ class Component(ABC):
         state, for example model internals or forcing containers.
         """
 
+        hook = getattr(self, "_create_runtime_payload_hook", None)
+        if hook is not None:
+            return hook(self)
         return None
 
     def prefill_runtime_state_fields(
@@ -494,6 +554,10 @@ class Component(ABC):
         those fields must exist before the first JAX scan iteration.
         """
 
+        hook = getattr(self, "_prefill_runtime_state_fields_hook", None)
+        if hook is not None:
+            hook(self, data, incoming, outgoing, contract)
+            return
         _runtime_field_adapters.prefill_declared_runtime_fields(self, data)
         _ = incoming, outgoing, contract
 
@@ -508,6 +572,10 @@ class Component(ABC):
         non-standard shapes before traced runtime execution begins.
         """
 
+        hook = getattr(self, "_validate_runtime_state_hook", None)
+        if hook is not None:
+            hook(self, component_state, contract)
+            return
         _ = contract
         _runtime_field_adapters.validate_declared_runtime_fields(
             self,
@@ -606,6 +674,10 @@ class HostRuntimeComponent(Component):
         inputs: _FieldNames = (),
         outputs: _FieldNames = (),
         default_fields: _AuthorFieldValues = None,
+        initialize: ComponentInitializeHook | None = None,
+        create_runtime_payload: ComponentCreatePayloadHook | None = None,
+        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+        validate_runtime_state: ComponentValidateHook | None = None,
     ) -> "HostRuntimeComponent":
         """Create a host-runtime component from a Python model callable."""
 
@@ -621,6 +693,10 @@ class HostRuntimeComponent(Component):
                 inputs=inputs,
                 outputs=outputs,
                 default_fields=default_fields,
+                initialize=initialize,
+                create_runtime_payload=create_runtime_payload,
+                prefill_runtime_state_fields=prefill_runtime_state_fields,
+                validate_runtime_state=validate_runtime_state,
             ),
         )
 
@@ -654,15 +730,28 @@ def data_component(
     grid: RectilinearGrid,
     fields: _AuthorFieldValues = None,
     settings: VercorSettings | None = None,
+    *,
+    initialize: ComponentInitializeHook | None = None,
+    create_runtime_payload: ComponentCreatePayloadHook | None = None,
+    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+    validate_runtime_state: ComponentValidateHook | None = None,
 ) -> DataComponent:
     """Create a data-only component using the author-friendly field facade."""
 
-    return DataComponent.from_fields(
+    component = DataComponent.from_fields(
         name=name,
         grid=grid,
         fields=fields,
         settings=settings,
     )
+    _install_lifecycle_hooks(
+        component,
+        initialize=initialize,
+        create_runtime_payload=create_runtime_payload,
+        prefill_runtime_state_fields=prefill_runtime_state_fields,
+        validate_runtime_state=validate_runtime_state,
+    )
+    return component
 
 
 def differentiable_component(
@@ -675,6 +764,10 @@ def differentiable_component(
     inputs: _FieldNames = (),
     outputs: _FieldNames = (),
     default_fields: _AuthorFieldValues = None,
+    initialize: ComponentInitializeHook | None = None,
+    create_runtime_payload: ComponentCreatePayloadHook | None = None,
+    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+    validate_runtime_state: ComponentValidateHook | None = None,
 ) -> Component:
     """Create a differentiable component using the author-friendly facade."""
 
@@ -687,6 +780,10 @@ def differentiable_component(
         inputs=inputs,
         outputs=outputs,
         default_fields=default_fields,
+        initialize=initialize,
+        create_runtime_payload=create_runtime_payload,
+        prefill_runtime_state_fields=prefill_runtime_state_fields,
+        validate_runtime_state=validate_runtime_state,
     )
 
 
@@ -700,6 +797,10 @@ def host_component(
     inputs: _FieldNames = (),
     outputs: _FieldNames = (),
     default_fields: _AuthorFieldValues = None,
+    initialize: ComponentInitializeHook | None = None,
+    create_runtime_payload: ComponentCreatePayloadHook | None = None,
+    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+    validate_runtime_state: ComponentValidateHook | None = None,
 ) -> HostRuntimeComponent:
     """Create a host-runtime component using the author-friendly facade."""
 
@@ -712,4 +813,8 @@ def host_component(
         inputs=inputs,
         outputs=outputs,
         default_fields=default_fields,
+        initialize=initialize,
+        create_runtime_payload=create_runtime_payload,
+        prefill_runtime_state_fields=prefill_runtime_state_fields,
+        validate_runtime_state=validate_runtime_state,
     )

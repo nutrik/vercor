@@ -15,7 +15,15 @@ from vercor.grid import RectilinearGrid
 from vercor.runtime.contexts import RuntimeStepContext
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
-from vercor.components.base import Component, HostRuntimeComponent
+from vercor.components.base import (
+    Component,
+    ComponentCreatePayloadHook,
+    ComponentInitializeHook,
+    ComponentPrefillHook,
+    ComponentValidateHook,
+    HostRuntimeComponent,
+    _install_lifecycle_hooks,
+)
 
 if TYPE_CHECKING:
     from vercor.runtime import RuntimeComponentState
@@ -151,6 +159,10 @@ class _CallableRuntimeMixin:
         payload: Any | None,
         settings: VercorSettings | None,
         field_spec: ComponentFieldSpec,
+        initialize: ComponentInitializeHook | None,
+        create_runtime_payload: ComponentCreatePayloadHook | None,
+        prefill_runtime_state_fields: ComponentPrefillHook | None,
+        validate_runtime_state: ComponentValidateHook | None,
     ) -> None:
         component = cast("Component", self)
         if settings is None:
@@ -160,10 +172,20 @@ class _CallableRuntimeMixin:
         self._step = normalize_component_step_callable(step)
         self._payload = payload
         component.declare_fields(field_spec)
+        _install_lifecycle_hooks(
+            component,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
+        )
 
     def create_runtime_payload(self) -> Any | None:
         """Return the payload supplied to the callable component factory."""
 
+        hook = getattr(self, "_create_runtime_payload_hook", None)
+        if hook is not None:
+            return hook(cast("Component", self))
         return self._payload
 
     def _step_callable_runtime_state(
@@ -197,6 +219,10 @@ class _CallableComponent(_CallableRuntimeMixin, Component):
         payload: Any | None = None,
         settings: VercorSettings | None = None,
         field_spec: ComponentFieldSpec | None = None,
+        initialize: ComponentInitializeHook | None = None,
+        create_runtime_payload: ComponentCreatePayloadHook | None = None,
+        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+        validate_runtime_state: ComponentValidateHook | None = None,
     ) -> None:
         self._initialize_callable_runtime(
             name=name,
@@ -205,6 +231,10 @@ class _CallableComponent(_CallableRuntimeMixin, Component):
             payload=payload,
             settings=settings,
             field_spec=field_spec or ComponentFieldSpec(),
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
         )
 
     def step_runtime_state(
@@ -232,6 +262,10 @@ class _CallableHostRuntimeComponent(
         payload: Any | None = None,
         settings: VercorSettings | None = None,
         field_spec: ComponentFieldSpec | None = None,
+        initialize: ComponentInitializeHook | None = None,
+        create_runtime_payload: ComponentCreatePayloadHook | None = None,
+        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+        validate_runtime_state: ComponentValidateHook | None = None,
     ) -> None:
         self._initialize_callable_runtime(
             name=name,
@@ -240,6 +274,10 @@ class _CallableHostRuntimeComponent(
             payload=payload,
             settings=settings,
             field_spec=field_spec or ComponentFieldSpec(),
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
         )
 
     def step_host_runtime_state(
@@ -261,6 +299,10 @@ def _create_callable_component(
     payload: Any | None = None,
     settings: VercorSettings | None = None,
     field_spec: ComponentFieldSpec | None = None,
+    initialize: ComponentInitializeHook | None = None,
+    create_runtime_payload: ComponentCreatePayloadHook | None = None,
+    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+    validate_runtime_state: ComponentValidateHook | None = None,
 ) -> "Component":
     """Create a callable-backed component for the selected runtime kind."""
 
@@ -281,4 +323,8 @@ def _create_callable_component(
         payload=payload,
         settings=settings,
         field_spec=field_spec,
+        initialize=initialize,
+        create_runtime_payload=create_runtime_payload,
+        prefill_runtime_state_fields=prefill_runtime_state_fields,
+        validate_runtime_state=validate_runtime_state,
     )

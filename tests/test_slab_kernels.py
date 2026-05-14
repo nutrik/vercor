@@ -5,14 +5,14 @@ import jax.numpy as jnp
 import numpy as np
 
 from tests.assertions import assert_allclose_compact
-from vercor.components.slab.atmosphere import (
+from setups.slab.atmosphere import (
     _bulk_flux_step,
     _default_sea_surface_temperature,
     _surface_wind_10m,
 )
-from vercor.components.slab.land import _update_soil_moisture
-from vercor.components.slab.ocean import _advance_sea_surface_temperature
-from vercor.components.slab.seaice import _diagnose_ice_fraction
+from setups.slab.land import _update_soil_moisture
+from setups.slab.ocean import _advance_sea_surface_temperature
+from setups.slab.seaice import _diagnose_ice_fraction
 
 
 def test_atmosphere_kernels_support_jit_and_gradients() -> None:

@@ -1,30 +1,48 @@
 from datetime import datetime
 
-from examples.jax_array_helpers import transposed_host_array
+from setups.jax_array_helpers import transposed_host_array
 from vercor import Clock, Coupler, Exchange, RunSequence
-from vercor.components.data.erainterim_ocean import ERAInterimOcean
-from vercor.components.data.jcm_land import JCMLand
-from vercor.components.external.jax_gcm import JAXGCM
-from vercor.components.external.jax_gcm_tools import (
+from setups.data.jcm_land import make_jcm_land
+from setups.external.jax_gcm import make_jax_gcm
+from setups.external.veros_gcm import make_veros_gcm
+from setups.external.jax_gcm_tools import (
     generate_jcm_coords_forcing_topography_files,
+    get_default_parameter_values,
 )
 from vercor.regridders import bilinear
 
+from jcm.physics.speedy.params import Parameters
+
 if __name__ == "__main__":
-    # This ocean data & grid is identical to Veros global setup (1deg. or 4deg.)
-    ocn = ERAInterimOcean(resolution="4deg")
+    optimized_parameters: list = [
+        "surface_flux.vgust",
+        "convection.rhbl",
+        "condensation.rhlsc",
+        "surface_flux.cds",
+    ]
+
+    custom_jcm_parameters: dict[str, float] = get_default_parameter_values(
+        parameters=optimized_parameters,
+        default_parameters=Parameters.default(),
+    )
+
+    # change the values of the parameters to be optimized here
+    # custom_jcm_parameters['surface_flux.vgust'] = 5.01
+
+    ocn = make_veros_gcm(do_spinup=True)
 
     coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()
 
-    lnd = JCMLand(coords, forcing, ocn.grid)
+    lnd = make_jcm_land(coords, forcing, ocn.grid)
 
     # Swap mask in JAXGCM with ocean/land masks from ocean model
     terrain.fmask = transposed_host_array(lnd.grid.binary_mask)  # type: ignore
 
     # Build components
-    atm = JAXGCM(
+    atm = make_jax_gcm(
         coords,
         terrain,
+        custom_parameters=custom_jcm_parameters,
         forcing_data=forcing,
         do_spinup=True,
         jitted=True,
@@ -36,7 +54,8 @@ if __name__ == "__main__":
     # which corresponds to 100 years of simulation with a daily time step,
     # starting from January 3rd, 2000.
     # The -2 accounts for the fact that the simulation starts on January 3rd,
-    # because of 2 days spinup of JCM model, so it will end on December 31st, 2099.
+    # because of 2 days spinup of JCM & Veros models,
+    # so it will end on December 31st, 2099.
     clock = Clock(
         start=datetime(2000, 1, 3, 0, 0, 0),
         dt_seconds=86400.0,
@@ -61,8 +80,10 @@ if __name__ == "__main__":
             field_names=[
                 ("u_velocity", "v_velocity"),
                 "specific_humidity",
-                "temperature",
                 "model_level_height",
+                "density",
+                "potential_temperature",
+                "temperature",
                 "net_shortwave_radiation_flux",
                 "downward_longwave_radiation_flux",
             ],

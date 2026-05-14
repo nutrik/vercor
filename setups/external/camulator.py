@@ -2,7 +2,8 @@
 
 import os
 
-from typing import TYPE_CHECKING, Any, Optional, cast
+from collections.abc import Mapping
+from typing import Any, Optional, cast
 from pathlib import Path
 
 import jax
@@ -10,7 +11,7 @@ import jax.numpy as jnp
 
 from vercor.jax_logging import LoggerLike, get_default_logger
 
-from vercor.components.external.camulator_state import (
+from setups.external.camulator_state import (
     initialize_camulator,
     parse_datetime_from_config,
     StateVariableAccessor,
@@ -31,18 +32,18 @@ except ModuleNotFoundError:
         "Credit module not found. Please install credit to use CAMulator."
     )
 
-from vercor.components.base import HostRuntimeComponent
+from vercor.components.base import (
+    ComponentStepContext,
+    HostRuntimeComponent,
+    host_component,
+)
 from vercor.dtypes import PrecisionPolicy, as_jax_real_array, jax_full, jax_ones
 from vercor.fluxes.utilities import _compute_hybrid_sigma_full_level_altitudes
 from vercor.grid import RectilinearGrid
 from vercor.host_arrays import runtime_array_to_host
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
+from vercor.runtime.contexts import ComponentInitContext
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
-
-if TYPE_CHECKING:
-    from vercor.runtime import RuntimeComponentState
-
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -347,7 +348,7 @@ def add_init_noise(
 # ============================================================================
 
 
-class CAMulatorGCM(HostRuntimeComponent):
+class _CAMulatorGCMState:
 
     def __init__(
         self,
@@ -420,14 +421,13 @@ class CAMulatorGCM(HostRuntimeComponent):
             ),
         )
 
-        super().__init__(name, grid=grid)
-        self.declare_fields(
-            inputs=("sea_surface_temperature", "land_surface_temperature"),
-            outputs=_CAMULATOR_RUNTIME_FIELD_NAMES,
-            default_fields=self.grid_field_defaults(_CAMULATOR_RUNTIME_FIELD_NAMES),
-        )
+        self.grid = grid
 
-    def initialize(self, context: ComponentInitContext) -> None:
+    def initialize(
+        self,
+        component: HostRuntimeComponent,
+        context: ComponentInitContext,
+    ) -> None:
         logger = context.logger
         self.coupler_start_datetime = context.start
         self.coupling_timestep = timedelta(seconds=context.dt_seconds)
@@ -508,24 +508,26 @@ class CAMulatorGCM(HostRuntimeComponent):
         self.forecast_hour = 1
         self.timestep_counter = 0
 
-        self.seed_fields(
-            self.grid_field_defaults(
+        component.seed_fields(
+            component.grid_field_defaults(
                 _CAMULATOR_RUNTIME_FIELD_NAMES,
                 policy=context.settings,
             )
         )
 
-    def step_host_runtime_state(
+    def step(
         self,
-        component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
-    ) -> "RuntimeComponentState":
+        fields: Mapping[str, Any],
+        context: ComponentStepContext,
+        payload: Any | None,
+    ) -> Mapping[str, Any]:
         """Advance the private host-backed CAMulator atmosphere boundary."""
 
+        _ = payload
         time = context.time
         logger = context.logger
         if time is None:
-            return component_state
+            return {}
 
         settings = context.settings
         prediction = None
@@ -588,8 +590,8 @@ class CAMulatorGCM(HostRuntimeComponent):
                 model_input = self.state
 
             total_ts, rescaled_total_ts = _prepare_camulator_surface_forcing(
-                self.runtime_field(component_state, "sea_surface_temperature"),
-                self.runtime_field(component_state, "land_surface_temperature"),
+                fields["sea_surface_temperature"],
+                fields["land_surface_temperature"],
                 self.LANDM_COSLAT,
             )
             last_total_surface_temperature = total_ts
@@ -662,10 +664,56 @@ class CAMulatorGCM(HostRuntimeComponent):
             prediction=prediction,
         )
 
-        return self.with_runtime_fields(
-            component_state,
-            {
-                "total_surface_temperature": last_total_surface_temperature,
-                **mapped_fields,
-            },
-        )
+        return {
+            "total_surface_temperature": last_total_surface_temperature,
+            **mapped_fields,
+        }
+
+    def step_host_runtime_state(
+        self,
+        component_state: Any,
+        context: ComponentStepContext,
+    ) -> Any:
+        """Compatibility helper for state-level unit tests."""
+
+        updates = self.step(component_state.data.to_mapping(), context, None)
+        return component_state.with_data(component_state.data.set_many(updates))
+
+
+def make_camulator_gcm(
+    config_path: str,
+    name: str = "ATM",
+    model_weights_path: str = "checkpoint.pt00091.pt",
+    output_subfolder_name: Optional[str] = None,
+    init_noise: Optional[float] = None,
+    spinup_time: timedelta = timedelta(days=2),
+    do_spinup: bool = False,
+    device: str = "cuda",
+    output_cpus_number: int = 8,
+    logger: LoggerLike | None = None,
+) -> HostRuntimeComponent:
+    """Return a host-backed CAMulator atmosphere component."""
+
+    state = _CAMulatorGCMState(
+        config_path=config_path,
+        name=name,
+        model_weights_path=model_weights_path,
+        output_subfolder_name=output_subfolder_name,
+        init_noise=init_noise,
+        spinup_time=spinup_time,
+        do_spinup=do_spinup,
+        device=device,
+        output_cpus_number=output_cpus_number,
+        logger=logger,
+    )
+    return host_component(
+        name=name,
+        grid=state.grid,
+        step=state.step,
+        inputs=("sea_surface_temperature", "land_surface_temperature"),
+        outputs=_CAMULATOR_RUNTIME_FIELD_NAMES,
+        default_fields={
+            field_name: 0.0 for field_name in _CAMULATOR_RUNTIME_FIELD_NAMES
+        },
+        initialize=state.initialize,
+    )

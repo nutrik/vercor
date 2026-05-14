@@ -49,7 +49,7 @@ except ImportError:
     )
 
 try:
-    from vercor.components.external.windpp import post_process_wind_artifacts
+    from setups.external.windpp import post_process_wind_artifacts
 
     WINDPP_AVAILABLE = True
 except ImportError:

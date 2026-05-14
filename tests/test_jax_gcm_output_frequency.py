@@ -8,7 +8,7 @@ import pytest
 
 from tests.conftest import SelectFastCases
 from vercor.clock import DateTime360
-from vercor.components.external.jax_gcm import JAXGCM
+from setups.external.jax_gcm import _JAXGCMState
 
 
 @dataclass(frozen=True)
@@ -20,8 +20,8 @@ class OutputFrequencyCase:
     expected: bool
 
 
-def _make_component(output_frequency: object | None) -> JAXGCM:
-    component = JAXGCM.__new__(JAXGCM)
+def _make_component(output_frequency: object | None) -> Any:
+    component = _JAXGCMState.__new__(_JAXGCMState)
     component.output_frequency = cast(Any, output_frequency)
     return component
 

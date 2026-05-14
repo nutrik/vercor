@@ -10,8 +10,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import vercor.components.external.jax_gcm_tools as jax_gcm_tools_module
-import vercor.components.external.veros_gcm as veros_gcm_module
+import setups.external.jax_gcm_tools as jax_gcm_tools_module
+import setups.external.veros_gcm as veros_gcm_module
 from tests.assertions import assert_allclose_compact
 from vercor.runtime import RuntimeFieldStore
 from vercor.settings import VercorSettings
