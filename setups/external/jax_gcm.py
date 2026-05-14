@@ -770,8 +770,4 @@ def make_jax_gcm(
         prefill_runtime_state_fields=state.prefill_runtime_state_fields,
         validate_runtime_state=state.validate_runtime_state,
     )
-    component_any = cast(Any, component)
-    component_any.model = state.model
-    component_any.sigma_levels = state.sigma_levels
-    component_any._setup_state = state
     return component

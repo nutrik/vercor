@@ -1,5 +1,44 @@
 # 2026-05-14
 
+## JAXGCM Test-Only Compatibility Surface Removal
+
+- Removed the factory-time compatibility attachments from `make_jax_gcm`;
+  public JAXGCM components no longer receive ad-hoc `model`, `sigma_levels`,
+  or `_setup_state` attributes for tests.
+- Reworked JAXGCM runtime tests to keep private setup internals in an explicit
+  local fixture instead of attaching them to the public component object.
+- Added an API boundary regression that forbids the removed factory block and
+  test `_setup_state` access from returning.
+- Removed the constructor coverage assertion that required `sigma_levels` on
+  the public component object.
+
+## Validation (JAXGCM Test-Only Compatibility Surface Removal, 2026-05-14)
+
+- `conda run -n scipy pytest tests/test_api_boundaries.py::test_jax_gcm_factory_does_not_attach_test_only_setup_state -q --tb=short`
+  - failed before implementation on the existing `component_any` compatibility
+    block
+  - passed after removing the block and updating runtime tests
+- `conda run -n scipy pytest tests/test_coupler_runtime.py::test_jax_gcm_runs_inside_runtime_under_jit_and_grad tests/test_coupler_runtime.py::test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable tests/test_coupler_runtime.py::test_jax_gcm_runtime_requires_initialized_payload -q --tb=short`
+  - passed after moving setup internals into the test fixture
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+- `conda run -n scipy pytest tests/test_external_components_coverage.py::test_jax_gcm_constructor_builds_jax_backed_grid -q --tb=short`
+  - passed after removing the public `sigma_levels` assertion
+- `conda run -n scipy black vercor setups tests`
+  - reformatted `tests/test_coupler_runtime.py`
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - passed (`130 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Maintainability Audit Refactor Implementation
 
 - Consolidated NetCDF forcing reads behind `vercor.forcing_data.read_forcing`;

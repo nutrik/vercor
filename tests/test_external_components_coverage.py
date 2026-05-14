@@ -417,7 +417,6 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component.grid.latitude, jax.Array)
     assert isinstance(component.grid.binary_mask, jax.Array)
-    assert isinstance(cast(Any, component).sigma_levels, jax.Array)
     assert component.field_spec.inputs == (
         "land_surface_temperature",
         "sea_surface_temperature",

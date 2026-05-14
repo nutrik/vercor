@@ -354,6 +354,25 @@ def test_private_setup_state_objects_do_not_borrow_component_methods() -> None:
 
 
 @pytest.mark.fast_always
+def test_jax_gcm_factory_does_not_attach_test_only_setup_state() -> None:
+    jax_gcm_source = Path("setups/external/jax_gcm.py").read_text(encoding="utf-8")
+    runtime_test_source = Path("tests/test_coupler_runtime.py").read_text(
+        encoding="utf-8"
+    )
+
+    forbidden_factory_markers = (
+        "component_any = cast(Any, component)",
+        "component_any.model =",
+        "component_any.sigma_levels =",
+        "component_any._setup_state =",
+    )
+    for marker in forbidden_factory_markers:
+        assert marker not in jax_gcm_source
+
+    assert "_setup_state" not in runtime_test_source
+
+
+@pytest.mark.fast_always
 def test_data_and_host_factories_return_core_contract_instances() -> None:
     from setups.data.era5_land import make_era5_land
     from setups.external.camulator import make_camulator_gcm

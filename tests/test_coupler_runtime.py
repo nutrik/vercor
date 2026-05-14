@@ -11,7 +11,12 @@ import pytest
 from tests._coverage_support import DummyComponent, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.clock import Clock
-from vercor.components import data_component, differentiable_component, host_component
+from vercor.components import (
+    Component,
+    data_component,
+    differentiable_component,
+    host_component,
+)
 from setups.data.era5_atmosphere import make_era5_atmosphere
 from setups.data.era5_land import make_era5_land
 from setups.data.era5_ocean import make_era5_ocean
@@ -90,6 +95,11 @@ class _FakeDynamicsPrediction(NamedTuple):
 class _FakePrediction(NamedTuple):
     physics: _FakePhysicsPrediction
     dynamics: _FakeDynamicsPrediction
+
+
+class _JAXGCMFixture(NamedTuple):
+    component: Component
+    state: Any
 
 
 def _make_data_component(
@@ -172,7 +182,7 @@ def _fake_jcm_step(
     return updated_state, prediction
 
 
-def _make_jax_gcm_component(grid: RectilinearGrid) -> Any:
+def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
     state = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
     state.name = "ATM"
     state.grid = grid
@@ -231,11 +241,11 @@ def _make_jax_gcm_component(grid: RectilinearGrid) -> Any:
         validate_runtime_state=state.validate_runtime_state,
     )
     component.seed_fields(state.data)
-    component_any = cast(Any, component)
-    component_any.model = state.model
-    component_any.sigma_levels = state.sigma_levels
-    component_any._setup_state = state
-    return component
+    return _JAXGCMFixture(component=component, state=state)
+
+
+def _make_jax_gcm_component(grid: RectilinearGrid) -> Component:
+    return _make_jax_gcm_fixture(grid).component
 
 
 def _component_state(
@@ -1383,9 +1393,10 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
 
 def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
     grid = make_test_grid(name="jcm-runtime")
-    component = _make_jax_gcm_component(grid)
-    original_state = cast(Any, component)._setup_state._state
-    original_forcing = cast(Any, component)._setup_state.forcing
+    fixture = _make_jax_gcm_fixture(grid)
+    component = fixture.component
+    original_state = fixture.state._state
+    original_forcing = fixture.state.forcing
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
@@ -1400,8 +1411,8 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
     temperature = atmosphere_state.data.get("temperature")
     sensible_heat_flux = atmosphere_state.data.get("sensible_heat_flux")
 
-    assert cast(Any, component)._setup_state._state is original_state
-    assert cast(Any, component)._setup_state.forcing is original_forcing
+    assert fixture.state._state is original_state
+    assert fixture.state.forcing is original_forcing
     assert temperature.shape == grid.shape
     assert sensible_heat_flux.shape == grid.shape
     assert isinstance(temperature, jax.Array)
@@ -1432,12 +1443,13 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
 
 def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> None:
     grid = make_test_grid(name="jcm-runtime-forcing-template")
-    component = _make_jax_gcm_component(grid)
+    fixture = _make_jax_gcm_fixture(grid)
+    component = fixture.component
     forcing_template = _FakeJCMForcing(
         stl_am=jnp.zeros((*grid.shape, 365), dtype=jnp.float64),
         sea_surface_temperature=jnp.zeros((*grid.shape, 365), dtype=jnp.float64),
     )
-    cast(Any, component)._setup_state.forcing = forcing_template
+    fixture.state.forcing = forcing_template
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
@@ -1531,8 +1543,9 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
 
 def test_jax_gcm_runtime_requires_initialized_payload() -> None:
     grid = make_test_grid(name="jcm-uninitialized")
-    component = _make_jax_gcm_component(grid)
-    del cast(Any, component)._setup_state._state
+    fixture = _make_jax_gcm_fixture(grid)
+    component = fixture.component
+    del fixture.state._state
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
