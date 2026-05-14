@@ -1,7 +1,8 @@
 from datetime import datetime
 
 from setups.jax_array_helpers import transposed_host_array
-from vercor import Clock, Coupler, Exchange, RunSequence
+from vercor import Clock, Exchange, RunSequence
+from setups.coupler_helpers import add_exchanges, build_coupler
 from setups.data.era5_ocean import make_era5_ocean
 from setups.data.jcm_land import make_jcm_land
 from setups.external.jax_gcm import make_jax_gcm
@@ -48,56 +49,49 @@ if __name__ == "__main__":
     )
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
 
-    # Coupler
-    cpl = Coupler(clock=clock)
     components = [ocn, lnd, atm]
-    for component in components:
-        cpl.register(component)  # type: ignore
-
-    cpl.set_components_run_sequence(run_sequence)
+    cpl = build_coupler(
+        clock=clock,
+        components=components,
+        run_sequence=run_sequence,
+    )
 
     # Exchanges
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="OCN",
-            field_names=[
-                ("u_velocity", "v_velocity"),
-                "specific_humidity",
-                "temperature",
-                "model_level_height",
-                "net_shortwave_radiation_flux",
-                "downward_longwave_radiation_flux",
-            ],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="LND",
-            destination="ATM",
-            field_names=list(JCM_LAND_TO_ATMOSPHERE_FIELDS),
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="LND",
-            field_names=list(ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS),
-            regridder_factory=bilinear,
-        )
+    add_exchanges(
+        cpl,
+        (
+            Exchange(
+                source="ATM",
+                destination="OCN",
+                field_names=[
+                    ("u_velocity", "v_velocity"),
+                    "specific_humidity",
+                    "temperature",
+                    "model_level_height",
+                    "net_shortwave_radiation_flux",
+                    "downward_longwave_radiation_flux",
+                ],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="OCN",
+                destination="ATM",
+                field_names=["sea_surface_temperature"],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="LND",
+                destination="ATM",
+                field_names=list(JCM_LAND_TO_ATMOSPHERE_FIELDS),
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="ATM",
+                destination="LND",
+                field_names=list(ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS),
+                regridder_factory=bilinear,
+            ),
+        ),
     )
 
     cpl.initialize()

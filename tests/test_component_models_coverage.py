@@ -202,7 +202,7 @@ def test_era5_land_constructor_uses_masked_grid_and_enables_interpolation(
     component.initialize(coupler.init_context())
     _step_component(component, timedelta(hours=1), datetime(2000, 1, 1), coupler)
 
-    assert cast(Any, component).DATA_FILES["surface"] == str(fake_path)
+    assert component.setup_metadata["DATA_FILES"] == {"surface": str(fake_path)}
     assert component.settings.apply_time_interpolation
     assert component.field_spec.outputs == ("land_surface_temperature",)
     assert isinstance(component.grid.longitude, jax.Array)
@@ -260,7 +260,7 @@ def test_era5_ocean_constructor_applies_land_mask_and_reverses_latitude(
     component.initialize(coupler.init_context())
     _step_component(component, timedelta(hours=1), datetime(2000, 1, 1), coupler)
 
-    assert cast(Any, component).DATA_FILES["surface"] == str(fake_path)
+    assert component.setup_metadata["DATA_FILES"] == {"surface": str(fake_path)}
     assert component.settings.apply_time_interpolation
     assert component.field_spec.outputs == ("sea_surface_temperature",)
     assert isinstance(component.grid.longitude, jax.Array)
@@ -315,7 +315,7 @@ def test_erainterim_ocean_constructor_builds_global_masked_grid(
     component.initialize(coupler.init_context())
     _step_component(component, timedelta(hours=1), datetime(2000, 1, 1), coupler)
 
-    assert cast(Any, component).DATA_FILES["model_level"] == str(fake_path)
+    assert component.setup_metadata["DATA_FILES"] == {"model_level": str(fake_path)}
     assert component.settings.apply_time_interpolation
     assert component.field_spec.outputs == ("sea_surface_temperature",)
     assert isinstance(component.grid.longitude, jax.Array)
@@ -481,7 +481,7 @@ def test_era5_atmosphere_constructor_initialize_and_step(
     coupler = cast(Any, CoverageCouplerStub())
     component = make_era5_atmosphere()
 
-    assert cast(Any, component).DATA_FILES == {
+    assert component.setup_metadata["DATA_FILES"] == {
         "model_level": str(model_level_path),
         "surface": str(surface_path),
     }
@@ -504,10 +504,11 @@ def test_era5_atmosphere_constructor_initialize_and_step(
     assert isinstance(component.data["surface_pressure"], jax.Array)
     assert_allclose_compact(component.grid.longitude, forcing["longitude"])
     assert_allclose_compact(component.grid.latitude, np.asarray([-45.0, 0.0, 45.0]))
-    assert_allclose_compact(cast(Any, component).hyai, np.asarray([2.0, 3.0, 4.0]))
-    assert_allclose_compact(cast(Any, component).hybi, np.asarray([12.0, 13.0, 14.0]))
-    assert_allclose_compact(cast(Any, component).hyam, np.asarray([22.0, 23.0]))
-    assert_allclose_compact(cast(Any, component).hybm, np.asarray([32.0, 33.0]))
+    hybrid_coefficients = component.setup_metadata["hybrid_coefficients"]
+    assert_allclose_compact(hybrid_coefficients["hyai"], np.asarray([2.0, 3.0, 4.0]))
+    assert_allclose_compact(hybrid_coefficients["hybi"], np.asarray([12.0, 13.0, 14.0]))
+    assert_allclose_compact(hybrid_coefficients["hyam"], np.asarray([22.0, 23.0]))
+    assert_allclose_compact(hybrid_coefficients["hybm"], np.asarray([32.0, 33.0]))
     for coefficient_name in ("hyai", "hybi", "hyam", "hybm"):
         assert coefficient_name not in component.data
     assert component.data["surface_pressure"].shape == (12, 3, 2)

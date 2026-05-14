@@ -178,6 +178,11 @@ immutable runtime containers used during traced integration.
   `prefill_runtime_fields()` for ordinary output/default fields. Non-grid metadata such as
   hybrid-level coefficients belongs on component attributes or runtime payloads.
   Use
+  Factory-created setup adapters should put non-runtime setup metadata in
+  `Component.setup_metadata` rather than attaching ad-hoc attributes to the
+  component object. Examples include forcing-file provenance and diagnostic
+  coefficients that should not enter runtime field validation or JAX scan state.
+  Use
   `Component` for differentiable active models and implement
   `step_runtime_state()`. Use `DataComponent` for forcing/static data adapters
   that intentionally keep the shared no-op runtime step and do not create

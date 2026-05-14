@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Optional
 
 import jax
 import jax.numpy as jnp
@@ -199,8 +199,10 @@ def make_era5_atmosphere(
         data_files=data_files,
         initialize=initialize,
     )
-    cast(Any, component).hyai = hyai
-    cast(Any, component).hybi = hybi
-    cast(Any, component).hyam = hyam
-    cast(Any, component).hybm = hybm
+    component.setup_metadata["hybrid_coefficients"] = {
+        "hyai": hyai,
+        "hybi": hybi,
+        "hyam": hyam,
+        "hybm": hybm,
+    }
     return component

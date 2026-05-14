@@ -4,9 +4,9 @@
 4. `vercor/fluxes/utilities.py` - JAX-native scalar/array thermodynamic helpers, shared virtual-temperature conversion, and hybrid-sigma altitude kernels built on (1, 3)
 5. `vercor/fluxes/bulk_formula_cesm.py` - JAX-native atmosphere-ocean / atmosphere-ice bulk flux kernels built on (1, 3, 4)
 6. `vercor/host_arrays.py` - explicit JAX/NumPy host-transfer boundary for non-differentiable adapters and output
-7. `setups/_time_helpers.py` - shared setup-time coupling/model timestep validation for setup adapters
+7. `setups/_time_helpers.py` - shared setup-time coupling/model timestep validation, lifecycle assignment, spinup logging, forcing-index, and default-field seeding helpers for setup adapters
 8. `setups/_lazy_imports.py` - shared lazy package export helper for setup modules with optional dependencies
-9. `setups/exchange_recipes.py` - shared field-recipe constants for runnable setup exchange declarations
+9. `setups/exchange_recipes.py` and `setups/coupler_helpers.py` - shared field-recipe constants plus runnable setup orchestration helpers for registering components, applying run sequences, and adding explicit exchanges
 10. `setups/external/jax_gcm_tools.py` - existing JAX helper layer used by the JCM adapter; validated for `jax.jit` and built on (1, 4)
 11. `setups/external/jax_gcm.py` - JCM adapter boundary that stores translated kernel outputs built on (1, 2, 7, 10)
 12. `setups/external/veros_runtime_settings.py` and `setups/external/veros_gcm.py` - explicit Veros host-runtime configuration plus the Veros adapter boundary that converts translated flux outputs back to NumPy for Veros state updates built on (1, 5, 6, 7)
@@ -19,7 +19,7 @@
 19. `vercor/regridders/conservative.py` - conservative regridder wrapper over (18)
 20. `vercor/grid_masks.py` - grid identity, component lookup, land/ocean mask construction, and remap-conservation checks built on (1, 14, 19)
 21. `vercor/assets.py` - forcing asset cache/download/checksum boundary for data components
-22. `vercor/forcing_data.py` - NetCDF forcing-file read boundary for data components
+22. `vercor/forcing_data.py` - canonical NetCDF forcing-file read boundary and compatibility reader class for data components
 23. `vercor/time_selection.py` - calendar, day-slice, and periodic interpolation index helpers
 24. `setups/slab/atmosphere.py` - slab atmosphere wrapper over pure JAX bulk-flux, default-SST, and wind kernels built on (1, 14)
 25. `setups/slab/ocean.py` - slab ocean wrapper over pure JAX SST tendency kernel built on (1, 14)
@@ -38,7 +38,7 @@
 38. `vercor/runtime/contexts.py` - immutable component initialization and runtime step context payloads built on clock, run-sequence, settings helpers, and (36)
 39. `vercor/runtime/views.py` - explicit runtime component metadata/field view used by diagnostics and output built on (14)
 40. `vercor/diagnostics.py` - runtime-view means tables, plotting helpers, and plotting-only derived field helpers built on (6, 39)
-41. `vercor/components/_contracts.py`, `vercor/components/_callable_wrappers.py`, `vercor/components/_runtime_fields.py`, `vercor/components/_validation.py`, and `vercor/components/base.py` - private component contract normalization, callable-wrapper runtime internals, component-facing runtime-field adapters, setup validation, and the slim public component-author surface for active differentiable components, data-only components, host-runtime adapters, top-level authoring helpers, `from_fields()` / `from_model()` authoring facade, flexible one/two/three-argument callable steps, public setup/step context aliases, `ComponentFieldSpec` declarations and introspection, setup field-name introspection, chainable component setting updates, declared grid-field default builders, base declared-default initialization, automatic data-component output declarations, scalar-to-grid field defaults/seeds, explicit runtime contexts, canonical data-field validation, step-result application, and finalized runtime boundary hooks built on (1, 14, 15, 38)
+41. `vercor/components/_contracts.py`, `vercor/components/_callable_wrappers.py`, `vercor/components/_runtime_fields.py`, `vercor/components/_validation.py`, and `vercor/components/base.py` - private component contract normalization, callable-wrapper runtime internals, component-facing runtime-field adapters, setup validation, and the slim public component-author surface for active differentiable components, data-only components, host-runtime adapters, top-level authoring helpers, `from_fields()` / `from_model()` authoring facade, flexible one/two/three-argument callable steps, public setup/step context aliases, `ComponentFieldSpec` declarations and introspection, setup field-name introspection, explicit setup metadata, chainable component setting updates, declared grid-field default builders, base declared-default initialization, automatic data-component output declarations, scalar-to-grid field defaults/seeds, explicit runtime contexts, canonical data-field validation, step-result application, and finalized runtime boundary hooks built on (1, 14, 15, 38)
 42. `vercor/runtime/contracts.py` - runtime import/export contracts, exchange-field flattening, stable exchange mask key names, and contract construction built on exchanges and coupler errors
 43. `vercor/runtime/stores.py`, `vercor/runtime/state.py`, and `vercor/runtime/__init__.py` - immutable runtime field stores, component/coupler runtime state containers, and the internal `vercor.runtime` re-export surface built on (1, 2, 42)
 44. `vercor/runtime/time.py` - `RuntimeStepInfo` plus host-precomputed daily/monthly runtime step metadata built on clock/settings helpers and (2, 23, 43)

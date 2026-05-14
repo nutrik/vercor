@@ -171,12 +171,15 @@ class Component(ABC):
         data: internal storage for component data arrays to/from which fields
             seed the runtime state during initialization
         settings: component-specific settings
+        setup_metadata: non-runtime setup metadata for adapter provenance or
+            diagnostics that must not enter runtime field validation
     """
 
     name: str
     grid: RectilinearGrid
     data: dict[str, RuntimeArray] = field(default_factory=dict)
     settings: VercorSettings = field(default_factory=VercorSettings)
+    setup_metadata: dict[str, Any] = field(default_factory=dict)
     _field_spec: ComponentFieldSpec = field(
         default_factory=ComponentFieldSpec,
         init=False,

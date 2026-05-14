@@ -1,7 +1,8 @@
 from datetime import datetime
 
 from setups.jax_array_helpers import transposed_host_array
-from vercor import Clock, Coupler, Exchange, RunSequence
+from vercor import Clock, Exchange, RunSequence
+from setups.coupler_helpers import build_coupler
 from setups.data.erainterim_ocean import make_erainterim_ocean
 from setups.data.jcm_land import make_jcm_land
 from setups.external.jax_gcm import make_jax_gcm
@@ -46,12 +47,12 @@ if __name__ == "__main__":
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
 
     # Coupler
-    cpl = Coupler(clock=clock)
     components = [ocn, lnd, atm]
-    for component in components:
-        cpl.register(component)  # type: ignore
-
-    cpl.set_components_run_sequence(run_sequence)
+    cpl = build_coupler(
+        clock=clock,
+        components=components,
+        run_sequence=run_sequence,
+    )
 
     # Exchanges
     cpl.add_exchange(

@@ -4,7 +4,8 @@ from typing import Any, Callable
 import jax
 
 from setups.jax_array_helpers import component_vector_speed
-from vercor import Clock, Coupler, Exchange, RunSequence
+from vercor import Clock, Exchange, RunSequence
+from setups.coupler_helpers import build_coupler
 from setups.data.era5_atmosphere import make_era5_atmosphere
 from setups.data.era5_land import make_era5_land
 from setups.data.erainterim_ocean import make_erainterim_ocean
@@ -28,12 +29,12 @@ if __name__ == "__main__":
     run_sequence = RunSequence(order=["OCN", "ATM", "LND"])
 
     # Coupler
-    cpl = Coupler(clock=clock)
     components: list[Any] = [atm, ocn, lnd]
-    for component in components:
-        cpl.register(component)
-
-    cpl.set_components_run_sequence(run_sequence)
+    cpl = build_coupler(
+        clock=clock,
+        components=components,
+        run_sequence=run_sequence,
+    )
 
     # Exchanges
     # scalar fields (vector field))

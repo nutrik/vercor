@@ -11,7 +11,11 @@ import jax.numpy as jnp
 
 from vercor.jax_logging import LoggerLike, get_default_logger
 
-from setups._time_helpers import align_model_timestep
+from setups._time_helpers import (
+    assign_model_timestep_alignment,
+    runtime_forcing_index,
+    seed_grid_field_defaults,
+)
 from setups.external.camulator_state import (
     initialize_camulator,
     initialize_camulator_forcing_cursor,
@@ -370,6 +374,9 @@ def add_init_noise(
 
 
 class _CAMulatorGCMState:
+    coupling_timestep: timedelta
+    model_timestep: timedelta
+    model_substeps: int
 
     def __init__(
         self,
@@ -451,13 +458,14 @@ class _CAMulatorGCMState:
     ) -> None:
         logger = context.logger
         self.coupler_start_datetime = context.start
-        self.model_timestep = timedelta(hours=self.lead_time_periods)
-        alignment = align_model_timestep(context.dt_seconds, self.model_timestep)
-        self.coupling_timestep = alignment.coupling_timestep
+        assign_model_timestep_alignment(
+            self,
+            context.dt_seconds,
+            timedelta(hours=self.lead_time_periods),
+        )
         self.spinup_steps = int(
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
-        self.model_substeps = alignment.model_substeps
 
         # Add noise to initial conditions if requested
         if self.init_noise is not None:
@@ -514,11 +522,10 @@ class _CAMulatorGCMState:
         self.forecast_hour = 1
         self.timestep_counter = 0
 
-        component.seed_fields(
-            component.grid_field_defaults(
-                _CAMULATOR_RUNTIME_FIELD_NAMES,
-                policy=context.settings,
-            )
+        seed_grid_field_defaults(
+            component,
+            _CAMULATOR_RUNTIME_FIELD_NAMES,
+            context,
         )
 
     def step(
@@ -539,7 +546,11 @@ class _CAMulatorGCMState:
         prediction = None
         last_total_surface_temperature: RuntimeArray | None = None
 
-        block_start = self.start_ix + self.timestep_counter * self.model_substeps
+        block_start = runtime_forcing_index(
+            start_ix=self.start_ix,
+            timestep_counter=self.timestep_counter,
+            model_substeps=self.model_substeps,
+        )
         block_end = block_start + self.model_substeps
 
         # Load chunk of dynamic forcing data

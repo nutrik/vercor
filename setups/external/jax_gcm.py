@@ -33,7 +33,11 @@ from vercor.components.base import (
     differentiable_component,
 )
 from vercor.exceptions import ComponentError, CouplerError
-from setups._time_helpers import align_model_timestep
+from setups._time_helpers import (
+    assign_model_timestep_alignment,
+    run_logged_spinup,
+    seed_grid_field_defaults,
+)
 from setups.external.jax_gcm_tools import (
     change_jcm_parameter_values,
     mean_leaf,
@@ -269,6 +273,8 @@ class _JAXGCMState:
     _state: JCMState
     forcing: ForcingData
     data: dict[str, RuntimeArray]
+    coupling_timestep: timedelta
+    model_substeps: int
 
     def __init__(
         self,
@@ -366,8 +372,11 @@ class _JAXGCMState:
         context: ComponentInitContext,
     ) -> None:
         self.settings = context.settings
-        alignment = align_model_timestep(context.dt_seconds, self.model_timestep)
-        self.coupling_timestep = alignment.coupling_timestep
+        assign_model_timestep_alignment(
+            self,
+            context.dt_seconds,
+            self.model_timestep,
+        )
         self.spinup_steps = int(
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
@@ -391,33 +400,37 @@ class _JAXGCMState:
 
         self._step_function = self._generate_step_function(jitted=self.jitted)
 
-        component.seed_fields(
-            component.grid_field_defaults(
-                _jax_gcm_default_field_names(
-                    include_total_surface_temperature=False,
-                ),
-                overrides={
-                    "sea_surface_temperature": _REFERENCE_SURFACE_TEMPERATURE,
-                },
-                policy=context.settings,
-            )
+        seed_grid_field_defaults(
+            component,
+            _jax_gcm_default_field_names(
+                include_total_surface_temperature=False,
+            ),
+            context,
+            overrides={
+                "sea_surface_temperature": _REFERENCE_SURFACE_TEMPERATURE,
+            },
         )
 
         self._predictions_list = []
 
         if self.do_spinup and "OCN" in context.run_sequence.order:
-            context.logger.info(
-                f" Performing JCM spinup for {self.spinup_time} day(s)..."
-            )
-            # Spin-up from the default JCM forcing
-            for i in range(self.spinup_steps):
-                context.logger.info(f" JCM spinup step {i+1} / {self.spinup_steps}")
+
+            def spinup_step(step_number: int) -> None:
+                _ = step_number
                 _new_state, _predictions = self._step_function(
                     self._state,
                     self.forcing,
                 )
                 self._state = _new_state
                 self._predictions_list.append(_predictions)
+
+            run_logged_spinup(
+                steps=self.spinup_steps,
+                logger=context.logger,
+                intro_message=f" Performing JCM spinup for {self.spinup_time} day(s)...",
+                step_message=lambda step, total: f" JCM spinup step {step} / {total}",
+                step=spinup_step,
+            )
 
     def create_runtime_payload(self) -> JAXGCMRuntimePayload:
         """Return immutable JCM state and forcing for runtime execution."""

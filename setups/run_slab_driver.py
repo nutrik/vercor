@@ -4,7 +4,8 @@ from typing import Any, cast
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from vercor import Clock, Coupler, Exchange, RunSequence
+from vercor import Clock, Exchange, RunSequence
+from setups.coupler_helpers import build_coupler
 from setups.slab.atmosphere import make_slab_atmosphere
 from setups.slab.land import make_slab_land
 from setups.slab.ocean import make_slab_ocean
@@ -46,12 +47,12 @@ if __name__ == "__main__":
     run_sequence = RunSequence(order=["OCN", "ATM", "ICE", "LND"])
 
     # Coupler
-    cpl = Coupler(clock=clock)
     components: list[Any] = [atm, ocn, ice, lnd]
-    for component in components:
-        cpl.register(component)
-
-    cpl.set_components_run_sequence(run_sequence)
+    cpl = build_coupler(
+        clock=clock,
+        components=components,
+        run_sequence=run_sequence,
+    )
 
     # Exchanges
     # scalar fields (vector field))

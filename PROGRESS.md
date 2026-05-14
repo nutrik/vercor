@@ -1,5 +1,51 @@
 # 2026-05-14
 
+## Maintainability Audit Refactor Implementation
+
+- Consolidated NetCDF forcing reads behind `vercor.forcing_data.read_forcing`;
+  `setups.data.forcing.read_forcing` and `ComponentForcingData._read_forcing`
+  now share the same implementation while preserving compatibility error text.
+- Added explicit `Component.setup_metadata` for setup-only metadata. Time
+  interpolated data components store `DATA_FILES` there, and ERA5 atmosphere
+  stores hybrid coefficients there instead of attaching ad-hoc attributes to
+  factory-created components.
+- Extended setup lifecycle helpers with common timestep assignment, spinup
+  logging, forcing-index calculation, and default-field seeding primitives.
+  JAXGCM, Veros, CAMulator atmosphere, and CAMulator land use the helpers where
+  behavior is identical.
+- Added `setups.coupler_helpers` and routed runnable setup component
+  registration/run-sequence setup through `build_coupler(...)`; exchange
+  recipes remain explicit in each script.
+
+## Validation (Maintainability Audit Refactor Implementation, 2026-05-14)
+
+- `conda run -n scipy pytest tests/test_component_base_coverage.py::test_component_forcing_data_read_and_runtime_write_round_trip tests/test_component_models_coverage.py::test_era5_land_constructor_uses_masked_grid_and_enables_interpolation tests/test_component_models_coverage.py::test_era5_ocean_constructor_applies_land_mask_and_reverses_latitude tests/test_component_models_coverage.py::test_era5_atmosphere_constructor_initialize_and_step tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py::test_setup_components_use_explicit_metadata_mapping tests/test_api_boundaries.py::test_setup_coupler_helpers_register_components_and_add_exchanges -q --tb=short`
+  - failed before implementation on missing lifecycle helper imports
+  - passed after implementing shared readers, metadata, lifecycle helpers, and
+    coupler setup helpers
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_data_component_kernels.py tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py -q --tb=short`
+  - passed after implementation
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed after implementation
+- `conda run -n scipy black vercor setups tests`
+  - first reformatted `setups/external/jax_gcm.py`,
+    `setups/external/veros_gcm.py`, and
+    `tests/test_component_models_coverage.py`
+  - final run left all 130 files unchanged
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - first reported missing setup-state attribute annotations plus two
+    test-only typing issues after introducing shared lifecycle helpers
+  - passed after adding explicit annotations and tightening tests
+    (`130 source files`)
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed after implementation
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Setup Lifecycle Helper Consolidation
 
 - Added `setups._time_helpers.align_model_timestep(...)` as the shared

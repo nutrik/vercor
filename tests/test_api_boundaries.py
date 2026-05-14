@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from inspect import signature
 from pathlib import Path
 import ast
@@ -12,9 +13,12 @@ import vercor
 import vercor.components as components_module
 from tests._coverage_support import make_test_grid
 from vercor.components.base import Component, DataComponent, HostRuntimeComponent
+from vercor.clock import Clock
+from vercor.exchange import Exchange
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.run_sequence import RunSequence
 from vercor.runtime import RuntimeComponentState, RuntimeFieldStore
+from vercor.regridders import bilinear
 
 
 @pytest.mark.fast_always
@@ -192,6 +196,60 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "_callable_wrappers" not in components_module.__all__
     assert "_runtime_fields" not in components_module.__all__
     assert "_validation" not in components_module.__all__
+
+
+@pytest.mark.fast_always
+def test_setup_components_use_explicit_metadata_mapping() -> None:
+    component = DataComponent(
+        name="ATM",
+        grid=make_test_grid(name="metadata-boundary"),
+    )
+
+    component.setup_metadata["DATA_FILES"] = {"surface": "surface.nc"}
+
+    assert component.setup_metadata["DATA_FILES"] == {"surface": "surface.nc"}
+
+    helper_source = Path("setups/data/_component_helpers.py").read_text(
+        encoding="utf-8"
+    )
+    era5_atmosphere_source = Path("setups/data/era5_atmosphere.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "cast(Any, component).DATA_FILES" not in helper_source
+    assert "cast(Any, component).hyai" not in era5_atmosphere_source
+    assert "cast(Any, component).hybi" not in era5_atmosphere_source
+    assert "cast(Any, component).hyam" not in era5_atmosphere_source
+    assert "cast(Any, component).hybm" not in era5_atmosphere_source
+
+
+@pytest.mark.fast_always
+def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
+    from setups.coupler_helpers import add_exchanges, build_coupler
+
+    grid = make_test_grid(name="shared")
+    ocean = DataComponent(name="OCN", grid=grid)
+    atmosphere = DataComponent(name="ATM", grid=grid)
+    clock = Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1)
+    run_sequence = RunSequence(order=["OCN", "ATM"])
+    exchange = Exchange(
+        source="OCN",
+        destination="ATM",
+        field_names=["sea_surface_temperature"],
+        regridder_factory=bilinear,
+    )
+
+    coupler = build_coupler(
+        clock=clock,
+        components=(ocean, atmosphere),
+        run_sequence=run_sequence,
+    )
+    add_exchanges(coupler, (exchange,))
+
+    assert coupler.clock is clock
+    assert tuple(coupler.components) == ("OCN", "ATM")
+    assert coupler.run_sequence is run_sequence
+    assert coupler.exchanges == [exchange]
 
 
 @pytest.mark.fast_always

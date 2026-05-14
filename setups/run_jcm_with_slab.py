@@ -3,7 +3,8 @@ from datetime import datetime
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from vercor import Clock, Coupler, Exchange, RunSequence
+from vercor import Clock, Exchange, RunSequence
+from setups.coupler_helpers import build_coupler
 from setups.external.jax_gcm import make_jax_gcm
 from setups.slab.land import make_slab_land
 from setups.slab.ocean import make_slab_ocean
@@ -62,12 +63,12 @@ if __name__ == "__main__":
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
 
     # Coupler
-    cpl = Coupler(clock=clock)
     components = [atm, ocn, lnd]
-    for component in components:
-        cpl.register(component)  # type: ignore
-
-    cpl.set_components_run_sequence(run_sequence)
+    cpl = build_coupler(
+        clock=clock,
+        components=components,
+        run_sequence=run_sequence,
+    )
 
     # Exchanges
     # scalar fields (vector field))

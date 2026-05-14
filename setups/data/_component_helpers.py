@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any, cast
 
 from vercor.components.base import DataComponent, data_component
 from vercor.grid import RectilinearGrid
@@ -27,5 +26,5 @@ def time_interpolated_data_component(
     )
     component.declare_fields(outputs=outputs)
     component.update_settings(apply_time_interpolation=True)
-    cast(Any, component).DATA_FILES = dict(data_files)
+    component.setup_metadata["DATA_FILES"] = dict(data_files)
     return component

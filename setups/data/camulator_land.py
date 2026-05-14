@@ -6,7 +6,10 @@ import jax
 from jax.typing import ArrayLike
 
 from vercor.dtypes import as_jax_real_array
-from setups._time_helpers import align_model_timestep
+from setups._time_helpers import (
+    assign_model_timestep_alignment,
+    runtime_forcing_index,
+)
 from setups.external.camulator_state import (
     initialize_camulator_forcing_cursor,
     load_camulator_forcing_context,
@@ -85,10 +88,11 @@ def make_camulator_land(
     ) -> None:
         logger = context.logger
         state.coupler_start_datetime = context.start
-        state.model_timestep = timedelta(hours=state.lead_time_periods)
-        alignment = align_model_timestep(context.dt_seconds, state.model_timestep)
-        state.coupling_timestep = alignment.coupling_timestep
-        state.model_substeps = alignment.model_substeps
+        assign_model_timestep_alignment(
+            state,
+            context.dt_seconds,
+            timedelta(hours=state.lead_time_periods),
+        )
 
         state.dynamic_ds = state.forcing_ds[
             [
@@ -121,7 +125,11 @@ def make_camulator_land(
         if time is None:
             return {}
 
-        idx = state.start_ix + state.timestep_counter * state.model_substeps
+        idx = runtime_forcing_index(
+            start_ix=state.start_ix,
+            timestep_counter=state.timestep_counter,
+            model_substeps=state.model_substeps,
+        )
         dynamic_ds = cast(Any, state.dynamic_ds)
         ts = dynamic_ds.isel(time=idx).load()
 

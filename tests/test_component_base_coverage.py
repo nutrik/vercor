@@ -15,6 +15,7 @@ import vercor.components as components_module
 import vercor.components.base as base_module
 from tests._coverage_support import DummyComponent, make_test_grid
 from tests.assertions import assert_allclose_compact
+from setups.data.forcing import read_forcing
 from setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.clock import Clock
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
@@ -1470,20 +1471,33 @@ def test_component_forcing_data_read_and_runtime_write_round_trip(
 
     normal_read = reader._read_forcing("foo", "sample")
     flipped_read = reader._read_forcing("foo", "sample", flip_y=True)
+    functional_read = read_forcing({"sample": str(path)}, "foo", "sample")
+    functional_flipped_read = read_forcing(
+        {"sample": str(path)},
+        "foo",
+        "sample",
+        flip_y=True,
+    )
 
     assert isinstance(normal_read, jax.Array)
     assert isinstance(flipped_read, jax.Array)
     assert_allclose_compact(normal_read, source.T)
+    assert_allclose_compact(functional_read, normal_read)
     assert_allclose_compact(
         flipped_read,
         np.flip(source.T, axis=1),
     )
+    assert_allclose_compact(functional_flipped_read, flipped_read)
 
     with pytest.raises(KeyError, match="Provided 'where' key 'missing'"):
         reader._read_forcing("foo", "missing")
+    with pytest.raises(KeyError, match="Provided 'where' key 'missing'"):
+        read_forcing({"sample": str(path)}, "foo", "missing")
 
     with pytest.raises(KeyError, match="Provided 'where' key 'sample'"):
         reader._read_forcing("bar", "sample")
+    with pytest.raises(KeyError, match="Provided 'where' key 'sample'"):
+        read_forcing({"sample": str(path)}, "bar", "sample")
 
     broken = tmp_path / "broken.nc"
     broken.write_text("not-a-netcdf-file", encoding="utf-8")
@@ -1491,6 +1505,8 @@ def test_component_forcing_data_read_and_runtime_write_round_trip(
 
     with pytest.raises(RuntimeError, match="Error reading variable 'foo'"):
         reader._read_forcing("foo", "broken")
+    with pytest.raises(RuntimeError, match="Error reading variable 'foo'"):
+        read_forcing({"broken": str(broken)}, "foo", "broken")
 
     state = RuntimeComponentState(
         data=RuntimeFieldStore.empty(),

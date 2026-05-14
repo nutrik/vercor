@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 from datetime import timedelta
 
-from setups._time_helpers import align_model_timestep
+from setups._time_helpers import assign_model_timestep_alignment, run_logged_spinup
 from setups.external.veros_runtime_settings import configure_veros_runtime
 from vercor.components.base import (
     ComponentStepContext,
@@ -379,6 +379,9 @@ class _VerosGCMState:
     name: str
     data: dict[str, RuntimeArray]
     settings: VercorSettings
+    coupling_timestep: timedelta
+    model_timestep: timedelta
+    model_substeps: int
 
     def __init__(
         self,
@@ -442,23 +445,28 @@ class _VerosGCMState:
         context: ComponentInitContext,
     ) -> None:
         dt_seconds = context.dt_seconds
-        alignment = align_model_timestep(
+        assign_model_timestep_alignment(
+            self,
             dt_seconds,
             timedelta(seconds=float(self.dt_tracer)),
             coupling_name="dt",
             model_name="dt_tracer",
         )
-        self.model_substeps = alignment.model_substeps
 
         # Initial spinup is performed with ERA-Interim (default) atmospheric forcing
         if self.do_spinup and "ATM" in context.run_sequence.order:
-            # Do it similar to CESM spinup when coupling with atmosphere is on
-            context.logger.info(
-                f" Performing Veros spinup for {self.spinup_time} day(s)..."
-            )
-            for i in range(self.spinup_steps):
-                context.logger.info(f" Step {i+1} / {self.spinup_steps}")
+
+            def spinup_step(step_number: int) -> None:
+                _ = step_number
                 self._veros_state = self._step_function(self._veros_state)
+
+            run_logged_spinup(
+                steps=self.spinup_steps,
+                logger=context.logger,
+                intro_message=f" Performing Veros spinup for {self.spinup_time} day(s)...",
+                step_message=lambda step, total: f" Step {step} / {total}",
+                step=spinup_step,
+            )
 
         component.seed_field(
             "sea_surface_temperature",
