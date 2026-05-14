@@ -284,7 +284,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def step_host_runtime_state" not in camulator_source
     assert "def make_camulator_land" in camulator_land_source
     assert "load_camulator_forcing_context" in camulator_land_source
-    assert "initialize_camulator" not in camulator_land_source
+    assert "initialize_camulator(" not in camulator_land_source
     assert "setups.external.camulator import" not in camulator_land_source
     assert "from setups.external.veros_runtime_settings import *" not in veros_source
     assert (

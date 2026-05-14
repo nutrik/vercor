@@ -18,6 +18,7 @@ import setups.external.jax_gcm as jax_gcm_module
 import setups.external.veros_gcm as veros_gcm_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
+from vercor.components.base import DataComponent
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.runtime import (
     RuntimeComponentContract,
@@ -494,16 +495,21 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
         lambda jitted: (lambda state, forcing: (state, "unused")),
     )
 
+    hook_component = DataComponent.from_fields(
+        name="ATM",
+        grid=component.grid,
+        settings=component.settings,
+    )
     coupler = _make_coupler(dt_seconds=3600.0, run_order=["OCN"])
-    component.initialize(cast(Any, component), coupler)
+    component.initialize(cast(Any, hook_component), coupler)
 
     assert component.coupling_timestep == timedelta(hours=1)
     assert component.spinup_steps == 2
     assert physics_calls["zeros"] == ((2, 3), 2)
     assert component.forcing == "provided-forcing"
     assert len(component._predictions_list) == 2
-    assert isinstance(component.data["sea_surface_temperature"], jax.Array)
-    assert component.data["sea_surface_temperature"].shape == component.grid.shape
+    assert isinstance(hook_component.data["sea_surface_temperature"], jax.Array)
+    assert hook_component.data["sea_surface_temperature"].shape == component.grid.shape
 
 
 def test_jax_gcm_initialize_builds_default_forcing_when_missing(
@@ -557,8 +563,13 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
         lambda jitted: (lambda state, forcing_data: (state, "unused")),
     )
 
+    hook_component = DataComponent.from_fields(
+        name="ATM",
+        grid=component.grid,
+        settings=component.settings,
+    )
     component.initialize(
-        cast(Any, component),
+        cast(Any, hook_component),
         _make_coupler(dt_seconds=3600.0, run_order=["ATM"]),
     )
 
@@ -670,8 +681,13 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     runtime_incoming: dict[str, Any] = {}
     runtime_outgoing: dict[str, Any] = {}
     runtime_contract = RuntimeComponentContract()
+    hook_component = DataComponent.from_fields(
+        name="ATM",
+        grid=component.grid,
+        settings=component.settings,
+    )
     component.prefill_runtime_state_fields(
-        cast(Any, component),
+        cast(Any, hook_component),
         runtime_data,
         runtime_incoming,
         runtime_outgoing,
@@ -1107,14 +1123,19 @@ def test_veros_initialize_can_spin_up_and_extract_surface_temperature() -> None:
 
     component._step_function = fake_step_function
 
+    hook_component = DataComponent.from_fields(
+        name="OCN",
+        grid=component.grid,
+        settings=component.settings,
+    )
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
-    component.initialize(cast(Any, component), coupler)
+    component.initialize(cast(Any, hook_component), coupler)
 
     assert component.model_substeps == 2
     assert step_calls["count"] == 2
-    assert isinstance(component.data["sea_surface_temperature"], jax.Array)
+    assert isinstance(hook_component.data["sea_surface_temperature"], jax.Array)
     assert_allclose_compact(
-        component.data["sea_surface_temperature"],
+        hook_component.data["sea_surface_temperature"],
         np.full((4, 4), 283.15),
     )
 

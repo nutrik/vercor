@@ -1,5 +1,59 @@
 # 2026-05-14
 
+## Setup Lifecycle Helper Consolidation
+
+- Added `setups._time_helpers.align_model_timestep(...)` as the shared
+  setup-time validation path for coupling/model timestep divisibility in
+  JAXGCM, Veros, CAMulator atmosphere, and CAMulator land adapters.
+- Added `setups.external.camulator_state.initialize_camulator_forcing_cursor(...)`
+  so CAMulator atmosphere and CAMulator land share forcing index lookup,
+  initialization timestamp formatting, and start-time mismatch warnings without
+  importing the full CAMulator adapter from the land forcing module.
+- Removed private setup-state borrowing of `Component` methods from
+  `_JAXGCMState` and `_VerosGCMState`; tests now pass real component objects
+  into lifecycle hooks to match the production factory path.
+- Added `setups.exchange_recipes` constants for repeated runnable setup exchange
+  field recipes while leaving each script's orchestration explicit.
+- Added `setups.data._component_helpers.time_interpolated_data_component(...)`
+  for ERA5/ERA-Interim time-interpolated data adapters, preserving
+  adapter-specific field preparation in each module.
+- Updated `DEPENDENCIES.md` for the new helper modules.
+- Failed approaches / corrections:
+  - The first lifecycle-helper test run failed at import because the planned
+    helper module did not exist yet; after adding the helper, the boundary test
+    correctly failed on remaining private `Component` method borrowing.
+  - The first full-suite run exposed an over-broad source-boundary assertion:
+    `initialize_camulator_forcing_cursor` intentionally contains the old
+    substring. The assertion now forbids the heavy `initialize_camulator(` call
+    shape instead.
+
+## Validation (Setup Lifecycle Helper Consolidation, 2026-05-14)
+
+- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py::test_private_setup_state_objects_do_not_borrow_component_methods -q --tb=short`
+  - failed as expected before implementation on missing helper/boundary paths
+  - passed after adding helpers and removing private method borrowing
+- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py tests/test_data_component_kernels.py tests/test_external_components_coverage.py::test_jax_gcm_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up tests/test_external_components_coverage.py::test_jax_gcm_initialize_builds_default_forcing_when_missing tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_veros_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_veros_initialize_can_spin_up_and_extract_surface_temperature tests/test_external_components_coverage.py::test_veros_step_sets_forcing_fields_and_refreshes_sst tests/test_external_components_coverage.py::test_veros_step_nan_cleans_forcing_fields_before_set_variable tests/test_camulator_component_kernels.py::test_camulator_land_stores_jax_runtime_arrays tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
+  - passed after implementation
+- `conda run -n scipy black vercor setups tests`
+  - passed
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning; final run left all 129 files unchanged
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - first reported one unused import in the new helper test
+  - passed after removing it (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - first reported the CAMulator cursor helper's start-time parameter was typed
+    too narrowly for VerCOR model-date clocks
+  - passed after widening that parameter (`129 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed after implementation
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - first failed on the over-broad CAMulator land boundary assertion noted
+    above
+  - passed after narrowing the assertion
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Conservative Architectural Redundancy Cleanup
 
 - Added `setups.data._field_helpers.mask_time_last_surface_field(...)` as the

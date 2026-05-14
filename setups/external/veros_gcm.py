@@ -6,9 +6,9 @@ import jax
 import jax.numpy as jnp
 from datetime import timedelta
 
+from setups._time_helpers import align_model_timestep
 from setups.external.veros_runtime_settings import configure_veros_runtime
 from vercor.components.base import (
-    Component,
     ComponentStepContext,
     HostRuntimeComponent,
     host_component,
@@ -379,8 +379,6 @@ class _VerosGCMState:
     name: str
     data: dict[str, RuntimeArray]
     settings: VercorSettings
-    seed_field = Component.seed_field
-    seed_fields = Component.seed_fields
 
     def __init__(
         self,
@@ -444,12 +442,13 @@ class _VerosGCMState:
         context: ComponentInitContext,
     ) -> None:
         dt_seconds = context.dt_seconds
-        self.model_substeps = int(dt_seconds // self.dt_tracer)
-
-        if dt_seconds % self.dt_tracer != 0:
-            raise ValueError(
-                f"dt_tracer ({self.dt_tracer}) must be a multiple of dt ({dt_seconds})"
-            )
+        alignment = align_model_timestep(
+            dt_seconds,
+            timedelta(seconds=float(self.dt_tracer)),
+            coupling_name="dt",
+            model_name="dt_tracer",
+        )
+        self.model_substeps = alignment.model_substeps
 
         # Initial spinup is performed with ERA-Interim (default) atmospheric forcing
         if self.do_spinup and "ATM" in context.run_sequence.order:

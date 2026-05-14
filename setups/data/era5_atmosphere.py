@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jax.typing import ArrayLike
 
-from vercor.components.base import DataComponent, data_component
+from vercor.components.base import DataComponent
 from vercor.dtypes import as_jax_real_array
 from vercor.field_layout import (
     canonicalize_time_last_level_field,
@@ -21,6 +21,7 @@ from vercor.grid import RectilinearGrid
 from vercor.runtime.contexts import ComponentInitContext
 from vercor.settings import VercorSettings
 from vercor.assets import get_forcing_data
+from setups.data._component_helpers import time_interpolated_data_component
 from setups.data.forcing import read_forcing as _read_forcing
 
 _ERA5_ATMOSPHERE_FIELD_NAMES = (
@@ -190,15 +191,14 @@ def make_era5_atmosphere(
             }
         )
 
-    component = data_component(
+    component = time_interpolated_data_component(
         name=name,
         grid=grid,
         fields=fields,
+        outputs=_ERA5_ATMOSPHERE_FIELD_NAMES,
+        data_files=data_files,
         initialize=initialize,
     )
-    component.declare_fields(outputs=_ERA5_ATMOSPHERE_FIELD_NAMES)
-    component.update_settings(apply_time_interpolation=True)
-    cast(Any, component).DATA_FILES = data_files
     cast(Any, component).hyai = hyai
     cast(Any, component).hybi = hybi
     cast(Any, component).hyam = hyam

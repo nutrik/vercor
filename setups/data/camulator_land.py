@@ -6,9 +6,10 @@ import jax
 from jax.typing import ArrayLike
 
 from vercor.dtypes import as_jax_real_array
+from setups._time_helpers import align_model_timestep
 from setups.external.camulator_state import (
+    initialize_camulator_forcing_cursor,
     load_camulator_forcing_context,
-    parse_datetime_from_config,
 )
 
 from vercor.grid import RectilinearGrid
@@ -84,19 +85,10 @@ def make_camulator_land(
     ) -> None:
         logger = context.logger
         state.coupler_start_datetime = context.start
-        state.coupling_timestep = timedelta(seconds=context.dt_seconds)
-
         state.model_timestep = timedelta(hours=state.lead_time_periods)
-        state.model_substeps = int(
-            state.coupling_timestep.total_seconds()
-            // state.model_timestep.total_seconds()
-        )
-
-        if state.coupling_timestep % state.model_timestep != timedelta(days=0):
-            raise ValueError(
-                f"model_timestep ({state.model_timestep}) must be a "
-                f"multiple of coupling_timestep ({state.coupling_timestep})"
-            )
+        alignment = align_model_timestep(context.dt_seconds, state.model_timestep)
+        state.coupling_timestep = alignment.coupling_timestep
+        state.model_substeps = alignment.model_substeps
 
         state.dynamic_ds = state.forcing_ds[
             [
@@ -106,21 +98,14 @@ def make_camulator_land(
 
         # IMPORTANT: Use the config's datetime object directly for xarray lookup
         # It might be cftime.DatetimeNoLeap, which xarray expects
-        start_datetime_raw = state.conf["predict"]["start_datetime"]
-        loc = state.dynamic_ds.indexes["time"].get_loc(start_datetime_raw)
-        state.start_ix = loc.start if isinstance(loc, slice) else loc
-        logger.info(f"Starting integration at time index: {state.start_ix}")
-
-        # Now convert to Python datetime for output formatting (if it's a string or cftime)
-        init_dt = parse_datetime_from_config(state.conf)
-        state.init_str = init_dt.strftime("%Y-%m-%dT%HZ")
-
-        if state.coupler_start_datetime != init_dt:
-            logger.warning(
-                f"Coupler start datetime ({state.coupler_start_datetime}) does not match "
-                f"CAMulator forcing start datetime ({start_datetime_raw}). "
-                f"Using CAMulator start datetime for indexing."
-            )
+        cursor = initialize_camulator_forcing_cursor(
+            conf=state.conf,
+            dynamic_ds=state.dynamic_ds,
+            coupler_start_datetime=state.coupler_start_datetime,
+            logger=logger,
+        )
+        state.start_ix = cursor.start_ix
+        state.init_str = cursor.init_str
 
         state.timestep_counter = 0
 

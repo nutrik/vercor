@@ -277,6 +277,25 @@ def test_setup_modules_do_not_subclass_component_contracts() -> None:
 
 
 @pytest.mark.fast_always
+def test_private_setup_state_objects_do_not_borrow_component_methods() -> None:
+    forbidden_markers = (
+        "grid_field_defaults = Component.",
+        "seed_field = Component.",
+        "seed_fields = Component.",
+        "prefill_runtime_fields = Component.",
+    )
+    for path in (
+        Path("setups/external/jax_gcm.py"),
+        Path("setups/external/veros_gcm.py"),
+        Path("setups/external/camulator.py"),
+        Path("setups/data/camulator_land.py"),
+    ):
+        source = path.read_text(encoding="utf-8")
+        for marker in forbidden_markers:
+            assert marker not in source, f"{path} borrows {marker}"
+
+
+@pytest.mark.fast_always
 def test_data_and_host_factories_return_core_contract_instances() -> None:
     from setups.data.era5_land import make_era5_land
     from setups.external.camulator import make_camulator_gcm

@@ -4,6 +4,7 @@ from vercor import Clock, Coupler, Exchange, RunSequence
 from setups.data.era5_atmosphere import make_era5_atmosphere
 from setups.data.era5_land import make_era5_land
 from setups.external.veros_gcm import make_veros_gcm
+from setups.exchange_recipes import ATMOSPHERE_TO_VEROS_FORCING_FIELDS
 from vercor.regridders import bilinear
 
 if __name__ == "__main__":
@@ -33,16 +34,7 @@ if __name__ == "__main__":
         Exchange(
             source="ATM",
             destination="OCN",
-            field_names=[
-                ("u_velocity", "v_velocity"),
-                "specific_humidity",
-                "model_level_height",
-                "density",
-                "potential_temperature",
-                "temperature",
-                "net_shortwave_radiation_flux",
-                "downward_longwave_radiation_flux",
-            ],
+            field_names=list(ATMOSPHERE_TO_VEROS_FORCING_FIELDS),
             regridder_factory=bilinear,
         )
     )

@@ -16,6 +16,7 @@ import os
 import yaml
 import xarray as xr
 import torch
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional, Literal
 
@@ -185,6 +186,46 @@ def parse_datetime_from_config(conf: dict[str, Any]) -> datetime:
         raw_dt.hour,
         raw_dt.minute,
         raw_dt.second,
+    )
+
+
+@dataclass(frozen=True)
+class CAMulatorForcingCursor:
+    """Time-index cursor for CAMulator forcing datasets."""
+
+    start_ix: int
+    init_datetime: datetime
+    init_str: str
+
+
+def initialize_camulator_forcing_cursor(
+    *,
+    conf: dict[str, Any],
+    dynamic_ds: Any,
+    coupler_start_datetime: object,
+    logger: Any,
+) -> CAMulatorForcingCursor:
+    """Initialize CAMulator forcing time indexing from config and xarray indexes."""
+
+    start_datetime_raw = conf["predict"]["start_datetime"]
+    loc = dynamic_ds.indexes["time"].get_loc(start_datetime_raw)
+    start_ix = loc.start if isinstance(loc, slice) else int(loc)
+    logger.info(f"Starting integration at time index: {start_ix}")
+
+    init_datetime = parse_datetime_from_config(conf)
+    init_str = init_datetime.strftime("%Y-%m-%dT%HZ")
+
+    if coupler_start_datetime != init_datetime:
+        logger.warning(
+            f"Coupler start datetime ({coupler_start_datetime}) does not match "
+            f"CAMulator forcing start datetime ({start_datetime_raw}). "
+            f"Using CAMulator start datetime for indexing."
+        )
+
+    return CAMulatorForcingCursor(
+        start_ix=start_ix,
+        init_datetime=init_datetime,
+        init_str=init_str,
     )
 
 

@@ -33,6 +33,7 @@ from vercor.components.base import (
     differentiable_component,
 )
 from vercor.exceptions import ComponentError, CouplerError
+from setups._time_helpers import align_model_timestep
 from setups.external.jax_gcm_tools import (
     change_jcm_parameter_values,
     mean_leaf,
@@ -268,9 +269,6 @@ class _JAXGCMState:
     _state: JCMState
     forcing: ForcingData
     data: dict[str, RuntimeArray]
-    grid_field_defaults = Component.grid_field_defaults
-    seed_fields = Component.seed_fields
-    prefill_runtime_fields = Component.prefill_runtime_fields
 
     def __init__(
         self,
@@ -368,16 +366,11 @@ class _JAXGCMState:
         context: ComponentInitContext,
     ) -> None:
         self.settings = context.settings
-        self.coupling_timestep = timedelta(seconds=context.dt_seconds)
+        alignment = align_model_timestep(context.dt_seconds, self.model_timestep)
+        self.coupling_timestep = alignment.coupling_timestep
         self.spinup_steps = int(
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
-
-        if self.coupling_timestep % self.model_timestep != timedelta(days=0):
-            raise ValueError(
-                f"model_timestep ({self.model_timestep}) must be a "
-                f"multiple of coupling_timestep ({self.coupling_timestep})"
-            )
 
         _modal_state = self.model._prepare_initial_modal_state()
         self._state = JCMState(

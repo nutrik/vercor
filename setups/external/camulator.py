@@ -11,9 +11,10 @@ import jax.numpy as jnp
 
 from vercor.jax_logging import LoggerLike, get_default_logger
 
+from setups._time_helpers import align_model_timestep
 from setups.external.camulator_state import (
     initialize_camulator,
-    parse_datetime_from_config,
+    initialize_camulator_forcing_cursor,
     StateVariableAccessor,
 )
 
@@ -450,21 +451,13 @@ class _CAMulatorGCMState:
     ) -> None:
         logger = context.logger
         self.coupler_start_datetime = context.start
-        self.coupling_timestep = timedelta(seconds=context.dt_seconds)
+        self.model_timestep = timedelta(hours=self.lead_time_periods)
+        alignment = align_model_timestep(context.dt_seconds, self.model_timestep)
+        self.coupling_timestep = alignment.coupling_timestep
         self.spinup_steps = int(
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
-        self.model_timestep = timedelta(hours=self.lead_time_periods)
-        self.model_substeps = int(
-            self.coupling_timestep.total_seconds()
-            // self.model_timestep.total_seconds()
-        )
-
-        if self.coupling_timestep % self.model_timestep != timedelta(days=0):
-            raise ValueError(
-                f"model_timestep ({self.model_timestep}) must be a "
-                f"multiple of coupling_timestep ({self.coupling_timestep})"
-            )
+        self.model_substeps = alignment.model_substeps
 
         # Add noise to initial conditions if requested
         if self.init_noise is not None:
@@ -505,21 +498,14 @@ class _CAMulatorGCMState:
 
         # IMPORTANT: Use the config's datetime object directly for xarray lookup
         # It might be cftime.DatetimeNoLeap, which xarray expects
-        start_datetime_raw = self.conf["predict"]["start_datetime"]
-        loc = self.dynamic_ds.indexes["time"].get_loc(start_datetime_raw)
-        self.start_ix = loc.start if isinstance(loc, slice) else loc
-        logger.info(f"Starting integration at time index: {self.start_ix}")
-
-        # Now convert to Python datetime for output formatting (if it's a string or cftime)
-        init_dt = parse_datetime_from_config(self.conf)
-        self.init_str = init_dt.strftime("%Y-%m-%dT%HZ")
-
-        if self.coupler_start_datetime != init_dt:
-            logger.warning(
-                f"Coupler start datetime ({self.coupler_start_datetime}) does not match "
-                f"CAMulator forcing start datetime ({start_datetime_raw}). "
-                f"Using CAMulator start datetime for indexing."
-            )
+        cursor = initialize_camulator_forcing_cursor(
+            conf=self.conf,
+            dynamic_ds=self.dynamic_ds,
+            coupler_start_datetime=self.coupler_start_datetime,
+            logger=logger,
+        )
+        self.start_ix = cursor.start_ix
+        self.init_str = cursor.init_str
 
         self.accessor_state = StateVariableAccessor(self.conf, tensor_type="state")
         self.accessor_input = StateVariableAccessor(self.conf, tensor_type="input")

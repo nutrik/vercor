@@ -1,14 +1,15 @@
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Optional
 
 import jax
 import jax.numpy as jnp
 from jax.typing import ArrayLike
 
-from vercor.components.base import DataComponent, data_component
+from vercor.components.base import DataComponent
 from vercor.dtypes import as_jax_real_array, jax_arange
 from vercor.grid import RectilinearGrid
 from vercor.assets import get_forcing_data
+from setups.data._component_helpers import time_interpolated_data_component
 from setups.data._field_helpers import mask_time_last_surface_field
 from setups.data.forcing import read_forcing as _read_forcing
 
@@ -117,12 +118,11 @@ def make_erainterim_ocean(
         binary_mask,
     )
 
-    component = data_component(
+    component = time_interpolated_data_component(
         name=name,
         grid=grid,
         fields={"sea_surface_temperature": sst},
+        outputs=_ERAINTERIM_OCEAN_FIELD_NAMES,
+        data_files=data_files,
     )
-    component.declare_fields(outputs=_ERAINTERIM_OCEAN_FIELD_NAMES)
-    component.update_settings(apply_time_interpolation=True)
-    cast(Any, component).DATA_FILES = data_files
     return component

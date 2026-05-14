@@ -8,6 +8,10 @@ from setups.external.jax_gcm import make_jax_gcm
 from setups.external.jax_gcm_tools import (
     generate_jcm_coords_forcing_topography_files,
 )
+from setups.exchange_recipes import (
+    ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
+    JCM_LAND_TO_ATMOSPHERE_FIELDS,
+)
 from vercor.regridders import bilinear
 
 if __name__ == "__main__":
@@ -82,7 +86,7 @@ if __name__ == "__main__":
         Exchange(
             source="LND",
             destination="ATM",
-            field_names=["soil_moisture", "land_surface_temperature"],
+            field_names=list(JCM_LAND_TO_ATMOSPHERE_FIELDS),
             regridder_factory=bilinear,
         )
     )
@@ -91,7 +95,7 @@ if __name__ == "__main__":
         Exchange(
             source="ATM",
             destination="LND",
-            field_names=["latent_heat_flux", "sensible_heat_flux"],
+            field_names=list(ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS),
             regridder_factory=bilinear,
         )
     )
