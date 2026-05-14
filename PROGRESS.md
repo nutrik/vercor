@@ -1,5 +1,57 @@
 # 2026-05-14
 
+## Lazy Optional Setup Adapter Imports
+
+- Added a shared `setups._lazy_imports` helper and moved `setups.data` /
+  `setups.external` package exports behind PEP 562 `__getattr__` lazy loading,
+  so unrelated setup imports do not initialize optional CAMulator or Veros
+  adapters.
+- Deferred CREDIT output/core/postblock imports to CAMulator execution
+  boundaries. Missing CREDIT now raises a clear `ImportError` only when
+  CAMulator forcing/model/output functionality is actually used.
+- Preserved package-level setup exports and module aliases such as
+  `from setups.external import jax_gcm as jax_gcm_module`.
+- Found an import-order issue in the local environment where importing Torch
+  before xarray aborts on duplicate OpenMP runtime initialization; reordered
+  `camulator_state` imports to keep the module importable without unsafe
+  OpenMP environment overrides.
+- Failed approaches / corrections:
+  - The first regression run confirmed all unrelated setup imports emitted the
+    reported CREDIT warnings and Veros startup messages.
+  - After lazy package exports and deferred CREDIT imports, the direct
+    `camulator_state` import exposed the Torch/xarray OpenMP abort; reordering
+    those imports fixed the remaining subprocess failure.
+  - The first flake8 pass exposed one unused import in the new lazy-import
+    helper; removing it restored a clean lint run.
+
+## Validation (Lazy Optional Setup Adapter Imports, 2026-05-14)
+
+- `conda run -n scipy pytest tests/ -v --fast 2>&1 | tail -20`
+  - passed baseline before implementation (`111 passed, 277 deselected`)
+- `conda run -n scipy pytest tests/test_api_boundaries.py::test_unrelated_setup_imports_do_not_initialize_optional_adapters -q --tb=short`
+  - failed as expected before implementation on CREDIT warning output from all
+    covered imports
+  - passed after lazy setup exports, deferred CREDIT imports, and the
+    Torch/xarray import-order correction
+- `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_camulator_component_kernels.py -q --tb=short`
+  - passed after implementation
+- `conda run -n scipy black vercor setups tests`
+  - passed
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning and reformatted `setups/external/camulator.py` on the first run;
+    the final run left all 124 files unchanged
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - first reported one unused import in `setups/_lazy_imports.py`
+  - passed after removing it (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - passed (`124 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Factory-Based Setup Components Refactor
 
 - Added a top-level `setups` package and moved runnable setup scripts plus

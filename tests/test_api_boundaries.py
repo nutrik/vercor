@@ -3,6 +3,8 @@ from __future__ import annotations
 from inspect import signature
 from pathlib import Path
 import ast
+import subprocess
+import sys
 
 import pytest
 
@@ -283,3 +285,40 @@ def test_data_and_host_factories_return_core_contract_instances() -> None:
     assert callable(make_camulator_gcm)
     assert issubclass(DataComponent, Component)
     assert issubclass(HostRuntimeComponent, Component)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "import_statement",
+    (
+        "import setups.external.jax_gcm",
+        "from setups.external import jax_gcm as jax_gcm_module",
+        "from setups.external import make_jax_gcm",
+        "import setups.data.era5_land",
+        "from setups.data import make_era5_land",
+        "import setups.external.camulator",
+        "import setups.external.camulator_state",
+    ),
+)
+def test_unrelated_setup_imports_do_not_initialize_optional_adapters(
+    import_statement: str,
+) -> None:
+    completed = subprocess.run(
+        [sys.executable, "-c", import_statement],
+        cwd=Path(__file__).resolve().parents[1],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    output = completed.stdout + completed.stderr
+
+    forbidden_markers = (
+        "CREDIT modules not fully available",
+        "credit.postblock not available",
+        "Credit module not found",
+        "Importing core modules",
+        "Using computational backend",
+        "Runtime settings are now locked",
+    )
+    for marker in forbidden_markers:
+        assert marker not in output

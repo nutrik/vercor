@@ -23,15 +23,6 @@ import xarray as xr
 # ---------- #
 import torch
 
-# ---------- #
-# credit
-try:
-    from credit.output import make_xarray, save_netcdf_increment
-except ModuleNotFoundError:
-    get_default_logger().warning(
-        "Credit module not found. Please install credit to use CAMulator."
-    )
-
 from vercor.components.base import (
     ComponentStepContext,
     HostRuntimeComponent,
@@ -48,6 +39,34 @@ from vercor.types import RuntimeArray
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
+
+make_xarray: Any | None = None
+save_netcdf_increment: Any | None = None
+
+
+def _credit_output_functions() -> tuple[Any, Any]:
+    """Load CREDIT output helpers when CAMulator writes a forecast increment."""
+
+    global make_xarray, save_netcdf_increment
+
+    if make_xarray is not None and save_netcdf_increment is not None:
+        return make_xarray, save_netcdf_increment
+
+    try:
+        from credit.output import (  # type: ignore[import-not-found]
+            make_xarray as loaded_make_xarray,
+            save_netcdf_increment as loaded_save_netcdf_increment,
+        )
+    except ModuleNotFoundError as error:
+        raise ImportError(
+            "CREDIT output helpers are required to write CAMulator forecasts. "
+            "Please install credit to use CAMulator output."
+        ) from error
+
+    make_xarray = loaded_make_xarray
+    save_netcdf_increment = loaded_save_netcdf_increment
+    return make_xarray, save_netcdf_increment
+
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -249,14 +268,15 @@ def _write_camulator_prediction_output(
 ) -> None:
     """Write one CAMulator prediction increment through the CREDIT output boundary."""
 
-    upper_air, single_level = make_xarray(
+    credit_make_xarray, credit_save_netcdf_increment = _credit_output_functions()
+    upper_air, single_level = credit_make_xarray(
         prediction.cpu(),
         utc_datetime,
         latitude,
         longitude,
         conf,
     )
-    save_netcdf_increment(
+    credit_save_netcdf_increment(
         upper_air,
         single_level,
         init_str,
