@@ -689,16 +689,6 @@ class _CAMulatorGCMState:
             **mapped_fields,
         }
 
-    def step_host_runtime_state(
-        self,
-        component_state: Any,
-        context: ComponentStepContext,
-    ) -> Any:
-        """Compatibility helper for state-level unit tests."""
-
-        updates = self.step(component_state.data.to_mapping(), context, None)
-        return component_state.with_data(component_state.data.set_many(updates))
-
 
 def make_camulator_gcm(
     config_path: str,

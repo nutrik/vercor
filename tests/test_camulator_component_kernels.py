@@ -709,15 +709,15 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
         lambda *args: {"temperature": jnp.full((2, 2), 9.0)},
     )
 
-    component_state = component.step_host_runtime_state(
-        _runtime_component_state("ATM", component.data),
-        RuntimeStepContext(
-            dt_seconds=float((datetime(2000, 1, 1, 6, 0, 0) - start).total_seconds()),
-            settings=VercorSettings(),
-            time=start,
-            logger=cast(Any, _RecordingLogger()),
-        ),
+    component_state = _runtime_component_state("ATM", component.data)
+    step_context = RuntimeStepContext(
+        dt_seconds=float((datetime(2000, 1, 1, 6, 0, 0) - start).total_seconds()),
+        settings=VercorSettings(),
+        time=start,
+        logger=cast(Any, _RecordingLogger()),
     )
+    updates = component.step(component_state.data.to_mapping(), step_context, None)
+    component_state = component_state.with_data(component_state.data.set_many(updates))
 
     assert captured["dynamic_forcing"].shape == (1, 2, 1, 2, 2)
     assert_allclose_compact(

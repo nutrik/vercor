@@ -279,6 +279,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def make_jax_gcm" in jax_gcm_source
     assert "def make_veros_gcm" in veros_source
     assert "def make_camulator_gcm" in camulator_source
+    assert "def step_runtime_state" not in jax_gcm_source
+    assert "def step_host_runtime_state" not in veros_source
+    assert "def step_host_runtime_state" not in camulator_source
     assert "def make_camulator_land" in camulator_land_source
     assert "load_camulator_forcing_context" in camulator_land_source
     assert "initialize_camulator" not in camulator_land_source

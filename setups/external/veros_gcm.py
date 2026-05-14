@@ -440,13 +440,9 @@ class _VerosGCMState:
 
     def initialize(
         self,
-        component: HostRuntimeComponent | ComponentInitContext,
-        context: ComponentInitContext | None = None,
+        component: HostRuntimeComponent,
+        context: ComponentInitContext,
     ) -> None:
-        if context is None:
-            context = cast(ComponentInitContext, component)
-            component = cast(HostRuntimeComponent, self)
-        component = cast(HostRuntimeComponent, component)
         dt_seconds = context.dt_seconds
         self.model_substeps = int(dt_seconds // self.dt_tracer)
 
@@ -510,16 +506,6 @@ class _VerosGCMState:
         return {
             "sea_surface_temperature": _extract_veros_runtime_sst(self._veros_state)
         }
-
-    def step_host_runtime_state(
-        self,
-        component_state: Any,
-        context: ComponentStepContext,
-    ) -> Any:
-        """Compatibility helper for state-level unit tests."""
-
-        updates = self.step(component_state.data.to_mapping(), context, None)
-        return component_state.with_data(component_state.data.set_many(updates))
 
 
 def make_veros_gcm(

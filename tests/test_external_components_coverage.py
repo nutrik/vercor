@@ -24,7 +24,6 @@ from vercor.runtime import (
     RuntimeComponentState,
     RuntimeFieldStore,
 )
-from vercor.runtime.components import create_runtime_component_state
 from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
 
@@ -442,7 +441,10 @@ def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
     component.grid = make_test_grid()
 
     with pytest.raises(ValueError, match="model_timestep"):
-        component.initialize(_make_coupler(dt_seconds=3600.0, run_order=["ATM"]))
+        component.initialize(
+            cast(Any, component),
+            _make_coupler(dt_seconds=3600.0, run_order=["ATM"]),
+        )
 
 
 def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
@@ -493,7 +495,7 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     )
 
     coupler = _make_coupler(dt_seconds=3600.0, run_order=["OCN"])
-    component.initialize(coupler)
+    component.initialize(cast(Any, component), coupler)
 
     assert component.coupling_timestep == timedelta(hours=1)
     assert component.spinup_steps == 2
@@ -555,7 +557,10 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
         lambda jitted: (lambda state, forcing_data: (state, "unused")),
     )
 
-    component.initialize(_make_coupler(dt_seconds=3600.0, run_order=["ATM"]))
+    component.initialize(
+        cast(Any, component),
+        _make_coupler(dt_seconds=3600.0, run_order=["ATM"]),
+    )
 
     assert component.forcing is forcing
     assert forcing.copy_calls == [{"lfluxland": True}]
@@ -661,19 +666,37 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     coupler = _make_coupler(
         dt_seconds=3600.0, run_order=["ATM"], settings=VercorSettings()
     )
-    component_state = component.step_runtime_state(
-        create_runtime_component_state(
-            cast(Any, component),
-            prefill_missing=True,
-            contract=RuntimeComponentContract(),
-        ),
-        RuntimeStepContext(
-            dt_seconds=timedelta(days=1).total_seconds(),
-            settings=coupler.settings,
-            time=datetime(2000, 1, 2),
-            logger=coupler.logger,
-        ),
+    runtime_data = dict(component.data)
+    runtime_incoming: dict[str, Any] = {}
+    runtime_outgoing: dict[str, Any] = {}
+    runtime_contract = RuntimeComponentContract()
+    component.prefill_runtime_state_fields(
+        cast(Any, component),
+        runtime_data,
+        runtime_incoming,
+        runtime_outgoing,
+        runtime_contract,
     )
+    component_state = RuntimeComponentState(
+        data=RuntimeFieldStore.from_mapping(runtime_data),
+        incoming=RuntimeFieldStore.from_mapping(runtime_incoming),
+        outgoing=RuntimeFieldStore.from_mapping(runtime_outgoing),
+        runtime_payload=component.create_runtime_payload(),
+    )
+    step_context = RuntimeStepContext(
+        dt_seconds=timedelta(days=1).total_seconds(),
+        settings=coupler.settings,
+        time=datetime(2000, 1, 2),
+        logger=coupler.logger,
+    )
+    step_result = component.step(
+        component_state.data.to_mapping(),
+        step_context,
+        component_state.runtime_payload,
+    )
+    component_state = component_state.with_data(
+        component_state.data.set_many(step_result.fields)
+    ).with_runtime_payload(step_result.payload)
     forcing_call = component.forcing.copy_calls[-1]
     assert isinstance(forcing_call["stl_am"], jax.Array)
     assert isinstance(forcing_call["sea_surface_temperature"], jax.Array)
@@ -1054,7 +1077,10 @@ def test_veros_initialize_validates_timestep_multiple() -> None:
     component.dt_tracer = 7.0
 
     with pytest.raises(ValueError, match="dt_tracer"):
-        component.initialize(_make_coupler(dt_seconds=20.0, run_order=["OCN"]))
+        component.initialize(
+            cast(Any, component),
+            _make_coupler(dt_seconds=20.0, run_order=["OCN"]),
+        )
 
 
 def test_veros_initialize_can_spin_up_and_extract_surface_temperature() -> None:
@@ -1082,7 +1108,7 @@ def test_veros_initialize_can_spin_up_and_extract_surface_temperature() -> None:
     component._step_function = fake_step_function
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
-    component.initialize(coupler)
+    component.initialize(cast(Any, component), coupler)
 
     assert component.model_substeps == 2
     assert step_calls["count"] == 2
@@ -1197,15 +1223,15 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
     component._step_function = fake_step_function
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
-    component_state = component.step_host_runtime_state(
-        _runtime_component_state("OCN", component.data),
-        RuntimeStepContext(
-            dt_seconds=20.0,
-            settings=coupler.settings,
-            time=datetime(2000, 1, 1),
-            logger=coupler.logger,
-        ),
+    component_state = _runtime_component_state("OCN", component.data)
+    step_context = RuntimeStepContext(
+        dt_seconds=20.0,
+        settings=coupler.settings,
+        time=datetime(2000, 1, 1),
+        logger=coupler.logger,
     )
+    updates = component.step(component_state.data.to_mapping(), step_context, None)
+    component_state = component_state.with_data(component_state.data.set_many(updates))
 
     expected_names = ["taux", "tauy", "qnet", "qnec"]
     assert [name for name, _ in set_calls] == expected_names
@@ -1261,15 +1287,14 @@ def test_veros_step_nan_cleans_forcing_fields_before_set_variable(
     component._step_function = lambda state: state
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
-    component.step_host_runtime_state(
-        _runtime_component_state("OCN", component.data),
-        RuntimeStepContext(
-            dt_seconds=20.0,
-            settings=coupler.settings,
-            time=datetime(2000, 1, 1),
-            logger=coupler.logger,
-        ),
+    component_state = _runtime_component_state("OCN", component.data)
+    step_context = RuntimeStepContext(
+        dt_seconds=20.0,
+        settings=coupler.settings,
+        time=datetime(2000, 1, 1),
+        logger=coupler.logger,
     )
+    _ = component.step(component_state.data.to_mapping(), step_context, None)
 
     assert [name for name, _ in set_calls] == ["taux", "tauy", "qnet", "qnec"]
     assert_allclose_compact(

@@ -1,5 +1,71 @@
 # 2026-05-14
 
+## Conservative Architectural Redundancy Cleanup
+
+- Added `setups.data._field_helpers.mask_time_last_surface_field(...)` as the
+  single canonical data-adapter helper for masking time-last surface fields.
+  ERA5 and ERA-Interim ocean setup adapters now share this path instead of
+  carrying duplicate SST masking helpers.
+- Routed setup host-array transfer through the canonical `vercor.host_arrays`
+  boundary and removed the duplicate `setups.jax_array_helpers.to_host_array`
+  helper while keeping setup-specific transpose/vector-speed helpers.
+- Removed the no-op `fill_value` parameter from the conservative rectilinear
+  regridder class and factory; bilinear interpolation keeps its real fill-value
+  API.
+- Removed component-like compatibility methods from private external setup
+  state objects: `_JAXGCMState.step_runtime_state`,
+  `_VerosGCMState.step_host_runtime_state`, and
+  `_CAMulatorGCMState.step_host_runtime_state`.
+- Narrowed private JAXGCM/Veros setup hooks to the production factory hook
+  signatures rather than supporting direct test-only calls.
+- Preserved intentional compatibility surfaces: `vercor.runtime.components`
+  reexports, public component author facades, context aliases, and setup lazy
+  imports.
+- Failed approaches / corrections:
+  - The first shared masked-field helper reused the old multiply-by-NaN masking
+    pattern; the new gradient regression exposed NaN gradients on masked cells.
+    Switching to `jnp.where(mask, field, jnp.nan)` preserved masked values while
+    keeping valid-cell gradients finite.
+  - Direct private-state runtime-state creation in a JAXGCM unit test depended
+    on the removed dual-signature hook; the test now calls the production hook
+    signature and constructs the runtime state explicitly.
+
+## Validation (Conservative Architectural Redundancy Cleanup, 2026-05-14)
+
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed baseline before implementation
+- `conda run -n scipy pytest tests/test_data_component_kernels.py tests/test_example_jax_helpers.py tests/test_conservative_rectilinear_regridder.py -q --tb=short`
+  - failed as expected before implementation on missing shared field helper,
+    remaining duplicate host-transfer helper, and no-op conservative
+    `fill_value` API
+  - first implementation run found NaN gradients from the old masking pattern;
+    passed after switching the shared helper to `jnp.where`
+- `conda run -n scipy pytest tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps tests/test_external_components_coverage.py::test_jax_gcm_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up tests/test_external_components_coverage.py::test_jax_gcm_initialize_builds_default_forcing_when_missing tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_veros_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_veros_initialize_can_spin_up_and_extract_surface_temperature tests/test_external_components_coverage.py::test_veros_step_sets_forcing_fields_and_refreshes_sst tests/test_external_components_coverage.py::test_veros_step_nan_cleans_forcing_fields_before_set_variable tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
+  - failed as expected before removing the private state-level step wrappers
+  - passed after moving tests to production hook/callable paths and removing the
+    wrappers
+- `conda run -n scipy pytest tests/test_data_component_kernels.py tests/test_example_jax_helpers.py tests/test_conservative_rectilinear_regridder.py tests/test_api_boundaries.py tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_veros_step_sets_forcing_fields_and_refreshes_sst tests/test_external_components_coverage.py::test_veros_step_nan_cleans_forcing_fields_before_set_variable tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
+  - passed after implementation
+- `conda run -n scipy black vercor setups tests`
+  - passed
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning and left all 125 files unchanged
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - first reported one stale unused import in
+    `tests/test_external_components_coverage.py`
+  - passed after removing it (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - first reported missing annotations in the updated helper test plus
+    test-only type errors after narrowing private setup hook signatures
+  - passed after adding test annotations and explicit test-only casts
+    (`125 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed after implementation
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed after implementation
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Lazy Optional Setup Adapter Imports
 
 - Added a shared `setups._lazy_imports` helper and moved `setups.data` /

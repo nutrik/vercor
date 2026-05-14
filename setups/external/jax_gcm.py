@@ -364,13 +364,9 @@ class _JAXGCMState:
 
     def initialize(
         self,
-        component: Component | ComponentInitContext,
-        context: ComponentInitContext | None = None,
+        component: Component,
+        context: ComponentInitContext,
     ) -> None:
-        if context is None:
-            context = cast(ComponentInitContext, component)
-            component = cast(Component, self)
-        component = cast(Component, component)
         self.settings = context.settings
         self.coupling_timestep = timedelta(seconds=context.dt_seconds)
         self.spinup_steps = int(
@@ -452,22 +448,14 @@ class _JAXGCMState:
 
     def prefill_runtime_state_fields(
         self,
-        component: Component | dict[str, RuntimeArray],
-        data: dict[str, RuntimeArray] | None = None,
-        incoming: dict[str, RuntimeArray] | None = None,
-        outgoing: dict[str, RuntimeArray] | None = None,
-        contract: "RuntimeComponentContract | None" = None,
+        component: Component,
+        data: dict[str, RuntimeArray],
+        incoming: dict[str, RuntimeArray],
+        outgoing: dict[str, RuntimeArray],
+        contract: "RuntimeComponentContract",
     ) -> None:
         """Pre-seed JAXGCM output fields so scan carry structure is stable."""
 
-        if contract is None:
-            contract = cast("RuntimeComponentContract", outgoing)
-            outgoing = cast(dict[str, RuntimeArray], incoming)
-            incoming = cast(dict[str, RuntimeArray], data)
-            data = cast(dict[str, RuntimeArray], component)
-            component = cast(Component, self)
-        component = cast(Component, component)
-        data = cast(dict[str, RuntimeArray], data)
         component.prefill_runtime_fields(
             data,
             default_fields=component.grid_field_defaults(
@@ -490,18 +478,12 @@ class _JAXGCMState:
 
     def validate_runtime_state(
         self,
-        component: Component | "RuntimeComponentState",
-        component_state: "RuntimeComponentState | RuntimeComponentContract",
-        contract: "RuntimeComponentContract | None" = None,
+        component: Component,
+        component_state: "RuntimeComponentState",
+        contract: "RuntimeComponentContract",
     ) -> None:
         """Validate JAXGCM runtime payload and pre-seeded output fields."""
 
-        if contract is None:
-            contract = cast("RuntimeComponentContract", component_state)
-            component_state = cast("RuntimeComponentState", component)
-            component = cast(Component, self)
-        component = cast(Component, component)
-        component_state = cast("RuntimeComponentState", component_state)
         _ = contract
         if not isinstance(component_state.runtime_payload, JAXGCMRuntimePayload):
             raise ComponentError(
@@ -662,22 +644,6 @@ class _JAXGCMState:
             )
 
         return step_result
-
-    def step_runtime_state(
-        self,
-        component_state: Any,
-        context: ComponentStepContext,
-    ) -> Any:
-        """Compatibility helper for state-level unit tests."""
-
-        result = self.step(
-            component_state.data.to_mapping(),
-            context,
-            component_state.runtime_payload,
-        )
-        return component_state.with_data(
-            component_state.data.set_many(result.fields)
-        ).with_runtime_payload(result.payload)
 
     def _is_period_end(
         self,
