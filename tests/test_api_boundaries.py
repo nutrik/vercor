@@ -11,6 +11,8 @@ import pytest
 
 import vercor
 import vercor.components as components_module
+import vercor.components._validation as validation_module
+import vercor.components.base as base_module
 from tests._coverage_support import make_test_grid
 from vercor.components.base import Component, DataComponent, HostRuntimeComponent
 from vercor.clock import Clock
@@ -102,6 +104,9 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert hasattr(components_module, "data_component")
     assert hasattr(components_module, "differentiable_component")
     assert hasattr(components_module, "host_component")
+    assert validation_module.validate_component_setup is not None
+    assert not hasattr(base_module, "validate_component_setup")
+    assert not hasattr(components_module, "validate_component_setup")
     assert not hasattr(components_module, "make_data_component")
     assert not hasattr(components_module, "make_differentiable_component")
     assert not hasattr(components_module, "make_host_component")

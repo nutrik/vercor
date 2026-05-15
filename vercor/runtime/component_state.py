@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from vercor.components.base import validate_component_setup
+from vercor.components._validation import validate_component_setup
 from vercor.dtypes import jax_zeros
 from vercor.field_layout import validate_component_data_layout
 from vercor.runtime.contracts import RuntimeComponentContract
