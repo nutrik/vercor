@@ -4,8 +4,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from vercor.clock import Clock
-from vercor.components.base import Component
-from vercor.components._validation import validate_component_setup
+from vercor.components.base import Component, validate_component_setup
 from vercor.dtypes import as_jax_real_array
 from vercor.exceptions import (
     CouplerError,

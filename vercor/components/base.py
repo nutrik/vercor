@@ -20,6 +20,9 @@ from vercor.components._contracts import (
     unique_field_names as _unique_field_names,
 )
 from vercor.components import _runtime_fields as _runtime_field_adapters
+from vercor.components._validation import (
+    validate_component_setup as validate_component_setup,
+)
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
@@ -60,6 +63,7 @@ __all__ = [
     "data_component",
     "differentiable_component",
     "host_component",
+    "validate_component_setup",
 ]
 
 
