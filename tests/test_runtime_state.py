@@ -113,6 +113,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     forcing_data_source = Path("vercor/forcing_data.py").read_text(encoding="utf-8")
     flux_source = Path("vercor/fluxes/bulk_formula_cesm.py").read_text(encoding="utf-8")
     diagnostics_source = Path("vercor/diagnostics.py").read_text(encoding="utf-8")
+    output_source = Path("vercor/output.py").read_text(encoding="utf-8")
     jax_gcm_source = Path("setups/external/jax_gcm.py").read_text(encoding="utf-8")
     veros_source = Path("setups/external/veros_gcm.py").read_text(encoding="utf-8")
     camulator_source = Path("setups/external/camulator.py").read_text(encoding="utf-8")
@@ -256,6 +257,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def validate_land_mask_consistency(" in runtime_topology_source
     assert "def patch_exchange_masks(" in runtime_topology_source
     assert "from vercor.runtime.topology import" in coupler_source
+    assert "def _create_exchange_masks(" not in coupler_source
+    assert "def _validate_land_mask_consistency(" not in coupler_source
+    assert "def _patch_exchange_masks(" not in coupler_source
     assert "compute_ocn_lnd_masks_on_atm_grid" not in coupler_source
     assert "check_total_lnd_ocn_mask_sum" not in coupler_source
     assert "jax_ones(" not in coupler_source
@@ -271,6 +275,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def write_runtime_component_to_netcdf" not in base_source
     assert "write_runtime_component_to_netcdf" not in components_source
     assert "write_runtime_component_view_to_netcdf" not in components_source
+    assert "def _write_runtime_component_to_netcdf" not in output_source
+    assert "def write_runtime_component_view_to_netcdf" in output_source
     assert not Path("vercor/tools.py").exists()
     assert "class RuntimeComponentView" not in diagnostics_source
     assert "RuntimeComponentView =" not in diagnostics_source

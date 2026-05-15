@@ -6,13 +6,13 @@ from vercor.runtime.views import RuntimeComponentView
 from vercor.types import RuntimeArray
 
 
-def _write_runtime_component_to_netcdf(
+def write_runtime_component_view_to_netcdf(
     view: RuntimeComponentView,
     filename: Path,
     *,
     masks: dict[str, RuntimeArray] | None = None,
 ) -> None:
-    """Write final runtime component fields to a netCDF file.
+    """Write final runtime fields from a single runtime component view.
 
     Arguments:
         view: runtime component view containing fields to write
@@ -60,18 +60,3 @@ def _write_runtime_component_to_netcdf(
         data_vars=data_vars,
         coords={"latitude": lat, "longitude": lon},
     ).to_netcdf(filename)
-
-
-def write_runtime_component_view_to_netcdf(
-    view: RuntimeComponentView,
-    filename: Path,
-    *,
-    masks: dict[str, RuntimeArray] | None = None,
-) -> None:
-    """Write final runtime fields from a single runtime component view."""
-
-    _write_runtime_component_to_netcdf(
-        view,
-        filename,
-        masks=masks,
-    )

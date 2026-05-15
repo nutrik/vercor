@@ -30,9 +30,6 @@ class ConservativeRectilinearRegridder(Regridder):
         else:
             src_lon_edges = centers_to_edges(self.source_grid.longitude, "lon")
             src_lat_edges = centers_to_edges(self.source_grid.latitude, "lat")
-            # TODO: Through a warning, to inform the user that bounds are being computed for source grid
-            # print(f"Source Longitude Edges (Start/End): {src_lon_edges[0]:.2f}, {src_lon_edges[-1]:.2f}")
-            # print(f"Source Latitude Edges (Start/End): {src_lat_edges[0]:.2f}, {src_lat_edges[-1]:.2f}")
 
         if (
             destination_grid.longitude_edges is not None
@@ -43,9 +40,6 @@ class ConservativeRectilinearRegridder(Regridder):
         else:
             dst_lon_edges = centers_to_edges(self.destination_grid.longitude, "lon")
             dst_lat_edges = centers_to_edges(self.destination_grid.latitude, "lat")
-            # TODO: Through a warning, to inform the user that bounds are being computed for destination grid
-            # print(f"Destination Longitude Edges (Start/End): {dst_lon_edges[0]:.2f}, {dst_lon_edges[-1]:.2f}")
-            # print(f"Destination Latitude Edges (Start/End): {dst_lat_edges[0]:.2f}, {dst_lat_edges[-1]:.2f}")
 
         self.interpolator = ConservativeRectilinearRemapper(
             src_lon_edges=src_lon_edges,

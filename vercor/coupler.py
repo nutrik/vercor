@@ -265,8 +265,15 @@ class Coupler:
             check_not_empty_import_export_lists(component, contract)
             check_valid_exchange_field_names(component, contract)
 
-        self._create_exchange_masks()
-        self._validate_land_mask_consistency()
+        (
+            self.ocn_fmask_on_atm_grid,
+            self.lnd_fmask_on_atm_grid,
+            self.lnd_bmask_on_atm_grid,
+        ) = create_exchange_masks(self.components, logger=self.logger)
+        validate_land_mask_consistency(
+            self.components,
+            self.lnd_bmask_on_atm_grid,
+        )
         self.logger.info(" LND <--> ATM & OCN <--> ATM masks initialization complete")
 
         initialize_regridders_and_masks(
@@ -279,10 +286,6 @@ class Coupler:
             logger=self.logger,
         )
 
-        self._patch_exchange_masks()
-        self.logger.info(" Exchange masks patching complete")
-
-    def _patch_exchange_masks(self) -> None:
         patch_exchange_masks(
             binary_masks=self._binary_masks,
             fractional_masks=self._fractional_masks,
@@ -290,24 +293,7 @@ class Coupler:
             lnd_bmask_on_atm_grid=self.lnd_bmask_on_atm_grid,
             lnd_fmask_on_atm_grid=self.lnd_fmask_on_atm_grid,
         )
-
-    def _create_exchange_masks(self) -> None:
-        """
-        Create binary and fractional masks for exchanges between
-        land, ocean, and atmosphere components.
-        """
-
-        (
-            self.ocn_fmask_on_atm_grid,
-            self.lnd_fmask_on_atm_grid,
-            self.lnd_bmask_on_atm_grid,
-        ) = create_exchange_masks(self.components, logger=self.logger)
-
-    def _validate_land_mask_consistency(self) -> None:
-        validate_land_mask_consistency(
-            self.components,
-            self.lnd_bmask_on_atm_grid,
-        )
+        self.logger.info(" Exchange masks patching complete")
 
     def _runtime_state_from_components(
         self, *, prefill_missing: bool = False

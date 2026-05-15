@@ -226,6 +226,17 @@ def test_setup_components_use_explicit_metadata_mapping() -> None:
 
 
 @pytest.mark.fast_always
+def test_setup_forcing_reader_reexports_canonical_read_boundary() -> None:
+    import setups.data.forcing as setup_forcing_module
+    import vercor.forcing_data as forcing_data_module
+
+    forcing_source = Path("setups/data/forcing.py").read_text(encoding="utf-8")
+
+    assert setup_forcing_module.read_forcing is forcing_data_module.read_forcing
+    assert "def read_forcing(" not in forcing_source
+
+
+@pytest.mark.fast_always
 def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
     from setups.coupler_helpers import add_exchanges, build_coupler
 

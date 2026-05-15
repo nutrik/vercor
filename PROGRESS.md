@@ -1,5 +1,51 @@
 # 2026-05-15
 
+## Conservative Compatibility Cleanup
+
+- Collapsed `setups.data.forcing.read_forcing` to a direct re-export of the
+  canonical `vercor.forcing_data.read_forcing` while preserving the setup import
+  path.
+- Inlined the single-use private NetCDF output helper into the public
+  `write_runtime_component_view_to_netcdf(...)` function.
+- Removed single-use Coupler topology delegate methods by calling the
+  runtime-owned topology helpers directly from `Coupler.initialize()`.
+- Removed obsolete TODO/commented print blocks from the conservative rectilinear
+  regridder edge-derivation path.
+- Preserved documented compatibility surfaces: settings attribute access,
+  `ComponentSettings`, component author facades/context aliases,
+  `vercor.runtime.components`, setup lazy exports, `ComponentForcingData`,
+  `Coupler._run_scanned_runtime()`, and `_runtime_state_from_components()`.
+- Updated source-boundary tests so the removed private output helper, collapsed
+  forcing wrapper, and removed Coupler topology delegates stay removed.
+
+## Validation (Conservative Compatibility Cleanup, 2026-05-15)
+
+- `conda run -n scipy pytest tests/test_api_boundaries.py::test_setup_forcing_reader_reexports_canonical_read_boundary tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps -q --tb=short`
+  - failed before implementation on the remaining setup forcing wrapper and
+    private Coupler topology delegates
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_runtime_state.py tests/test_coupler_coverage.py -q --tb=short`
+  - first failed after removing the Coupler delegates because stale coverage
+    still patched/called the removed private methods
+  - passed after moving that coverage to the runtime topology boundary and the
+    inlined `Coupler.initialize()` call site
+- `conda run -n scipy black vercor setups tests`
+  - first reformatted `tests/test_coupler_coverage.py`
+  - final run left all 131 files unchanged
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - first reported the test logger double did not satisfy `LoggerLike`
+  - passed after using the real configured logger in topology tests
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Private Runtime Helper Consolidation
 
 - Added private `Coupler._prepare_runtime_state(...)` so `run()` and

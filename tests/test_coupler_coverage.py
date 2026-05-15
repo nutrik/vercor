@@ -12,6 +12,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+import vercor.coupler as coupler_module
 from tests._coverage_support import (
     DummyComponent,
     RecordingRegridder,
@@ -36,6 +37,11 @@ from vercor.regridders.bilinear import bilinear
 from vercor.regridders.conservative import conservative
 from vercor.run_sequence import RunSequence
 from vercor.runtime import RuntimeComponentContract, dispatch_component_exchanges
+from vercor.runtime.topology import (
+    create_exchange_masks,
+    patch_exchange_masks,
+    validate_land_mask_consistency,
+)
 
 
 class _RecordingLogger:
@@ -510,12 +516,15 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
         monkeypatch.setattr(exchange, "create", fake_create)
         coupler.add_exchange(exchange)
 
-    def fake_create_exchange_masks() -> None:
-        coupler.ocn_fmask_on_atm_grid = np.full((2, 2), 0.4)
-        coupler.lnd_fmask_on_atm_grid = np.full((2, 2), 0.6)
-        coupler.lnd_bmask_on_atm_grid = lnd_mask
+    def fake_create_exchange_masks(*args: Any, **kwargs: Any) -> tuple[Any, Any, Any]:
+        _ = args, kwargs
+        return np.full((2, 2), 0.4), np.full((2, 2), 0.6), lnd_mask
 
-    monkeypatch.setattr(coupler, "_create_exchange_masks", fake_create_exchange_masks)
+    monkeypatch.setattr(
+        coupler_module,
+        "create_exchange_masks",
+        fake_create_exchange_masks,
+    )
     jax_calls: list[tuple[str, bool]] = []
     monkeypatch.setitem(
         sys.modules,
@@ -581,7 +590,13 @@ def test_patch_exchange_masks_updates_only_expected_bilinear_pairs() -> None:
     coupler.lnd_bmask_on_atm_grid = np.asarray([[1.0, 0.0], [0.0, 1.0]])
     coupler.lnd_fmask_on_atm_grid = np.full((2, 2), 0.75)
 
-    coupler._patch_exchange_masks()
+    patch_exchange_masks(
+        binary_masks=coupler._binary_masks,
+        fractional_masks=coupler._fractional_masks,
+        ocn_fmask_on_atm_grid=coupler.ocn_fmask_on_atm_grid,
+        lnd_bmask_on_atm_grid=coupler.lnd_bmask_on_atm_grid,
+        lnd_fmask_on_atm_grid=coupler.lnd_fmask_on_atm_grid,
+    )
 
     assert_allclose_compact(coupler._fractional_masks[ocn_key], np.full((2, 2), 0.25))
     assert_allclose_compact(
@@ -606,7 +621,9 @@ def test_validate_land_mask_consistency_rejects_shape_and_value_mismatches() -> 
     coupler.lnd_bmask_on_atm_grid = np.ones((2, 2))
 
     with pytest.raises(CouplerError, match="does not match atmospheric grid shape"):
-        coupler._validate_land_mask_consistency()
+        validate_land_mask_consistency(
+            coupler.components, coupler.lnd_bmask_on_atm_grid
+        )
 
     coupler.components["LND"] = cast(
         Any,
@@ -621,7 +638,9 @@ def test_validate_land_mask_consistency_rejects_shape_and_value_mismatches() -> 
     coupler.lnd_bmask_on_atm_grid = np.asarray([[1.0, 0.0], [0.0, 1.0]])
 
     with pytest.raises(CouplerError, match="mismatched points: 2"):
-        coupler._validate_land_mask_consistency()
+        validate_land_mask_consistency(
+            coupler.components, coupler.lnd_bmask_on_atm_grid
+        )
 
 
 def test_create_exchange_masks_rejects_non_identical_land_and_atmosphere_grids() -> (
@@ -649,7 +668,7 @@ def test_create_exchange_masks_rejects_non_identical_land_and_atmosphere_grids()
     )
 
     with pytest.raises(CouplerError, match="must use identical horizontal grids"):
-        coupler._create_exchange_masks()
+        create_exchange_masks(coupler.components, logger=setup_logger())
 
 
 def test_create_exchange_masks_rejects_missing_ocean_binary_mask() -> None:
@@ -664,7 +683,7 @@ def test_create_exchange_masks_rejects_missing_ocean_binary_mask() -> None:
     )
 
     with pytest.raises(ComponentError, match="has no binary mask defined"):
-        coupler._create_exchange_masks()
+        create_exchange_masks(coupler.components, logger=setup_logger())
 
 
 def test_output_masks_for_component_returns_destination_exchange_masks() -> None:
