@@ -54,7 +54,7 @@ jobs:
       run: |
         pip install mypy
         pip install types-PyYAML
-        mypy vercor tests examples
+        mypy vercor tests setups
     - name: Test with pytest
       run: |
         pytest tests -q --ignore=vendor
