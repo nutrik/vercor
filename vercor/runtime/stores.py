@@ -66,8 +66,6 @@ class RuntimeFieldStore(PyTreeNodeMixin):
 
         try:
             index = self.field_indices[name]
-        except ValueError as exc:
-            raise KeyError(f"Runtime field {name!r} not found") from exc
         except KeyError as exc:
             raise KeyError(f"Runtime field {name!r} not found") from exc
         return self.values[index]

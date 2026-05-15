@@ -475,6 +475,8 @@ def test_runtime_field_store_exposes_mapping_membership_and_fallback_helpers() -
 
     assert "temperature" in store
     assert "missing" not in store
+    with pytest.raises(KeyError, match="Runtime field 'missing' not found"):
+        store.get("missing")
     assert tuple(fields) == ("temperature", "humidity")
     assert_allclose_compact(fields["temperature"], np.full((2, 2), 280.0))
     assert_allclose_compact(

@@ -1,5 +1,39 @@
 # 2026-05-15
 
+## Runtime FieldStore Compatibility Audit
+
+- Removed the unreachable `ValueError` branch from `RuntimeFieldStore.get(...)`;
+  dictionary index lookup only raises `KeyError`, so the public missing-field
+  error text remains unchanged.
+- Added focused runtime-store coverage for direct missing-field lookup.
+- Preserved the documented/test-relied compatibility surfaces from the audit:
+  `vercor.runtime.components` reexports, settings attribute compatibility and
+  `ComponentSettings`, component author facades/context aliases, setup forcing
+  and lazy exports, `ComponentForcingData._read_forcing()`,
+  `Coupler._run_scanned_runtime()`, `_runtime_state_from_components()`,
+  regridder class/factory APIs, and top-level calendar aliases.
+
+## Validation (Runtime FieldStore Compatibility Audit, 2026-05-15)
+
+- `conda run -n scipy pytest tests/test_runtime_state.py::test_runtime_field_store_is_immutable_pytree tests/test_runtime_state.py::test_runtime_field_store_replace_helpers_preserve_dtype_and_reject_missing -q --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_runtime_state.py tests/test_settings.py -q --tb=short`
+  - passed
+- `conda run -n scipy black vercor setups tests`
+  - left all 131 files unchanged
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - passed (`131 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Runtime Wrapper Cleanup
 
 - Removed the private `vercor.runtime.coupler_state.prime_runtime_state(...)`
