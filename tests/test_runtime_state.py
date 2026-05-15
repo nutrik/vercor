@@ -179,6 +179,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def validate_runtime_state(" in runtime_coupler_state_source
     assert "def runtime_dispatch_context(" in runtime_coupler_state_source
     assert "def output_masks_for_component(" in runtime_coupler_state_source
+    assert "def prime_runtime_state(" not in runtime_coupler_state_source
+    assert "prime_runtime_state(" not in coupler_source
+    assert "prime_runtime_outgoing(" in coupler_source
     assert "def run_host_runtime(" in runtime_runner_source
     assert "def run_scanned_runtime(" in runtime_runner_source
     assert "def run_coupler_runtime(" in runtime_runner_source

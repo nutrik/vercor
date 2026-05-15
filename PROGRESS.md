@@ -1,5 +1,45 @@
 # 2026-05-15
 
+## Runtime Wrapper Cleanup
+
+- Removed the private `vercor.runtime.coupler_state.prime_runtime_state(...)`
+  one-hop wrapper; `Coupler.create_runtime_state()` now calls the runtime-owned
+  `prime_runtime_outgoing(...)` helper directly.
+- Removed the private `Coupler._output_masks_for_component(...)` one-hop
+  wrapper; finalization now calls `output_masks_for_component(...)` directly.
+- Preserved documented/test-relied compatibility surfaces: `vercor.runtime.components`
+  reexports, setup forcing reexports, `ComponentForcingData._read_forcing()`,
+  settings attribute compatibility and `ComponentSettings`, component author
+  facades/context aliases, setup lazy imports, `_run_scanned_runtime()`, and
+  `_runtime_state_from_components()`.
+- Updated boundary coverage so these private wrappers stay removed while the
+  runtime helper behavior remains covered.
+
+## Validation (Runtime Wrapper Cleanup, 2026-05-15)
+
+- `conda run -n scipy pytest tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps tests/test_coupler_coverage.py::test_output_masks_for_component_returns_destination_exchange_masks -q --tb=short`
+  - failed before implementation on the remaining `prime_runtime_state(...)`
+    wrapper and `Coupler._output_masks_for_component(...)`
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_coupler_coverage.py tests/test_runtime_state.py -q --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/test_api_boundaries.py -q --tb=short`
+  - passed
+- `conda run -n scipy black vercor setups tests`
+  - left all 131 files unchanged
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - passed (`131 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Conservative Compatibility Cleanup
 
 - Collapsed `setups.data.forcing.read_forcing` to a direct re-export of the

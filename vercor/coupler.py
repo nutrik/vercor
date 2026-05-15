@@ -30,13 +30,12 @@ from vercor.runtime.validation import (
 )
 from vercor.runtime.coupler_state import (
     output_masks_for_component,
-    prime_runtime_state,
     refresh_runtime_contracts,
     runtime_dispatch_context,
     runtime_state_from_components,
     validate_runtime_state as validate_coupler_runtime_state,
 )
-from vercor.runtime.driver import RuntimeDispatchContext
+from vercor.runtime.driver import RuntimeDispatchContext, prime_runtime_outgoing
 from vercor.runtime.interrupts import RuntimeInterruptController
 from vercor.runtime.runner import run_coupler_runtime, run_scanned_runtime
 from vercor.runtime.time import initial_runtime_step_info
@@ -357,7 +356,7 @@ class Coupler:
             prefill_missing=prefill_missing
         )
         if prefill_missing and hasattr(self, "run_sequence"):
-            runtime_state = prime_runtime_state(
+            runtime_state = prime_runtime_outgoing(
                 runtime_state,
                 tuple(self.run_sequence),
                 dispatch_context=self._runtime_dispatch_context(),
@@ -365,19 +364,6 @@ class Coupler:
             )
         self._validate_runtime_state(runtime_state)
         return runtime_state
-
-    def _output_masks_for_component(
-        self,
-        name: str,
-    ) -> dict[str, RuntimeArray]:
-        """Return runtime output mask fields for one destination component."""
-
-        return output_masks_for_component(
-            name,
-            self.exchanges,
-            self._binary_masks,
-            self._fractional_masks,
-        )
 
     def _runtime_dispatch_context(self) -> RuntimeDispatchContext:
         """Return static runtime dispatch plumbing for the current coupler state."""
@@ -428,7 +414,12 @@ class Coupler:
             write_runtime_component_view_to_netcdf(
                 view,
                 filepath,
-                masks=self._output_masks_for_component(name),
+                masks=output_masks_for_component(
+                    name,
+                    self.exchanges,
+                    self._binary_masks,
+                    self._fractional_masks,
+                ),
             )
             self.logger.info(f" Finalized {name}")
 

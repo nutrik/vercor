@@ -37,6 +37,7 @@ from vercor.regridders.bilinear import bilinear
 from vercor.regridders.conservative import conservative
 from vercor.run_sequence import RunSequence
 from vercor.runtime import RuntimeComponentContract, dispatch_component_exchanges
+from vercor.runtime.coupler_state import output_masks_for_component
 from vercor.runtime.topology import (
     create_exchange_masks,
     patch_exchange_masks,
@@ -710,7 +711,14 @@ def test_output_masks_for_component_returns_destination_exchange_masks() -> None
         ("LND", "ATM", "bilinear"): np.full((2, 2), 0.75),
     }
 
-    masks = coupler._output_masks_for_component("ATM")
+    assert not hasattr(coupler, "_output_masks_for_component")
+
+    masks = output_masks_for_component(
+        "ATM",
+        coupler.exchanges,
+        coupler._binary_masks,
+        coupler._fractional_masks,
+    )
 
     assert set(masks) == {
         "bmask_OCN_ATM_bilinear",

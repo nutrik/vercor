@@ -14,10 +14,9 @@ from vercor.runtime.contracts import (
     build_runtime_contracts,
     exchange_key_name,
 )
-from vercor.runtime.driver import RuntimeDispatchContext, prime_runtime_outgoing
+from vercor.runtime.driver import RuntimeDispatchContext
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.stores import RuntimeFieldStore
-from vercor.runtime.time import RuntimeStepInfo
 from vercor.runtime.validation import (
     validate_component_runtime_contract_fields,
 )
@@ -108,23 +107,6 @@ def runtime_dispatch_context(
         contracts=contracts,
         dt_seconds=dt_seconds,
         settings=settings,
-    )
-
-
-def prime_runtime_state(
-    runtime_state: RuntimeCouplerState,
-    run_sequence: Sequence[str],
-    *,
-    dispatch_context: RuntimeDispatchContext,
-    step_info: RuntimeStepInfo,
-) -> RuntimeCouplerState:
-    """Populate outgoing runtime stores before the first exchange dispatch."""
-
-    return prime_runtime_outgoing(
-        runtime_state,
-        run_sequence,
-        dispatch_context=dispatch_context,
-        step_info=step_info,
     )
 
 
