@@ -435,6 +435,9 @@ def test_jax_gcm_factory_does_not_attach_test_only_setup_state() -> None:
 
     assert "_setup_state" not in runtime_test_source
 
+    jcm_slab_source = Path("setups/run_jcm_with_slab.py").read_text(encoding="utf-8")
+    assert 'getattr(atm, "model")' not in jcm_slab_source
+
 
 @pytest.mark.fast_always
 def test_data_and_host_factories_return_core_contract_instances() -> None:

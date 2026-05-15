@@ -30,18 +30,17 @@ if __name__ == "__main__":
     ocn_binary_mask = jnp.where(as_jax_real_array(terrain.fmask) < 1, 1, 0).T
     lnd_binary_mask = 1 - ocn_binary_mask
 
-    hgrid = getattr(atm, "model").coords.horizontal
     lnd_grid = RectilinearGrid(
         name="LND",
-        longitude=jnp.rad2deg(as_jax_real_array(hgrid.longitudes)),
-        latitude=jnp.rad2deg(as_jax_real_array(hgrid.latitudes)),
+        longitude=atm.grid.longitude,
+        latitude=atm.grid.latitude,
         binary_mask=lnd_binary_mask,
     )
 
     ocn_grid = RectilinearGrid(
         name="OCN",
-        longitude=jnp.rad2deg(as_jax_real_array(hgrid.longitudes)),
-        latitude=jnp.rad2deg(as_jax_real_array(hgrid.latitudes)),
+        longitude=atm.grid.longitude,
+        latitude=atm.grid.latitude,
         binary_mask=ocn_binary_mask,
     )
 

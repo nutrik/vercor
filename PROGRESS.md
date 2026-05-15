@@ -1,5 +1,44 @@
 # 2026-05-15
 
+## Component Validation Boundary Cleanup
+
+- Removed the undocumented `validate_component_setup` re-export from
+  `vercor.components.base`; internal callers now import the canonical private
+  validator from `vercor.components._validation`.
+- Updated the JAXGCM slab example to use the returned component's public grid
+  coordinates instead of the removed factory-time `atm.model` attachment.
+- Added API-boundary coverage so component setup validation remains private and
+  the example does not reintroduce the stale `getattr(atm, "model")` path.
+- Preserved intentional compatibility/public surfaces from the audit: settings
+  attribute compatibility and `ComponentSettings`, component author facades and
+  context aliases, `vercor.runtime.components` reexports, setup lazy exports and
+  setup forcing reexport, `ComponentForcingData._read_forcing()`,
+  `Coupler._run_scanned_runtime()`, `_runtime_state_from_components()`,
+  regridder class/factory APIs, and `Exchange.create()`.
+
+## Validation (Component Validation Boundary Cleanup, 2026-05-15)
+
+- `conda run -n scipy pytest tests/test_api_boundaries.py -q --tb=short`
+  - failed before implementation on the remaining base validation re-export and
+    stale JAXGCM example `getattr(atm, "model")` call
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_runtime_state.py tests/test_coupler_coverage.py -q --tb=short`
+  - passed
+- `conda run -n scipy black vercor setups tests`
+  - reformatted `tests/test_api_boundaries.py`
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - passed (`131 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Conservative Bilinear Helper Cleanup
 
 - Removed the unused private `_geo_to_cart(...)` helper from the bilinear
