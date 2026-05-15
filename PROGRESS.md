@@ -1,5 +1,42 @@
 # 2026-05-15
 
+## Conservative Bilinear Helper Cleanup
+
+- Removed the unused private `_geo_to_cart(...)` helper from the bilinear
+  rectilinear interpolator; it had no production callers and no test coverage
+  beyond the new boundary guard.
+- Added source-boundary coverage so the unused Cartesian conversion helper stays
+  removed.
+- Preserved intentional compatibility/public surfaces from the audit: settings
+  attribute compatibility and `ComponentSettings`, component author facades and
+  context aliases, `vercor.runtime.components` reexports, setup lazy exports and
+  setup forcing reexport, `ComponentForcingData._read_forcing()`,
+  `Coupler._run_scanned_runtime()`, `_runtime_state_from_components()`,
+  regridder class/factory APIs, `Exchange.create()`, and CAMulator accessor
+  helper methods with unclear external risk.
+
+## Validation (Conservative Bilinear Helper Cleanup, 2026-05-15)
+
+- `conda run -n scipy pytest tests/test_api_boundaries.py::test_bilinear_interpolator_removes_unused_cartesian_helper -q --tb=short`
+  - failed before implementation on the remaining `_geo_to_cart(...)` helper
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_bilinear_rectilinear_interpolator.py -q --tb=short`
+  - passed
+- `conda run -n scipy black vercor setups tests`
+  - left all 131 files unchanged
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - passed (`131 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Private Compatibility Shim Removal
 
 - Removed the private `_author_field_spec(...)` one-hop helper and now build

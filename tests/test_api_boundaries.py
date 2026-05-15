@@ -404,6 +404,15 @@ def test_jcm_land_uses_single_coordinate_conversion_helper() -> None:
 
 
 @pytest.mark.fast_always
+def test_bilinear_interpolator_removes_unused_cartesian_helper() -> None:
+    source = Path("vercor/interpolators/bilinear_rectilinear.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def _geo_to_cart(" not in source
+
+
+@pytest.mark.fast_always
 def test_jax_gcm_factory_does_not_attach_test_only_setup_state() -> None:
     jax_gcm_source = Path("setups/external/jax_gcm.py").read_text(encoding="utf-8")
     runtime_test_source = Path("tests/test_coupler_runtime.py").read_text(

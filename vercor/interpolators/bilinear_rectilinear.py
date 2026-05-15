@@ -27,17 +27,6 @@ def _unit_east_north(lon_rad: Array, lat_rad: Array) -> tuple[Array, Array]:
     return (e_east, e_north)
 
 
-def _geo_to_cart(lon_rad: Array, lat_rad: Array) -> Array:
-    r"""Convert geographic coordinates in radians to unit Cartesian vectors."""
-
-    slon, clon = jnp.sin(lon_rad), jnp.cos(lon_rad)
-    slat, clat = jnp.sin(lat_rad), jnp.cos(lat_rad)
-    x = clat * clon
-    y = clat * slon
-    z = slat
-    return jnp.stack((x, y, z), axis=-1)
-
-
 def _great_circle_distance_rad(
     lon1: Array, lat1: Array, lon2: Array, lat2: Array
 ) -> Array:
