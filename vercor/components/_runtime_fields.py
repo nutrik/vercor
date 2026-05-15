@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from vercor.components._contracts import (
     AuthorFieldValues,
     ComponentFieldSpec,
+    ComponentStepResult,
+    ComponentStepReturn,
     FieldNames,
     component_field_spec,
     declared_runtime_field_names,
@@ -121,6 +123,20 @@ def with_runtime_fields(
             "exchange before runtime execution."
         )
     return component_state.with_data(component_state.data.replace_many(fields))
+
+
+def apply_step_result(
+    component: "Component",
+    component_state: "RuntimeComponentState",
+    result: ComponentStepReturn,
+) -> "RuntimeComponentState":
+    """Apply a field mapping or ``ComponentStepResult`` to runtime state."""
+
+    if isinstance(result, ComponentStepResult):
+        updated_state = with_runtime_fields(component, component_state, result.fields)
+        return updated_state.with_runtime_payload(result.payload)
+
+    return with_runtime_fields(component, component_state, result)
 
 
 def require_runtime_fields(

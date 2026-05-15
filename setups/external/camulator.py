@@ -13,12 +13,11 @@ from vercor.jax_logging import LoggerLike, get_default_logger
 
 from setups._time_helpers import (
     assign_model_timestep_alignment,
-    runtime_forcing_index,
     seed_grid_field_defaults,
 )
 from setups.external.camulator_state import (
+    CamulatorRuntimeCursor,
     initialize_camulator,
-    initialize_camulator_forcing_cursor,
     StateVariableAccessor,
 )
 
@@ -401,6 +400,7 @@ class _CAMulatorGCMState:
         self.output_cpus_number = output_cpus_number
         self.spinup_time = spinup_time
         self.do_spinup = do_spinup
+        self.runtime_cursor = CamulatorRuntimeCursor()
 
         context = initialize_camulator(
             config_path=self.config_path,
@@ -506,22 +506,19 @@ class _CAMulatorGCMState:
 
         # IMPORTANT: Use the config's datetime object directly for xarray lookup
         # It might be cftime.DatetimeNoLeap, which xarray expects
-        cursor = initialize_camulator_forcing_cursor(
+        self.runtime_cursor.initialize(
             conf=self.conf,
             dynamic_ds=self.dynamic_ds,
             coupler_start_datetime=self.coupler_start_datetime,
+            model_substeps=self.model_substeps,
             logger=logger,
         )
-        self.start_ix = cursor.start_ix
-        self.init_str = cursor.init_str
 
         self.accessor_state = StateVariableAccessor(self.conf, tensor_type="state")
         self.accessor_input = StateVariableAccessor(self.conf, tensor_type="input")
         self.accessor_output = StateVariableAccessor(self.conf, tensor_type="output")
 
         self.forecast_hour = 1
-        self.timestep_counter = 0
-
         seed_grid_field_defaults(
             component,
             _CAMULATOR_RUNTIME_FIELD_NAMES,
@@ -546,11 +543,7 @@ class _CAMulatorGCMState:
         prediction = None
         last_total_surface_temperature: RuntimeArray | None = None
 
-        block_start = runtime_forcing_index(
-            start_ix=self.start_ix,
-            timestep_counter=self.timestep_counter,
-            model_substeps=self.model_substeps,
-        )
+        block_start = self.runtime_cursor.current_index()
         block_end = block_start + self.model_substeps
 
         # Load chunk of dynamic forcing data
@@ -590,14 +583,15 @@ class _CAMulatorGCMState:
 
             if logger is not None:
                 logger.info(
-                    f"    CAMulator step: {self.timestep_counter + 1:05}, time: {utc_datetime}"
+                    "    CAMulator step: "
+                    f"{self.forecast_hour:05}, time: {utc_datetime}"
                 )
 
             dynamic_forcing_t = gpu_forcing_chunk[t].unsqueeze(0)
 
             # CAMulator's first state already contains forcing. Later states need
             # the next forcing slice appended before inference.
-            if self.timestep_counter != 0:
+            if self.forecast_hour != 1:
                 # Build forcing from dynamic + static
                 model_input = self.stepper.state_manager.build_input_with_forcing(
                     self.state, dynamic_forcing_t, self.static_forcing
@@ -641,7 +635,7 @@ class _CAMulatorGCMState:
                 utc_datetime,
                 latitude=self.latlons.latitude.values,
                 longitude=self.latlons.longitude.values,
-                init_str=self.init_str,
+                init_str=self.runtime_cursor.init_str,
                 lead_time_periods=self.lead_time_periods,
                 forecast_hour=self.forecast_hour,
                 metadata=self.metadata,
@@ -656,7 +650,6 @@ class _CAMulatorGCMState:
                 self.state, prediction
             )
 
-            self.timestep_counter += 1
             self.forecast_hour += 1
 
         # ================================================================
@@ -668,6 +661,8 @@ class _CAMulatorGCMState:
                 "No CAMulator timesteps were generated from the forcing slice; "
                 "check forcing availability and coupling timestep alignment."
             )
+
+        self.runtime_cursor.advance()
 
         mapped_fields = _map_camulator_prediction_to_runtime_fields(
             settings,

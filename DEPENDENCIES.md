@@ -10,7 +10,7 @@
 10. `setups/external/jax_gcm_tools.py` - existing JAX helper layer used by the JCM adapter; validated for `jax.jit` and built on (1, 4)
 11. `setups/external/jax_gcm.py` - JCM adapter boundary that stores translated kernel outputs built on (1, 2, 7, 10)
 12. `setups/external/veros_runtime_settings.py` and `setups/external/veros_gcm.py` - explicit Veros host-runtime configuration plus the Veros adapter boundary that converts translated flux outputs back to NumPy for Veros state updates built on (1, 5, 6, 7)
-13. `setups/external/camulator_state.py` and `setups/external/camulator.py` - CAMulator state loading, shared forcing cursor setup, host-runtime adapter boundary, JAX-backed runtime-field helpers, hybrid-sigma altitude diagnostics, and explicit Torch / xarray output boundaries built on (1, 4, 6, 7)
+13. `setups/external/camulator_state.py` and `setups/external/camulator.py` - CAMulator state loading, shared forcing cursor/runtime cursor setup, host-runtime adapter boundary, JAX-backed runtime-field helpers, hybrid-sigma altitude diagnostics, and explicit Torch / xarray output boundaries built on (1, 4, 6, 7)
 14. `vercor/grid.py` - JAX-friendly `RectilinearGrid` holder with eager validation and PyTree registration built on (2)
 15. `vercor/field_layout.py` - canonical component data-field layout validation and time-last forcing normalization helpers built on (14)
 16. `vercor/regridders/helpers.py` - JAX-native rectilinear helper kernels built on (1, 14)

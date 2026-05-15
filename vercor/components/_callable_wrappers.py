@@ -7,9 +7,9 @@ from vercor.components._contracts import (
     AuthorStepCallable,
     ComponentFieldSpec,
     ComponentStepCallable,
-    ComponentStepResult,
     ComponentStepReturn,
 )
+from vercor.components._runtime_fields import apply_step_result
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.runtime.contexts import RuntimeStepContext
@@ -27,20 +27,6 @@ from vercor.components.base import (
 
 if TYPE_CHECKING:
     from vercor.runtime import RuntimeComponentState
-
-
-def apply_callable_step_result(
-    component: "Component",
-    component_state: "RuntimeComponentState",
-    result: ComponentStepReturn,
-) -> "RuntimeComponentState":
-    """Apply a callable wrapper result to runtime state."""
-
-    if isinstance(result, ComponentStepResult):
-        updated_state = component.with_runtime_fields(component_state, result.fields)
-        return updated_state.with_runtime_payload(result.payload)
-
-    return component.with_runtime_fields(component_state, result)
 
 
 def normalize_component_step_callable(
@@ -196,7 +182,7 @@ class _CallableRuntimeMixin:
         """Advance callable-backed runtime state using the normalized step."""
 
         component = cast("Component", self)
-        return apply_callable_step_result(
+        return apply_step_result(
             component,
             component_state,
             self._step(

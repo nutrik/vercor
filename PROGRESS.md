@@ -1,5 +1,47 @@
 # 2026-05-15
 
+## Runtime/Setup Helper Boundary Cleanup
+
+- Added `CamulatorRuntimeCursor` so CAMulator atmosphere and land adapters share
+  forcing-index initialization, counter reset, index lookup, and counter
+  advancement through one helper instead of duplicating state transitions.
+- Moved generic component step-result application into
+  `vercor.components._runtime_fields.apply_step_result(...)`; callable wrappers
+  now use the same runtime-field primitive as `Component.apply_step_result(...)`.
+- Removed the test-only JCM coordinate wrapper and pointed tests at the real
+  `_jcm_coordinates_in_degrees(...)` helper.
+
+## Validation (Runtime/Setup Helper Boundary Cleanup, 2026-05-15)
+
+- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py::test_camulator_runtime_cursor_initializes_indexes_and_advances tests/test_api_boundaries.py::test_component_base_internals_are_private_modules tests/test_api_boundaries.py::test_camulator_adapters_share_runtime_cursor_state_transition_helper tests/test_api_boundaries.py::test_jcm_land_uses_single_coordinate_conversion_helper tests/test_data_component_kernels.py::test_jcm_land_coordinate_helper_supports_jit -q --tb=short`
+  - failed before implementation on missing `CamulatorRuntimeCursor`, missing
+    runtime-field `apply_step_result`, remaining direct CAMulator cursor state,
+    and the leftover JCM coordinate wrapper
+- `conda run -n scipy pytest tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
+  - failed before the cursor semantic fix because the CAMulator atmosphere
+    cursor advanced once per model substep instead of once per coupling step
+    (`2 == 1`)
+  - passed after advancing the cursor once after each non-empty forcing block
+- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py::test_camulator_runtime_cursor_initializes_indexes_and_advances tests/test_api_boundaries.py::test_component_base_internals_are_private_modules tests/test_api_boundaries.py::test_camulator_adapters_share_runtime_cursor_state_transition_helper tests/test_api_boundaries.py::test_jcm_land_uses_single_coordinate_conversion_helper tests/test_data_component_kernels.py::test_jcm_land_coordinate_helper_supports_jit tests/test_component_base_coverage.py::test_apply_step_result_updates_fields_and_payload tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py tests/test_data_component_kernels.py tests/test_component_base_coverage.py tests/test_camulator_component_kernels.py -q --tb=short`
+  - passed
+- `conda run -n scipy black vercor setups tests`
+  - first reformatted `setups/data/camulator_land.py`
+  - final run left all 131 files unchanged
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - passed (`131 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Maintainability Audit Follow-Up Consolidation
 
 - Added `setups.jcm_setup_helpers.build_jcm_land_atmosphere_components(...)`

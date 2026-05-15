@@ -481,9 +481,7 @@ class Component(ABC):
     ) -> "RuntimeComponentState":
         """Apply a field mapping or ``ComponentStepResult`` to runtime state."""
 
-        from vercor.components._callable_wrappers import apply_callable_step_result
-
-        return apply_callable_step_result(self, component_state, result)
+        return _runtime_field_adapters.apply_step_result(self, component_state, result)
 
     def require_runtime_fields(
         self,

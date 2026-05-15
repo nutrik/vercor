@@ -14,14 +14,6 @@ from vercor.grid_masks import create_lnd_mask_from_ocn
 _JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture")
 
 
-def _coordinates_in_degrees(
-    longitude_radians: ArrayLike,
-    latitude_radians: ArrayLike,
-) -> tuple[jax.Array, jax.Array]:
-    """Convert JCM coordinates from radians to degrees on the JAX runtime path."""
-    return _jcm_coordinates_in_degrees(longitude_radians, latitude_radians)
-
-
 def _jcm_coordinates_in_degrees(
     longitude_radians: ArrayLike,
     latitude_radians: ArrayLike,

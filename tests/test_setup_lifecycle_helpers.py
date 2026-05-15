@@ -14,6 +14,7 @@ from setups._time_helpers import (
     run_logged_spinup,
     seed_grid_field_defaults,
 )
+import setups.external.camulator_state as camulator_state_module
 from setups.external.camulator_state import initialize_camulator_forcing_cursor
 from tests._coverage_support import make_test_grid
 from vercor.components.base import data_component
@@ -159,6 +160,32 @@ def test_initialize_camulator_forcing_cursor_accepts_integer_index() -> None:
     assert cursor.start_ix == 3
     assert cursor.init_str == "2000-01-01T00Z"
     assert logger.warnings == []
+
+
+def test_camulator_runtime_cursor_initializes_indexes_and_advances() -> None:
+    assert hasattr(camulator_state_module, "CamulatorRuntimeCursor")
+    logger = _RecordingLogger()
+    forcing_start = datetime(2000, 1, 1)
+    dynamic_ds = SimpleNamespace(indexes={"time": _TimeIndex(4)})
+    cursor = camulator_state_module.CamulatorRuntimeCursor()
+
+    cursor.initialize(
+        conf={"predict": {"start_datetime": forcing_start}},
+        dynamic_ds=dynamic_ds,
+        coupler_start_datetime=forcing_start,
+        model_substeps=3,
+        logger=logger,
+    )
+
+    assert cursor.start_ix == 4
+    assert cursor.init_datetime == forcing_start
+    assert cursor.init_str == "2000-01-01T00Z"
+    assert cursor.timestep_counter == 0
+    assert cursor.current_index() == 4
+
+    cursor.advance()
+    assert cursor.timestep_counter == 1
+    assert cursor.current_index() == 7
 
 
 def test_build_jcm_land_atmosphere_components_patches_mask_and_options(

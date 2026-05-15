@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, cast
 
@@ -6,12 +6,9 @@ import jax
 from jax.typing import ArrayLike
 
 from vercor.dtypes import as_jax_real_array
-from setups._time_helpers import (
-    assign_model_timestep_alignment,
-    runtime_forcing_index,
-)
+from setups._time_helpers import assign_model_timestep_alignment
 from setups.external.camulator_state import (
-    initialize_camulator_forcing_cursor,
+    CamulatorRuntimeCursor,
     load_camulator_forcing_context,
 )
 
@@ -46,9 +43,9 @@ class _CAMulatorLandState:
     model_timestep: timedelta | None = None
     model_substeps: int = 0
     dynamic_ds: Any | None = None
-    start_ix: int = 0
-    init_str: str = ""
-    timestep_counter: int = 0
+    runtime_cursor: CamulatorRuntimeCursor = field(
+        default_factory=CamulatorRuntimeCursor
+    )
 
 
 def make_camulator_land(
@@ -102,16 +99,13 @@ def make_camulator_land(
 
         # IMPORTANT: Use the config's datetime object directly for xarray lookup
         # It might be cftime.DatetimeNoLeap, which xarray expects
-        cursor = initialize_camulator_forcing_cursor(
+        state.runtime_cursor.initialize(
             conf=state.conf,
             dynamic_ds=state.dynamic_ds,
             coupler_start_datetime=state.coupler_start_datetime,
+            model_substeps=state.model_substeps,
             logger=logger,
         )
-        state.start_ix = cursor.start_ix
-        state.init_str = cursor.init_str
-
-        state.timestep_counter = 0
 
         component.seed_declared_defaults(context.settings)
 
@@ -125,15 +119,11 @@ def make_camulator_land(
         if time is None:
             return {}
 
-        idx = runtime_forcing_index(
-            start_ix=state.start_ix,
-            timestep_counter=state.timestep_counter,
-            model_substeps=state.model_substeps,
-        )
+        idx = state.runtime_cursor.current_index()
         dynamic_ds = cast(Any, state.dynamic_ds)
         ts = dynamic_ds.isel(time=idx).load()
 
-        state.timestep_counter += 1
+        state.runtime_cursor.advance()
 
         return {
             "land_surface_temperature": _prepare_camulator_land_surface_temperature(

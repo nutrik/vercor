@@ -727,9 +727,13 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
             camulator_module._CAMulatorGCMState
         ),
     )
-    component.start_ix = 0
-    component.timestep_counter = 1
-    component.model_substeps = 1
+    component.model_substeps = 2
+    component.runtime_cursor = camulator_state_module.CamulatorRuntimeCursor(
+        start_ix=0,
+        init_str="2000-01-01T00Z",
+        model_substeps=2,
+        timestep_counter=0,
+    )
     component.dynamic_ds = dynamic_ds
     component.device = "cpu"
     component.stepper = SimpleNamespace(
@@ -762,7 +766,6 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
         longitude=SimpleNamespace(values=np.asarray([0.0, 1.0])),
     )
     component.conf = {}
-    component.init_str = "2000-01-01T00Z"
     component.lead_time_periods = 6
     component.forecast_hour = 1
     component.metadata = {}
@@ -825,3 +828,4 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     assert_allclose_compact(
         component_state.data.get("temperature"), np.full((2, 2), 9.0)
     )
+    assert component.runtime_cursor.timestep_counter == 1

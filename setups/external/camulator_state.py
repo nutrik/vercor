@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional, Literal, Sequence
 
+from setups._time_helpers import runtime_forcing_index
 from vercor.jax_logging import LoggerLike, get_default_logger
 
 CREDIT_AVAILABLE = False
@@ -196,6 +197,55 @@ class CAMulatorForcingCursor:
     start_ix: int
     init_datetime: datetime
     init_str: str
+
+
+@dataclass
+class CamulatorRuntimeCursor:
+    """Mutable CAMulator forcing cursor shared by host setup adapters."""
+
+    start_ix: int = 0
+    init_datetime: datetime | None = None
+    init_str: str = ""
+    model_substeps: int = 0
+    timestep_counter: int = 0
+
+    def initialize(
+        self,
+        *,
+        conf: dict[str, Any],
+        dynamic_ds: Any,
+        coupler_start_datetime: object,
+        model_substeps: int,
+        logger: Any,
+    ) -> CAMulatorForcingCursor:
+        """Initialize forcing index metadata and reset the runtime counter."""
+
+        cursor = initialize_camulator_forcing_cursor(
+            conf=conf,
+            dynamic_ds=dynamic_ds,
+            coupler_start_datetime=coupler_start_datetime,
+            logger=logger,
+        )
+        self.start_ix = cursor.start_ix
+        self.init_datetime = cursor.init_datetime
+        self.init_str = cursor.init_str
+        self.model_substeps = int(model_substeps)
+        self.timestep_counter = 0
+        return cursor
+
+    def current_index(self) -> int:
+        """Return the current forcing index for this cursor."""
+
+        return runtime_forcing_index(
+            start_ix=self.start_ix,
+            timestep_counter=self.timestep_counter,
+            model_substeps=self.model_substeps,
+        )
+
+    def advance(self) -> None:
+        """Advance the cursor by one runtime counter step."""
+
+        self.timestep_counter += 1
 
 
 def initialize_camulator_forcing_cursor(

@@ -154,6 +154,7 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def runtime_field_or(" in runtime_fields_source
     assert "def runtime_field_or_zeros_like(" in runtime_fields_source
     assert "def with_runtime_fields(" in runtime_fields_source
+    assert "def apply_step_result(" in runtime_fields_source
     assert "def prefill_runtime_fields(" in runtime_fields_source
     assert "def require_runtime_fields(" in runtime_fields_source
     assert "def validate_declared_runtime_fields(" in runtime_fields_source
@@ -168,6 +169,7 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "required_fields:" not in callable_source
     assert "prefill_fields:" not in callable_source
     assert "field_defaults:" not in callable_source
+    assert "def apply_callable_step_result" not in callable_source
     assert "def make_callable_component" not in callable_source
     assert "def make_callable_host_component" not in callable_source
     assert "def _create_callable_component" in callable_source
@@ -367,6 +369,26 @@ def test_private_setup_state_objects_do_not_borrow_component_methods() -> None:
         source = path.read_text(encoding="utf-8")
         for marker in forbidden_markers:
             assert marker not in source, f"{path} borrows {marker}"
+
+
+@pytest.mark.fast_always
+def test_camulator_adapters_share_runtime_cursor_state_transition_helper() -> None:
+    for path in (
+        Path("setups/external/camulator.py"),
+        Path("setups/data/camulator_land.py"),
+    ):
+        source = path.read_text(encoding="utf-8")
+        assert "CamulatorRuntimeCursor" in source, path
+        assert "runtime_forcing_index(" not in source, path
+        assert "timestep_counter += 1" not in source, path
+
+
+@pytest.mark.fast_always
+def test_jcm_land_uses_single_coordinate_conversion_helper() -> None:
+    source = Path("setups/data/jcm_land.py").read_text(encoding="utf-8")
+
+    assert "def _jcm_coordinates_in_degrees" in source
+    assert "def _coordinates_in_degrees" not in source
 
 
 @pytest.mark.fast_always

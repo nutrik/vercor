@@ -24,7 +24,7 @@ from setups.data.camulator_land import (
     _prepare_camulator_land_surface_temperature,
 )
 from setups.data.jcm_land import (
-    _coordinates_in_degrees,
+    _jcm_coordinates_in_degrees,
     _prepare_jcm_land_runtime_fields,
 )
 from vercor.runtime import RuntimeFieldStore
@@ -279,7 +279,7 @@ def test_jcm_land_coordinate_helper_supports_jit() -> None:
     longitude_radians = jnp.deg2rad(jnp.asarray([0.0, 180.0]))
     latitude_radians = jnp.deg2rad(jnp.asarray([-45.0, 45.0]))
 
-    longitude_degrees, latitude_degrees = jax.jit(_coordinates_in_degrees)(
+    longitude_degrees, latitude_degrees = jax.jit(_jcm_coordinates_in_degrees)(
         longitude_radians,
         latitude_radians,
     )
