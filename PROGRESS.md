@@ -13,7 +13,7 @@
 - Deferred high-risk audit findings intentionally: `Component` /
   `HostRuntimeComponent` inheritance changes, host/scanned runner unification,
   and callable-wrapper architecture changes.
-- Implementation commit hash will be recorded after the commit exists.
+- Implementation commit: `15fc761` (`Consolidate private runtime maintenance helpers`).
 
 ## Validation (Private Runtime Helper Consolidation, 2026-05-15)
 
