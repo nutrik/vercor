@@ -1,5 +1,46 @@
 # 2026-05-15
 
+## Private Runtime Helper Consolidation
+
+- Added private `Coupler._prepare_runtime_state(...)` so `run()` and
+  `_run_scanned_runtime()` share the same runtime-state creation/reuse and
+  optional validation transition.
+- Split runtime exchange dispatch into private scalar and vector field
+  primitives while preserving the existing behavior: scalar exchanges apply
+  fractional masks, vector exchanges do not.
+- Added boundary coverage that locks the private helper structure without
+  changing public APIs or exported names.
+- Deferred high-risk audit findings intentionally: `Component` /
+  `HostRuntimeComponent` inheritance changes, host/scanned runner unification,
+  and callable-wrapper architecture changes.
+- Implementation commit hash will be recorded after the commit exists.
+
+## Validation (Private Runtime Helper Consolidation, 2026-05-15)
+
+- `conda run -n scipy pytest tests/test_runtime_exchange.py::test_exchange_dispatch_uses_scalar_and_vector_primitives tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps -q --tb=short`
+  - failed before implementation on missing `_dispatch_scalar_exchange_field`,
+    `_dispatch_vector_exchange_field`, and `_prepare_runtime_state`
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_runtime_exchange.py tests/test_runtime_state.py tests/test_api_boundaries.py -q --tb=short`
+  - passed
+- `conda run -n scipy black vercor setups tests`
+  - first reformatted `vercor/runtime/exchange_dispatch.py`
+  - final run left all 131 files unchanged
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - first reported the extracted exchange helper update mapping needed an
+    explicit type annotation
+  - passed after annotating it (`131 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Runtime/Setup Helper Boundary Cleanup
 
 - Added `CamulatorRuntimeCursor` so CAMulator atmosphere and land adapters share

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, cast
 
 import jax
@@ -163,3 +164,10 @@ def test_runtime_dispatch_context_groups_exchanges_by_destination() -> None:
 
     assert context.destination_exchanges("ATM") == (atm_exchange,)
     assert context.destination_exchanges("OCN") == ()
+
+
+def test_exchange_dispatch_uses_scalar_and_vector_primitives() -> None:
+    source = Path("vercor/runtime/exchange_dispatch.py").read_text(encoding="utf-8")
+
+    assert "def _dispatch_scalar_exchange_field(" in source
+    assert "def _dispatch_vector_exchange_field(" in source

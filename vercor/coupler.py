@@ -345,6 +345,23 @@ class Coupler:
             ),
         )
 
+    def _prepare_runtime_state(
+        self,
+        initial_state: RuntimeCouplerState | None,
+        *,
+        validate_state: bool = True,
+    ) -> RuntimeCouplerState:
+        """Return a runtime state ready for execution."""
+
+        runtime_state = (
+            self.create_runtime_state(prefill_missing=True)
+            if initial_state is None
+            else initial_state
+        )
+        if validate_state:
+            self._validate_runtime_state(runtime_state)
+        return runtime_state
+
     def create_runtime_state(
         self, *, prefill_missing: bool = True
     ) -> RuntimeCouplerState:
@@ -461,13 +478,7 @@ class Coupler:
         runtime state as consumed after this method returns.
         """
 
-        runtime_state = (
-            self.create_runtime_state(prefill_missing=True)
-            if initial_state is None
-            else initial_state
-        )
-        self._validate_runtime_state(runtime_state)
-
+        runtime_state = self._prepare_runtime_state(initial_state)
         return run_coupler_runtime(
             runtime_state,
             components=self.components,
@@ -493,13 +504,10 @@ class Coupler:
     ) -> RuntimeCouplerState:
         """Run the unified scanned runtime path and return state."""
 
-        runtime_state = (
-            self.create_runtime_state(prefill_missing=True)
-            if initial_state is None
-            else initial_state
+        runtime_state = self._prepare_runtime_state(
+            initial_state,
+            validate_state=validate_state,
         )
-        if validate_state:
-            self._validate_runtime_state(runtime_state)
         return run_scanned_runtime(
             runtime_state,
             run_sequence=tuple(self.run_sequence),

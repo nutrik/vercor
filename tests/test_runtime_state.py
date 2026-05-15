@@ -189,6 +189,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     scanned_body = coupler_source.split("def _run_scanned_runtime", 1)[1]
     assert "host_component_names(self.components)" not in run_body
     assert "host_component_names(components)" in runtime_runner_source
+    assert "def _prepare_runtime_state(" in coupler_source
+    assert "self._prepare_runtime_state(" in run_body
+    assert "self._prepare_runtime_state(" in scanned_body
     assert "run_coupler_runtime(" in run_body
     assert "run_scanned_runtime(" in scanned_body
     assert "jax.lax.scan" not in coupler_source
