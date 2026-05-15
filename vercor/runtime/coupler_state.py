@@ -24,21 +24,6 @@ from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 
-def refresh_runtime_contracts(
-    components: Mapping[str, Component],
-    exchanges: Sequence[Exchange],
-    *,
-    validate_endpoints: bool,
-) -> dict[str, RuntimeComponentContract]:
-    """Build runtime import/export contracts for the current coupler topology."""
-
-    return build_runtime_contracts(
-        tuple(components),
-        exchanges,
-        validate_endpoints=validate_endpoints,
-    )
-
-
 def runtime_state_from_components(
     components: Mapping[str, Component],
     exchanges: Sequence[Exchange],
@@ -51,8 +36,8 @@ def runtime_state_from_components(
     """Create immutable runtime state from component setup objects."""
 
     runtime_contracts = (
-        refresh_runtime_contracts(
-            components,
+        build_runtime_contracts(
+            tuple(components),
             exchanges,
             validate_endpoints=False,
         )

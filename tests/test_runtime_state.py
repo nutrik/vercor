@@ -179,6 +179,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def validate_runtime_state(" in runtime_coupler_state_source
     assert "def runtime_dispatch_context(" in runtime_coupler_state_source
     assert "def output_masks_for_component(" in runtime_coupler_state_source
+    assert "def refresh_runtime_contracts(" not in runtime_coupler_state_source
+    assert "refresh_runtime_contracts(" not in coupler_source
+    assert "build_runtime_contracts(" in coupler_source
     assert "def prime_runtime_state(" not in runtime_coupler_state_source
     assert "prime_runtime_state(" not in coupler_source
     assert "prime_runtime_outgoing(" in coupler_source
@@ -201,7 +204,6 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "jax.lax.scan" not in coupler_source
     assert "jax.debug.callback" not in coupler_source
     assert "RuntimeFieldStore.from_mapping" not in coupler_source
-    assert "build_runtime_contracts(" not in coupler_source
     assert "_runtime_step_progress_message" not in coupler_source
     assert "_runtime_component_progress_message" not in coupler_source
     assert "def _apply_scalar" not in regridder_source

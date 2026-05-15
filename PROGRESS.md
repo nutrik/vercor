@@ -1,5 +1,49 @@
 # 2026-05-15
 
+## Private Compatibility Shim Removal
+
+- Removed the private `_author_field_spec(...)` one-hop helper and now build
+  callable component field declarations directly with `ComponentFieldSpec`.
+- Removed the private `component_field_spec(...)` fallback for light fixtures;
+  runtime-field helpers now use the real component `field_spec` property.
+- Removed the private `refresh_runtime_contracts(...)` wrapper; `Coupler` and
+  runtime state assembly now call `build_runtime_contracts(...)` directly.
+- Preserved documented/test-relied compatibility surfaces: settings attribute
+  compatibility and `ComponentSettings`, component author facades/context
+  aliases, `vercor.runtime.components` reexports, setup lazy exports and setup
+  forcing reexport, `ComponentForcingData._read_forcing()`,
+  `Coupler._run_scanned_runtime()`, `_runtime_state_from_components()`,
+  regridder class/factory APIs, and `Exchange.create()`.
+- Updated boundary coverage so the removed private shims stay removed.
+- Updated `DEPENDENCIES.md` to stop documenting contract refresh indirection.
+
+## Validation (Private Compatibility Shim Removal, 2026-05-15)
+
+- `conda run -n scipy pytest tests/test_api_boundaries.py::test_component_base_internals_are_private_modules tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps -q --tb=short`
+  - failed before implementation on the remaining `_author_field_spec(...)`
+    and `refresh_runtime_contracts(...)` wrappers
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_component_base_coverage.py::test_from_fields_and_from_model_facade_expand_scalar_defaults tests/test_component_base_coverage.py::test_data_component_seeding_updates_declared_outputs -q --tb=short`
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_runtime_state.py tests/test_coupler_coverage.py tests/test_coupler_runtime.py -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+- `conda run -n scipy black vercor setups tests`
+  - left all 131 files unchanged
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - passed (`131 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 ## Runtime FieldStore Compatibility Audit
 
 - Removed the unreachable `ValueError` branch from `RuntimeFieldStore.get(...)`;

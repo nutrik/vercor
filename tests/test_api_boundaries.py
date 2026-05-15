@@ -159,7 +159,8 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def require_runtime_fields(" in runtime_fields_source
     assert "def validate_declared_runtime_fields(" in runtime_fields_source
     assert "def validate_component_setup" in validation_source
-    assert "def _author_field_spec(" in base_source
+    assert "def _author_field_spec(" not in base_source
+    assert "def component_field_spec(" not in contracts_source
     assert "def _callable_component_from_model(" in base_source
     assert base_source.count("_callable_component_from_model(") == 3
     assert base_source.count("_create_callable_component(") == 1

@@ -9,7 +9,6 @@ from vercor.components._contracts import (
     ComponentStepResult,
     ComponentStepReturn,
     FieldNames,
-    component_field_spec,
     declared_runtime_field_names,
     normalize_author_field_values,
     unique_field_names,
@@ -190,7 +189,7 @@ def prefill_declared_runtime_fields(
 ) -> None:
     """Prefill component data from the component's declared runtime fields."""
 
-    prefill_runtime_fields(component, data, component_field_spec(component))
+    prefill_runtime_fields(component, data, component.field_spec)
 
 
 def validate_declared_runtime_fields(
@@ -199,6 +198,6 @@ def validate_declared_runtime_fields(
 ) -> None:
     """Validate fields required by the component's declared field contract."""
 
-    declared_fields = declared_runtime_field_names(component_field_spec(component))
+    declared_fields = declared_runtime_field_names(component.field_spec)
     if declared_fields:
         require_runtime_fields(component, component_state, *declared_fields)

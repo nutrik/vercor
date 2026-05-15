@@ -105,19 +105,13 @@ def declared_runtime_field_names(field_spec: ComponentFieldSpec) -> tuple[str, .
     )
 
 
-def component_field_spec(component: Any) -> ComponentFieldSpec:
-    """Return the component's declared field spec, tolerating light test fixtures."""
-
-    return getattr(component, "_field_spec", ComponentFieldSpec())
-
-
 def merge_component_outputs(
     component: Any,
     output_names: Iterable[str],
 ) -> None:
     """Merge output names into a component field declaration."""
 
-    field_spec = component_field_spec(component)
+    field_spec = component.field_spec
     component._field_spec = ComponentFieldSpec(
         inputs=field_spec.inputs,
         outputs=unique_field_names((*field_spec.outputs, *tuple(output_names))),

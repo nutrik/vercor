@@ -22,6 +22,7 @@ from vercor.output import write_runtime_component_view_to_netcdf
 from vercor.runtime import (
     RuntimeComponentContract,
     RuntimeCouplerState,
+    build_runtime_contracts,
 )
 from vercor.runtime.contexts import ComponentInitContext
 from vercor.runtime.validation import (
@@ -30,7 +31,6 @@ from vercor.runtime.validation import (
 )
 from vercor.runtime.coupler_state import (
     output_masks_for_component,
-    refresh_runtime_contracts,
     runtime_dispatch_context,
     runtime_state_from_components,
     validate_runtime_state as validate_coupler_runtime_state,
@@ -252,8 +252,8 @@ class Coupler:
 
             self.logger.info(f" Initialized {name}")
 
-        self._runtime_contracts = refresh_runtime_contracts(
-            self.components,
+        self._runtime_contracts = build_runtime_contracts(
+            tuple(self.components),
             self.exchanges,
             validate_endpoints=True,
         )
@@ -297,8 +297,8 @@ class Coupler:
     def _runtime_state_from_components(
         self, *, prefill_missing: bool = False
     ) -> RuntimeCouplerState:
-        self._runtime_contracts = refresh_runtime_contracts(
-            self.components,
+        self._runtime_contracts = build_runtime_contracts(
+            tuple(self.components),
             self.exchanges,
             validate_endpoints=False,
         )
@@ -313,8 +313,8 @@ class Coupler:
 
     def _validate_runtime_state(self, runtime_state: RuntimeCouplerState) -> None:
         if set(self._runtime_contracts) != set(self.components):
-            self._runtime_contracts = refresh_runtime_contracts(
-                self.components,
+            self._runtime_contracts = build_runtime_contracts(
+                tuple(self.components),
                 self.exchanges,
                 validate_endpoints=False,
             )

@@ -15,7 +15,6 @@ from vercor.components._contracts import (
     ComponentFieldSpec,
     ComponentStepReturn as _ComponentStepReturn,
     FieldNames as _FieldNames,
-    component_field_spec as _component_field_spec,
     merge_component_outputs as _merge_component_outputs,
     normalize_author_field_values as _normalize_author_field_values,
     unique_field_names as _unique_field_names,
@@ -66,21 +65,6 @@ __all__ = [
     "host_component",
     "validate_component_setup",
 ]
-
-
-def _author_field_spec(
-    *,
-    inputs: _FieldNames = (),
-    outputs: _FieldNames = (),
-    default_fields: _AuthorFieldValues = None,
-) -> ComponentFieldSpec:
-    """Build a component field declaration from author constructor arguments."""
-
-    return ComponentFieldSpec(
-        inputs=inputs,
-        outputs=outputs,
-        default_fields=default_fields or {},
-    )
 
 
 def _install_lifecycle_hooks(
@@ -134,10 +118,10 @@ def _callable_component_from_model(
         step=step,
         payload=payload,
         settings=settings,
-        field_spec=_author_field_spec(
+        field_spec=ComponentFieldSpec(
             inputs=inputs,
             outputs=outputs,
-            default_fields=default_fields,
+            default_fields=default_fields or {},
         ),
         initialize=initialize,
         create_runtime_payload=create_runtime_payload,
@@ -265,7 +249,7 @@ class Component(ABC):
     def field_spec(self) -> ComponentFieldSpec:
         """Return this component's declared author-facing runtime field contract."""
 
-        return _component_field_spec(self)
+        return self._field_spec
 
     @property
     def field_names(self) -> tuple[str, ...]:
@@ -355,7 +339,7 @@ class Component(ABC):
     ) -> "Component":
         """Seed this component's declared default fields and return itself."""
 
-        default_fields = _component_field_spec(self).default_fields
+        default_fields = self._field_spec.default_fields
         if default_fields:
             self.seed_fields(default_fields, policy=policy)
         return self
