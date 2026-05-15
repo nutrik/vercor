@@ -1,13 +1,9 @@
 from datetime import datetime
 
-from setups.jax_array_helpers import transposed_host_array
 from vercor import Clock, Exchange, RunSequence
-from setups.coupler_helpers import build_coupler
-from setups.data.jcm_land import make_jcm_land
-from setups.external.jax_gcm import make_jax_gcm
+from setups.coupler_helpers import add_exchanges, build_coupler
 from setups.external.veros_gcm import make_veros_gcm
 from setups.external.jax_gcm_tools import (
-    generate_jcm_coords_forcing_topography_files,
     get_default_parameter_values,
 )
 from setups.exchange_recipes import (
@@ -15,6 +11,7 @@ from setups.exchange_recipes import (
     ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
     JCM_LAND_TO_ATMOSPHERE_FIELDS,
 )
+from setups.jcm_setup_helpers import build_jcm_land_atmosphere_components
 from vercor.regridders import bilinear
 
 from jcm.physics.speedy.params import Parameters
@@ -37,23 +34,15 @@ if __name__ == "__main__":
 
     ocn = make_veros_gcm(do_spinup=True)
 
-    coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()
-
-    lnd = make_jcm_land(coords, forcing, ocn.grid)
-
-    # Swap mask in JAXGCM with ocean/land masks from ocean model
-    terrain.fmask = transposed_host_array(lnd.grid.binary_mask)  # type: ignore
-
-    # Build components
-    atm = make_jax_gcm(
-        coords,
-        terrain,
+    jcm_setup = build_jcm_land_atmosphere_components(
+        ocn.grid,
         custom_parameters=custom_jcm_parameters,
-        forcing_data=forcing,
         do_spinup=True,
         jitted=True,
         output_frequency="month",
     )
+    lnd = jcm_setup.land
+    atm = jcm_setup.atmosphere
 
     # Clock and sequence
     # Note that the number of steps is set to 365*100-2,
@@ -79,40 +68,34 @@ if __name__ == "__main__":
     )
 
     # Exchanges
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="OCN",
-            field_names=list(ATMOSPHERE_TO_VEROS_FORCING_FIELDS),
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="LND",
-            destination="ATM",
-            field_names=list(JCM_LAND_TO_ATMOSPHERE_FIELDS),
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="LND",
-            field_names=list(ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS),
-            regridder_factory=bilinear,
-        )
+    add_exchanges(
+        cpl,
+        (
+            Exchange(
+                source="ATM",
+                destination="OCN",
+                field_names=list(ATMOSPHERE_TO_VEROS_FORCING_FIELDS),
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="OCN",
+                destination="ATM",
+                field_names=["sea_surface_temperature"],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="LND",
+                destination="ATM",
+                field_names=list(JCM_LAND_TO_ATMOSPHERE_FIELDS),
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="ATM",
+                destination="LND",
+                field_names=list(ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS),
+                regridder_factory=bilinear,
+            ),
+        ),
     )
 
     cpl.initialize()

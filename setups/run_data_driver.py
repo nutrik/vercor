@@ -5,7 +5,7 @@ import jax
 
 from setups.jax_array_helpers import component_vector_speed
 from vercor import Clock, Exchange, RunSequence
-from setups.coupler_helpers import build_coupler
+from setups.coupler_helpers import add_exchanges, build_coupler
 from setups.data.era5_atmosphere import make_era5_atmosphere
 from setups.data.era5_land import make_era5_land
 from setups.data.erainterim_ocean import make_erainterim_ocean
@@ -39,79 +39,67 @@ if __name__ == "__main__":
     # Exchanges
     # scalar fields (vector field))
     # ["qbot", "zbot", ("ubot", "vbot")]
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="OCN",
-            field_names=[
-                ("u_velocity", "v_velocity"),
-                "specific_humidity",
-                "model_level_height",
-                "density",
-                "potential_temperature",
-                "temperature",
-            ],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="OCN",
-            field_names=[
-                "net_shortwave_radiation_flux",
-                "downward_longwave_radiation_flux",
-            ],
-            regridder_factory=conservative,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="LND",
-            field_names=[
-                "specific_humidity",
-                "model_level_height",
-                "potential_temperature",
-            ],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="LND",
-            field_names=[
-                "net_shortwave_radiation_flux",
-                "downward_longwave_radiation_flux",
-            ],
-            regridder_factory=conservative,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="OCN",
-            destination="ATM",
-            field_names=[
-                "sea_surface_temperature",
-            ],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="LND",
-            destination="ATM",
-            field_names=[
-                "land_surface_temperature",
-            ],
-            regridder_factory=bilinear,
-        )
+    add_exchanges(
+        cpl,
+        (
+            Exchange(
+                source="ATM",
+                destination="OCN",
+                field_names=[
+                    ("u_velocity", "v_velocity"),
+                    "specific_humidity",
+                    "model_level_height",
+                    "density",
+                    "potential_temperature",
+                    "temperature",
+                ],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="ATM",
+                destination="OCN",
+                field_names=[
+                    "net_shortwave_radiation_flux",
+                    "downward_longwave_radiation_flux",
+                ],
+                regridder_factory=conservative,
+            ),
+            Exchange(
+                source="ATM",
+                destination="LND",
+                field_names=[
+                    "specific_humidity",
+                    "model_level_height",
+                    "potential_temperature",
+                ],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="ATM",
+                destination="LND",
+                field_names=[
+                    "net_shortwave_radiation_flux",
+                    "downward_longwave_radiation_flux",
+                ],
+                regridder_factory=conservative,
+            ),
+            Exchange(
+                source="OCN",
+                destination="ATM",
+                field_names=[
+                    "sea_surface_temperature",
+                ],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="LND",
+                destination="ATM",
+                field_names=[
+                    "land_surface_temperature",
+                ],
+                regridder_factory=bilinear,
+            ),
+        ),
     )
 
     cpl.initialize()

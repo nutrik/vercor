@@ -1,3 +1,64 @@
+# 2026-05-15
+
+## Maintainability Audit Follow-Up Consolidation
+
+- Added `setups.jcm_setup_helpers.build_jcm_land_atmosphere_components(...)`
+  for the repeated JCM setup path that generates JCM inputs, builds JCM land,
+  patches `terrain.fmask` from the land mask, and constructs JAXGCM with the
+  caller's explicit options.
+- Refactored CAMulator `StateVariableAccessor` index-map construction through
+  shared private primitives for available indexed variables and unavailable
+  configured variables, preserving state/input/output tensor contracts.
+- Routed remaining multi-exchange runnable setup scripts through
+  `setups.coupler_helpers.add_exchanges(...)` while keeping exchange recipes
+  explicit in each script.
+- Corrected the `align_model_timestep(...)` non-divisible error text so it
+  states that the model timestep must evenly divide the coupling timestep.
+- Updated `DEPENDENCIES.md` for the new JCM setup helper.
+- Deferred intentionally high-risk items from the audit: JAXGCM mirrored
+  runtime/setup state, host/scanned runner unification, and component
+  inheritance changes.
+
+## Validation (Maintainability Audit Follow-Up Consolidation, 2026-05-15)
+
+- `conda run -n scipy pytest tests/ -v --fast 2>&1 | tail -20`
+  - passed baseline before implementation (`123 passed, 286 deselected`)
+- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py::test_align_model_timestep_rejects_non_divisible_model_step tests/test_setup_lifecycle_helpers.py::test_build_jcm_land_atmosphere_components_patches_mask_and_options -q --tb=short`
+  - failed before implementation on the old timestep wording and missing
+    `setups.jcm_setup_helpers`
+  - passed after implementing the helper and correcting the error text
+- `conda run -n scipy pytest tests/test_camulator_component_kernels.py::test_state_variable_accessor_builds_exact_index_maps tests/test_camulator_component_kernels.py::test_state_variable_accessor_uses_shared_index_map_builders -q --tb=short`
+  - failed before implementation on the missing shared index-map helpers
+  - passed after refactoring `StateVariableAccessor`
+- `conda run -n scipy pytest tests/test_api_boundaries.py::test_multi_exchange_setup_scripts_use_shared_add_exchanges_helper -q --tb=short`
+  - failed before implementation on direct `cpl.add_exchange(...)` usage in
+    runnable setup scripts
+  - passed after routing multi-exchange scripts through `add_exchanges(...)`
+- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py -q --tb=short`
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_camulator_component_kernels.py -q --tb=short`
+  - passed after implementation
+- `conda run -n scipy pytest tests/test_api_boundaries.py -q --tb=short`
+  - passed after implementation
+- `conda run -n scipy black vercor setups tests`
+  - first reformatted `tests/test_setup_lifecycle_helpers.py`
+  - final run left all 131 files unchanged
+  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
+    warning
+- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+  - passed (`0`)
+- `conda run -n scipy mypy vercor setups tests`
+  - first reported the JCM helper's optional binary-mask type and one test
+    double annotation issue
+  - passed after adding an explicit mask guard and widening the test double
+    annotation (`131 source files`)
+- `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  - passed
+- `conda run -n scipy pytest tests/ -q --tb=short`
+  - passed
+  - note: JAX emitted the existing dtype promotion `FutureWarning` in the
+    JAXGCM runtime gradient test
+
 # 2026-05-14
 
 ## JAXGCM Test-Only Compatibility Surface Removal

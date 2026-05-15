@@ -1,36 +1,23 @@
 from datetime import datetime
 
-from setups.jax_array_helpers import transposed_host_array
 from vercor import Clock, Exchange, RunSequence
-from setups.coupler_helpers import build_coupler
+from setups.coupler_helpers import add_exchanges, build_coupler
 from setups.data.erainterim_ocean import make_erainterim_ocean
-from setups.data.jcm_land import make_jcm_land
-from setups.external.jax_gcm import make_jax_gcm
-from setups.external.jax_gcm_tools import (
-    generate_jcm_coords_forcing_topography_files,
-)
+from setups.jcm_setup_helpers import build_jcm_land_atmosphere_components
 from vercor.regridders import bilinear
 
 if __name__ == "__main__":
     # This ocean data & grid is identical to Veros global setup (1deg. or 4deg.)
     ocn = make_erainterim_ocean(resolution="4deg")
 
-    coords, terrain, forcing = generate_jcm_coords_forcing_topography_files()
-
-    lnd = make_jcm_land(coords, forcing, ocn.grid)
-
-    # Swap mask in JAXGCM with ocean/land masks from ocean model
-    terrain.fmask = transposed_host_array(lnd.grid.binary_mask)  # type: ignore
-
-    # Build components
-    atm = make_jax_gcm(
-        coords,
-        terrain,
-        forcing_data=forcing,
+    jcm_setup = build_jcm_land_atmosphere_components(
+        ocn.grid,
         do_spinup=True,
         jitted=True,
         output_frequency="month",
     )
+    lnd = jcm_setup.land
+    atm = jcm_setup.atmosphere
 
     # Clock and sequence
     # Note that the number of steps is set to 365*100-2,
@@ -55,47 +42,41 @@ if __name__ == "__main__":
     )
 
     # Exchanges
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="OCN",
-            field_names=[
-                ("u_velocity", "v_velocity"),
-                "specific_humidity",
-                "temperature",
-                "model_level_height",
-                "net_shortwave_radiation_flux",
-                "downward_longwave_radiation_flux",
-            ],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="LND",
-            destination="ATM",
-            field_names=["soil_moisture", "land_surface_temperature"],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="LND",
-            field_names=["latent_heat_flux", "sensible_heat_flux"],
-            regridder_factory=bilinear,
-        )
+    add_exchanges(
+        cpl,
+        (
+            Exchange(
+                source="ATM",
+                destination="OCN",
+                field_names=[
+                    ("u_velocity", "v_velocity"),
+                    "specific_humidity",
+                    "temperature",
+                    "model_level_height",
+                    "net_shortwave_radiation_flux",
+                    "downward_longwave_radiation_flux",
+                ],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="OCN",
+                destination="ATM",
+                field_names=["sea_surface_temperature"],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="LND",
+                destination="ATM",
+                field_names=["soil_moisture", "land_surface_temperature"],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="ATM",
+                destination="LND",
+                field_names=["latent_heat_flux", "sensible_heat_flux"],
+                regridder_factory=bilinear,
+            ),
+        ),
     )
 
     cpl.initialize()

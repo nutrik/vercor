@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from vercor import Clock, Exchange, RunSequence
-from setups.coupler_helpers import build_coupler
+from setups.coupler_helpers import add_exchanges, build_coupler
 from setups.slab.atmosphere import make_slab_atmosphere
 from setups.slab.land import make_slab_land
 from setups.slab.ocean import make_slab_ocean
@@ -57,71 +57,56 @@ if __name__ == "__main__":
     # Exchanges
     # scalar fields (vector field))
     # ["SHF", "LHF", ("u10m", "v10m")]
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="OCN",
-            field_names=[
-                ("u_velocity_10m", "v_velocity_10m"),
-                "sensible_heat_flux",
-                "latent_heat_flux",
-            ],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="OCN",
-            destination="ICE",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="LND",
-            destination="ATM",
-            field_names=["soil_moisture"],
-            regridder_factory=bilinear,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="LND",
-            field_names=["latent_heat_flux", "sensible_heat_flux"],
-            regridder_factory=conservative,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="OCN",
-            destination="ICE",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=conservative,
-        )
-    )
-
-    cpl.add_exchange(
-        Exchange(
-            source="ICE",
-            destination="OCN",
-            field_names=["ice_fraction"],
-            regridder_factory=conservative,
-        )
+    add_exchanges(
+        cpl,
+        (
+            Exchange(
+                source="ATM",
+                destination="OCN",
+                field_names=[
+                    ("u_velocity_10m", "v_velocity_10m"),
+                    "sensible_heat_flux",
+                    "latent_heat_flux",
+                ],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="OCN",
+                destination="ATM",
+                field_names=["sea_surface_temperature"],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="OCN",
+                destination="ICE",
+                field_names=["sea_surface_temperature"],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="LND",
+                destination="ATM",
+                field_names=["soil_moisture"],
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                source="ATM",
+                destination="LND",
+                field_names=["latent_heat_flux", "sensible_heat_flux"],
+                regridder_factory=conservative,
+            ),
+            Exchange(
+                source="OCN",
+                destination="ICE",
+                field_names=["sea_surface_temperature"],
+                regridder_factory=conservative,
+            ),
+            Exchange(
+                source="ICE",
+                destination="OCN",
+                field_names=["ice_fraction"],
+                regridder_factory=conservative,
+            ),
+        ),
     )
 
     cpl.initialize()

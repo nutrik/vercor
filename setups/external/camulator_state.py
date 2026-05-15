@@ -18,7 +18,7 @@ import xarray as xr
 import torch
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, Literal
+from typing import Any, Optional, Literal, Sequence
 
 from vercor.jax_logging import LoggerLike, get_default_logger
 
@@ -229,6 +229,41 @@ def initialize_camulator_forcing_cursor(
     )
 
 
+def _append_indexed_variables(
+    indices: dict[str, dict[str, Any]],
+    variable_names: Sequence[str],
+    *,
+    start_index: int,
+    n_channels: int,
+    is_3d: bool,
+) -> int:
+    """Append available tensor-variable indices and return the next channel index."""
+
+    idx = start_index
+    for var in variable_names:
+        indices[var] = {
+            "start_idx": idx,
+            "end_idx": idx + n_channels,
+            "n_channels": n_channels,
+            "is_3d": is_3d,
+            "available": True,
+        }
+        idx += n_channels
+    return idx
+
+
+def _mark_unavailable_variables(
+    indices: dict[str, dict[str, Any]],
+    variable_names: Sequence[str],
+    *,
+    reason: str,
+) -> None:
+    """Mark variables that are recognized by config but absent from a tensor type."""
+
+    for var in variable_names:
+        indices[var] = {"available": False, "reason": reason}
+
+
 def _prepare_static_forcing_tensor(
     forcing_ds: xr.Dataset,
     static_variables: list[str],
@@ -334,41 +369,33 @@ class StateVariableAccessor:
 
     def _build_state_indices(self) -> None:
         """Build indices for pure state tensor (no forcing, no diagnostics)."""
-        indices: dict[str, dict] = {}
+        indices: dict[str, dict[str, Any]] = {}
         idx = 0
 
-        # Prognostic variables (3D with levels)
-        for var in self.prognostic_vars:
-            indices[var] = {
-                "start_idx": idx,
-                "end_idx": idx + self.levels,
-                "n_channels": self.levels,
-                "is_3d": True,
-                "available": True,
-            }
-            idx += self.levels
-
-        # Surface variables (2D)
-        for var in self.surface_vars:
-            indices[var] = {
-                "start_idx": idx,
-                "end_idx": idx + 1,
-                "n_channels": 1,
-                "is_3d": False,
-                "available": True,
-            }
-            idx += 1
-
-        # Mark diagnostics as not available in state
-        for var in self.diagnostic_vars:
-            indices[var] = {
-                "available": False,
-                "reason": "Diagnostics not in state tensor",
-            }
-
-        # Mark forcing as not available in state
-        for var in self.dynamic_forcing_vars + self.forcing_vars + self.static_vars:
-            indices[var] = {"available": False, "reason": "Forcing not in state tensor"}
+        idx = _append_indexed_variables(
+            indices,
+            self.prognostic_vars,
+            start_index=idx,
+            n_channels=self.levels,
+            is_3d=True,
+        )
+        _append_indexed_variables(
+            indices,
+            self.surface_vars,
+            start_index=idx,
+            n_channels=1,
+            is_3d=False,
+        )
+        _mark_unavailable_variables(
+            indices,
+            self.diagnostic_vars,
+            reason="Diagnostics not in state tensor",
+        )
+        _mark_unavailable_variables(
+            indices,
+            (*self.dynamic_forcing_vars, *self.forcing_vars, *self.static_vars),
+            reason="Forcing not in state tensor",
+        )
 
         self.var_indices["state"] = indices
 
@@ -378,30 +405,23 @@ class StateVariableAccessor:
         Input tensor structure: [state] + [forcing]
         Where state = prognostic + surface
         """
-        indices = {}
+        indices: dict[str, dict[str, Any]] = {}
         idx = 0
 
-        # FIRST: Prognostic variables (3D with levels) - part of state
-        for var in self.prognostic_vars:
-            indices[var] = {
-                "start_idx": idx,
-                "end_idx": idx + self.levels,
-                "n_channels": self.levels,
-                "is_3d": True,
-                "available": True,
-            }
-            idx += self.levels
-
-        # SECOND: Surface variables (2D) - part of state
-        for var in self.surface_vars:
-            indices[var] = {
-                "start_idx": idx,
-                "end_idx": idx + 1,
-                "n_channels": 1,
-                "is_3d": False,
-                "available": True,
-            }
-            idx += 1
+        idx = _append_indexed_variables(
+            indices,
+            self.prognostic_vars,
+            start_index=idx,
+            n_channels=self.levels,
+            is_3d=True,
+        )
+        idx = _append_indexed_variables(
+            indices,
+            self.surface_vars,
+            start_index=idx,
+            n_channels=1,
+            is_3d=False,
+        )
 
         # THIRD: Forcing variables - appended after state
         # Order depends on static_first flag
@@ -414,70 +434,52 @@ class StateVariableAccessor:
                 self.dynamic_forcing_vars + self.forcing_vars + self.static_vars
             )
 
-        # Add all forcing variables (2D)
-        for var in forcing_order:
-            indices[var] = {
-                "start_idx": idx,
-                "end_idx": idx + 1,
-                "n_channels": 1,
-                "is_3d": False,
-                "available": True,
-            }
-            idx += 1
-
-        # Mark diagnostics as not available in input
-        for var in self.diagnostic_vars:
-            indices[var] = {
-                "available": False,
-                "reason": "Diagnostics not in input tensor",
-            }
+        _append_indexed_variables(
+            indices,
+            forcing_order,
+            start_index=idx,
+            n_channels=1,
+            is_3d=False,
+        )
+        _mark_unavailable_variables(
+            indices,
+            self.diagnostic_vars,
+            reason="Diagnostics not in input tensor",
+        )
 
         self.var_indices["input"] = indices
 
     def _build_output_indices(self) -> None:
         """Build indices for model output tensor (with diagnostics)."""
-        indices: dict[str, dict] = {}
+        indices: dict[str, dict[str, Any]] = {}
         idx = 0
 
-        # Prognostic variables (3D with levels)
-        for var in self.prognostic_vars:
-            indices[var] = {
-                "start_idx": idx,
-                "end_idx": idx + self.levels,
-                "n_channels": self.levels,
-                "is_3d": True,
-                "available": True,
-            }
-            idx += self.levels
-
-        # Surface variables (2D)
-        for var in self.surface_vars:
-            indices[var] = {
-                "start_idx": idx,
-                "end_idx": idx + 1,
-                "n_channels": 1,
-                "is_3d": False,
-                "available": True,
-            }
-            idx += 1
-
-        # Diagnostic variables (2D)
-        for var in self.diagnostic_vars:
-            indices[var] = {
-                "start_idx": idx,
-                "end_idx": idx + 1,
-                "n_channels": 1,
-                "is_3d": False,
-                "available": True,
-            }
-            idx += 1
-
-        # Mark forcing as not available in output
-        for var in self.dynamic_forcing_vars + self.forcing_vars + self.static_vars:
-            indices[var] = {
-                "available": False,
-                "reason": "Forcing not in output tensor",
-            }
+        idx = _append_indexed_variables(
+            indices,
+            self.prognostic_vars,
+            start_index=idx,
+            n_channels=self.levels,
+            is_3d=True,
+        )
+        idx = _append_indexed_variables(
+            indices,
+            self.surface_vars,
+            start_index=idx,
+            n_channels=1,
+            is_3d=False,
+        )
+        _append_indexed_variables(
+            indices,
+            self.diagnostic_vars,
+            start_index=idx,
+            n_channels=1,
+            is_3d=False,
+        )
+        _mark_unavailable_variables(
+            indices,
+            (*self.dynamic_forcing_vars, *self.forcing_vars, *self.static_vars),
+            reason="Forcing not in output tensor",
+        )
 
         self.var_indices["output"] = indices
 

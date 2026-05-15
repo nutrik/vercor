@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from types import SimpleNamespace
+from typing import Any
 
 import jax.numpy as jnp
 import pytest
@@ -51,7 +52,10 @@ def test_align_model_timestep_returns_coupling_timestep_and_substeps() -> None:
 
 
 def test_align_model_timestep_rejects_non_divisible_model_step() -> None:
-    with pytest.raises(ValueError, match="model_timestep"):
+    with pytest.raises(
+        ValueError,
+        match=r"model_timestep .* must evenly divide coupling_timestep",
+    ):
         align_model_timestep(
             3600.0,
             timedelta(minutes=45),
@@ -155,3 +159,77 @@ def test_initialize_camulator_forcing_cursor_accepts_integer_index() -> None:
     assert cursor.start_ix == 3
     assert cursor.init_str == "2000-01-01T00Z"
     assert logger.warnings == []
+
+
+def test_build_jcm_land_atmosphere_components_patches_mask_and_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import setups.jcm_setup_helpers as helper
+
+    coords = object()
+    forcing = object()
+    terrain = SimpleNamespace(fmask="original-mask")
+    ocean_grid = make_test_grid(name="ocn-grid")
+    land_mask = jnp.asarray([[1.0, 0.0], [0.0, 1.0]])
+    land: Any = SimpleNamespace(grid=SimpleNamespace(binary_mask=land_mask))
+    atmosphere: Any = object()
+    calls: dict[str, Any] = {}
+
+    def fake_generate() -> tuple[object, SimpleNamespace, object]:
+        calls["generated"] = True
+        return coords, terrain, forcing
+
+    def fake_make_jcm_land(
+        received_coords: object,
+        received_forcing: object,
+        received_grid: object,
+    ) -> Any:
+        calls["land_args"] = (received_coords, received_forcing, received_grid)
+        return land
+
+    def fake_transposed_host_array(mask: object) -> str:
+        calls["mask"] = mask
+        return "patched-mask"
+
+    def fake_make_jax_gcm(
+        received_coords: object,
+        received_terrain: object,
+        **kwargs: object,
+    ) -> object:
+        calls["atmosphere_args"] = (received_coords, received_terrain, kwargs)
+        return atmosphere
+
+    monkeypatch.setattr(
+        helper, "generate_jcm_coords_forcing_topography_files", fake_generate
+    )
+    monkeypatch.setattr(helper, "make_jcm_land", fake_make_jcm_land)
+    monkeypatch.setattr(helper, "transposed_host_array", fake_transposed_host_array)
+    monkeypatch.setattr(helper, "make_jax_gcm", fake_make_jax_gcm)
+
+    result = helper.build_jcm_land_atmosphere_components(
+        ocean_grid,
+        custom_parameters={"surface_flux.vgust": 5.01},
+        do_spinup=False,
+        jitted=False,
+        output_frequency="year",
+    )
+
+    assert result.land is land
+    assert result.atmosphere is atmosphere
+    assert result.coords is coords
+    assert result.terrain is terrain
+    assert result.forcing is forcing
+    assert terrain.fmask == "patched-mask"
+    assert calls["mask"] is land_mask
+    assert calls["land_args"] == (coords, forcing, ocean_grid)
+    assert calls["atmosphere_args"] == (
+        coords,
+        terrain,
+        {
+            "custom_parameters": {"surface_flux.vgust": 5.01},
+            "forcing_data": forcing,
+            "do_spinup": False,
+            "jitted": False,
+            "output_frequency": "year",
+        },
+    )

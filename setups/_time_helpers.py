@@ -34,7 +34,7 @@ def align_model_timestep(
 
     if coupling_timestep % model_timestep != timedelta(days=0):
         raise ValueError(
-            f"{model_name} ({model_timestep}) must be a multiple of "
+            f"{model_name} ({model_timestep}) must evenly divide "
             f"{coupling_name} ({coupling_timestep})"
         )
 

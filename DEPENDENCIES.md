@@ -6,7 +6,7 @@
 6. `vercor/host_arrays.py` - explicit JAX/NumPy host-transfer boundary for non-differentiable adapters and output
 7. `setups/_time_helpers.py` - shared setup-time coupling/model timestep validation, lifecycle assignment, spinup logging, forcing-index, and default-field seeding helpers for setup adapters
 8. `setups/_lazy_imports.py` - shared lazy package export helper for setup modules with optional dependencies
-9. `setups/exchange_recipes.py` and `setups/coupler_helpers.py` - shared field-recipe constants plus runnable setup orchestration helpers for registering components, applying run sequences, and adding explicit exchanges
+9. `setups/exchange_recipes.py`, `setups/coupler_helpers.py`, and `setups/jcm_setup_helpers.py` - shared field-recipe constants, runnable setup orchestration helpers, and JCM land/atmosphere setup helpers for repeated runnable scripts
 10. `setups/external/jax_gcm_tools.py` - existing JAX helper layer used by the JCM adapter; validated for `jax.jit` and built on (1, 4)
 11. `setups/external/jax_gcm.py` - JCM adapter boundary that stores translated kernel outputs built on (1, 2, 7, 10)
 12. `setups/external/veros_runtime_settings.py` and `setups/external/veros_gcm.py` - explicit Veros host-runtime configuration plus the Veros adapter boundary that converts translated flux outputs back to NumPy for Veros state updates built on (1, 5, 6, 7)

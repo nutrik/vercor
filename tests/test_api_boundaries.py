@@ -253,6 +253,22 @@ def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
 
 
 @pytest.mark.fast_always
+def test_multi_exchange_setup_scripts_use_shared_add_exchanges_helper() -> None:
+    multi_exchange_scripts = (
+        Path("setups/run_data_driver.py"),
+        Path("setups/run_jcm_with_verosdata.py"),
+        Path("setups/run_jcm_with_veros.py"),
+        Path("setups/run_jcm_with_slab.py"),
+        Path("setups/run_slab_driver.py"),
+    )
+
+    for path in multi_exchange_scripts:
+        source = path.read_text(encoding="utf-8")
+        assert "add_exchanges" in source, path
+        assert "cpl.add_exchange(" not in source, path
+
+
+@pytest.mark.fast_always
 def test_runtime_state_is_separate_from_public_component_objects() -> None:
     assert hasattr(components_module, "DataComponent")
     component = components_module.DataComponent(

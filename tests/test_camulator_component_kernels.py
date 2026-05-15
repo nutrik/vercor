@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 import torch
 import xarray as xr
 
@@ -195,6 +197,91 @@ def test_prepare_static_forcing_tensor_preserves_order_and_shape() -> None:
             ]
         ),
     )
+
+
+def _state_variable_accessor_conf(static_first: bool = False) -> dict[str, Any]:
+    return {
+        "data": {
+            "variables": ["U", "V"],
+            "surface_variables": ["TS", "PS"],
+            "diagnostic_variables": ["FSNS"],
+            "dynamic_forcing_variables": ["SOLIN"],
+            "forcing_variables": ["ORO"],
+            "static_variables": ["LAND"],
+            "static_first": static_first,
+        },
+        "model": {"levels": 3},
+    }
+
+
+def test_state_variable_accessor_builds_exact_index_maps() -> None:
+    state_accessor = camulator_state_module.StateVariableAccessor(
+        _state_variable_accessor_conf(),
+        tensor_type="state",
+    )
+    input_accessor = camulator_state_module.StateVariableAccessor(
+        _state_variable_accessor_conf(static_first=False),
+        tensor_type="input",
+    )
+    static_first_input_accessor = camulator_state_module.StateVariableAccessor(
+        _state_variable_accessor_conf(static_first=True),
+        tensor_type="input",
+    )
+    output_accessor = camulator_state_module.StateVariableAccessor(
+        _state_variable_accessor_conf(),
+        tensor_type="output",
+    )
+
+    assert state_accessor.get_var_info("U") == {
+        "start_idx": 0,
+        "end_idx": 3,
+        "n_channels": 3,
+        "is_3d": True,
+        "available": True,
+    }
+    assert state_accessor.get_var_info("V")["start_idx"] == 3
+    assert state_accessor.get_var_info("TS")["start_idx"] == 6
+    assert state_accessor.get_var_info("PS")["end_idx"] == 8
+    assert state_accessor.get_var_info("FSNS") == {
+        "available": False,
+        "reason": "Diagnostics not in state tensor",
+    }
+    assert state_accessor.get_var_info("SOLIN") == {
+        "available": False,
+        "reason": "Forcing not in state tensor",
+    }
+
+    assert input_accessor.get_var_info("SOLIN")["start_idx"] == 8
+    assert input_accessor.get_var_info("ORO")["start_idx"] == 9
+    assert input_accessor.get_var_info("LAND")["start_idx"] == 10
+    assert static_first_input_accessor.get_var_info("LAND")["start_idx"] == 8
+    assert static_first_input_accessor.get_var_info("SOLIN")["start_idx"] == 9
+    assert static_first_input_accessor.get_var_info("ORO")["start_idx"] == 10
+    assert input_accessor.get_var_info("FSNS") == {
+        "available": False,
+        "reason": "Diagnostics not in input tensor",
+    }
+
+    assert output_accessor.get_var_info("FSNS") == {
+        "start_idx": 8,
+        "end_idx": 9,
+        "n_channels": 1,
+        "is_3d": False,
+        "available": True,
+    }
+    assert output_accessor.get_var_info("LAND") == {
+        "available": False,
+        "reason": "Forcing not in output tensor",
+    }
+
+
+@pytest.mark.fast_always
+def test_state_variable_accessor_uses_shared_index_map_builders() -> None:
+    source = Path("setups/external/camulator_state.py").read_text(encoding="utf-8")
+
+    assert "def _append_indexed_variables(" in source
+    assert "def _mark_unavailable_variables(" in source
+    assert source.count('"start_idx": idx') == 1
 
 
 def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions() -> (
