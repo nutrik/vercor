@@ -122,6 +122,16 @@ def test_regridder_has_identical_grids_true_for_equal_coords() -> None:
     assert regridder.has_identical_grids is True
 
 
+def test_regridder_identical_grid_uses_shared_coordinate_tolerance() -> None:
+    lon = np.array([0.0, 1.0, 2.0])
+    lat = np.array([0.0, 1.0])
+    src_grid = _make_grid("src", lon.copy(), lat.copy())
+    dst_grid = _make_grid("dst", lon + 1e-16, lat.copy())
+
+    regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
+    assert regridder.has_identical_grids is True
+
+
 def test_regridder_has_identical_grids_false_for_different_coords() -> None:
     src_grid = _make_grid("src", np.array([0.0, 1.0, 2.0]), np.array([0.0, 1.0]))
     dst_grid = _make_grid("dst", np.array([0.0, 2.0, 4.0]), np.array([0.0, 1.0]))

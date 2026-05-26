@@ -126,7 +126,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     camulator_source = Path("vercor/setups/external/camulator.py").read_text(
         encoding="utf-8"
     )
-    camulator_land_source = Path("vercor/setups/data/camulator_land.py").read_text(
+    camulator_land_source = Path("vercor/setups/external/camulator_land.py").read_text(
         encoding="utf-8"
     )
     veros_runtime_settings_source = Path(

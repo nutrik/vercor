@@ -400,7 +400,7 @@ def test_private_setup_state_objects_do_not_borrow_component_methods() -> None:
         Path("vercor/setups/external/jax_gcm.py"),
         Path("vercor/setups/external/veros_gcm.py"),
         Path("vercor/setups/external/camulator.py"),
-        Path("vercor/setups/data/camulator_land.py"),
+        Path("vercor/setups/external/camulator_land.py"),
     ):
         source = path.read_text(encoding="utf-8")
         for marker in forbidden_markers:
@@ -424,20 +424,44 @@ def test_setup_adapters_do_not_import_runtime_context_or_store_internals() -> No
 @pytest.mark.fast_always
 def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None:
     import vercor.calendar as calendar_module
+    import vercor.clock as clock_module
+    import vercor.field_names as field_names_module
     import vercor.fluxes.vertical_coordinates as vertical_module
     import vercor.grid_geometry as grid_geometry_module
+    import vercor.grid_masks as grid_masks_module
     import vercor.pytree_utils as pytree_utils_module
+    import vercor.exchange as exchange_module
 
     assert callable(calendar_module.is_leap_year)
     assert callable(calendar_module.daily_forcing_index)
+    assert calendar_module.DateTime360 is clock_module.DateTime360
+    assert calendar_module.DateTime365 is clock_module.DateTime365
+    assert calendar_module.ModelDateTime == clock_module.ModelDateTime
     assert callable(grid_geometry_module.make_rectilinear_grid)
     assert callable(grid_geometry_module.centers_to_edges)
+    assert grid_masks_module.grids_identical is grid_geometry_module.grids_identical
     assert callable(vertical_module.compute_pressure_levels)
+    assert callable(vertical_module.compute_sigma_pressure_levels)
+    assert callable(vertical_module.compute_hybrid_pressure_levels)
+    assert callable(vertical_module.compute_hybrid_sigma_full_level_altitudes)
     assert callable(vertical_module.get_altitudes_sigma_levels)
     assert callable(pytree_utils_module.mean_leaf)
     assert callable(pytree_utils_module.stack_objects)
     assert callable(pytree_utils_module.unwrap_leading_dims)
+    assert (
+        exchange_module.VALID_EXCHANGE_FIELD_NAMES
+        is field_names_module.VALID_EXCHANGE_FIELD_NAMES
+    )
 
+    clock_source = Path("vercor/clock.py").read_text(encoding="utf-8")
+    runtime_time_source = Path("vercor/runtime/time.py").read_text(encoding="utf-8")
+    runtime_validation_source = Path("vercor/runtime/validation.py").read_text(
+        encoding="utf-8"
+    )
+    exchange_source = Path("vercor/exchange.py").read_text(encoding="utf-8")
+    regridder_base_source = Path("vercor/regridders/base.py").read_text(
+        encoding="utf-8"
+    )
     regridder_init = Path("vercor/regridders/__init__.py").read_text(encoding="utf-8")
     grid_masks_source = Path("vercor/grid_masks.py").read_text(encoding="utf-8")
     topology_source = Path("vercor/runtime/topology.py").read_text(encoding="utf-8")
@@ -445,6 +469,21 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
         encoding="utf-8"
     )
 
+    assert "class _ModelDateTimeBase" not in clock_source
+    assert "class DateTime365" not in clock_source
+    assert "class DateTime360" not in clock_source
+    assert "def runtime_daily_index(" not in runtime_time_source
+    assert "from vercor.exchange import VALID_EXCHANGE_FIELD_NAMES" not in (
+        runtime_validation_source
+    )
+    assert "from vercor.field_names import VALID_EXCHANGE_FIELD_NAMES" in (
+        runtime_validation_source
+    )
+    assert "from vercor.field_names import" in exchange_source
+    assert "VALID_EXCHANGE_FIELD_NAMES as VALID_EXCHANGE_FIELD_NAMES" in exchange_source
+    assert "VALID_EXCHANGE_FIELD_NAMES: list[str]" not in exchange_source
+    assert "def _compute_has_identical_grids(" not in regridder_base_source
+    assert "grids_identical(" in regridder_base_source
     assert "make_rectilinear_grid" not in regridder_init
     assert "centers_to_edges" not in regridder_init
     assert "compute_land_mask" not in regridder_init
@@ -456,6 +495,63 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert "def mean_leaf(" not in jax_gcm_tools_source
     assert "def stack_objects(" not in jax_gcm_tools_source
     assert "def unwrap_leading_dims(" not in jax_gcm_tools_source
+
+
+@pytest.mark.fast_always
+def test_setup_helper_and_external_output_ownership_boundaries() -> None:
+    import vercor.diagnostics as diagnostics_module
+    import vercor.host_arrays as host_arrays_module
+    import vercor.setups.jax_array_helpers as jax_array_helpers_module
+    import vercor.setups.data.camulator_land as camulator_land_compat_module
+    import vercor.setups.external.camulator_land as camulator_land_module
+
+    assert (
+        jax_array_helpers_module.transposed_host_array
+        is host_arrays_module.transposed_host_array
+    )
+    assert (
+        jax_array_helpers_module.component_vector_speed
+        is diagnostics_module.component_vector_speed
+    )
+    assert (
+        camulator_land_compat_module.make_camulator_land
+        is camulator_land_module.make_camulator_land
+    )
+
+    helper_source = Path("vercor/setups/jax_array_helpers.py").read_text(
+        encoding="utf-8"
+    )
+    camulator_land_compat_source = Path(
+        "vercor/setups/data/camulator_land.py"
+    ).read_text(encoding="utf-8")
+    jax_gcm_source = Path("vercor/setups/external/jax_gcm.py").read_text(
+        encoding="utf-8"
+    )
+    camulator_source = Path("vercor/setups/external/camulator.py").read_text(
+        encoding="utf-8"
+    )
+    camulator_imports_source = Path(
+        "vercor/setups/external/camulator_imports.py"
+    ).read_text(encoding="utf-8")
+    windpp_source = Path("vercor/setups/external/windpp.py").read_text(encoding="utf-8")
+
+    assert Path("vercor/setups/external/camulator_land.py").exists()
+    assert Path("vercor/setups/external/jax_gcm_output.py").exists()
+    assert Path("vercor/setups/external/camulator_output.py").exists()
+    assert Path("vercor/setups/external/camulator_wind_filter.py").exists()
+
+    assert "def transposed_host_array(" not in helper_source
+    assert "def component_vector_speed(" not in helper_source
+    assert "def make_camulator_land(" not in camulator_land_compat_source
+    assert "from vercor.runtime.validation import" not in jax_gcm_source
+    assert "def _should_write_output(" not in jax_gcm_source
+    assert "def _write_output(" not in jax_gcm_source
+    assert "def _credit_output_functions(" not in camulator_source
+    assert "def _write_camulator_prediction_output(" not in camulator_source
+    assert "from vercor.setups.external.camulator_wind_filter import" in (
+        camulator_imports_source
+    )
+    assert "def apply_wind_artifact_filter_to_tensor(" not in windpp_source
 
 
 @pytest.mark.fast_always
@@ -482,7 +578,7 @@ def test_assets_and_diagnostics_have_focused_ownership_boundaries() -> None:
 def test_camulator_adapters_share_runtime_cursor_state_transition_helper() -> None:
     for path in (
         Path("vercor/setups/external/camulator.py"),
-        Path("vercor/setups/data/camulator_land.py"),
+        Path("vercor/setups/external/camulator_land.py"),
     ):
         source = path.read_text(encoding="utf-8")
         assert "CamulatorRuntimeCursor" in source, path

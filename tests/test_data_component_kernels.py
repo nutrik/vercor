@@ -20,7 +20,7 @@ from vercor.setups.data.erainterim_ocean import (
     _assemble_erainterim_latitude,
     _binary_ocean_mask_from_salinity,
 )
-from vercor.setups.data.camulator_land import (
+from vercor.setups.external.camulator_land import (
     _prepare_camulator_land_surface_temperature,
 )
 from vercor.setups.data.jcm_land import (

@@ -5,12 +5,12 @@ from typing import Mapping, Protocol
 
 import jax.numpy as jnp
 
-from vercor.clock import (
+from vercor.calendar import (
     DateTime360,
     DateTime365,
     ModelDateTime,
+    daily_forcing_day_of_year,
 )
-from vercor.calendar import daily_forcing_day_of_year
 from vercor.types import RuntimeArray
 
 

@@ -10,6 +10,19 @@ from vercor.types import RuntimeArray
 ComponentMetric = str | Callable[[RuntimeComponentView], RuntimeArray | float]
 
 
+def component_vector_speed(
+    component_state: object,
+    u_field: str = "u_velocity",
+    v_field: str = "v_velocity",
+) -> RuntimeArray:
+    """Return vector speed from a runtime component state."""
+
+    data = getattr(component_state, "data")
+    u = jnp.asarray(data.get(u_field))
+    v = jnp.asarray(data.get(v_field))
+    return jnp.sqrt(u**2 + v**2)
+
+
 def combine_surface_temperatures(
     land_surface_temperature: RuntimeArray,
     sea_surface_temperature: RuntimeArray,

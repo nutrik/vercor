@@ -5,8 +5,29 @@ from typing import Any, cast
 from jax import Array, lax
 import jax.numpy as jnp
 
-from vercor.dtypes import as_jax_real_array, jax_linspace
+from vercor.dtypes import as_jax_real_array, dtype_policy, jax_linspace
 from vercor.grid import RectilinearGrid
+from vercor.types import RuntimeArray
+
+
+def _coordinate_allclose(values_0: RuntimeArray, values_1: RuntimeArray) -> bool:
+    policy = dtype_policy()
+    dtype = policy.jax_real
+    array_0 = jnp.asarray(values_0, dtype=dtype)
+    array_1 = jnp.asarray(values_1, dtype=dtype)
+    atol = jnp.asarray(1e-15 if policy.enable_x64 else 1e-6, dtype=dtype)
+    rtol = jnp.asarray(0.0, dtype=dtype)
+    return bool(jnp.allclose(array_0, array_1, rtol=rtol, atol=atol))
+
+
+def grids_identical(g0: RectilinearGrid, g1: RectilinearGrid) -> bool:
+    """Return whether two rectilinear grids have the same shape and coordinates."""
+
+    return (
+        g0.shape == g1.shape
+        and _coordinate_allclose(g0.latitude, g1.latitude)
+        and _coordinate_allclose(g0.longitude, g1.longitude)
+    )
 
 
 def make_rectilinear_grid(

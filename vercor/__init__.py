@@ -1,5 +1,6 @@
 from vercor import fluxes
-from vercor.clock import Clock, DateTime360, DateTime365, CustomDateTime, ModelDateTime
+from vercor.calendar import DateTime360, DateTime365, CustomDateTime, ModelDateTime
+from vercor.clock import Clock
 from vercor.components.base import (
     Component,
     ComponentFieldSpec,

@@ -459,7 +459,7 @@ def test_era5_atmosphere_constructor_initialize_and_step(
     monkeypatch.setattr(era5_atmosphere_module, "_read_forcing", fake_read_forcing)
     monkeypatch.setattr(
         era5_atmosphere_module,
-        "compute_pressure_levels",
+        "compute_hybrid_pressure_levels",
         fake_compute_pressure_levels,
     )
     monkeypatch.setattr(

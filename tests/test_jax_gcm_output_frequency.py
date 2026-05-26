@@ -7,8 +7,8 @@ from typing import Any, cast
 import pytest
 
 from tests.conftest import SelectFastCases
-from vercor.clock import DateTime360
-from vercor.setups.external.jax_gcm import _JAXGCMState
+from vercor.calendar import DateTime360
+from vercor.setups.external.jax_gcm_output import should_write_period_output
 
 
 @dataclass(frozen=True)
@@ -20,14 +20,8 @@ class OutputFrequencyCase:
     expected: bool
 
 
-def _make_component(output_frequency: object | None) -> Any:
-    component = _JAXGCMState.__new__(_JAXGCMState)
-    component.output_frequency = cast(Any, output_frequency)
-    return component
-
-
 @pytest.mark.fast_always
-def test_should_write_output_frequency_cases(
+def test_should_write_period_output_frequency_cases(
     select_fast_cases: SelectFastCases,
 ) -> None:
     cases = [
@@ -129,12 +123,24 @@ def test_should_write_output_frequency_cases(
         case_id=lambda case: case.case_id,
         min_cases=3,
     ):
-        component = _make_component(case.output_frequency)
-        assert component._should_write_output(case.time, case.dt) is case.expected
+        assert (
+            should_write_period_output(
+                time=case.time,
+                dt=case.dt,
+                output_frequency=cast(Any, case.output_frequency),
+            )
+            is case.expected
+        )
 
 
 def test_is_period_end_stays_false_within_same_day() -> None:
-    component = _make_component("day")
     time = datetime(2026, 2, 20, 12, 0, 0)
 
-    assert component._is_period_end(time, timedelta(minutes=30), "day") is False
+    assert (
+        should_write_period_output(
+            time=time,
+            dt=timedelta(minutes=30),
+            output_frequency="day",
+        )
+        is False
+    )

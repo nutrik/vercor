@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Optional, Literal, cast
+from datetime import timedelta
+from typing import TYPE_CHECKING, Any, Optional
 
 import jax
 import jax.numpy as jnp
 import tree_math
-import xarray as xr
 
 from dinosaur import primitive_equations
 from dinosaur.coordinate_systems import CoordinateSystem
@@ -25,7 +24,6 @@ from jcm.physics_interface import (
     dynamics_state_to_physics_state,
 )
 
-from vercor.clock import ModelDateTime
 from vercor.components import (
     Component,
     ComponentSetupContext,
@@ -42,8 +40,12 @@ from vercor.setups._time_helpers import (
 from vercor.setups.external.jax_gcm_tools import (
     change_jcm_parameter_values,
 )
+from vercor.setups.external.jax_gcm_output import (
+    should_write_period_output,
+    write_jax_gcm_averages_output,
+)
 from vercor.fluxes.vertical_coordinates import (
-    compute_pressure_levels,
+    compute_sigma_pressure_levels,
     get_altitudes_sigma_levels,
 )
 from vercor.pytree_utils import mean_leaf, stack_objects, unwrap_leading_dims
@@ -54,12 +56,7 @@ from vercor.dtypes import (
     jax_zeros,
 )
 from vercor.grid import RectilinearGrid
-from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.pytree import PyTreeNodeMixin
-from vercor.runtime.validation import (
-    validate_runtime_data_field_exists,
-    validate_runtime_grid_data_field,
-)
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
@@ -207,7 +204,7 @@ def _map_jcm_output_fields(
         downward_longwave_radiation_flux
     ).T
 
-    pressure = compute_pressure_levels(
+    pressure = compute_sigma_pressure_levels(
         as_jax_real_array(reference_pressure),
         as_jax_real_array(0.0),
         as_jax_real_array(sigma_levels),
@@ -497,14 +494,15 @@ class _JAXGCMState:
                 f"for component '{component.name}'"
             )
 
-        for field_name in _JAXGCM_REQUIRED_GRID_FIELD_NAMES:
-            validate_runtime_grid_data_field(
-                component,
-                component_state,
-                field_name,
-            )
+        component.require_runtime_fields(
+            component_state, *_JAXGCM_REQUIRED_GRID_FIELD_NAMES
+        )
 
-        validate_runtime_data_field_exists(component, component_state, "pressure")
+        if "pressure" not in component_state.data:
+            raise CouplerError(
+                "Runtime missing required data field "
+                f"'pressure' for component '{component.name}'"
+            )
         pressure_shape = jnp.asarray(component_state.data.get("pressure")).shape
         sigma_levels = jnp.asarray(self.sigma_levels)
         expected_pressure_shape = (sigma_levels.shape[0], *component.grid.shape)
@@ -639,82 +637,19 @@ class _JAXGCMState:
                 jnp.sum(cold_surface_cells),
             )
 
-        if self._should_write_output(
+        if should_write_period_output(
             time=time,
             dt=timedelta(seconds=context.dt_seconds),
+            output_frequency=self.output_frequency,
         ):
             date_time = time.strftime("%Y-%m-%d")
-            self._write_output(
+            write_jax_gcm_averages_output(
+                self._predictions_list,
                 output=f"jcm.averages.{date_time}.nc",
                 logger=logger,
             )
 
         return step_result
-
-    def _is_period_end(
-        self,
-        time: datetime | ModelDateTime,
-        dt: timedelta,
-        frequency: Literal["day", "month", "year"],
-    ) -> bool:
-        next_time = time + dt
-
-        if frequency == "day":
-            return (
-                next_time.year != time.year
-                or next_time.month != time.month
-                or next_time.day != time.day
-            )
-        if frequency == "month":
-            return next_time.year != time.year or next_time.month != time.month
-
-        return next_time.year != time.year
-
-    def _should_write_output(
-        self,
-        time: datetime | ModelDateTime,
-        dt: timedelta,
-    ) -> bool:
-        if self.output_frequency is None:
-            return True
-
-        if not isinstance(self.output_frequency, str):
-            return False
-
-        frequency = self.output_frequency.lower()
-        if frequency not in ("day", "month", "year"):
-            return False
-
-        return self._is_period_end(
-            time=time,
-            dt=dt,
-            frequency=cast(Literal["day", "month", "year"], frequency),
-        )
-
-    def _write_output(
-        self,
-        output: str,
-        logger: LoggerLike | None = None,
-    ) -> None:
-        ds = cast(
-            xr.Dataset,
-            xr.merge(
-                [_prediction.to_xarray() for _prediction in self._predictions_list]
-            ),
-        )
-
-        log = logger if logger is not None else get_default_logger()
-        log.info(f"Output file: {output:s}")
-
-        t_end = ds.time.isel(time=-1)
-        ds.mean(dim="time", keep_attrs=True, keepdims=True).assign_coords(
-            time=[t_end.values]
-        ).transpose("time", "wvi_id", "hsg_level", "level", "lat", "lon").to_netcdf(
-            output, engine="h5netcdf"
-        )
-
-        # Clear the predictions list after saving to disk to free up memory
-        self._predictions_list = []
 
 
 def make_jax_gcm(

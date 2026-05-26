@@ -241,14 +241,19 @@ should not depend on a top-level `setups` package. Setup adapters use
 mappings at their author boundary instead of importing runtime context/store
 internals directly.
 
-Core helper ownership follows the same boundary. Calendar constants, leap-year
-logic, 360/noleap daily mapping, and runtime daily forcing indexes live in
-`vercor.calendar`. Rectilinear grid construction and center-to-edge geometry
-live in `vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while
-component lookup for exchange topology is private to `vercor.runtime.topology`.
-Generic sigma-coordinate pressure/altitude helpers live in
+Core helper ownership follows the same boundary. Calendar constants,
+model-calendar datetime values, leap-year logic, 360/noleap daily mapping, and
+runtime daily forcing indexes live in `vercor.calendar`. The canonical exchange
+field vocabulary lives in `vercor.field_names`. Rectilinear grid construction,
+center-to-edge geometry, and grid identity checks live in
+`vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while component
+lookup for exchange topology is private to `vercor.runtime.topology`. Generic
+hybrid/sigma-coordinate pressure and altitude helpers live in
 `vercor.fluxes.vertical_coordinates`, and generic PyTree transforms live in
 `vercor.pytree_utils`.
+Adapter-specific file output policy lives beside adapters in focused output
+helpers, such as `vercor.setups.external.jax_gcm_output` and
+`vercor.setups.external.camulator_output`, instead of in stepping adapters.
 
 `vercor.assets` owns generic cache, download, and checksum validation only.
 Concrete forcing product registries and `get_forcing_data(...)` defaults live
@@ -258,11 +263,15 @@ into `vercor.diagnostics.fields`, `vercor.diagnostics.tables`, and
 reexport surface.
 
 CAMulator optional-dependency loading, forcing cursors, tensor accessors,
-stepping, and initialization are split across
+stepping, output, wind filtering, land forcing, and initialization are split
+across
 `vercor.setups.external.camulator_imports`,
 `vercor.setups.external.camulator_forcing`,
 `vercor.setups.external.camulator_tensors`,
-`vercor.setups.external.camulator_stepper`, and
+`vercor.setups.external.camulator_stepper`,
+`vercor.setups.external.camulator_output`,
+`vercor.setups.external.camulator_wind_filter`,
+`vercor.setups.external.camulator_land`, and
 `vercor.setups.external.camulator_init`. The old `camulator_state` module is a
 thin compatibility facade over those focused modules.
 

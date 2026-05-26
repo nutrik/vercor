@@ -1,9 +1,8 @@
 from typing import Any, Tuple, Union, cast
 
-import jax.numpy as jnp
-
 from vercor.exceptions import RegridderError
 from vercor.grid import RectilinearGrid
+from vercor.grid_geometry import grids_identical
 from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 from vercor.interpolators.conservative_remap_rectilinear import (
     ConservativeRectilinearRemapper,
@@ -19,25 +18,9 @@ class Regridder:
         self.interpolator: Union[
             BilinearRectilinearInterpolator, ConservativeRectilinearRemapper, None
         ] = None
-        self._has_identical_grids = self._compute_has_identical_grids()
-
-    def _compute_has_identical_grids(self) -> bool:
-        """Check if source and destination grids are identical in shape and coordinates."""
-
-        source = self.source_grid
-        destination = self.destination_grid
-
-        shape_condition = source.shape == destination.shape
-
-        if not shape_condition:
-            return False
-
-        coord_condition = bool(
-            jnp.all(jnp.equal(source.latitude, destination.latitude))
-            & jnp.all(jnp.equal(source.longitude, destination.longitude))
+        self._has_identical_grids = grids_identical(
+            self.source_grid, self.destination_grid
         )
-
-        return shape_condition and coord_condition
 
     @property
     def has_identical_grids(self) -> bool:

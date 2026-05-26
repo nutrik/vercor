@@ -15,6 +15,7 @@ import pytest
 import xarray as xr
 
 import vercor.setups.external.jax_gcm as jax_gcm_module
+import vercor.setups.external.jax_gcm_output as jax_gcm_output_module
 import vercor.setups.external.veros_gcm as veros_gcm_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
@@ -235,7 +236,7 @@ def test_map_jcm_output_fields_supports_jit(
 ) -> None:
     monkeypatch.setattr(
         jax_gcm_module,
-        "compute_pressure_levels",
+        "compute_sigma_pressure_levels",
         lambda reference_pressure, top_pressure, sigma_levels, normalized_surface_pressure: jnp.asarray(
             [
                 jnp.full((2, 2), 90000.0),
@@ -647,7 +648,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     monkeypatch.setattr(jax_gcm_module, "mean_leaf", lambda obj, axis: obj)
     monkeypatch.setattr(
         jax_gcm_module,
-        "compute_pressure_levels",
+        "compute_sigma_pressure_levels",
         lambda reference_pressure, top_pressure, sigma_levels, normalized_surface_pressure: jnp.asarray(
             [
                 np.full((2, 2), 90000.0),
@@ -666,11 +667,25 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
         ),
     )
     cast(Any, jax_gcm_module._map_jcm_output_fields).clear_cache()
-    monkeypatch.setattr(component, "_should_write_output", lambda time, dt: True)
+
+    def fake_write_jax_gcm_averages_output(
+        predictions: list[Any],
+        output: str,
+        logger: Any | None = None,
+    ) -> None:
+        _ = logger
+        written["path"] = output
+        predictions.clear()
+
     monkeypatch.setattr(
-        component,
-        "_write_output",
-        lambda output, logger=None: written.__setitem__("path", output),
+        jax_gcm_module,
+        "should_write_period_output",
+        lambda time, dt, output_frequency: True,
+    )
+    monkeypatch.setattr(
+        jax_gcm_module,
+        "write_jax_gcm_averages_output",
+        fake_write_jax_gcm_averages_output,
     )
 
     coupler = _make_coupler(
@@ -772,7 +787,6 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
 
 
 def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
-    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
     dataset = xr.Dataset(
         {
             "temperature": (
@@ -789,19 +803,23 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
             "lon": [0],
         },
     )
-    component._predictions_list = [_PredictionDataset(dataset=dataset)]
+    predictions = [_PredictionDataset(dataset=dataset)]
 
     output = tmp_path / "jcm_output.nc"
     logger_name = "VerCOR.test.jax-gcm-output"
     logger = logging.getLogger(logger_name)
 
     with capture_logger_output(logger_name) as stream:
-        component._write_output(str(output), logger=logger)
+        jax_gcm_output_module.write_jax_gcm_averages_output(
+            predictions,
+            str(output),
+            logger=logger,
+        )
 
     with xr.open_dataset(output) as actual:
         assert actual["temperature"].shape == (1, 1, 1, 1, 1, 1)
         assert np.isclose(float(actual["temperature"].values.squeeze()), 0.5)
-    assert component._predictions_list == []
+    assert predictions == []
     assert f"Output file: {output}" in stream.getvalue()
 
 

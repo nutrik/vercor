@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import jax.numpy as jnp
 
 from vercor.exceptions import ComponentError, CouplerError
-from vercor.exchange import VALID_EXCHANGE_FIELD_NAMES
+from vercor.field_names import VALID_EXCHANGE_FIELD_NAMES
 from vercor.field_layout import (
     canonical_data_layout_description,
     is_canonical_grid_field_shape,

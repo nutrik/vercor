@@ -2,32 +2,12 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Callable, Union
 
+from vercor.field_names import (  # noqa: F401
+    VALID_EXCHANGE_FIELD_NAMES as VALID_EXCHANGE_FIELD_NAMES,
+)
 from vercor.grid import Grid
 from vercor.regridders.bilinear import BilinearRectilinearRegridder
 from vercor.regridders.conservative import ConservativeRectilinearRegridder
-
-VALID_EXCHANGE_FIELD_NAMES: list[str] = [
-    "specific_humidity",
-    "temperature",
-    "temperature_2m",
-    "potential_temperature",
-    "sea_surface_temperature",
-    "land_surface_temperature",
-    "model_level_height",
-    "u_velocity",
-    "v_velocity",
-    "u_velocity_10m",
-    "v_velocity_10m",
-    "surface_pressure",
-    "pressure",
-    "density",
-    "ice_fraction",
-    "soil_moisture",
-    "sensible_heat_flux",
-    "latent_heat_flux",
-    "net_shortwave_radiation_flux",
-    "downward_longwave_radiation_flux",
-]
 
 
 def _regridder_factory_name(regridder_factory: Callable[..., object]) -> str:

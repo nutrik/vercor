@@ -1,15 +1,14 @@
 from datetime import datetime
 from typing import Any, Callable
 
-import jax
-
-from vercor.setups.jax_array_helpers import component_vector_speed
 from vercor import Clock, Exchange, RunSequence
+from vercor.diagnostics import component_vector_speed
 from vercor.setups.coupler_helpers import add_exchanges, build_coupler
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.setups.data.era5_land import make_era5_land
 from vercor.setups.data.erainterim_ocean import make_erainterim_ocean
 from vercor.regridders import bilinear, conservative
+from vercor.types import RuntimeArray
 from vercor.diagnostics import (
     plot_component_scalar_vector_comparison,
     print_component_field_means_table,
@@ -106,7 +105,7 @@ if __name__ == "__main__":
     final_state = cpl.run()
     cpl.finalize(final_state)
 
-    Metric = str | Callable[[Any], jax.Array | float]
+    Metric = str | Callable[[Any], RuntimeArray | float]
 
     variables: list[tuple[Metric, str]] = [
         ("sea_surface_temperature", "sst"),
@@ -114,7 +113,7 @@ if __name__ == "__main__":
         ("potential_temperature", "tbot"),
         ("model_level_height", "zbot"),
         (
-            component_vector_speed,
+            lambda component: component_vector_speed(component),
             "speed",
         ),
     ]

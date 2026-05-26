@@ -12,11 +12,12 @@ import pytest
 import torch
 import xarray as xr
 
-import vercor.setups.data.camulator_land as camulator_land_module
 import vercor.setups.external.camulator as camulator_module
 import vercor.setups.external.camulator_forcing as camulator_forcing_module
 import vercor.setups.external.camulator_imports as camulator_imports_module
 import vercor.setups.external.camulator_init as camulator_init_module
+import vercor.setups.external.camulator_land as camulator_land_module
+import vercor.setups.external.camulator_output as camulator_output_module
 import vercor.setups.external.camulator_tensors as camulator_tensors_module
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
@@ -30,7 +31,7 @@ from vercor.setups.external.camulator import (
     _prepare_camulator_surface_forcing,
     _torch_tensor_from_jax_array,
 )
-from vercor.fluxes.utilities import get_altitudes_hybrid_sigma_levels
+from vercor.fluxes.vertical_coordinates import get_altitudes_hybrid_sigma_levels
 from vercor.grid import RectilinearGrid
 from vercor.runtime import (
     RuntimeComponentContract,
@@ -175,6 +176,65 @@ def test_torch_tensor_from_jax_array_uses_copied_host_boundary() -> None:
     assert isinstance(tensor, torch.Tensor)
     assert tensor.device.type == "cpu"
     assert_allclose_compact(np.asarray(source), np.asarray([[1.0, 2.0], [3.0, 4.0]]))
+
+
+def test_camulator_output_helper_delegates_to_credit_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, Any] = {}
+
+    def fake_make_xarray(
+        prediction: torch.Tensor,
+        utc_datetime: datetime,
+        latitude: object,
+        longitude: object,
+        conf: dict[str, Any],
+    ) -> tuple[xr.Dataset, xr.Dataset]:
+        calls["make_xarray"] = (prediction, utc_datetime, latitude, longitude, conf)
+        return xr.Dataset(), xr.Dataset()
+
+    def fake_save_netcdf_increment(
+        upper_air: xr.Dataset,
+        single_level: xr.Dataset,
+        init_str: str,
+        forecast_hour: int,
+        metadata: dict[str, Any],
+        conf: dict[str, Any],
+    ) -> None:
+        calls["save"] = (
+            upper_air,
+            single_level,
+            init_str,
+            forecast_hour,
+            metadata,
+            conf,
+        )
+
+    monkeypatch.setattr(
+        camulator_output_module,
+        "_credit_output_functions",
+        lambda: (fake_make_xarray, fake_save_netcdf_increment),
+    )
+
+    prediction = torch.ones((1, 1))
+    utc_datetime = datetime(2000, 1, 1)
+    metadata: dict[str, Any] = {"source": "test"}
+    conf: dict[str, Any] = {"data": {}}
+
+    camulator_output_module.write_camulator_prediction_output(
+        prediction,
+        utc_datetime,
+        latitude=[0.0],
+        longitude=[1.0],
+        init_str="2000010100",
+        lead_time_periods=6,
+        forecast_hour=2,
+        metadata=metadata,
+        conf=conf,
+    )
+
+    assert calls["make_xarray"][0].shape == prediction.shape
+    assert calls["save"][2:] == ("2000010100", 12, metadata, conf)
 
 
 def test_prepare_static_forcing_tensor_preserves_order_and_shape() -> None:
@@ -785,18 +845,8 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
 
     monkeypatch.setattr(
         camulator_module,
-        "make_xarray",
-        lambda prediction, utc_datetime, latitude, longitude, conf: (
-            xr.Dataset(),
-            xr.Dataset(),
-        ),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        camulator_module,
-        "save_netcdf_increment",
-        lambda upper_air, single_level, init_str, forecast_hour, metadata, conf: None,
-        raising=False,
+        "write_camulator_prediction_output",
+        lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
         camulator_module,

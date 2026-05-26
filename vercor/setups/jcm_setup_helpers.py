@@ -9,7 +9,7 @@ from vercor.setups.external.jax_gcm import make_jax_gcm
 from vercor.setups.external.jax_gcm_tools import (
     generate_jcm_coords_forcing_topography_files,
 )
-from vercor.setups.jax_array_helpers import transposed_host_array
+from vercor.host_arrays import transposed_host_array
 from vercor.components import Component, DataComponent
 from vercor.grid import RectilinearGrid
 

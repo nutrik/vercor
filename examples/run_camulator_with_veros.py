@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 
 from vercor import Clock, Exchange, RunSequence
 from vercor.setups.coupler_helpers import add_exchanges, build_coupler
-from vercor.setups.data.camulator_land import make_camulator_land
 from vercor.setups.external.camulator import make_camulator_gcm
+from vercor.setups.external.camulator_land import make_camulator_land
 from vercor.setups.external.veros_gcm import make_veros_gcm
 
 from vercor.regridders import bilinear

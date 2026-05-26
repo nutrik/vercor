@@ -42,6 +42,29 @@ historical commands, failure messages, or detailed validation notes.
 
 ## Recent Work
 
+### 2026-05-26: Ownership Boundary Refactor Follow-Up
+
+- Moved model-calendar datetime values into `vercor.calendar` while preserving
+  `vercor.clock` compatibility reexports.
+- Split canonical exchange-field vocabulary into `vercor.field_names`, unified
+  grid identity in `vercor.grid_geometry`, and removed the runtime daily-index
+  wrapper in favor of `vercor.calendar.daily_forcing_index`.
+- Consolidated hybrid/sigma pressure and altitude helpers in
+  `vercor.fluxes.vertical_coordinates`, leaving old flux utility import paths as
+  compatibility aliases.
+- Moved setup helper ownership to `vercor.host_arrays` and
+  `vercor.diagnostics.fields`; moved CAMulator land, CAMulator output, CAMulator
+  wind filtering, and JAXGCM output helpers under `vercor.setups.external`.
+- Updated `DESIGN.md`, `DEPENDENCIES.md`, examples, and boundary tests for the
+  new ownership map.
+- Required validation passed:
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+
 ### 2026-05-26: Refactoring Campaign Ownership Split
 
 - Moved reusable setup adapters under the canonical `vercor.setups` package and

@@ -17,6 +17,7 @@ from vercor.setups._time_helpers import (
 )
 from vercor.setups.external.camulator_forcing import CamulatorRuntimeCursor
 from vercor.setups.external.camulator_init import initialize_camulator
+from vercor.setups.external.camulator_output import write_camulator_prediction_output
 from vercor.setups.external.camulator_tensors import StateVariableAccessor
 
 from datetime import datetime, timedelta
@@ -31,7 +32,7 @@ from vercor.components import (
     host_component,
 )
 from vercor.dtypes import PrecisionPolicy, as_jax_real_array, jax_full, jax_ones
-from vercor.fluxes.utilities import _compute_hybrid_sigma_full_level_altitudes
+from vercor.fluxes.vertical_coordinates import compute_hybrid_sigma_full_level_altitudes
 from vercor.grid import RectilinearGrid
 from vercor.host_arrays import runtime_array_to_host
 from vercor.components import ComponentSetupContext
@@ -41,34 +42,6 @@ from vercor.types import RuntimeArray
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
-
-make_xarray: Any | None = None
-save_netcdf_increment: Any | None = None
-
-
-def _credit_output_functions() -> tuple[Any, Any]:
-    """Load CREDIT output helpers when CAMulator writes a forecast increment."""
-
-    global make_xarray, save_netcdf_increment
-
-    if make_xarray is not None and save_netcdf_increment is not None:
-        return make_xarray, save_netcdf_increment
-
-    try:
-        from credit.output import (  # type: ignore[import-not-found]
-            make_xarray as loaded_make_xarray,
-            save_netcdf_increment as loaded_save_netcdf_increment,
-        )
-    except ModuleNotFoundError as error:
-        raise ImportError(
-            "CREDIT output helpers are required to write CAMulator forecasts. "
-            "Please install credit to use CAMulator output."
-        ) from error
-
-    make_xarray = loaded_make_xarray
-    save_netcdf_increment = loaded_save_netcdf_increment
-    return make_xarray, save_netcdf_increment
-
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -224,7 +197,7 @@ def _map_camulator_prediction_arrays(
     temperature_for_height = temperature_3d_array.T
     humidity_for_height = specific_humidity_3d_array.T
     pressure_interfaces_for_height = p_int.T
-    altitude = _compute_hybrid_sigma_full_level_altitudes(
+    altitude = compute_hybrid_sigma_full_level_altitudes(
         temperature_for_height,
         humidity_for_height,
         pressure_interfaces_for_height,
@@ -254,38 +227,6 @@ def _map_camulator_prediction_arrays(
         "density": density,
         "potential_temperature": potential_temperature,
     }
-
-
-def _write_camulator_prediction_output(
-    prediction: torch.Tensor,
-    utc_datetime: datetime,
-    *,
-    latitude: object,
-    longitude: object,
-    init_str: str,
-    lead_time_periods: int,
-    forecast_hour: int,
-    metadata: dict[str, Any],
-    conf: dict[str, Any],
-) -> None:
-    """Write one CAMulator prediction increment through the CREDIT output boundary."""
-
-    credit_make_xarray, credit_save_netcdf_increment = _credit_output_functions()
-    upper_air, single_level = credit_make_xarray(
-        prediction.cpu(),
-        utc_datetime,
-        latitude,
-        longitude,
-        conf,
-    )
-    credit_save_netcdf_increment(
-        upper_air,
-        single_level,
-        init_str,
-        lead_time_periods * forecast_hour,
-        metadata,
-        conf,
-    )
 
 
 def _camulator_output_array(
@@ -628,7 +569,7 @@ class _CAMulatorGCMState:
             # Apply post-processing
             prediction = self.stepper._apply_postprocessing(prediction, model_input)
 
-            _write_camulator_prediction_output(
+            write_camulator_prediction_output(
                 prediction,
                 utc_datetime,
                 latitude=self.latlons.latitude.values,

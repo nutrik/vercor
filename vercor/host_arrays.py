@@ -14,3 +14,9 @@ def runtime_array_to_host(array: RuntimeArray) -> NDArray[Any]:
     """Transfer a runtime array to host memory for NumPy-only consumers."""
 
     return np.asarray(jax.device_get(jnp.asarray(array)))
+
+
+def transposed_host_array(array: RuntimeArray) -> NDArray[Any]:
+    """Transfer a transposed runtime array to host memory."""
+
+    return runtime_array_to_host(jnp.asarray(array).T)

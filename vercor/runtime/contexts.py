@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from vercor.clock import ModelDateTime
+from vercor.calendar import ModelDateTime
 from vercor.jax_logging import LoggerLike
 from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings

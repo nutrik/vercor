@@ -7,8 +7,8 @@ from typing import cast
 
 import jax
 
-from vercor.clock import Clock, ModelDateTime
-from vercor.calendar import daily_forcing_index
+from vercor.calendar import ModelDateTime, daily_forcing_index
+from vercor.clock import Clock
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor.pytree import PyTreeNodeMixin
 from vercor.settings import VercorSettings
@@ -58,12 +58,6 @@ class RuntimeStepInfo(PyTreeNodeMixin):
         )
 
 
-def runtime_daily_index(time: datetime | ModelDateTime, year_type: str) -> int:
-    """Return the no-leap daily forcing index for a runtime timestamp."""
-
-    return daily_forcing_index(time, year_type=year_type, no_leap=True)
-
-
 def runtime_step_info_from_times(
     times: Sequence[datetime | ModelDateTime],
     *,
@@ -90,7 +84,7 @@ def runtime_step_info_from_times(
         monthly_index_right.append(n2)
         monthly_weight_left.append(f1)
         monthly_weight_right.append(f2)
-        daily_index.append(runtime_daily_index(time, year_type))
+        daily_index.append(daily_forcing_index(time, year_type=year_type, no_leap=True))
 
     return RuntimeStepInfo.from_sequences(
         monthly_index_left,

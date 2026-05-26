@@ -56,8 +56,13 @@ def test_change_and_get_default_jcm_parameter_values() -> None:
     assert np.isclose(float(updated["condensation.trlsc"]), 0.123)
 
 
-def test_compute_pressure_levels_handles_valid_and_invalid_inputs() -> None:
-    pressure = vertical_coordinates_module.compute_pressure_levels(
+def test_compute_sigma_pressure_levels_handles_valid_and_invalid_inputs() -> None:
+    assert (
+        vertical_coordinates_module.compute_pressure_levels
+        is vertical_coordinates_module.compute_sigma_pressure_levels
+    )
+
+    pressure = vertical_coordinates_module.compute_sigma_pressure_levels(
         reference_pressure=jnp.asarray(100000.0),
         top_pressure=jnp.asarray(10000.0),
         sigma_levels=jnp.asarray([0.0, 0.5, 1.0]),
@@ -73,7 +78,7 @@ def test_compute_pressure_levels_handles_valid_and_invalid_inputs() -> None:
     )
     assert_allclose_compact(pressure, expected)
     assert_allclose_compact(
-        jax.jit(vertical_coordinates_module.compute_pressure_levels)(
+        jax.jit(vertical_coordinates_module.compute_sigma_pressure_levels)(
             reference_pressure=jnp.asarray(100000.0),
             top_pressure=jnp.asarray(10000.0),
             sigma_levels=jnp.asarray([0.0, 0.5, 1.0]),
@@ -83,7 +88,7 @@ def test_compute_pressure_levels_handles_valid_and_invalid_inputs() -> None:
     )
 
     with pytest.raises(ValueError, match="top_pressure must be a scalar array"):
-        vertical_coordinates_module.compute_pressure_levels(
+        vertical_coordinates_module.compute_sigma_pressure_levels(
             reference_pressure=jnp.asarray(100000.0),
             top_pressure=jnp.asarray([0.0, 1.0]),
             sigma_levels=jnp.asarray([0.0, 1.0]),
@@ -91,12 +96,32 @@ def test_compute_pressure_levels_handles_valid_and_invalid_inputs() -> None:
         )
 
     with pytest.raises(ValueError, match="sigma_levels must be a 1D array"):
-        vertical_coordinates_module.compute_pressure_levels(
+        vertical_coordinates_module.compute_sigma_pressure_levels(
             reference_pressure=jnp.asarray(100000.0),
             top_pressure=jnp.asarray(0.0),
             sigma_levels=jnp.asarray([[0.0, 1.0]]),
             normalized_surface_pressure=jnp.asarray([[1.0]]),
         )
+
+
+def test_compute_hybrid_pressure_levels_has_explicit_owner() -> None:
+    surface_pressure = jnp.asarray([[100000.0, 90000.0], [80000.0, 70000.0]])
+    hya = jnp.asarray([1000.0, 2000.0])
+    hyb = jnp.asarray([0.25, 0.75])
+
+    pressure = vertical_coordinates_module.compute_hybrid_pressure_levels(
+        surface_pressure,
+        hya,
+        hyb,
+    )
+
+    expected = np.asarray(
+        [
+            [[26000.0, 77000.0], [23500.0, 69500.0]],
+            [[21000.0, 62000.0], [18500.0, 54500.0]],
+        ]
+    )
+    assert_allclose_compact(pressure, expected)
 
 
 @pytest.mark.parametrize(

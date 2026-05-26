@@ -13,9 +13,11 @@ from vercor.field_layout import (
 )
 from vercor.fluxes.utilities import (
     compute_air_density,
-    get_altitudes_hybrid_sigma_levels,
-    compute_pressure_levels,
     compute_potential_temperature,
+)
+from vercor.fluxes.vertical_coordinates import (
+    compute_hybrid_pressure_levels,
+    get_altitudes_hybrid_sigma_levels,
 )
 from vercor.grid import RectilinearGrid
 from vercor.components import ComponentSetupContext
@@ -72,8 +74,8 @@ def _compute_monthly_diagnostics(
     hyam_array = as_jax_real_array(hyam, settings)
     hybm_array = as_jax_real_array(hybm, settings)
 
-    ph = compute_pressure_levels(surface_pressure_array, hyai_array, hybi_array)
-    pf = compute_pressure_levels(surface_pressure_array, hyam_array, hybm_array)
+    ph = compute_hybrid_pressure_levels(surface_pressure_array, hyai_array, hybi_array)
+    pf = compute_hybrid_pressure_levels(surface_pressure_array, hyam_array, hybm_array)
     model_level_height = get_altitudes_hybrid_sigma_levels(
         settings,
         temperature_3d_array,

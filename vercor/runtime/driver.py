@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from vercor.clock import ModelDateTime
+from vercor.calendar import ModelDateTime
 from vercor.components.base import Component, HostRuntimeComponent
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike

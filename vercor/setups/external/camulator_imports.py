@@ -114,7 +114,7 @@ def _load_windpp_module() -> bool:
         return True
 
     try:
-        from vercor.setups.external.windpp import (
+        from vercor.setups.external.camulator_wind_filter import (
             post_process_wind_artifacts as windpp_post_process,
         )
     except ImportError:
