@@ -13,6 +13,7 @@ import vercor
 import vercor.components as components_module
 import vercor.components._validation as validation_module
 import vercor.components.base as base_module
+import vercor.components.factories as factories_module
 from tests._coverage_support import make_test_grid
 from vercor.components.base import Component, DataComponent, HostRuntimeComponent
 from vercor.clock import Clock
@@ -101,12 +102,18 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert hasattr(components_module, "ComponentStepResult")
     assert hasattr(components_module, "DataComponent")
     assert components_module.HostRuntimeComponent is HostRuntimeComponent
-    assert hasattr(components_module, "data_component")
-    assert hasattr(components_module, "differentiable_component")
-    assert hasattr(components_module, "host_component")
+    assert components_module.data_component is factories_module.data_component
+    assert (
+        components_module.differentiable_component
+        is factories_module.differentiable_component
+    )
+    assert components_module.host_component is factories_module.host_component
     assert validation_module.validate_component_setup is not None
     assert not hasattr(base_module, "validate_component_setup")
     assert not hasattr(components_module, "validate_component_setup")
+    assert not hasattr(base_module, "data_component")
+    assert not hasattr(base_module, "differentiable_component")
+    assert not hasattr(base_module, "host_component")
     assert not hasattr(components_module, "make_data_component")
     assert not hasattr(components_module, "make_differentiable_component")
     assert not hasattr(components_module, "make_host_component")
@@ -145,6 +152,9 @@ def test_component_base_internals_are_private_modules() -> None:
     runtime_fields_source = Path("vercor/components/_runtime_fields.py").read_text(
         encoding="utf-8"
     )
+    factories_source = Path("vercor/components/factories.py").read_text(
+        encoding="utf-8"
+    )
     validation_source = Path("vercor/components/_validation.py").read_text(
         encoding="utf-8"
     )
@@ -166,9 +176,17 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def validate_component_setup" in validation_source
     assert "def _author_field_spec(" not in base_source
     assert "def component_field_spec(" not in contracts_source
-    assert "def _callable_component_from_model(" in base_source
-    assert base_source.count("_callable_component_from_model(") == 3
-    assert base_source.count("_create_callable_component(") == 1
+    assert "def _install_lifecycle_hooks(" not in base_source
+    assert "def _callable_component_from_model(" not in base_source
+    assert "def data_component(" not in base_source
+    assert "def differentiable_component(" not in base_source
+    assert "def host_component(" not in base_source
+    assert "def _install_lifecycle_hooks(" in factories_source
+    assert "def _callable_component_from_model(" in factories_source
+    assert factories_source.count("_create_callable_component(") == 1
+    assert "def data_component(" in factories_source
+    assert "def differentiable_component(" in factories_source
+    assert "def host_component(" in factories_source
     assert "_required_fields" not in callable_source
     assert "_prefill_fields" not in callable_source
     assert "_field_defaults" not in callable_source
@@ -217,10 +235,10 @@ def test_setup_components_use_explicit_metadata_mapping() -> None:
 
     assert component.setup_metadata["DATA_FILES"] == {"surface": "surface.nc"}
 
-    helper_source = Path("setups/data/_component_helpers.py").read_text(
+    helper_source = Path("vercor/setups/data/_component_helpers.py").read_text(
         encoding="utf-8"
     )
-    era5_atmosphere_source = Path("setups/data/era5_atmosphere.py").read_text(
+    era5_atmosphere_source = Path("vercor/setups/data/era5_atmosphere.py").read_text(
         encoding="utf-8"
     )
 
@@ -233,10 +251,10 @@ def test_setup_components_use_explicit_metadata_mapping() -> None:
 
 @pytest.mark.fast_always
 def test_setup_forcing_reader_reexports_canonical_read_boundary() -> None:
-    import setups.data.forcing as setup_forcing_module
+    import vercor.setups.data.forcing as setup_forcing_module
     import vercor.forcing_data as forcing_data_module
 
-    forcing_source = Path("setups/data/forcing.py").read_text(encoding="utf-8")
+    forcing_source = Path("vercor/setups/data/forcing.py").read_text(encoding="utf-8")
 
     assert setup_forcing_module.read_forcing is forcing_data_module.read_forcing
     assert "def read_forcing(" not in forcing_source
@@ -244,7 +262,7 @@ def test_setup_forcing_reader_reexports_canonical_read_boundary() -> None:
 
 @pytest.mark.fast_always
 def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
-    from setups.coupler_helpers import add_exchanges, build_coupler
+    from vercor.setups.coupler_helpers import add_exchanges, build_coupler
 
     grid = make_test_grid(name="shared")
     ocean = DataComponent(name="OCN", grid=grid)
@@ -274,11 +292,11 @@ def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
 @pytest.mark.fast_always
 def test_multi_exchange_setup_scripts_use_shared_add_exchanges_helper() -> None:
     multi_exchange_scripts = (
-        Path("setups/run_data_driver.py"),
-        Path("setups/run_jcm_with_verosdata.py"),
-        Path("setups/run_jcm_with_veros.py"),
-        Path("setups/run_jcm_with_slab.py"),
-        Path("setups/run_slab_driver.py"),
+        Path("examples/run_data_driver.py"),
+        Path("examples/run_jcm_with_verosdata.py"),
+        Path("examples/run_jcm_with_veros.py"),
+        Path("examples/run_jcm_with_slab.py"),
+        Path("examples/run_slab_driver.py"),
     )
 
     for path in multi_exchange_scripts:
@@ -311,7 +329,7 @@ def test_runtime_state_is_separate_from_public_component_objects() -> None:
 
 @pytest.mark.fast_always
 def test_examples_import_run_sequence_from_top_level_public_api() -> None:
-    for path in Path("setups").glob("run_*.py"):
+    for path in Path("examples").glob("run_*.py"):
         source = path.read_text(encoding="utf-8")
         assert "from vercor.coupler import RunSequence" not in source
         if "RunSequence" in source:
@@ -325,7 +343,7 @@ def test_examples_import_run_sequence_from_top_level_public_api() -> None:
 
 @pytest.mark.fast_always
 def test_setup_factories_are_primary_concrete_component_api() -> None:
-    from setups.slab import (
+    from vercor.setups.slab import (
         make_slab_atmosphere,
         make_slab_land,
         make_slab_ocean,
@@ -338,8 +356,8 @@ def test_setup_factories_are_primary_concrete_component_api() -> None:
     assert isinstance(make_slab_land(grid), Component)
     assert isinstance(make_slab_seaice(grid), Component)
 
-    from setups.data.era5_land import make_era5_land
-    from setups.external.veros_gcm import make_veros_gcm
+    from vercor.setups.data.era5_land import make_era5_land
+    from vercor.setups.external.veros_gcm import make_veros_gcm
 
     assert callable(make_era5_land)
     assert callable(make_veros_gcm)
@@ -350,12 +368,13 @@ def test_old_concrete_component_packages_are_removed() -> None:
     assert not Path("vercor/components/slab").exists()
     assert not Path("vercor/components/data").exists()
     assert not Path("vercor/components/external").exists()
+    assert not Path("setups").exists()
 
 
 @pytest.mark.fast_always
 def test_setup_modules_do_not_subclass_component_contracts() -> None:
     forbidden_bases = {"Component", "DataComponent", "HostRuntimeComponent"}
-    for path in Path("setups").rglob("*.py"):
+    for path in Path("vercor/setups").rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
@@ -378,10 +397,10 @@ def test_private_setup_state_objects_do_not_borrow_component_methods() -> None:
         "prefill_runtime_fields = Component.",
     )
     for path in (
-        Path("setups/external/jax_gcm.py"),
-        Path("setups/external/veros_gcm.py"),
-        Path("setups/external/camulator.py"),
-        Path("setups/data/camulator_land.py"),
+        Path("vercor/setups/external/jax_gcm.py"),
+        Path("vercor/setups/external/veros_gcm.py"),
+        Path("vercor/setups/external/camulator.py"),
+        Path("vercor/setups/data/camulator_land.py"),
     ):
         source = path.read_text(encoding="utf-8")
         for marker in forbidden_markers:
@@ -389,10 +408,81 @@ def test_private_setup_state_objects_do_not_borrow_component_methods() -> None:
 
 
 @pytest.mark.fast_always
+def test_setup_adapters_do_not_import_runtime_context_or_store_internals() -> None:
+    forbidden_markers = (
+        "from vercor.runtime.contexts import ComponentInitContext",
+        "from vercor.runtime.contexts import RuntimeStepContext",
+        "from vercor.runtime import RuntimeFieldStore",
+        "RuntimeFieldStore.from_mapping",
+    )
+    for path in Path("vercor/setups").rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        for marker in forbidden_markers:
+            assert marker not in source, f"{path} imports runtime internals"
+
+
+@pytest.mark.fast_always
+def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None:
+    import vercor.calendar as calendar_module
+    import vercor.fluxes.vertical_coordinates as vertical_module
+    import vercor.grid_geometry as grid_geometry_module
+    import vercor.pytree_utils as pytree_utils_module
+
+    assert callable(calendar_module.is_leap_year)
+    assert callable(calendar_module.daily_forcing_index)
+    assert callable(grid_geometry_module.make_rectilinear_grid)
+    assert callable(grid_geometry_module.centers_to_edges)
+    assert callable(vertical_module.compute_pressure_levels)
+    assert callable(vertical_module.get_altitudes_sigma_levels)
+    assert callable(pytree_utils_module.mean_leaf)
+    assert callable(pytree_utils_module.stack_objects)
+    assert callable(pytree_utils_module.unwrap_leading_dims)
+
+    regridder_init = Path("vercor/regridders/__init__.py").read_text(encoding="utf-8")
+    grid_masks_source = Path("vercor/grid_masks.py").read_text(encoding="utf-8")
+    topology_source = Path("vercor/runtime/topology.py").read_text(encoding="utf-8")
+    jax_gcm_tools_source = Path("vercor/setups/external/jax_gcm_tools.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "make_rectilinear_grid" not in regridder_init
+    assert "centers_to_edges" not in regridder_init
+    assert "compute_land_mask" not in regridder_init
+    assert "def compute_land_mask(" in grid_masks_source
+    assert "def get_component(" not in grid_masks_source
+    assert "def get_component(" in topology_source
+    assert "def compute_pressure_levels(" not in jax_gcm_tools_source
+    assert "def get_altitudes_sigma_levels(" not in jax_gcm_tools_source
+    assert "def mean_leaf(" not in jax_gcm_tools_source
+    assert "def stack_objects(" not in jax_gcm_tools_source
+    assert "def unwrap_leading_dims(" not in jax_gcm_tools_source
+
+
+@pytest.mark.fast_always
+def test_assets_and_diagnostics_have_focused_ownership_boundaries() -> None:
+    import vercor.assets as assets_module
+    import vercor.diagnostics as diagnostics_module
+    import vercor.setups.data.assets as setup_assets_module
+
+    assert hasattr(assets_module, "ensure_registered_asset")
+    assert not hasattr(assets_module, "get_forcing_data")
+    assert not hasattr(assets_module, "_FORCING_ASSETS")
+    assert hasattr(setup_assets_module, "get_forcing_data")
+
+    assert diagnostics_module.combine_surface_temperatures is not None
+    assert diagnostics_module.print_component_field_means_table is not None
+    assert diagnostics_module.plot_component_scalar_vector_comparison is not None
+    assert Path("vercor/diagnostics/fields.py").exists()
+    assert Path("vercor/diagnostics/tables.py").exists()
+    assert Path("vercor/diagnostics/plotting.py").exists()
+    assert not Path("vercor/diagnostics.py").exists()
+
+
+@pytest.mark.fast_always
 def test_camulator_adapters_share_runtime_cursor_state_transition_helper() -> None:
     for path in (
-        Path("setups/external/camulator.py"),
-        Path("setups/data/camulator_land.py"),
+        Path("vercor/setups/external/camulator.py"),
+        Path("vercor/setups/data/camulator_land.py"),
     ):
         source = path.read_text(encoding="utf-8")
         assert "CamulatorRuntimeCursor" in source, path
@@ -401,8 +491,31 @@ def test_camulator_adapters_share_runtime_cursor_state_transition_helper() -> No
 
 
 @pytest.mark.fast_always
+def test_camulator_state_is_thin_facade_over_focused_modules() -> None:
+    focused_modules = (
+        Path("vercor/setups/external/camulator_imports.py"),
+        Path("vercor/setups/external/camulator_forcing.py"),
+        Path("vercor/setups/external/camulator_tensors.py"),
+        Path("vercor/setups/external/camulator_stepper.py"),
+        Path("vercor/setups/external/camulator_init.py"),
+    )
+    for path in focused_modules:
+        assert path.exists(), path
+
+    facade_source = Path("vercor/setups/external/camulator_state.py").read_text(
+        encoding="utf-8"
+    )
+    assert len(facade_source.splitlines()) <= 120
+    assert "class StateVariableAccessor" not in facade_source
+    assert "class StateManager" not in facade_source
+    assert "class CAMulatorStepper" not in facade_source
+    assert "def initialize_camulator(" not in facade_source
+    assert "def _load_credit_modules(" not in facade_source
+
+
+@pytest.mark.fast_always
 def test_jcm_land_uses_single_coordinate_conversion_helper() -> None:
-    source = Path("setups/data/jcm_land.py").read_text(encoding="utf-8")
+    source = Path("vercor/setups/data/jcm_land.py").read_text(encoding="utf-8")
 
     assert "def _jcm_coordinates_in_degrees" in source
     assert "def _coordinates_in_degrees" not in source
@@ -419,7 +532,9 @@ def test_bilinear_interpolator_removes_unused_cartesian_helper() -> None:
 
 @pytest.mark.fast_always
 def test_jax_gcm_factory_does_not_attach_test_only_setup_state() -> None:
-    jax_gcm_source = Path("setups/external/jax_gcm.py").read_text(encoding="utf-8")
+    jax_gcm_source = Path("vercor/setups/external/jax_gcm.py").read_text(
+        encoding="utf-8"
+    )
     runtime_test_source = Path("tests/test_coupler_runtime.py").read_text(
         encoding="utf-8"
     )
@@ -435,14 +550,14 @@ def test_jax_gcm_factory_does_not_attach_test_only_setup_state() -> None:
 
     assert "_setup_state" not in runtime_test_source
 
-    jcm_slab_source = Path("setups/run_jcm_with_slab.py").read_text(encoding="utf-8")
+    jcm_slab_source = Path("examples/run_jcm_with_slab.py").read_text(encoding="utf-8")
     assert 'getattr(atm, "model")' not in jcm_slab_source
 
 
 @pytest.mark.fast_always
 def test_data_and_host_factories_return_core_contract_instances() -> None:
-    from setups.data.era5_land import make_era5_land
-    from setups.external.camulator import make_camulator_gcm
+    from vercor.setups.data.era5_land import make_era5_land
+    from vercor.setups.external.camulator import make_camulator_gcm
 
     assert callable(make_era5_land)
     assert callable(make_camulator_gcm)
@@ -454,13 +569,13 @@ def test_data_and_host_factories_return_core_contract_instances() -> None:
 @pytest.mark.parametrize(
     "import_statement",
     (
-        "import setups.external.jax_gcm",
-        "from setups.external import jax_gcm as jax_gcm_module",
-        "from setups.external import make_jax_gcm",
-        "import setups.data.era5_land",
-        "from setups.data import make_era5_land",
-        "import setups.external.camulator",
-        "import setups.external.camulator_state",
+        "import vercor.setups.external.jax_gcm",
+        "from vercor.setups.external import jax_gcm as jax_gcm_module",
+        "from vercor.setups.external import make_jax_gcm",
+        "import vercor.setups.data.era5_land",
+        "from vercor.setups.data import make_era5_land",
+        "import vercor.setups.external.camulator",
+        "import vercor.setups.external.camulator_state",
     ),
 )
 def test_unrelated_setup_imports_do_not_initialize_optional_adapters(

@@ -10,10 +10,10 @@ import numpy as np
 
 from tests._coverage_support import make_test_grid
 from vercor.clock import Clock
-from setups.slab.atmosphere import make_slab_atmosphere
-from setups.slab.land import make_slab_land
-from setups.slab.ocean import make_slab_ocean
-from setups.slab.seaice import make_slab_seaice
+from vercor.setups.slab.atmosphere import make_slab_atmosphere
+from vercor.setups.slab.land import make_slab_land
+from vercor.setups.slab.ocean import make_slab_ocean
+from vercor.setups.slab.seaice import make_slab_seaice
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
 from vercor.run_sequence import RunSequence
@@ -261,7 +261,7 @@ def test_non_donating_run_preserves_runtime_treedef() -> None:
 
 
 def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
-    profile_runtime = importlib.import_module("setups.profile_runtime")
+    profile_runtime = importlib.import_module("examples.profile_runtime")
 
     assert callable(profile_runtime.main)
     parser = profile_runtime.build_parser()
@@ -272,7 +272,7 @@ def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
 
 
 def test_runtime_profile_harness_runs_small_slab_profile() -> None:
-    profile_runtime = importlib.import_module("setups.profile_runtime")
+    profile_runtime = importlib.import_module("examples.profile_runtime")
 
     result = profile_runtime.profile_runtime(
         steps=1,

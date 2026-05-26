@@ -12,7 +12,6 @@ from vercor.grid_masks import (
     check_remap_conservation,
     check_total_lnd_ocn_mask_sum,
     compute_ocn_lnd_masks_on_atm_grid,
-    get_component,
     grids_identical,
 )
 from vercor.jax_logging import LoggerLike
@@ -24,6 +23,21 @@ from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 RuntimeRegridder = BilinearRectilinearRegridder | ConservativeRectilinearRegridder
+
+
+def get_component(allcomponents: dict[str, Component], types: str) -> Component:
+    """Return the registered component with the requested VerCOR component name."""
+
+    components: list[Component] = [
+        component for component in allcomponents.values() if component.name == types
+    ]
+    if len(components) > 1:
+        raise CouplerError(
+            f"Multiple {components[0].name} components registered; only one supported"
+        )
+    if not components:
+        raise CouplerError(f"No component of types ({types}) registered")
+    return components[0]
 
 
 def create_exchange_masks(

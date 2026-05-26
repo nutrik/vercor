@@ -10,23 +10,23 @@ import numpy as np
 from numpy.typing import NDArray
 import pytest
 
-import setups.data.era5_atmosphere as era5_atmosphere_module
-import setups.data.era5_land as era5_land_module
-import setups.data.era5_ocean as era5_ocean_module
-import setups.data.erainterim_ocean as erainterim_ocean_module
-import setups.data.jcm_land as jcm_land_module
+import vercor.setups.data.era5_atmosphere as era5_atmosphere_module
+import vercor.setups.data.era5_land as era5_land_module
+import vercor.setups.data.era5_ocean as era5_ocean_module
+import vercor.setups.data.erainterim_ocean as erainterim_ocean_module
+import vercor.setups.data.jcm_land as jcm_land_module
 from tests._coverage_support import CoverageCouplerStub, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.runtime.contexts import RuntimeStepContext
-from setups.data.era5_atmosphere import make_era5_atmosphere
-from setups.data.era5_land import make_era5_land
-from setups.data.era5_ocean import make_era5_ocean
-from setups.data.erainterim_ocean import make_erainterim_ocean
-from setups.data.jcm_land import make_jcm_land
-from setups.slab.atmosphere import make_slab_atmosphere
-from setups.slab.land import make_slab_land
-from setups.slab.ocean import make_slab_ocean
-from setups.slab.seaice import make_slab_seaice
+from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
+from vercor.setups.data.era5_land import make_era5_land
+from vercor.setups.data.era5_ocean import make_era5_ocean
+from vercor.setups.data.erainterim_ocean import make_erainterim_ocean
+from vercor.setups.data.jcm_land import make_jcm_land
+from vercor.setups.slab.atmosphere import make_slab_atmosphere
+from vercor.setups.slab.land import make_slab_land
+from vercor.setups.slab.ocean import make_slab_ocean
+from vercor.setups.slab.seaice import make_slab_seaice
 from vercor.runtime import RuntimeComponentContract
 from vercor.runtime.components import create_runtime_component_state
 from vercor.types import RuntimeArray

@@ -20,9 +20,6 @@ from vercor.components._contracts import (
     unique_field_names as _unique_field_names,
 )
 from vercor.components import _runtime_fields as _runtime_field_adapters
-from vercor.components._validation import (
-    validate_component_setup as validate_component_setup,
-)
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
@@ -60,74 +57,7 @@ __all__ = [
     "ComponentStepResult",
     "DataComponent",
     "HostRuntimeComponent",
-    "data_component",
-    "differentiable_component",
-    "host_component",
-    "validate_component_setup",
 ]
-
-
-def _install_lifecycle_hooks(
-    component: "Component",
-    *,
-    initialize: ComponentInitializeHook | None = None,
-    create_runtime_payload: ComponentCreatePayloadHook | None = None,
-    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-    validate_runtime_state: ComponentValidateHook | None = None,
-) -> None:
-    """Attach optional lifecycle hooks to a factory-created component."""
-
-    if initialize is not None:
-        setattr(component, "_initialize_hook", initialize)
-    if create_runtime_payload is not None:
-        setattr(component, "_create_runtime_payload_hook", create_runtime_payload)
-    if prefill_runtime_state_fields is not None:
-        setattr(
-            component,
-            "_prefill_runtime_state_fields_hook",
-            prefill_runtime_state_fields,
-        )
-    if validate_runtime_state is not None:
-        setattr(component, "_validate_runtime_state_hook", validate_runtime_state)
-
-
-def _callable_component_from_model(
-    *,
-    runtime_kind: str,
-    name: str,
-    grid: RectilinearGrid,
-    step: _AuthorStepCallable,
-    payload: Any | None = None,
-    settings: VercorSettings | None = None,
-    inputs: _FieldNames = (),
-    outputs: _FieldNames = (),
-    default_fields: _AuthorFieldValues = None,
-    initialize: ComponentInitializeHook | None = None,
-    create_runtime_payload: ComponentCreatePayloadHook | None = None,
-    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-    validate_runtime_state: ComponentValidateHook | None = None,
-) -> "Component":
-    """Create a callable-backed component from the shared author facade."""
-
-    from vercor.components._callable_wrappers import _create_callable_component
-
-    return _create_callable_component(
-        runtime_kind=runtime_kind,
-        name=name,
-        grid=grid,
-        step=step,
-        payload=payload,
-        settings=settings,
-        field_spec=ComponentFieldSpec(
-            inputs=inputs,
-            outputs=outputs,
-            default_fields=default_fields or {},
-        ),
-        initialize=initialize,
-        create_runtime_payload=create_runtime_payload,
-        prefill_runtime_state_fields=prefill_runtime_state_fields,
-        validate_runtime_state=validate_runtime_state,
-    )
 
 
 @dataclass
@@ -195,6 +125,8 @@ class Component(ABC):
         concrete runtime defaults. Scalar default values expand to this
         component's grid shape.
         """
+
+        from vercor.components.factories import _callable_component_from_model
 
         return _callable_component_from_model(
             runtime_kind="differentiable",
@@ -666,6 +598,8 @@ class HostRuntimeComponent(Component):
     ) -> "HostRuntimeComponent":
         """Create a host-runtime component from a Python model callable."""
 
+        from vercor.components.factories import _callable_component_from_model
+
         return cast(
             "HostRuntimeComponent",
             _callable_component_from_model(
@@ -708,98 +642,3 @@ class HostRuntimeComponent(Component):
         context: RuntimeStepContext,
     ) -> "RuntimeComponentState":
         """Advance this non-differentiable host adapter by one runtime step."""
-
-
-def data_component(
-    name: str,
-    grid: RectilinearGrid,
-    fields: _AuthorFieldValues = None,
-    settings: VercorSettings | None = None,
-    *,
-    initialize: ComponentInitializeHook | None = None,
-    create_runtime_payload: ComponentCreatePayloadHook | None = None,
-    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-    validate_runtime_state: ComponentValidateHook | None = None,
-) -> DataComponent:
-    """Create a data-only component using the author-friendly field facade."""
-
-    component = DataComponent.from_fields(
-        name=name,
-        grid=grid,
-        fields=fields,
-        settings=settings,
-    )
-    _install_lifecycle_hooks(
-        component,
-        initialize=initialize,
-        create_runtime_payload=create_runtime_payload,
-        prefill_runtime_state_fields=prefill_runtime_state_fields,
-        validate_runtime_state=validate_runtime_state,
-    )
-    return component
-
-
-def differentiable_component(
-    name: str,
-    grid: RectilinearGrid,
-    step: _AuthorStepCallable,
-    *,
-    payload: Any | None = None,
-    settings: VercorSettings | None = None,
-    inputs: _FieldNames = (),
-    outputs: _FieldNames = (),
-    default_fields: _AuthorFieldValues = None,
-    initialize: ComponentInitializeHook | None = None,
-    create_runtime_payload: ComponentCreatePayloadHook | None = None,
-    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-    validate_runtime_state: ComponentValidateHook | None = None,
-) -> Component:
-    """Create a differentiable component using the author-friendly facade."""
-
-    return Component.from_model(
-        name=name,
-        grid=grid,
-        step=step,
-        payload=payload,
-        settings=settings,
-        inputs=inputs,
-        outputs=outputs,
-        default_fields=default_fields,
-        initialize=initialize,
-        create_runtime_payload=create_runtime_payload,
-        prefill_runtime_state_fields=prefill_runtime_state_fields,
-        validate_runtime_state=validate_runtime_state,
-    )
-
-
-def host_component(
-    name: str,
-    grid: RectilinearGrid,
-    step: _AuthorStepCallable,
-    *,
-    payload: Any | None = None,
-    settings: VercorSettings | None = None,
-    inputs: _FieldNames = (),
-    outputs: _FieldNames = (),
-    default_fields: _AuthorFieldValues = None,
-    initialize: ComponentInitializeHook | None = None,
-    create_runtime_payload: ComponentCreatePayloadHook | None = None,
-    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-    validate_runtime_state: ComponentValidateHook | None = None,
-) -> HostRuntimeComponent:
-    """Create a host-runtime component using the author-friendly facade."""
-
-    return HostRuntimeComponent.from_model(
-        name=name,
-        grid=grid,
-        step=step,
-        payload=payload,
-        settings=settings,
-        inputs=inputs,
-        outputs=outputs,
-        default_fields=default_fields,
-        initialize=initialize,
-        create_runtime_payload=create_runtime_payload,
-        prefill_runtime_state_fields=prefill_runtime_state_fields,
-        validate_runtime_state=validate_runtime_state,
-    )

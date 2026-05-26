@@ -8,6 +8,8 @@ from vercor.components.base import (
     ComponentStepResult,
     DataComponent,
     HostRuntimeComponent,
+)
+from vercor.components.factories import (
     data_component,
     differentiable_component,
     host_component,

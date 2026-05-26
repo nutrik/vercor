@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VERCOR_ROOT = PROJECT_ROOT / "vercor"
 
 ALLOWED_NUMPY_BOUNDARIES = {
-    "vercor/diagnostics.py",
+    "vercor/diagnostics/plotting.py",
     "vercor/dtypes.py",
     "vercor/forcing_data.py",
     "vercor/host_arrays.py",

@@ -14,6 +14,8 @@ historical commands, failure messages, or detailed validation notes.
   passed as of 2026-05-15.
 - Latest archived static checks: Black, flake8, and mypy passed as of
   2026-05-15.
+- Latest local refactor validation: Black, flake8, mypy, fast pytest, and full
+  pytest passed as of 2026-05-26.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -39,6 +41,35 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-26: Refactoring Campaign Ownership Split
+
+- Moved reusable setup adapters under the canonical `vercor.setups` package and
+  runnable setup scripts under `examples`, removing in-repo reliance on a
+  top-level `setups` package.
+- Split public component factory helpers into `vercor.components.factories` and
+  kept `vercor.components.base` focused on base authoring contracts.
+- Routed setup adapter validation and runtime-boundary imports through private
+  validation internals or public component context aliases instead of runtime
+  stores/contexts.
+- Added focused ownership modules for calendar logic, rectilinear grid geometry,
+  generic sigma-coordinate helpers, generic PyTree transforms, setup data asset
+  registries, and diagnostics fields/tables/plotting.
+- Moved mask math into `vercor.grid_masks` and component topology lookup into
+  `vercor.runtime.topology`.
+- Split CAMulator optional imports, forcing cursors, tensor accessors, stepping,
+  and initialization into focused modules while keeping `camulator_state.py` as
+  a thin compatibility facade.
+- Focused checks passed for API boundaries, component factories, setup imports,
+  runtime-boundary imports, shared helper ownership, assets/diagnostics
+  separation, and CAMulator decomposition.
+- Required validation passed:
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-15: Conservative Helper and Compatibility Cleanup
 

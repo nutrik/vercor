@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 import xarray as xr
 
-import setups.external.jax_gcm as jax_gcm_module
-import setups.external.veros_gcm as veros_gcm_module
+import vercor.setups.external.jax_gcm as jax_gcm_module
+import vercor.setups.external.veros_gcm as veros_gcm_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.components.base import DataComponent
@@ -876,7 +876,7 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
 
     taux, tauy, qnet, qnec = veros_gcm_module.compute_fluxes(
         component._veros_state,
-        RuntimeFieldStore.from_mapping(component.data),
+        component.data,
         VercorSettings(),
     )
 

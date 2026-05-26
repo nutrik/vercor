@@ -15,7 +15,7 @@ import vercor.grid_masks as grid_masks_module
 
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact, assert_array_equal_compact
-from vercor.assets import _asset_base_url, _download_asset, _ensure_forcing_asset
+from vercor.assets import _asset_base_url, _download_asset, ensure_registered_asset
 from vercor.exceptions import AssetError, RegridderError
 from vercor.grid_masks import (
     check_remap_conservation,
@@ -73,18 +73,16 @@ def test_ensure_forcing_asset_uses_valid_cached_file(
     monkeypatch.setattr(assets_module, "_ASSETS_CACHE_DIR", tmp_path)
     monkeypatch.setattr(
         assets_module,
-        "_FORCING_ASSETS",
-        {"k": {"filename": filename, "md5": hashlib.md5(payload).hexdigest()}},
-    )
-    monkeypatch.setattr(
-        assets_module,
         "_download_asset",
         lambda _url, _target: (_ for _ in ()).throw(
             AssertionError("unexpected download")
         ),
     )
 
-    resolved = _ensure_forcing_asset("k")
+    resolved = ensure_registered_asset(
+        "k",
+        {"k": {"filename": filename, "md5": hashlib.md5(payload).hexdigest()}},
+    )
     assert resolved == tmp_path / filename
 
 
@@ -98,11 +96,6 @@ def test_ensure_forcing_asset_downloads_when_cached_md5_invalid(
 
     monkeypatch.setattr(assets_module, "_ASSETS_CACHE_DIR", tmp_path)
     monkeypatch.setattr(
-        assets_module,
-        "_FORCING_ASSETS",
-        {"k": {"filename": filename, "md5": hashlib.md5(downloaded).hexdigest()}},
-    )
-    monkeypatch.setattr(
         assets_module, "VERCOR_ASSETS_BASE_URL", "https://example.test/base"
     )
 
@@ -112,7 +105,10 @@ def test_ensure_forcing_asset_downloads_when_cached_md5_invalid(
 
     monkeypatch.setattr(assets_module, "_download_asset", fake_download)
 
-    resolved = _ensure_forcing_asset("k")
+    resolved = ensure_registered_asset(
+        "k",
+        {"k": {"filename": filename, "md5": hashlib.md5(downloaded).hexdigest()}},
+    )
     assert resolved == cached
     assert cached.read_bytes() == downloaded
 
@@ -121,15 +117,13 @@ def test_ensure_forcing_asset_errors_without_base_url(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(assets_module, "_ASSETS_CACHE_DIR", tmp_path)
-    monkeypatch.setattr(
-        assets_module,
-        "_FORCING_ASSETS",
-        {"k": {"filename": "missing.nc", "md5": hashlib.md5(b"x").hexdigest()}},
-    )
     monkeypatch.setattr(assets_module, "VERCOR_ASSETS_BASE_URL", None)
 
     with pytest.raises(AssetError, match="no remote base URL configured"):
-        _ensure_forcing_asset("k")
+        ensure_registered_asset(
+            "k",
+            {"k": {"filename": "missing.nc", "md5": hashlib.md5(b"x").hexdigest()}},
+        )
 
 
 def test_ensure_forcing_asset_raises_and_deletes_on_md5_mismatch(
@@ -139,18 +133,16 @@ def test_ensure_forcing_asset_raises_and_deletes_on_md5_mismatch(
     target = tmp_path / filename
 
     monkeypatch.setattr(assets_module, "_ASSETS_CACHE_DIR", tmp_path)
-    monkeypatch.setattr(
-        assets_module,
-        "_FORCING_ASSETS",
-        {"k": {"filename": filename, "md5": hashlib.md5(b"expected").hexdigest()}},
-    )
     monkeypatch.setattr(assets_module, "VERCOR_ASSETS_BASE_URL", "https://example.test")
     monkeypatch.setattr(
         assets_module, "_download_asset", lambda _url, tgt: tgt.write_bytes(b"wrong")
     )
 
     with pytest.raises(AssetError, match="MD5 mismatch"):
-        _ensure_forcing_asset("k")
+        ensure_registered_asset(
+            "k",
+            {"k": {"filename": filename, "md5": hashlib.md5(b"expected").hexdigest()}},
+        )
 
     assert not target.exists()
 

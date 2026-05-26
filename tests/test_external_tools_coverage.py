@@ -10,10 +10,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import setups.external.jax_gcm_tools as jax_gcm_tools_module
-import setups.external.veros_gcm as veros_gcm_module
+import vercor.setups.external.jax_gcm_tools as jax_gcm_tools_module
+import vercor.setups.external.veros_gcm as veros_gcm_module
 from tests.assertions import assert_allclose_compact
-from vercor.runtime import RuntimeFieldStore
+from vercor.fluxes import vertical_coordinates as vertical_coordinates_module
+import vercor.pytree_utils as pytree_utils_module
 from vercor.settings import VercorSettings
 
 
@@ -56,7 +57,7 @@ def test_change_and_get_default_jcm_parameter_values() -> None:
 
 
 def test_compute_pressure_levels_handles_valid_and_invalid_inputs() -> None:
-    pressure = jax_gcm_tools_module.compute_pressure_levels(
+    pressure = vertical_coordinates_module.compute_pressure_levels(
         reference_pressure=jnp.asarray(100000.0),
         top_pressure=jnp.asarray(10000.0),
         sigma_levels=jnp.asarray([0.0, 0.5, 1.0]),
@@ -72,7 +73,7 @@ def test_compute_pressure_levels_handles_valid_and_invalid_inputs() -> None:
     )
     assert_allclose_compact(pressure, expected)
     assert_allclose_compact(
-        jax.jit(jax_gcm_tools_module.compute_pressure_levels)(
+        jax.jit(vertical_coordinates_module.compute_pressure_levels)(
             reference_pressure=jnp.asarray(100000.0),
             top_pressure=jnp.asarray(10000.0),
             sigma_levels=jnp.asarray([0.0, 0.5, 1.0]),
@@ -82,7 +83,7 @@ def test_compute_pressure_levels_handles_valid_and_invalid_inputs() -> None:
     )
 
     with pytest.raises(ValueError, match="top_pressure must be a scalar array"):
-        jax_gcm_tools_module.compute_pressure_levels(
+        vertical_coordinates_module.compute_pressure_levels(
             reference_pressure=jnp.asarray(100000.0),
             top_pressure=jnp.asarray([0.0, 1.0]),
             sigma_levels=jnp.asarray([0.0, 1.0]),
@@ -90,7 +91,7 @@ def test_compute_pressure_levels_handles_valid_and_invalid_inputs() -> None:
         )
 
     with pytest.raises(ValueError, match="sigma_levels must be a 1D array"):
-        jax_gcm_tools_module.compute_pressure_levels(
+        vertical_coordinates_module.compute_pressure_levels(
             reference_pressure=jnp.asarray(100000.0),
             top_pressure=jnp.asarray(0.0),
             sigma_levels=jnp.asarray([[0.0, 1.0]]),
@@ -173,11 +174,11 @@ def test_tree_helpers_transform_pytrees() -> None:
         "b": jnp.asarray([[2.0, 4.0], [6.0, 8.0]]),
     }
 
-    mean_tree = jax_gcm_tools_module.mean_leaf(tree, axis=0)
+    mean_tree = pytree_utils_module.mean_leaf(tree, axis=0)
     assert_allclose_compact(mean_tree["a"], np.asarray([3.0, 5.0]))
     assert_allclose_compact(mean_tree["b"], np.asarray([4.0, 6.0]))
 
-    unwrapped = jax_gcm_tools_module.unwrap_leading_dims(
+    unwrapped = pytree_utils_module.unwrap_leading_dims(
         {
             "a": jnp.arange(24.0).reshape(2, 3, 4),
             "b": jnp.arange(24.0, 48.0).reshape(2, 3, 4),
@@ -187,7 +188,7 @@ def test_tree_helpers_transform_pytrees() -> None:
     assert unwrapped["a"].shape == (6, 4)
     assert unwrapped["b"].shape == (6, 4)
 
-    stacked = jax_gcm_tools_module.stack_objects(
+    stacked = pytree_utils_module.stack_objects(
         [
             {"a": jnp.asarray([1.0, 2.0]), "b": jnp.asarray([3.0, 4.0])},
             {"a": jnp.asarray([5.0, 6.0]), "b": jnp.asarray([7.0, 8.0])},
@@ -196,7 +197,7 @@ def test_tree_helpers_transform_pytrees() -> None:
     assert_allclose_compact(stacked["a"], np.asarray([[1.0, 2.0], [5.0, 6.0]]))
     assert_allclose_compact(stacked["b"], np.asarray([[3.0, 4.0], [7.0, 8.0]]))
 
-    concatenated = jax_gcm_tools_module.concat_objects(
+    concatenated = pytree_utils_module.concat_objects(
         [
             {"a": jnp.asarray([[1.0], [2.0]]), "b": jnp.asarray([[3.0], [4.0]])},
             {"a": jnp.asarray([[5.0], [6.0]]), "b": jnp.asarray([[7.0], [8.0]])},
@@ -225,19 +226,17 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
         tau=0,
     )
     veros_state = SimpleNamespace(variables=variables)
-    runtime_fields = RuntimeFieldStore.from_mapping(
-        {
-            "model_level_height": np.full((4, 4), 10.0),
-            "u_velocity": np.full((4, 4), 11.0),
-            "v_velocity": np.full((4, 4), 12.0),
-            "potential_temperature": np.full((4, 4), 13.0),
-            "specific_humidity": np.full((4, 4), 14.0),
-            "density": np.full((4, 4), 15.0),
-            "temperature": np.full((4, 4), 16.0),
-            "net_shortwave_radiation_flux": np.full((4, 4), 20.0),
-            "downward_longwave_radiation_flux": np.full((4, 4), 30.0),
-        }
-    )
+    runtime_fields = {
+        "model_level_height": np.full((4, 4), 10.0),
+        "u_velocity": np.full((4, 4), 11.0),
+        "v_velocity": np.full((4, 4), 12.0),
+        "potential_temperature": np.full((4, 4), 13.0),
+        "specific_humidity": np.full((4, 4), 14.0),
+        "density": np.full((4, 4), 15.0),
+        "temperature": np.full((4, 4), 16.0),
+        "net_shortwave_radiation_flux": np.full((4, 4), 20.0),
+        "downward_longwave_radiation_flux": np.full((4, 4), 30.0),
+    }
 
     def fake_compute_ocean_surface_fluxes(*args: Any) -> tuple[Any, ...]:
         _ = args

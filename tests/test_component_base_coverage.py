@@ -15,8 +15,8 @@ import vercor.components as components_module
 import vercor.components.base as base_module
 from tests._coverage_support import DummyComponent, make_test_grid
 from tests.assertions import assert_allclose_compact
-from setups.data.forcing import read_forcing
-from setups.data.era5_atmosphere import make_era5_atmosphere
+from vercor.setups.data.forcing import read_forcing
+from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.clock import Clock
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.coupler import Coupler
@@ -128,7 +128,7 @@ def test_data_component_uses_explicit_noop_runtime_step() -> None:
 @pytest.mark.fast_always
 def test_data_component_seeds_canonical_fields() -> None:
     grid = make_test_grid(name="factory-data")
-    component = base_module.data_component(
+    component = components_module.data_component(
         name="OBS",
         grid=grid,
         fields={"temperature": jnp.full(grid.shape, 281.0)},
@@ -145,7 +145,7 @@ def test_data_component_seeds_canonical_fields() -> None:
 def test_convenience_factories_delegate_to_authoring_facade() -> None:
     grid = make_test_grid(name="author-factories")
 
-    data_component = base_module.data_component(
+    data_component = components_module.data_component(
         name="OBS",
         grid=grid,
         fields={"temperature": 281.0},
@@ -167,7 +167,7 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
             "tendency": fields["tendency"] + context.dt_seconds,
         }
 
-    differentiable = base_module.differentiable_component(
+    differentiable = components_module.differentiable_component(
         name="ATM",
         grid=grid,
         step=step,
@@ -197,7 +197,7 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
         np.full(grid.shape, 3.0),
     )
 
-    host = base_module.host_component(
+    host = components_module.host_component(
         name="HOST",
         grid=grid,
         step=step,
@@ -347,21 +347,21 @@ def test_callable_facade_accepts_one_two_and_three_argument_steps() -> None:
         }
 
     components = (
-        base_module.differentiable_component(
+        components_module.differentiable_component(
             name="ONE",
             grid=grid,
             step=fields_only,
             outputs=("temperature",),
             default_fields={"temperature": 280.0},
         ),
-        base_module.differentiable_component(
+        components_module.differentiable_component(
             name="TWO",
             grid=grid,
             step=fields_and_context,
             outputs=("temperature",),
             default_fields={"temperature": 280.0},
         ),
-        base_module.differentiable_component(
+        components_module.differentiable_component(
             name="THREE",
             grid=grid,
             step=fields_context_payload,
@@ -408,7 +408,7 @@ def test_callable_facade_rejects_unsupported_step_signature() -> None:
         ComponentError,
         match="step callable.*1, 2, or 3 positional arguments",
     ):
-        base_module.differentiable_component(
+        components_module.differentiable_component(
             name="ATM",
             grid=grid,
             step=too_many_arguments,
@@ -424,7 +424,7 @@ def test_callable_facade_rejects_removed_legacy_field_seed_keyword() -> None:
 
     removed_keyword = "initial" + "_fields"
     with pytest.raises(TypeError, match=removed_keyword):
-        cast(Any, base_module.differentiable_component)(
+        cast(Any, components_module.differentiable_component)(
             name="ATM",
             grid=grid,
             step=step,
@@ -530,7 +530,7 @@ def test_apply_step_result_updates_fields_and_payload() -> None:
 @pytest.mark.fast_always
 def test_data_component_seeding_updates_declared_outputs() -> None:
     grid = make_test_grid(name="data-outputs")
-    component = base_module.data_component(
+    component = components_module.data_component(
         name="OBS",
         grid=grid,
         fields={"temperature": 281.0},
@@ -610,11 +610,11 @@ def test_required_fields_declaration_api_is_removed() -> None:
             {"name": "HOST", "grid": grid, "step": step},
         ),
         (
-            base_module.differentiable_component,
+            components_module.differentiable_component,
             {"name": "ATM", "grid": grid, "step": step},
         ),
         (
-            base_module.host_component,
+            components_module.host_component,
             {"name": "HOST", "grid": grid, "step": step},
         ),
     )
@@ -920,7 +920,7 @@ def test_data_component_rejects_non_grid_fields_early() -> None:
         ComponentError,
         match="data field 'bad_metadata'.*canonical grid-field layout",
     ):
-        base_module.data_component(
+        components_module.data_component(
             name="OBS",
             grid=grid,
             fields={"bad_metadata": jnp.zeros((3,), dtype=jnp.float64)},
@@ -983,7 +983,7 @@ def test_differentiable_component_applies_callable_field_updates() -> None:
         assert payload is None
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
-    component = base_module.differentiable_component(
+    component = components_module.differentiable_component(
         name="ATM",
         grid=grid,
         step=step,
@@ -1020,7 +1020,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
         assert isinstance(payload, Mapping)
         return {"temperature": fields["temperature"] + payload["offset"]}
 
-    preserve_component = base_module.differentiable_component(
+    preserve_component = components_module.differentiable_component(
         name="ATM",
         grid=grid,
         payload={"offset": jnp.asarray(2.0)},
@@ -1056,7 +1056,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
             payload={"offset": payload["offset"] + 1.0},
         )
 
-    replace_component = base_module.differentiable_component(
+    replace_component = components_module.differentiable_component(
         name="ATM",
         grid=grid,
         payload={"offset": jnp.asarray(2.0)},
@@ -1095,7 +1095,7 @@ def test_host_component_runs_through_coupler_host_runtime() -> None:
         _ = payload
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
-    component = base_module.host_component(
+    component = components_module.host_component(
         name="HOST",
         grid=grid,
         step=step,
@@ -1126,7 +1126,7 @@ def test_callable_component_rejects_unseeded_field_updates() -> None:
         _ = fields, context, payload
         return {"created_during_step": jnp.zeros(grid.shape)}
 
-    component = base_module.differentiable_component(
+    component = components_module.differentiable_component(
         name="ATM",
         grid=grid,
         step=step,

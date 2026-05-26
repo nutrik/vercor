@@ -22,7 +22,6 @@ from vercor.components.base import (
     ComponentPrefillHook,
     ComponentValidateHook,
     HostRuntimeComponent,
-    _install_lifecycle_hooks,
 )
 
 if TYPE_CHECKING:
@@ -158,6 +157,8 @@ class _CallableRuntimeMixin:
         self._step = normalize_component_step_callable(step)
         self._payload = payload
         component.declare_fields(field_spec)
+        from vercor.components.factories import _install_lifecycle_hooks
+
         _install_lifecycle_hooks(
             component,
             initialize=initialize,

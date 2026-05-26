@@ -6,24 +6,24 @@ import numpy as np
 
 from tests.assertions import assert_allclose_compact
 import vercor.diagnostics as diagnostics_module
-from setups.data.era5_atmosphere import (
+from vercor.setups.data.era5_atmosphere import (
     _compute_monthly_diagnostics,
     _decode_surface_pressure,
 )
-from setups.data._field_helpers import mask_time_last_surface_field
-from setups.data.era5_land import _prepare_era5_land_runtime_fields
-from setups.data.era5_ocean import (
+from vercor.setups.data._field_helpers import mask_time_last_surface_field
+from vercor.setups.data.era5_land import _prepare_era5_land_runtime_fields
+from vercor.setups.data.era5_ocean import (
     _ocean_binary_mask_from_land_fraction,
 )
-from setups.data.erainterim_ocean import (
+from vercor.setups.data.erainterim_ocean import (
     _assemble_erainterim_field,
     _assemble_erainterim_latitude,
     _binary_ocean_mask_from_salinity,
 )
-from setups.data.camulator_land import (
+from vercor.setups.data.camulator_land import (
     _prepare_camulator_land_surface_temperature,
 )
-from setups.data.jcm_land import (
+from vercor.setups.data.jcm_land import (
     _jcm_coordinates_in_degrees,
     _prepare_jcm_land_runtime_fields,
 )

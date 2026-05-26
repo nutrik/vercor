@@ -8,13 +8,13 @@ from typing import cast
 import jax
 
 from vercor.clock import Clock, ModelDateTime
+from vercor.calendar import daily_forcing_index
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor.pytree import PyTreeNodeMixin
 from vercor.settings import VercorSettings
 from vercor.time_selection import (
     datetime_to_seconds_in_year,
     get_periodic_interval,
-    is_leap_year,
 )
 from vercor.types import RuntimeArray
 
@@ -61,22 +61,7 @@ class RuntimeStepInfo(PyTreeNodeMixin):
 def runtime_daily_index(time: datetime | ModelDateTime, year_type: str) -> int:
     """Return the no-leap daily forcing index for a runtime timestamp."""
 
-    if year_type == "360":
-        month_lengths = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-        month_length = month_lengths[time.month - 1]
-        mapped_day = ((time.day - 1) * (month_length - 1)) // 29 + 1
-        day_of_year = sum(month_lengths[: time.month - 1]) + mapped_day
-    elif year_type == "noleap":
-        model_day_of_year = getattr(time, "day_of_year", None)
-        if model_day_of_year is None:
-            raise ValueError("ModelDateTime.day_of_year is not initialized")
-        day_of_year = model_day_of_year
-    else:
-        day_of_year = time.timetuple().tm_yday
-        if is_leap_year(time.year) and day_of_year > 59:
-            day_of_year -= 1
-
-    return day_of_year - 1
+    return daily_forcing_index(time, year_type=year_type, no_leap=True)
 
 
 def runtime_step_info_from_times(

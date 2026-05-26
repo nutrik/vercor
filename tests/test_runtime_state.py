@@ -13,7 +13,7 @@ from tests.assertions import assert_allclose_compact
 from vercor.components.base import DataComponent
 from vercor.runtime.contexts import ComponentInitContext
 from vercor.settings import VercorSettings
-from setups.external.jax_gcm import JAXGCMRuntimePayload
+from vercor.setups.external.jax_gcm import JAXGCMRuntimePayload
 from vercor.runtime import (
     RuntimeComponentContract,
     RuntimeComponentState,
@@ -112,18 +112,27 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     )
     forcing_data_source = Path("vercor/forcing_data.py").read_text(encoding="utf-8")
     flux_source = Path("vercor/fluxes/bulk_formula_cesm.py").read_text(encoding="utf-8")
-    diagnostics_source = Path("vercor/diagnostics.py").read_text(encoding="utf-8")
+    diagnostics_source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted(Path("vercor/diagnostics").glob("*.py"))
+    )
     output_source = Path("vercor/output.py").read_text(encoding="utf-8")
-    jax_gcm_source = Path("setups/external/jax_gcm.py").read_text(encoding="utf-8")
-    veros_source = Path("setups/external/veros_gcm.py").read_text(encoding="utf-8")
-    camulator_source = Path("setups/external/camulator.py").read_text(encoding="utf-8")
-    camulator_land_source = Path("setups/data/camulator_land.py").read_text(
+    jax_gcm_source = Path("vercor/setups/external/jax_gcm.py").read_text(
+        encoding="utf-8"
+    )
+    veros_source = Path("vercor/setups/external/veros_gcm.py").read_text(
+        encoding="utf-8"
+    )
+    camulator_source = Path("vercor/setups/external/camulator.py").read_text(
+        encoding="utf-8"
+    )
+    camulator_land_source = Path("vercor/setups/data/camulator_land.py").read_text(
         encoding="utf-8"
     )
     veros_runtime_settings_source = Path(
-        "setups/external/veros_runtime_settings.py"
+        "vercor/setups/external/veros_runtime_settings.py"
     ).read_text(encoding="utf-8")
-    windpp_source = Path("setups/external/windpp.py").read_text(encoding="utf-8")
+    windpp_source = Path("vercor/setups/external/windpp.py").read_text(encoding="utf-8")
 
     forbidden_component_markers = (
         "step_slab_component_state",
@@ -299,10 +308,13 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def make_camulator_land" in camulator_land_source
     assert "load_camulator_forcing_context" in camulator_land_source
     assert "initialize_camulator(" not in camulator_land_source
-    assert "setups.external.camulator import" not in camulator_land_source
-    assert "from setups.external.veros_runtime_settings import *" not in veros_source
+    assert "vercor.setups.external.camulator import" not in camulator_land_source
     assert (
-        "from setups.external.veros_runtime_settings import configure_veros_runtime"
+        "from vercor.setups.external.veros_runtime_settings import *"
+        not in veros_source
+    )
+    assert (
+        "from vercor.setups.external.veros_runtime_settings import configure_veros_runtime"
         in veros_source
     )
     assert veros_source.index("configure_veros_runtime()") < veros_source.index(
@@ -364,9 +376,9 @@ def test_runtime_focused_modules_keep_compatibility_reexports() -> None:
 
 
 def test_examples_use_coupler_runtime_component_view_factory() -> None:
-    slab_driver_source = Path("setups/run_slab_driver.py").read_text(encoding="utf-8")
-    data_driver_source = Path("setups/run_data_driver.py").read_text(encoding="utf-8")
-    jcm_slab_source = Path("setups/run_jcm_with_slab.py").read_text(encoding="utf-8")
+    slab_driver_source = Path("examples/run_slab_driver.py").read_text(encoding="utf-8")
+    data_driver_source = Path("examples/run_data_driver.py").read_text(encoding="utf-8")
+    jcm_slab_source = Path("examples/run_jcm_with_slab.py").read_text(encoding="utf-8")
 
     for source in (slab_driver_source, data_driver_source, jcm_slab_source):
         assert "RuntimeComponentView.from_coupler_state" not in source
@@ -374,7 +386,7 @@ def test_examples_use_coupler_runtime_component_view_factory() -> None:
 
 
 def test_examples_import_concrete_components_directly() -> None:
-    for path in Path("setups").glob("run_*.py"):
+    for path in Path("examples").glob("run_*.py"):
         source = path.read_text(encoding="utf-8")
         assert "from vercor.components import" not in source
 

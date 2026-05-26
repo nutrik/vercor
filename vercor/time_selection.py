@@ -9,9 +9,8 @@ from vercor.clock import (
     DateTime360,
     DateTime365,
     ModelDateTime,
-    _DAYS_PER_MONTH_GREGORIAN_LEAP,
-    _DAYS_PER_MONTH_GREGORIAN_NO_LEAP,
 )
+from vercor.calendar import daily_forcing_day_of_year
 from vercor.types import RuntimeArray
 
 
@@ -66,24 +65,11 @@ def datetime_to_seconds_in_year(dt: datetime | ModelDateTime) -> float:
     )
 
 
-def is_leap_year(x: int) -> bool:
-    """Return whether ``x`` is a Gregorian leap year."""
-
-    return (x % 4 == 0 and x % 100 != 0) or (x % 400 == 0)
-
-
 def _custom_360_day_to_gregorian_day_of_year(
     time: datetime | ModelDateTime,
     no_leap: bool,
 ) -> int:
-    month_lengths = _DAYS_PER_MONTH_GREGORIAN_NO_LEAP
-    if not no_leap and is_leap_year(time.year):
-        month_lengths = _DAYS_PER_MONTH_GREGORIAN_LEAP
-
-    month_length = month_lengths[time.month - 1]
-    mapped_day_in_month = ((time.day - 1) * (month_length - 1)) // 29 + 1
-    days_before_month = sum(month_lengths[: time.month - 1])
-    return days_before_month + mapped_day_in_month
+    return daily_forcing_day_of_year(time, year_type="360", no_leap=no_leap)
 
 
 def get_field_time_slice(
@@ -97,15 +83,17 @@ def get_field_time_slice(
     if isinstance(time, DateTime360):
         tm_yday = _custom_360_day_to_gregorian_day_of_year(time, no_leap=no_leap)
     elif isinstance(time, DateTime365):
-        if time.day_of_year is None:
-            raise ValueError("DateTime365.day_of_year is not initialized")
-        tm_yday = time.day_of_year
+        tm_yday = daily_forcing_day_of_year(
+            time,
+            year_type="noleap",
+            no_leap=no_leap,
+        )
     else:
-        tm_yday = time.timetuple().tm_yday
-
-        year = time.year
-        if no_leap and is_leap_year(year) and tm_yday > 59:
-            tm_yday -= 1
+        tm_yday = daily_forcing_day_of_year(
+            time,
+            year_type="leap",
+            no_leap=no_leap,
+        )
 
     time_index = tm_yday - 1
     out: RuntimeArray = jnp.asarray(data[field_name])[time_index, ...]

@@ -12,13 +12,16 @@ import pytest
 import torch
 import xarray as xr
 
-import setups.data.camulator_land as camulator_land_module
-import setups.external.camulator as camulator_module
-import setups.external.camulator_state as camulator_state_module
+import vercor.setups.data.camulator_land as camulator_land_module
+import vercor.setups.external.camulator as camulator_module
+import vercor.setups.external.camulator_forcing as camulator_forcing_module
+import vercor.setups.external.camulator_imports as camulator_imports_module
+import vercor.setups.external.camulator_init as camulator_init_module
+import vercor.setups.external.camulator_tensors as camulator_tensors_module
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
-from setups.external.camulator import (
+from vercor.setups.external.camulator import (
     make_camulator_gcm,
     _initialize_camulator_runtime_fields,
     _prepare_camulator_dynamic_forcing_chunk,
@@ -182,7 +185,7 @@ def test_prepare_static_forcing_tensor_preserves_order_and_shape() -> None:
         }
     )
 
-    static_forcing = camulator_state_module._prepare_static_forcing_tensor(
+    static_forcing = camulator_tensors_module._prepare_static_forcing_tensor(
         forcing_ds, ["LAND", "TOPO"], "cpu"
     )
 
@@ -215,19 +218,19 @@ def _state_variable_accessor_conf(static_first: bool = False) -> dict[str, Any]:
 
 
 def test_state_variable_accessor_builds_exact_index_maps() -> None:
-    state_accessor = camulator_state_module.StateVariableAccessor(
+    state_accessor = camulator_tensors_module.StateVariableAccessor(
         _state_variable_accessor_conf(),
         tensor_type="state",
     )
-    input_accessor = camulator_state_module.StateVariableAccessor(
+    input_accessor = camulator_tensors_module.StateVariableAccessor(
         _state_variable_accessor_conf(static_first=False),
         tensor_type="input",
     )
-    static_first_input_accessor = camulator_state_module.StateVariableAccessor(
+    static_first_input_accessor = camulator_tensors_module.StateVariableAccessor(
         _state_variable_accessor_conf(static_first=True),
         tensor_type="input",
     )
-    output_accessor = camulator_state_module.StateVariableAccessor(
+    output_accessor = camulator_tensors_module.StateVariableAccessor(
         _state_variable_accessor_conf(),
         tensor_type="output",
     )
@@ -277,7 +280,9 @@ def test_state_variable_accessor_builds_exact_index_maps() -> None:
 
 @pytest.mark.fast_always
 def test_state_variable_accessor_uses_shared_index_map_builders() -> None:
-    source = Path("setups/external/camulator_state.py").read_text(encoding="utf-8")
+    source = Path("vercor/setups/external/camulator_tensors.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "def _append_indexed_variables(" in source
     assert "def _mark_unavailable_variables(" in source
@@ -510,55 +515,55 @@ def test_initialize_camulator_logs_lifecycle_through_injected_logger(
         },
     }
 
-    monkeypatch.setattr(camulator_state_module, "CREDIT_AVAILABLE", True)
+    monkeypatch.setattr(camulator_imports_module, "CREDIT_AVAILABLE", True)
     monkeypatch.setattr(
-        camulator_state_module.yaml,
+        camulator_init_module.yaml,
         "load",
         lambda config_file, Loader: conf,
     )
     monkeypatch.setattr(
-        camulator_state_module,
+        camulator_imports_module,
         "credit_main_parser",
         lambda parsed, parse_training, parse_predict, print_summary: parsed,
         raising=False,
     )
     monkeypatch.setattr(
-        camulator_state_module, "load_transforms", lambda conf: None, raising=False
+        camulator_imports_module, "load_transforms", lambda conf: None, raising=False
     )
     monkeypatch.setattr(
-        camulator_state_module,
+        camulator_imports_module,
         "Normalize_ERA5_and_Forcing",
         lambda conf: _Transformer(),
         raising=False,
     )
     monkeypatch.setattr(
-        camulator_state_module,
+        camulator_imports_module,
         "load_model_name",
         lambda conf, model_name, load_weights: _Model(),
         raising=False,
     )
-    monkeypatch.setattr(camulator_state_module.os.path, "exists", lambda path: True)
+    monkeypatch.setattr(camulator_init_module.os.path, "exists", lambda path: True)
     monkeypatch.setattr(
-        camulator_state_module.torch,
+        camulator_init_module.torch,
         "load",
         lambda path, map_location: torch.zeros((1, 1), dtype=torch.float32),
     )
     monkeypatch.setattr(
-        camulator_state_module.xr, "open_dataset", lambda path, **kwargs: _Dataset()
+        camulator_init_module.xr, "open_dataset", lambda path, **kwargs: _Dataset()
     )
     monkeypatch.setattr(
-        camulator_state_module,
+        camulator_init_module,
         "_prepare_static_forcing_tensor",
         lambda forcing_ds, static_variables, device: torch.zeros((1, 1)),
     )
     monkeypatch.setattr(
-        camulator_state_module, "load_metadata", lambda conf: {}, raising=False
+        camulator_imports_module, "load_metadata", lambda conf: {}, raising=False
     )
     monkeypatch.setattr(
-        camulator_state_module, "CAMulatorStepper", lambda model, conf, device: stepper
+        camulator_init_module, "CAMulatorStepper", lambda model, conf, device: stepper
     )
 
-    camulator_state_module.initialize_camulator(
+    camulator_init_module.initialize_camulator(
         str(config_path),
         model_name="checkpoint.pt",
         device="cpu",
@@ -728,7 +733,7 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
         ),
     )
     component.model_substeps = 2
-    component.runtime_cursor = camulator_state_module.CamulatorRuntimeCursor(
+    component.runtime_cursor = camulator_forcing_module.CamulatorRuntimeCursor(
         start_ix=0,
         init_str="2000-01-01T00Z",
         model_substeps=2,

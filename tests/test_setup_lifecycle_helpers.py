@@ -7,17 +7,18 @@ from typing import Any
 import jax.numpy as jnp
 import pytest
 
-from setups._time_helpers import (
+from vercor.setups._time_helpers import (
     align_model_timestep,
     assign_model_timestep_alignment,
     runtime_forcing_index,
     run_logged_spinup,
     seed_grid_field_defaults,
 )
-import setups.external.camulator_state as camulator_state_module
-from setups.external.camulator_state import initialize_camulator_forcing_cursor
+import vercor.setups.external.camulator_state as camulator_state_module
+import vercor.setups.external.camulator_forcing as camulator_forcing_module
+from vercor.setups.external.camulator_forcing import initialize_camulator_forcing_cursor
 from tests._coverage_support import make_test_grid
-from vercor.components.base import data_component
+from vercor.components import data_component
 from vercor.settings import VercorSettings
 
 
@@ -167,7 +168,7 @@ def test_camulator_runtime_cursor_initializes_indexes_and_advances() -> None:
     logger = _RecordingLogger()
     forcing_start = datetime(2000, 1, 1)
     dynamic_ds = SimpleNamespace(indexes={"time": _TimeIndex(4)})
-    cursor = camulator_state_module.CamulatorRuntimeCursor()
+    cursor = camulator_forcing_module.CamulatorRuntimeCursor()
 
     cursor.initialize(
         conf={"predict": {"start_datetime": forcing_start}},
@@ -191,7 +192,7 @@ def test_camulator_runtime_cursor_initializes_indexes_and_advances() -> None:
 def test_build_jcm_land_atmosphere_components_patches_mask_and_options(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import setups.jcm_setup_helpers as helper
+    import vercor.setups.jcm_setup_helpers as helper
 
     coords = object()
     forcing = object()

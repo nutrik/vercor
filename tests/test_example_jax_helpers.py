@@ -6,8 +6,8 @@ import numpy as np
 from numpy.typing import NDArray
 import pytest
 
-import setups.jax_array_helpers as helpers_module
-from setups.jax_array_helpers import (
+import vercor.setups.jax_array_helpers as helpers_module
+from vercor.setups.jax_array_helpers import (
     component_vector_speed,
     transposed_host_array,
 )

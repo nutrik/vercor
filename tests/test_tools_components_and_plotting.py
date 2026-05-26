@@ -25,8 +25,8 @@ from vercor.diagnostics import (
     print_component_field_means_table,
     safe_component_nanmean,
 )
+from vercor.runtime.topology import get_component
 from vercor.grid_masks import (
-    get_component,
     grids_identical,
 )
 

@@ -143,11 +143,13 @@ immutable runtime containers used during traced integration.
   through helper seeding. The legacy `wrap()` classmethods and
   `make_*_component()` factory functions have been removed; component authors
   should use the helper facade, class-level `from_fields()` / `from_model()`
-  constructors, or subclasses with `declare_fields(...)`. `vercor.components.base`
-  is the public authoring surface; field
-  declarations and author-value normalization live in private
-  `vercor.components._contracts`, callable signature adaptation and
-  callable-backed runtime components live in private
+  constructors, or subclasses with `declare_fields(...)`. `vercor.components`
+  and `vercor` reexport the component-author facade. `vercor.components.base`
+  owns only the base classes and class-level authoring contracts, while
+  module-level factory helpers and lifecycle hook installation live in
+  `vercor.components.factories`. Field declarations and author-value
+  normalization live in private `vercor.components._contracts`, callable
+  signature adaptation and callable-backed runtime components live in private
   `vercor.components._callable_wrappers`, component-facing runtime-field
   adapters live in private `vercor.components._runtime_fields`, and setup
   validation lives in private `vercor.components._validation`. These private
@@ -175,14 +177,13 @@ immutable runtime containers used during traced integration.
   `seed_declared_defaults()` seeds fields from a component's declared
   defaults, and the base `initialize()` hook now does this automatically when
   subclasses do not need custom setup. Prefill hooks should use
-  `prefill_runtime_fields()` for ordinary output/default fields. Non-grid metadata such as
-  hybrid-level coefficients belongs on component attributes or runtime payloads.
-  Use
-  Factory-created setup adapters should put non-runtime setup metadata in
+  `prefill_runtime_fields()` for ordinary output/default fields. Non-grid
+  metadata such as hybrid-level coefficients belongs on component attributes or
+  runtime payloads. Factory-created setup adapters should put non-runtime setup
+  metadata in
   `Component.setup_metadata` rather than attaching ad-hoc attributes to the
   component object. Examples include forcing-file provenance and diagnostic
   coefficients that should not enter runtime field validation or JAX scan state.
-  Use
   `Component` for differentiable active models and implement
   `step_runtime_state()`. Use `DataComponent` for forcing/static data adapters
   that intentionally keep the shared no-op runtime step and do not create
@@ -230,6 +231,40 @@ immutable runtime containers used during traced integration.
   shape and dtype between input and output; per-step slices or adapted forcing
   objects should be local values unless they are shape-stable runtime state.
   Internal runtime containers are not exported from the package top level.
+
+### Setup adapters and shared ownership
+
+Reusable concrete adapters live under the canonical packaged namespace
+`vercor.setups`. Runnable assembly scripts live under `examples/`; in-repo code
+should not depend on a top-level `setups` package. Setup adapters use
+`ComponentSetupContext`, `ComponentStepContext`, and plain runtime-array
+mappings at their author boundary instead of importing runtime context/store
+internals directly.
+
+Core helper ownership follows the same boundary. Calendar constants, leap-year
+logic, 360/noleap daily mapping, and runtime daily forcing indexes live in
+`vercor.calendar`. Rectilinear grid construction and center-to-edge geometry
+live in `vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while
+component lookup for exchange topology is private to `vercor.runtime.topology`.
+Generic sigma-coordinate pressure/altitude helpers live in
+`vercor.fluxes.vertical_coordinates`, and generic PyTree transforms live in
+`vercor.pytree_utils`.
+
+`vercor.assets` owns generic cache, download, and checksum validation only.
+Concrete forcing product registries and `get_forcing_data(...)` defaults live
+with setup data adapters in `vercor.setups.data.assets`. Diagnostics are split
+into `vercor.diagnostics.fields`, `vercor.diagnostics.tables`, and
+`vercor.diagnostics.plotting`, with `vercor.diagnostics` preserving the public
+reexport surface.
+
+CAMulator optional-dependency loading, forcing cursors, tensor accessors,
+stepping, and initialization are split across
+`vercor.setups.external.camulator_imports`,
+`vercor.setups.external.camulator_forcing`,
+`vercor.setups.external.camulator_tensors`,
+`vercor.setups.external.camulator_stepper`, and
+`vercor.setups.external.camulator_init`. The old `camulator_state` module is a
+thin compatibility facade over those focused modules.
 
 ### Settings container
 
@@ -399,7 +434,7 @@ For each module, pre-generate reference data and check agreement.
 
 For each module, verify that AD gradients match finite-difference gradients.
 
-**level 5**: End-to-end integration tests (from runnable setups in `setups/`)
+**level 5**: End-to-end integration tests (from runnable scripts in `examples/`)
 
 ---
 

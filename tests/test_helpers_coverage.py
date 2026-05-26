@@ -13,9 +13,10 @@ from tests.assertions import assert_allclose_compact
 from vercor.exceptions import GridError
 from vercor.exchange import Exchange
 from vercor.grid import Grid, RectilinearGrid
+from vercor.grid_geometry import centers_to_edges
+from vercor.grid_masks import compute_land_mask
 from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 from vercor.regridders.bilinear import bilinear
-from vercor.regridders.helpers import centers_to_edges, compute_land_mask
 from vercor.run_sequence import RunSequence
 
 

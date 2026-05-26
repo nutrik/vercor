@@ -4,8 +4,13 @@ from math import floor
 import time
 from typing import Callable, ClassVar, Iterator, Literal, Self
 
-_DAYS_PER_MONTH_GREGORIAN_LEAP = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-_DAYS_PER_MONTH_GREGORIAN_NO_LEAP = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+from vercor.calendar import (
+    DAYS_PER_MONTH_360,
+    DAYS_PER_MONTH_GREGORIAN_NO_LEAP,
+    day_of_year_from_month_day,
+    month_day_from_day_of_year,
+)
+
 _MICROSECONDS_PER_DAY = 86_400_000_000
 
 
@@ -157,17 +162,11 @@ class _ModelDateTimeBase:
 
     @classmethod
     def _day_of_year_from_month_day(cls, month: int, day: int) -> int:
-        return sum(cls._MONTH_LENGTHS[: month - 1]) + day
+        return day_of_year_from_month_day(cls._MONTH_LENGTHS, month, day)
 
     @classmethod
     def _month_day_from_day_of_year(cls, day_of_year: int) -> tuple[int, int]:
-        day_cursor = day_of_year
-        for month, month_len in enumerate(cls._MONTH_LENGTHS, start=1):
-            if day_cursor <= month_len:
-                return month, day_cursor
-            day_cursor -= month_len
-
-        raise ValueError(f"invalid day_of_year={day_of_year}")
+        return month_day_from_day_of_year(cls._MONTH_LENGTHS, day_of_year)
 
     def _from_ordinal_microseconds(self, total_microseconds: int) -> Self:
         total_day_index, micros_of_day = divmod(
@@ -270,14 +269,14 @@ class _ModelDateTimeBase:
 class DateTime365(_ModelDateTimeBase):
     DAYS_PER_YEAR: ClassVar[int] = 365
     FIXED_30_DAY_MONTHS: ClassVar[bool] = False
-    _MONTH_LENGTHS: ClassVar[tuple[int, ...]] = _DAYS_PER_MONTH_GREGORIAN_NO_LEAP
+    _MONTH_LENGTHS: ClassVar[tuple[int, ...]] = DAYS_PER_MONTH_GREGORIAN_NO_LEAP
 
 
 @dataclass(frozen=True, repr=False)
 class DateTime360(_ModelDateTimeBase):
     DAYS_PER_YEAR: ClassVar[int] = 360
     FIXED_30_DAY_MONTHS: ClassVar[bool] = True
-    _MONTH_LENGTHS: ClassVar[tuple[int, ...]] = (30,) * 12
+    _MONTH_LENGTHS: ClassVar[tuple[int, ...]] = DAYS_PER_MONTH_360
 
 
 ModelDateTime = DateTime365 | DateTime360

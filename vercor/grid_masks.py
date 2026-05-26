@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 import jax.numpy as jnp
 
 from vercor.dtypes import as_jax_real_array, dtype_policy
-from vercor.exceptions import CouplerError, RegridderError
-from vercor.components.base import Component
+from vercor.exceptions import RegridderError
 from vercor.grid import RectilinearGrid
 from vercor.interpolators.conservative_remap_rectilinear import (
     ConservativeRectilinearRemapper,
 )
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.regridders.conservative import ConservativeRectilinearRegridder
-from vercor.regridders.helpers import compute_land_mask
 from vercor.types import RuntimeArray
 
 
@@ -35,22 +35,15 @@ def grids_identical(g0: RectilinearGrid, g1: RectilinearGrid) -> bool:
     )
 
 
-def get_component(allcomponents: dict[str, Component], types: str) -> Component:
-    """Return the registered component with the requested VerCOR component name."""
+def compute_land_mask(ocean_fractional_mask: Any) -> Any:
+    """Compute land binary mask from an ocean fractional mask."""
 
-    components: list[Component] = [
-        component for component in allcomponents.values() if component.name == types
-    ]
-
-    if len(components) > 1:
-        raise CouplerError(
-            f"Multiple {components[0].name} components registered; only one supported"
-        )
-
-    if not components:
-        raise CouplerError(f"No component of types ({types}) registered")
-
-    return components[0]
+    fminval = 0.001
+    fmaxval = 1.0
+    land_binary_mask = 1.0 - as_jax_real_array(ocean_fractional_mask)
+    land_binary_mask = jnp.where(land_binary_mask > fmaxval, 1.0, land_binary_mask)
+    land_binary_mask = jnp.where(land_binary_mask < fminval, 0.0, land_binary_mask)
+    return cast(Any, jnp.where(land_binary_mask != 0.0, 1, 0))
 
 
 def compute_ocn_lnd_masks_on_atm_grid(

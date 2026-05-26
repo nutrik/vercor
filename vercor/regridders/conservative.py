@@ -1,7 +1,7 @@
 from typing import Optional
 
 from vercor.grid import RectilinearGrid
-from vercor.regridders.helpers import centers_to_edges
+from vercor.grid_geometry import centers_to_edges
 from vercor.interpolators.conservative_remap_rectilinear import (
     ConservativeRectilinearRemapper,
 )
