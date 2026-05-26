@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, NamedTuple
 
 from vercor.dtypes import DTypePolicy
+from vercor.physical_constants import PHYSICAL_CONSTANT_SETTINGS
 
 
 class Settings(NamedTuple):
@@ -13,7 +14,7 @@ class Settings(NamedTuple):
     units: str
 
 
-DEFAULT_SETTINGS: dict[str, Settings] = {
+CONTROL_SETTINGS: dict[str, Settings] = {
     # Runtime settings
     "enable_x64": Settings(False, "Enable 64-bit precision for JAX computations", "-"),
     "identifier": Settings("UNNAMED", "Identifier of the current simulation", "-"),
@@ -29,49 +30,15 @@ DEFAULT_SETTINGS: dict[str, Settings] = {
         "-",
     ),
     "year_in_seconds": Settings(365 * 86400.0, "Nominal model year length", "s"),
-    # Physical constants
-    "earth_radius": Settings(6.371e6, "Earth radius", "m"),
-    # Bulk formula constants
-    "gravity": Settings(9.81, "Acceleration due to gravity", "m/s^2"),
-    "rhoAir": Settings(1.3, "Density of air", "kg/m^3"),
-    "rdair": Settings(287.042, "Dry air gas constant", "J/(K*kg)"),
-    "cpdair": Settings(
-        1.00464e3,
-        "Specific heat capacity of dry air",
-        "J/(kg*K)",
-    ),
-    "zvir": Settings(
-        0.608,
-        "Dry-air water-vapor molecular mass ratio correction",
-        "-",
-    ),
-    "p0": Settings(1e5, "Reference pressure for potential temperature", "Pa"),
-    "mwdair": Settings(28.966, "Molecular weight of dry air", "kg/kmole"),
-    "cpwv": Settings(1.810e3, "Specific heat of water vapor", "J/(kg*K)"),
-    "cpvir": Settings(0.802, "Specific heat of vaporization ratio correction", "-"),
-    "cappa": Settings(0.286, "Dry air gas constant over heat capacity", "-"),
-    "latice": Settings(3.337e5, "Latent heat of fusion", "J/kg"),
-    "rgas": Settings(8314.47, "Ideal gas constant", "J/(K*kmole)"),
-    "umin_ocean": Settings(
-        0.5,
-        "Minimum atmospheric wind speed over ocean surface",
-        "m/s",
-    ),
-    "umin_ice": Settings(
-        1.0,
-        "Minimum atmospheric wind speed over ice surface",
-        "m/s",
-    ),
-    "karman": Settings(0.4, "von Karman constant", "-"),
-    "stefBoltz": Settings(5.67e-8, "Stefan-Boltzmann constant", "W/(m^2*K^4)"),
-    "ocean_emissivity": Settings(0.97, "Long-wave emissivity of ocean surface", "-"),
-    "ice_emissivity": Settings(0.97, "Long-wave emissivity of sea ice", "-"),
-    "snow_emissivity": Settings(0.99, "Long-wave emissivity of snow", "-"),
-    "latvap": Settings(2.501e6, "Latent heat of vaporization", "J/kg"),
-    "latfresh": Settings(3.34e5, "Latent heat of fusion", "J/kg"),
-    "gamma_blk": Settings(0.1, "Bulk aerodynamic resistance", "-"),
-    "zref": Settings(10.0, "Reference height", "m"),
-    "ztref": Settings(2.0, "Reference height for air temperature", "m"),
+}
+
+
+DEFAULT_SETTINGS: dict[str, Settings] = {
+    **CONTROL_SETTINGS,
+    **{
+        name: Settings(value, description, units)
+        for name, (value, description, units) in PHYSICAL_CONSTANT_SETTINGS.items()
+    },
 }
 
 

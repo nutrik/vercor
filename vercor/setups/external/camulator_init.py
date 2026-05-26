@@ -15,6 +15,19 @@ from vercor.setups.external.camulator_stepper import CAMulatorStepper
 from vercor.setups.external.camulator_tensors import _prepare_static_forcing_tensor
 
 
+def add_init_noise(
+    state: torch.Tensor,
+    noise_std: float = 0.05,
+    logger: LoggerLike | None = None,
+) -> torch.Tensor:
+    """Return CAMulator initial conditions with Gaussian perturbation."""
+
+    log = logger if logger is not None else get_default_logger()
+    log.info(f"Adding initial condition noise (std={noise_std})")
+    noise = torch.randn_like(state) * noise_std
+    return state + noise
+
+
 def initialize_camulator(
     config_path: str,
     model_name: Optional[str] = None,
@@ -136,4 +149,4 @@ def initialize_camulator(
     }
 
 
-__all__ = ["initialize_camulator"]
+__all__ = ["add_init_noise", "initialize_camulator"]

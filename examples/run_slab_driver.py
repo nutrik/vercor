@@ -13,6 +13,14 @@ from vercor.setups.slab.seaice import make_slab_seaice
 from vercor.dtypes import jax_ones
 from vercor.grid_geometry import make_rectilinear_grid
 from vercor.regridders import bilinear, conservative
+from vercor.setups.exchange_recipes import (
+    LAND_TO_ATMOSPHERE_SOIL_FIELDS,
+    OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+    OCEAN_TO_SEAICE_SURFACE_FIELDS,
+    SEAICE_TO_OCEAN_FIELDS,
+    SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+    SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+)
 from vercor.diagnostics import (
     plot_component_scalar_vector_comparison,
     print_component_field_means_table,
@@ -60,47 +68,43 @@ if __name__ == "__main__":
             Exchange(
                 source="ATM",
                 destination="OCN",
-                field_names=[
-                    ("u_velocity_10m", "v_velocity_10m"),
-                    "sensible_heat_flux",
-                    "latent_heat_flux",
-                ],
+                field_names=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="OCN",
                 destination="ATM",
-                field_names=["sea_surface_temperature"],
+                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="OCN",
                 destination="ICE",
-                field_names=["sea_surface_temperature"],
+                field_names=OCEAN_TO_SEAICE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="LND",
                 destination="ATM",
-                field_names=["soil_moisture"],
+                field_names=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="ATM",
                 destination="LND",
-                field_names=["latent_heat_flux", "sensible_heat_flux"],
+                field_names=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
                 regridder_factory=conservative,
             ),
             Exchange(
                 source="OCN",
                 destination="ICE",
-                field_names=["sea_surface_temperature"],
+                field_names=OCEAN_TO_SEAICE_SURFACE_FIELDS,
                 regridder_factory=conservative,
             ),
             Exchange(
                 source="ICE",
                 destination="OCN",
-                field_names=["ice_fraction"],
+                field_names=SEAICE_TO_OCEAN_FIELDS,
                 regridder_factory=conservative,
             ),
         ),

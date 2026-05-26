@@ -24,6 +24,7 @@ from vercor.setups.data.erainterim_ocean import make_erainterim_ocean
 from vercor.setups.data.jcm_land import make_jcm_land
 from vercor.setups.external import jax_gcm as jax_gcm_module
 from vercor.setups.external.jax_gcm import JCMState
+from vercor.setups.external.jax_gcm_fields import JAXGCM_OUTPUT_GRID_FIELD_NAMES
 from vercor.setups.slab.atmosphere import make_slab_atmosphere
 from vercor.setups.slab.land import make_slab_land
 from vercor.setups.slab.ocean import make_slab_ocean
@@ -227,7 +228,7 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
             "land_surface_temperature",
             "sea_surface_temperature",
             "total_surface_temperature",
-            *jax_gcm_module._JAXGCM_OUTPUT_GRID_FIELD_NAMES,
+            *JAXGCM_OUTPUT_GRID_FIELD_NAMES,
             "pressure",
         ),
         default_fields={

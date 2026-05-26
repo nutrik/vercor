@@ -14,7 +14,7 @@ historical commands, failure messages, or detailed validation notes.
   passed as of 2026-05-15.
 - Latest archived static checks: Black, flake8, and mypy passed as of
   2026-05-15.
-- Latest local refactor validation: Black, flake8, mypy, fast pytest, and full
+- Latest local organization-refactor validation: Black, flake8, mypy, and fast
   pytest passed as of 2026-05-26.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
@@ -41,6 +41,37 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-26: Code Organization Audit Implementation
+
+- Split physical defaults into `vercor.physical_constants` and composed them
+  into `VercorSettings`, keeping static runtime controls in `settings.py`.
+- Replaced concrete interpolator imports in `vercor.regridders.base` with a
+  small scalar/vector interpolation protocol.
+- Moved default topology component-name validation into
+  `vercor.runtime.topology` so `Coupler` delegates topology policy.
+- Split broad external adapters:
+  `jax_gcm_fields.py` owns JCM field mapping and surface-temperature helpers,
+  `camulator_fields.py`/`camulator_tensors.py`/`camulator_init.py`/
+  `camulator_runtime_settings.py` own CAMulator field, tensor, init-noise, and
+  environment setup helpers, and `veros_setup.py`/`veros_fluxes.py`/
+  `veros_state.py` own Veros setup, flux, and host-state helpers.
+- Kept adapter factory/state compatibility while removing moved helper symbols
+  from old external adapter facades; narrowed
+  `vercor.setups.data.camulator_land` to the public land factory only.
+- Centralized common example exchange field lists in
+  `vercor.setups.exchange_recipes`, added slab land/ocean recipe separation,
+  and widened `Exchange.field_names` to accept immutable recipe sequences.
+- Updated `DEPENDENCIES.md` and ownership boundary tests for the new module map.
+- Validation run for this change:
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/test_api_boundaries.py -q --fast --tb=short`,
+  focused external adapter tests, and
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning remains. Full pytest was not rerun for this
+  refactor.
 
 ### 2026-05-26: Ownership Boundary Refactor Follow-Up
 

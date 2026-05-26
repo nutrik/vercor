@@ -10,6 +10,7 @@ from vercor.setups.exchange_recipes import (
     ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
     ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
     JCM_LAND_TO_ATMOSPHERE_FIELDS,
+    OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
 from vercor.setups.jcm_setup_helpers import build_jcm_land_atmosphere_components
 from vercor.regridders import bilinear
@@ -74,25 +75,25 @@ if __name__ == "__main__":
             Exchange(
                 source="ATM",
                 destination="OCN",
-                field_names=list(ATMOSPHERE_TO_VEROS_FORCING_FIELDS),
+                field_names=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="OCN",
                 destination="ATM",
-                field_names=["sea_surface_temperature"],
+                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="LND",
                 destination="ATM",
-                field_names=list(JCM_LAND_TO_ATMOSPHERE_FIELDS),
+                field_names=JCM_LAND_TO_ATMOSPHERE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="ATM",
                 destination="LND",
-                field_names=list(ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS),
+                field_names=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
                 regridder_factory=bilinear,
             ),
         ),

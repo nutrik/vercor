@@ -5,6 +5,14 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
+from vercor.dtypes import jax_real_dtype
+
+
+def asfloat(tree: Any, policy: Any = None) -> Any:
+    """Cast every leaf in a PyTree to VerCOR's configured real dtype."""
+
+    return jax.tree_util.tree_map(lambda arr: arr.astype(jax_real_dtype(policy)), tree)
+
 
 def mean_leaf(tree: Any, axis: int | list[int]) -> Any:
     """Return a PyTree with ``jnp.mean`` applied to every leaf."""

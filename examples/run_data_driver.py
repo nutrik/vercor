@@ -7,6 +7,14 @@ from vercor.setups.coupler_helpers import add_exchanges, build_coupler
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.setups.data.era5_land import make_era5_land
 from vercor.setups.data.erainterim_ocean import make_erainterim_ocean
+from vercor.setups.exchange_recipes import (
+    ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
+    ATMOSPHERE_TO_LAND_STATE_FIELDS,
+    ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
+    ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
+    LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
+    OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+)
 from vercor.regridders import bilinear, conservative
 from vercor.types import RuntimeArray
 from vercor.diagnostics import (
@@ -44,58 +52,37 @@ if __name__ == "__main__":
             Exchange(
                 source="ATM",
                 destination="OCN",
-                field_names=[
-                    ("u_velocity", "v_velocity"),
-                    "specific_humidity",
-                    "model_level_height",
-                    "density",
-                    "potential_temperature",
-                    "temperature",
-                ],
+                field_names=ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="ATM",
                 destination="OCN",
-                field_names=[
-                    "net_shortwave_radiation_flux",
-                    "downward_longwave_radiation_flux",
-                ],
+                field_names=ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
                 regridder_factory=conservative,
             ),
             Exchange(
                 source="ATM",
                 destination="LND",
-                field_names=[
-                    "specific_humidity",
-                    "model_level_height",
-                    "potential_temperature",
-                ],
+                field_names=ATMOSPHERE_TO_LAND_STATE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="ATM",
                 destination="LND",
-                field_names=[
-                    "net_shortwave_radiation_flux",
-                    "downward_longwave_radiation_flux",
-                ],
+                field_names=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
                 regridder_factory=conservative,
             ),
             Exchange(
                 source="OCN",
                 destination="ATM",
-                field_names=[
-                    "sea_surface_temperature",
-                ],
+                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="LND",
                 destination="ATM",
-                field_names=[
-                    "land_surface_temperature",
-                ],
+                field_names=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
         ),

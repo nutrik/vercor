@@ -7,10 +7,7 @@ from vercor.clock import Clock
 from vercor.components.base import Component
 from vercor.components._validation import validate_component_setup
 from vercor.dtypes import as_jax_real_array
-from vercor.exceptions import (
-    CouplerError,
-    ComponentError,
-)
+from vercor.exceptions import CouplerError
 from vercor.exchange import Exchange
 from vercor.jax_logging import (
     JaxCallbackLogger,
@@ -45,6 +42,7 @@ from vercor.runtime.topology import (
     create_exchange_masks,
     initialize_regridders_and_masks,
     patch_exchange_masks,
+    validate_component_topology_names,
     validate_land_mask_consistency,
 )
 from vercor.runtime.views import RuntimeComponentView
@@ -245,12 +243,7 @@ class Coupler:
         # Initialize each component
         for name, component in self.components.items():
             component.initialize(init_context)
-
-            if name not in ("ATM", "OCN", "LND", "ICE"):
-                raise ComponentError(
-                    f"Incorrect component name: {name}, must be ATM, OCN, LND, or ICE"
-                )
-
+            validate_component_topology_names({name: component})
             self.logger.info(f" Initialized {name}")
 
         self._runtime_contracts = build_runtime_contracts(

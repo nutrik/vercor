@@ -11,7 +11,8 @@ import numpy as np
 import pytest
 
 import vercor.setups.external.jax_gcm_tools as jax_gcm_tools_module
-import vercor.setups.external.veros_gcm as veros_gcm_module
+import vercor.setups.external.veros_fluxes as veros_fluxes_module
+import vercor.setups.external.veros_state as veros_state_module
 from tests.assertions import assert_allclose_compact
 from vercor.fluxes import vertical_coordinates as vertical_coordinates_module
 import vercor.pytree_utils as pytree_utils_module
@@ -289,12 +290,12 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
         )
 
     monkeypatch.setattr(
-        veros_gcm_module,
+        veros_fluxes_module,
         "compute_ocean_surface_fluxes",
         fake_compute_ocean_surface_fluxes,
     )
 
-    taux, tauy, qnet, qnec = veros_gcm_module.compute_fluxes(
+    taux, tauy, qnet, qnec = veros_fluxes_module.compute_fluxes(
         veros_state=veros_state,  # type: ignore[arg-type]
         runtime_fields=runtime_fields,
         settings=VercorSettings(),
@@ -316,16 +317,14 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
     )
 
 
-def test_veros_state_helpers_cover_non_jitted_paths(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_veros_state_helpers_cover_non_jitted_paths() -> None:
     state = _FakeVerosState(
         variables=_FakeVariableStore(
             taux=np.zeros((8, 8, 1), dtype=float),
         )
     )
 
-    assert veros_gcm_module.copy_state(state, jitted=False) is state
+    assert veros_state_module.copy_state(state, jitted=False) is state
 
     calls: dict[str, int] = {"step": 0}
 
@@ -333,24 +332,12 @@ def test_veros_state_helpers_cover_non_jitted_paths(
         calls["step"] += 1
         current_state.marker = "updated"
 
-    pure_state = veros_gcm_module.pure(state, jitted=False, step=fake_step)
+    pure_state = veros_state_module.pure(state, jitted=False, step=fake_step)
     assert pure_state is state
     assert calls["step"] == 1
     assert getattr(state, "marker") == "updated"
 
-    class _FakeAt:
-        def __getitem__(self, item: Any) -> Any:
-            return item
-
-    def fake_update(array: np.ndarray, indexer: Any, value: np.ndarray) -> np.ndarray:
-        updated = np.array(array, copy=True)
-        updated[indexer] = value
-        return updated
-
-    monkeypatch.setattr(veros_gcm_module, "at", _FakeAt())
-    monkeypatch.setattr(veros_gcm_module, "update", fake_update)
-
-    result_state = veros_gcm_module.set_variable(
+    result_state = veros_state_module.set_variable(
         state,
         "taux",
         np.full((4, 4, 1), 9.0),

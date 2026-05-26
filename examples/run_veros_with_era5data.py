@@ -5,7 +5,12 @@ from vercor.setups.coupler_helpers import add_exchanges, build_coupler
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.setups.data.era5_land import make_era5_land
 from vercor.setups.external.veros_gcm import make_veros_gcm
-from vercor.setups.exchange_recipes import ATMOSPHERE_TO_VEROS_FORCING_FIELDS
+from vercor.setups.exchange_recipes import (
+    ATMOSPHERE_TO_LAND_BASIC_FIELDS,
+    ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
+    LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
+    OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+)
 from vercor.regridders import bilinear
 
 if __name__ == "__main__":
@@ -36,32 +41,25 @@ if __name__ == "__main__":
             Exchange(
                 source="ATM",
                 destination="OCN",
-                field_names=list(ATMOSPHERE_TO_VEROS_FORCING_FIELDS),
+                field_names=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="OCN",
                 destination="ATM",
-                field_names=[
-                    "sea_surface_temperature",
-                ],
+                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="ATM",
                 destination="LND",
-                field_names=[
-                    "temperature",
-                    "specific_humidity",
-                ],
+                field_names=ATMOSPHERE_TO_LAND_BASIC_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="LND",
                 destination="ATM",
-                field_names=[
-                    "land_surface_temperature",
-                ],
+                field_names=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
         ),

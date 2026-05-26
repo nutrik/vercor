@@ -8,6 +8,23 @@ from typing import Any, Literal, Optional
 import torch
 import xarray as xr
 
+from vercor.host_arrays import runtime_array_to_host
+from vercor.types import RuntimeArray
+
+
+def _torch_tensor_from_jax_array(
+    array: RuntimeArray,
+    device: str,
+    *,
+    pin_memory: bool = False,
+) -> torch.Tensor:
+    """Transfer a JAX-compatible array through an explicit host-to-Torch boundary."""
+
+    tensor = torch.as_tensor(runtime_array_to_host(array).copy())
+    if pin_memory and device != "cpu" and torch.cuda.is_available():
+        tensor = tensor.pin_memory()
+    return tensor.to(device, non_blocking=True)
+
 
 def _append_indexed_variables(
     indices: dict[str, dict[str, Any]],
@@ -300,4 +317,5 @@ __all__ = [
     "_append_indexed_variables",
     "_mark_unavailable_variables",
     "_prepare_static_forcing_tensor",
+    "_torch_tensor_from_jax_array",
 ]

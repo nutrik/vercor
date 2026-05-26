@@ -13,6 +13,7 @@ import torch
 import xarray as xr
 
 import vercor.setups.external.camulator as camulator_module
+import vercor.setups.external.camulator_fields as camulator_fields_module
 import vercor.setups.external.camulator_forcing as camulator_forcing_module
 import vercor.setups.external.camulator_imports as camulator_imports_module
 import vercor.setups.external.camulator_init as camulator_init_module
@@ -22,15 +23,15 @@ import vercor.setups.external.camulator_tensors as camulator_tensors_module
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
-from vercor.setups.external.camulator import (
-    make_camulator_gcm,
+from vercor.setups.external.camulator import make_camulator_gcm
+from vercor.setups.external.camulator_fields import (
     _initialize_camulator_runtime_fields,
+    _map_camulator_prediction_arrays,
     _prepare_camulator_dynamic_forcing_chunk,
     _prepare_camulator_sst_input,
-    _map_camulator_prediction_arrays,
     _prepare_camulator_surface_forcing,
-    _torch_tensor_from_jax_array,
 )
+from vercor.setups.external.camulator_tensors import _torch_tensor_from_jax_array
 from vercor.fluxes.vertical_coordinates import get_altitudes_hybrid_sigma_levels
 from vercor.grid import RectilinearGrid
 from vercor.runtime import (
@@ -442,7 +443,7 @@ def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
         latitude=SimpleNamespace(values=np.asarray([-45.0, 0.0, 45.0])),
     )
     monkeypatch.setattr(
-        camulator_module,
+        camulator_init_module,
         "initialize_camulator",
         lambda **kwargs: {
             "conf": {
@@ -473,7 +474,8 @@ def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
         "land_surface_temperature",
     )
     assert (
-        component.field_spec.outputs == camulator_module._CAMULATOR_RUNTIME_FIELD_NAMES
+        component.field_spec.outputs
+        == camulator_fields_module._CAMULATOR_RUNTIME_FIELD_NAMES
     )
     assert_allclose_compact(component.grid.binary_mask, np.ones((3, 2)))
 
@@ -484,7 +486,7 @@ def test_camulator_constructor_logs_save_forecast_path(monkeypatch: Any) -> None
         latitude=SimpleNamespace(values=np.asarray([-45.0, 0.0, 45.0])),
     )
     monkeypatch.setattr(
-        camulator_module,
+        camulator_init_module,
         "initialize_camulator",
         lambda **kwargs: {
             "conf": {
@@ -522,9 +524,9 @@ def test_add_init_noise_logs_through_injected_logger(
 ) -> None:
     logger = _RecordingLogger()
     state = torch.ones((1, 1), dtype=torch.float32)
-    monkeypatch.setattr(camulator_module.torch, "randn_like", torch.zeros_like)
+    monkeypatch.setattr(camulator_init_module.torch, "randn_like", torch.zeros_like)
 
-    actual = camulator_module.add_init_noise(state, noise_std=0.125, logger=logger)
+    actual = camulator_init_module.add_init_noise(state, noise_std=0.125, logger=logger)
 
     assert torch.equal(actual, state)
     assert logger.messages == ["Adding initial condition noise (std=0.125)"]
@@ -844,12 +846,12 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     component.hybm = torch.ones((1, 2, 1, 1))
 
     monkeypatch.setattr(
-        camulator_module,
+        camulator_output_module,
         "write_camulator_prediction_output",
         lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
-        camulator_module,
+        camulator_fields_module,
         "_map_camulator_prediction_arrays",
         lambda *args: {"temperature": jnp.full((2, 2), 9.0)},
     )

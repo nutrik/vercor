@@ -11,6 +11,12 @@ from vercor.setups.slab.ocean import make_slab_ocean
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
 from vercor.regridders import bilinear, conservative
+from vercor.setups.exchange_recipes import (
+    ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
+    ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
+    JCM_LAND_TO_ATMOSPHERE_FIELDS,
+    OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+)
 from vercor.diagnostics import (
     plot_component_scalar_vector_comparison,
     print_component_field_means_table,
@@ -79,31 +85,25 @@ if __name__ == "__main__":
             Exchange(
                 source="ATM",
                 destination="OCN",
-                field_names=[
-                    ("u_velocity", "v_velocity"),
-                    "specific_humidity",
-                    "temperature",
-                    "net_shortwave_radiation_flux",
-                    "downward_longwave_radiation_flux",
-                ],
+                field_names=ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="OCN",
                 destination="ATM",
-                field_names=["sea_surface_temperature"],
+                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="LND",
                 destination="ATM",
-                field_names=["soil_moisture", "land_surface_temperature"],
+                field_names=JCM_LAND_TO_ATMOSPHERE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 source="ATM",
                 destination="LND",
-                field_names=["latent_heat_flux", "sensible_heat_flux"],
+                field_names=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
                 regridder_factory=conservative,
             ),
         ),

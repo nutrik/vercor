@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Callable, Union
@@ -36,7 +37,7 @@ class Exchange:
     Attributes:
         source, destination: component names
         name: exchange name (automatically setup from source, destination, and regridder_factory)
-        field_names: list of scalar field names and
+        field_names: sequence of scalar field names and
             tuples of vectors (u-component, v-component)
         regridder_factory: callable that returns a Regridder instance
         interpolation_type: type of interpolation used (automatically set from regridder_factory)
@@ -45,7 +46,7 @@ class Exchange:
     source: str
     destination: str
     name: str = field(init=False)
-    field_names: list[Union[str, tuple[str, str]]]
+    field_names: Sequence[Union[str, tuple[str, str]]]
     regridder_factory: Callable[
         ..., BilinearRectilinearRegridder | ConservativeRectilinearRegridder
     ]

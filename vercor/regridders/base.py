@@ -1,12 +1,20 @@
-from typing import Any, Tuple, Union, cast
+from typing import Any, Protocol, Tuple, cast
 
 from vercor.exceptions import RegridderError
 from vercor.grid import RectilinearGrid
 from vercor.grid_geometry import grids_identical
-from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
-from vercor.interpolators.conservative_remap_rectilinear import (
-    ConservativeRectilinearRemapper,
-)
+
+
+class SupportsScalarVectorInterpolation(Protocol):
+    """Protocol for rectilinear interpolators used by regridder wrappers."""
+
+    def apply_scalar(self, src: Any) -> Any:
+        """Interpolate one scalar field."""
+        ...
+
+    def apply_vector(self, u_src: Any, v_src: Any) -> tuple[Any, Any]:
+        """Interpolate one vector field."""
+        ...
 
 
 class Regridder:
@@ -15,9 +23,7 @@ class Regridder:
     ) -> None:
         self.source_grid = source_grid
         self.destination_grid = destination_grid
-        self.interpolator: Union[
-            BilinearRectilinearInterpolator, ConservativeRectilinearRemapper, None
-        ] = None
+        self.interpolator: SupportsScalarVectorInterpolation | None = None
         self._has_identical_grids = grids_identical(
             self.source_grid, self.destination_grid
         )

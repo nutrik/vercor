@@ -15,8 +15,12 @@ import pytest
 import xarray as xr
 
 import vercor.setups.external.jax_gcm as jax_gcm_module
+import vercor.setups.external.jax_gcm_fields as jax_gcm_fields_module
 import vercor.setups.external.jax_gcm_output as jax_gcm_output_module
+import vercor.setups.external.veros_fluxes as veros_fluxes_module
 import vercor.setups.external.veros_gcm as veros_gcm_module
+import vercor.setups.external.veros_setup as veros_setup_module
+import vercor.setups.external.veros_state as veros_state_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.components.base import DataComponent
@@ -180,7 +184,7 @@ def test_cleanup_surface_temperature_fields_supports_jit_and_gradients() -> None
         clean_sea_surface_temperature,
         total_surface_temperature,
         cold_surface_cells,
-    ) = jax.jit(jax_gcm_module._cleanup_surface_temperature_fields)(
+    ) = jax.jit(jax_gcm_fields_module._cleanup_surface_temperature_fields)(
         land_surface_temperature,
         sea_surface_temperature,
     )
@@ -204,7 +208,7 @@ def test_cleanup_surface_temperature_fields_supports_jit_and_gradients() -> None
 
     gradient = jax.grad(
         lambda land: jnp.sum(
-            jax_gcm_module._cleanup_surface_temperature_fields(
+            jax_gcm_fields_module._cleanup_surface_temperature_fields(
                 land,
                 jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
             )[2]
@@ -218,7 +222,7 @@ def test_prepare_surface_temperature_forcing_supports_jit_and_fill_value() -> No
     land_fraction_mask = jnp.asarray([[1.0, 0.0], [0.0, 1.0]])
 
     land_surface_temperature, sea_surface_temperature = jax.jit(
-        jax_gcm_module._prepare_surface_temperature_forcing
+        jax_gcm_fields_module._prepare_surface_temperature_forcing
     )(total_surface_temperature, land_fraction_mask)
 
     assert_allclose_compact(
@@ -235,7 +239,7 @@ def test_map_jcm_output_fields_supports_jit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_fields_module,
         "compute_sigma_pressure_levels",
         lambda reference_pressure, top_pressure, sigma_levels, normalized_surface_pressure: jnp.asarray(
             [
@@ -245,7 +249,7 @@ def test_map_jcm_output_fields_supports_jit(
         ),
     )
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_fields_module,
         "get_altitudes_sigma_levels",
         lambda temperature, pressure, specific_humidity: jnp.asarray(
             [
@@ -255,7 +259,7 @@ def test_map_jcm_output_fields_supports_jit(
         ),
     )
 
-    mapped_fields = jax.jit(jax_gcm_module._map_jcm_output_fields)(
+    mapped_fields = jax.jit(jax_gcm_fields_module._map_jcm_output_fields)(
         2.5e6,
         1.0e5,
         jnp.asarray([0.2, 1.0]),
@@ -426,7 +430,7 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
         "land_surface_temperature",
         "sea_surface_temperature",
         "total_surface_temperature",
-        *jax_gcm_module._JAXGCM_OUTPUT_GRID_FIELD_NAMES,
+        *jax_gcm_fields_module.JAXGCM_OUTPUT_GRID_FIELD_NAMES,
         "pressure",
     )
     assert_allclose_compact(component.grid.longitude, np.asarray([0.0, 180.0]))
@@ -647,7 +651,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     monkeypatch.setattr(jax_gcm_module, "unwrap_leading_dims", lambda obj: obj)
     monkeypatch.setattr(jax_gcm_module, "mean_leaf", lambda obj, axis: obj)
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_fields_module,
         "compute_sigma_pressure_levels",
         lambda reference_pressure, top_pressure, sigma_levels, normalized_surface_pressure: jnp.asarray(
             [
@@ -657,7 +661,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
         ),
     )
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_fields_module,
         "get_altitudes_sigma_levels",
         lambda temperature, pressure, specific_humidity: jnp.asarray(
             [
@@ -666,7 +670,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
             ]
         ),
     )
-    cast(Any, jax_gcm_module._map_jcm_output_fields).clear_cache()
+    cast(Any, jax_gcm_fields_module._map_jcm_output_fields).clear_cache()
 
     def fake_write_jax_gcm_averages_output(
         predictions: list[Any],
@@ -887,12 +891,12 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
         )
 
     monkeypatch.setattr(
-        veros_gcm_module,
+        veros_fluxes_module,
         "compute_ocean_surface_fluxes",
         fake_compute_ocean_surface_fluxes,
     )
 
-    taux, tauy, qnet, qnec = veros_gcm_module.compute_fluxes(
+    taux, tauy, qnet, qnec = veros_fluxes_module.compute_fluxes(
         component._veros_state,
         component.data,
         VercorSettings(),
@@ -929,8 +933,8 @@ def test_custom_global_four_degree_set_diagnostics_populates_outputs() -> None:
         },
     )
 
-    component = object.__new__(veros_gcm_module.CustomGlobalFourDegree)
-    routine = veros_gcm_module.CustomGlobalFourDegree.set_diagnostics.func.__self__
+    component = object.__new__(veros_setup_module.CustomGlobalFourDegree)
+    routine = veros_setup_module.CustomGlobalFourDegree.set_diagnostics.func.__self__
     routine.function(component, state)
 
     assert state.diagnostics["snapshot"].output_frequency == 365 * 86400.0
@@ -955,7 +959,7 @@ def test_custom_global_four_degree_set_diagnostics_populates_outputs() -> None:
 def test_veros_copy_state_jitted_path_deep_copies_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(veros_gcm_module, "VerosState", _ConstructedVerosState)
+    monkeypatch.setattr(veros_state_module, "VerosState", _ConstructedVerosState)
 
     state = SimpleNamespace(
         _dimensions={"xt": [1, 2]},
@@ -967,7 +971,7 @@ def test_veros_copy_state_jitted_path_deep_copies_state(
         profile_timers={"profile": [2.0]},
     )
 
-    copied = veros_gcm_module.copy_state(state, jitted=True)
+    copied = veros_state_module.copy_state(state, jitted=True)
 
     assert copied is not state
     assert copied._dimensions == state._dimensions
@@ -996,12 +1000,12 @@ def test_veros_pure_runs_step_on_copied_state(monkeypatch: pytest.MonkeyPatch) -
         assert jitted is False
         return copied_state
 
-    monkeypatch.setattr(veros_gcm_module, "copy_state", fake_copy_state)
+    monkeypatch.setattr(veros_state_module, "copy_state", fake_copy_state)
 
     def fake_step(state: Any) -> None:
         state.counter += 1
 
-    result = veros_gcm_module.pure(original_state, jitted=False, step=fake_step)
+    result = veros_state_module.pure(original_state, jitted=False, step=fake_step)
 
     assert result is copied_state
     assert copied_state.counter == 2
@@ -1012,7 +1016,7 @@ def test_veros_update_veros_interior_supports_jit_and_gradients() -> None:
     array = jnp.zeros((8, 8, 1), dtype=jnp.float64)
     interior = jnp.arange(16.0, dtype=jnp.float64).reshape(4, 4, 1)
 
-    updated = jax.jit(veros_gcm_module._update_veros_interior)(array, interior)
+    updated = jax.jit(veros_state_module._update_veros_interior)(array, interior)
 
     assert_allclose_compact(updated[2:-2, 2:-2, :], interior)
     assert np.count_nonzero(np.asarray(updated[:2, :, :])) == 0
@@ -1021,7 +1025,9 @@ def test_veros_update_veros_interior_supports_jit_and_gradients() -> None:
     assert np.count_nonzero(np.asarray(updated[:, -2:, :])) == 0
 
     gradient = jax.grad(
-        lambda payload: jnp.sum(veros_gcm_module._update_veros_interior(array, payload))
+        lambda payload: jnp.sum(
+            veros_state_module._update_veros_interior(array, payload)
+        )
     )(interior)
     assert_allclose_compact(gradient, np.ones((4, 4, 1)))
 
@@ -1029,7 +1035,7 @@ def test_veros_update_veros_interior_supports_jit_and_gradients() -> None:
 def test_veros_extract_surface_temperature_supports_jit_and_gradients() -> None:
     temperature = jnp.arange(8 * 8 * 2 * 2.0, dtype=jnp.float64).reshape(8, 8, 2, 2)
 
-    surface_temperature = jax.jit(veros_gcm_module._extract_surface_temperature)(
+    surface_temperature = jax.jit(veros_state_module._extract_surface_temperature)(
         temperature, 1
     )
 
@@ -1040,7 +1046,7 @@ def test_veros_extract_surface_temperature_supports_jit_and_gradients() -> None:
 
     gradient = jax.grad(
         lambda payload: jnp.sum(
-            veros_gcm_module._extract_surface_temperature(payload, 0)
+            veros_state_module._extract_surface_temperature(payload, 0)
         )
     )(temperature)
     expected_gradient = np.zeros((8, 8, 2, 2), dtype=float)
@@ -1056,7 +1062,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     qnet = jnp.asarray([[9.0, 10.0], [11.0, jnp.nan]])
     qnec = jnp.asarray([[12.0, 13.0], [14.0, 15.0]])
 
-    prepared = jax.jit(veros_gcm_module._prepare_surface_forcing_fields)(
+    prepared = jax.jit(veros_state_module._prepare_surface_forcing_fields)(
         taux, tauy, qnet, qnec, False
     )
     taux_out, tauy_out, qnet_out, qnec_out = prepared
@@ -1069,7 +1075,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     assert_allclose_compact(qnet_out, np.asarray([[[9.0], [11.0]], [[10.0], [0.0]]]))
     assert_allclose_compact(qnec_out, np.zeros((2, 2, 1)))
 
-    restored = veros_gcm_module._prepare_surface_forcing_fields(
+    restored = veros_state_module._prepare_surface_forcing_fields(
         taux, tauy, qnet, qnec, True
     )[3]
     assert_allclose_compact(
@@ -1085,10 +1091,10 @@ def test_veros_set_variable_updates_only_interior_cells(
     state = SimpleNamespace(variables=variables)
 
     monkeypatch.setattr(
-        veros_gcm_module, "copy_state", lambda tree, jitted=True: deepcopy(tree)
+        veros_state_module, "copy_state", lambda tree, jitted=True: deepcopy(tree)
     )
 
-    updated = veros_gcm_module.set_variable(
+    updated = veros_state_module.set_variable(
         state,
         "temp",
         jnp.full((4, 4, 1), 9.0),
@@ -1177,9 +1183,11 @@ def test_veros_constructor_builds_jax_backed_grid(
             return None
 
     monkeypatch.setattr(
-        veros_gcm_module, "CustomGlobalFourDegree", _FakeGlobalFourDegree
+        veros_setup_module, "CustomGlobalFourDegree", _FakeGlobalFourDegree
     )
-    monkeypatch.setattr(veros_gcm_module, "copy_state", lambda tree, jitted=True: tree)
+    monkeypatch.setattr(
+        veros_state_module, "copy_state", lambda tree, jitted=True: tree
+    )
 
     component = veros_gcm_module.make_veros_gcm(
         custom_parameters={"dt_tracer": 600.0},
@@ -1248,7 +1256,7 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
         return state
 
     monkeypatch.setattr(
-        veros_gcm_module,
+        veros_fluxes_module,
         "compute_fluxes",
         lambda veros_state, runtime_fields, settings: (
             np.asarray([[1.0, 2.0], [3.0, 4.0]]),
@@ -1257,7 +1265,7 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
             np.asarray([[3.0, 4.0], [5.0, 6.0]]),
         ),
     )
-    monkeypatch.setattr(veros_gcm_module, "set_variable", fake_set_variable)
+    monkeypatch.setattr(veros_state_module, "set_variable", fake_set_variable)
     component._step_function = fake_step_function
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
@@ -1312,7 +1320,7 @@ def test_veros_step_nan_cleans_forcing_fields_before_set_variable(
         return state
 
     monkeypatch.setattr(
-        veros_gcm_module,
+        veros_fluxes_module,
         "compute_fluxes",
         lambda veros_state, runtime_fields, settings: (
             np.asarray([[1.0, np.nan], [3.0, 4.0]]),
@@ -1321,7 +1329,7 @@ def test_veros_step_nan_cleans_forcing_fields_before_set_variable(
             np.asarray([[12.0, 13.0], [14.0, np.nan]]),
         ),
     )
-    monkeypatch.setattr(veros_gcm_module, "set_variable", fake_set_variable)
+    monkeypatch.setattr(veros_state_module, "set_variable", fake_set_variable)
     component._step_function = lambda state: state
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
