@@ -7,7 +7,7 @@ import jax
 from jax.errors import JaxRuntimeError
 
 from vercor.clock import Clock
-from vercor.components._runtime_execution import host_component_names
+from vercor.components.runtime_execution import host_component_names
 from vercor.exceptions import CouplerError
 from vercor.jax_logging import LoggerLike
 from vercor.dtypes import as_jax_index_array

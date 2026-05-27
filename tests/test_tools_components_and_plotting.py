@@ -94,6 +94,40 @@ def test_safe_component_nanmean_returns_nan_for_missing_fields() -> None:
     assert np.isnan(safe_component_nanmean(comp, "does_not_exist"))
 
 
+@pytest.mark.fast_always
+def test_runtime_component_view_reads_fields_without_store_internals() -> None:
+    grid = RectilinearGrid(
+        "dummy",
+        longitude=np.array([0.0, 1.0]),
+        latitude=np.array([0.0, 1.0]),
+    )
+    view = RuntimeComponentView(
+        name="ATM",
+        grid=grid,
+        data=RuntimeFieldStore.from_mapping({"shared": jnp.asarray(1.0)}),
+        incoming=RuntimeFieldStore.from_mapping(
+            {"shared": jnp.asarray(2.0), "only_incoming": jnp.asarray(3.0)}
+        ),
+        outgoing=RuntimeFieldStore.from_mapping({"only_outgoing": jnp.asarray(4.0)}),
+    )
+
+    assert [float(value) for value in view.field_candidates("shared")] == [1.0, 2.0]
+    assert float(view.field("only_incoming")) == 3.0
+    assert [
+        (store_name, field_name, float(value))
+        for store_name, field_name, value in view.iter_store_fields(
+            "incoming",
+            "outgoing",
+        )
+    ] == [
+        ("incoming", "shared", 2.0),
+        ("incoming", "only_incoming", 3.0),
+        ("outgoing", "only_outgoing", 4.0),
+    ]
+    with pytest.raises(KeyError, match="Field 'missing' not found"):
+        view.field("missing")
+
+
 def test_print_component_field_means_table_with_callable_metric(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

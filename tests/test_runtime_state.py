@@ -123,7 +123,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     regridder_source = Path("vercor/regridders/base.py").read_text(encoding="utf-8")
     coupler_source = Path("vercor/coupler.py").read_text(encoding="utf-8")
     base_source = Path("vercor/components/base.py").read_text(encoding="utf-8")
-    component_runtime_execution_path = Path("vercor/components/_runtime_execution.py")
+    component_runtime_execution_path = Path("vercor/components/runtime_execution.py")
     assert component_runtime_execution_path.exists()
     component_runtime_execution_source = component_runtime_execution_path.read_text(
         encoding="utf-8"
@@ -309,12 +309,26 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def check_valid_exchange_field_names" in runtime_validation_source
     assert "def apply_run_precision_to_component(" in runtime_initialization_source
     assert "def initialize_coupler_runtime(" in runtime_initialization_source
-    assert "from vercor.components._validation import validate_component_setup" in (
-        runtime_initialization_source
+    assert (
+        "from vercor.components.setup_validation import validate_component_setup"
+        in (runtime_initialization_source)
     )
     assert "from vercor.runtime.initialization import" in coupler_source
     assert "def _apply_run_precision_to_component(" not in coupler_source
     assert "from vercor.components._validation import" not in coupler_source
+    for source in (
+        runtime_driver_source,
+        runtime_runner_source,
+        runtime_component_state_source,
+        runtime_initialization_source,
+    ):
+        assert "from vercor.components._runtime_execution import" not in source
+        assert "from vercor.components._validation import" not in source
+    assert "from vercor.components.runtime_execution import" in runtime_driver_source
+    assert "from vercor.components.runtime_execution import" in runtime_runner_source
+    assert "from vercor.components.setup_validation import" in (
+        runtime_component_state_source
+    )
     assert "from vercor.runtime.components import" not in coupler_source
     assert "from vercor.runtime.components import" not in runtime_coupler_state_source
     assert "from vercor.runtime.components import" not in runtime_driver_source
@@ -479,7 +493,7 @@ def test_examples_use_coupler_runtime_component_view_factory() -> None:
 
     for source in (slab_driver_source, data_driver_source, jcm_slab_source):
         assert "RuntimeComponentView.from_coupler_state" not in source
-        assert "cpl.runtime_component_view(final_state," in source
+        assert "cpl.runtime_component_views(final_state" in source
 
 
 def test_examples_import_concrete_components_directly() -> None:

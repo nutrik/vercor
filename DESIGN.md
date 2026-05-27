@@ -156,10 +156,12 @@ immutable runtime containers used during traced integration.
   `vercor.components._callable_wrappers`, component-facing runtime-field
   adapters live in private `vercor.components._runtime_fields`, component-facing
   required-field validation lives in private
-  `vercor.components._runtime_validation`, component host/scanned execution
-  policy lives in private `vercor.components._runtime_execution`, and setup
-  validation lives in private `vercor.components._validation`. These private
-  modules are not exported from `vercor.components`. Subclasses should call
+  `vercor.components._runtime_validation`. Component host/scanned execution
+  policy lives in internal `vercor.components.runtime_execution`, and setup
+  validation lives in internal `vercor.components.setup_validation`, giving
+  runtime modules explicit component-owned bridge modules instead of importing
+  private component internals. These internals are not exported from
+  `vercor.components`. Subclasses should call
   the base constructor so `name`,
   `grid`, `data`, and a component-owned `VercorSettings` container are available
   during initialization, execution, and finalization. `Component.data` is a
@@ -238,8 +240,11 @@ immutable runtime containers used during traced integration.
   wrapping live in `vercor.runtime.cache`, and shared host/scanned progress
   messages plus traced callbacks live in `vercor.runtime.progress`. Host/scanned
   runtime loops, run-mode selection, donation checks, and interrupt translation
-  live in `vercor.runtime.runner`. Final runtime output iteration and view
-  writing live in `vercor.output`, with `Coupler.finalize()` acting as a
+  live in `vercor.runtime.runner`. Runtime component metadata and read-only field
+  access for diagnostics/output live in `vercor.runtime.views`; `Coupler`
+  exposes `runtime_component_view()` and `runtime_component_views()` as the
+  public facade for creating those views. Final runtime output iteration and
+  view writing live in `vercor.output`, with `Coupler.finalize()` acting as a
   validation and delegation wrapper. `Coupler` delegates to these modules and
   remains the public setup/finalization facade rather than the owner of runtime
   adapter mechanics.

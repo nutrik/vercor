@@ -62,20 +62,13 @@ def view_field_candidates(
 ) -> list[RuntimeArray]:
     """Return matching fields from an explicit runtime component view."""
 
-    candidates: list[RuntimeArray] = []
-    for store in (component.data, component.incoming, component.outgoing):
-        if field_name in store.field_names:
-            candidates.append(store.get(field_name))
-    return candidates
+    return component.field_candidates(field_name)
 
 
 def view_field(component: RuntimeComponentView, field_name: str) -> RuntimeArray:
     """Return a field from an explicit runtime component view."""
 
-    candidates = view_field_candidates(component, field_name)
-    if candidates:
-        return candidates[0]
-    raise KeyError(f"Field {field_name!r} not found")
+    return component.field(field_name)
 
 
 def component_plot_field(

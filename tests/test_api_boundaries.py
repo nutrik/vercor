@@ -11,9 +11,9 @@ import pytest
 
 import vercor
 import vercor.components as components_module
-import vercor.components._validation as validation_module
 import vercor.components.base as base_module
 import vercor.components.factories as factories_module
+import vercor.components.setup_validation as setup_validation_module
 from tests._coverage_support import make_test_grid
 from vercor.components.base import Component, DataComponent, HostRuntimeComponent
 from vercor.clock import Clock
@@ -192,7 +192,7 @@ def test_components_package_exports_only_component_author_contracts() -> None:
         is factories_module.differentiable_component
     )
     assert components_module.host_component is factories_module.host_component
-    assert validation_module.validate_component_setup is not None
+    assert setup_validation_module.validate_component_setup is not None
     assert not hasattr(base_module, "validate_component_setup")
     assert not hasattr(components_module, "validate_component_setup")
     assert not hasattr(base_module, "data_component")
@@ -239,13 +239,16 @@ def test_component_base_internals_are_private_modules() -> None:
     runtime_validation_source = Path(
         "vercor/components/_runtime_validation.py"
     ).read_text(encoding="utf-8")
+    runtime_execution_source = Path("vercor/components/runtime_execution.py").read_text(
+        encoding="utf-8"
+    )
     factories_source = Path("vercor/components/factories.py").read_text(
         encoding="utf-8"
     )
     lifecycle_source = Path("vercor/components/_lifecycle.py").read_text(
         encoding="utf-8"
     )
-    validation_source = Path("vercor/components/_validation.py").read_text(
+    validation_source = Path("vercor/components/setup_validation.py").read_text(
         encoding="utf-8"
     )
 
@@ -265,6 +268,9 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def validate_declared_runtime_fields(" not in runtime_fields_source
     assert "def require_runtime_fields(" in runtime_validation_source
     assert "def validate_declared_runtime_fields(" in runtime_validation_source
+    assert "def component_requires_host_runtime(" in runtime_execution_source
+    assert "def host_component_names(" in runtime_execution_source
+    assert "def step_component_runtime_state(" in runtime_execution_source
     assert "def validate_component_setup" in validation_source
     assert "def _author_field_spec(" not in base_source
     assert "def component_field_spec(" not in contracts_source
@@ -334,8 +340,11 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "_contracts" not in components_module.__all__
     assert "_callable_wrappers" not in components_module.__all__
     assert "_runtime_fields" not in components_module.__all__
-    assert "_validation" not in components_module.__all__
     assert "_runtime_validation" not in components_module.__all__
+    assert "runtime_execution" not in components_module.__all__
+    assert "setup_validation" not in components_module.__all__
+    assert not Path("vercor/components/_runtime_execution.py").exists()
+    assert not Path("vercor/components/_validation.py").exists()
 
 
 @pytest.mark.fast_always

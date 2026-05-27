@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
@@ -322,6 +323,19 @@ class Coupler:
             self.components[name].grid,
             runtime_state.get_component_state(name),
         )
+
+    def runtime_component_views(
+        self,
+        runtime_state: RuntimeCouplerState,
+        names: Sequence[str] | None = None,
+    ) -> dict[str, RuntimeComponentView]:
+        """Return named runtime component views in component or requested order."""
+
+        selected_names = tuple(self.components) if names is None else tuple(names)
+        return {
+            name: self.runtime_component_view(runtime_state, name)
+            for name in selected_names
+        }
 
     def finalize(
         self,

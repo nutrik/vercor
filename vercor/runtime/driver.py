@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from vercor.calendar import ModelDateTime
-from vercor.components._runtime_execution import step_component_runtime_state
+from vercor.components.runtime_execution import step_component_runtime_state
 from vercor.jax_logging import LoggerLike
 from vercor.runtime.contexts import RuntimeStepContext
 from vercor.runtime.dispatch_context import RuntimeDispatchContext

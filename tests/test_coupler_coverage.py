@@ -247,6 +247,31 @@ def test_setup_logger_routes_child_loggers_through_parent_canonical_handler() ->
     assert "VerCOR.test.callback" not in formatted
 
 
+@pytest.mark.fast_always
+def test_coupler_runtime_component_views_returns_ordered_named_views() -> None:
+    coupler = make_coupler()
+    for component_name in ("ATM", "OCN", "LND"):
+        coupler.register(
+            DummyComponent(
+                name=component_name,
+                grid=make_test_grid(name=component_name.lower()),
+            )
+        )
+    coupler.set_components_run_sequence(RunSequence(order=["ATM", "OCN", "LND"]))
+
+    runtime_state = coupler.create_runtime_state(prefill_missing=True)
+
+    all_views = coupler.runtime_component_views(runtime_state)
+    selected_views = coupler.runtime_component_views(
+        runtime_state, names=("LND", "ATM")
+    )
+
+    assert tuple(all_views) == ("ATM", "OCN", "LND")
+    assert tuple(selected_views) == ("LND", "ATM")
+    assert all_views["ATM"].name == "ATM"
+    assert selected_views["LND"].grid.name == "lnd"
+
+
 def test_coupler_configures_injected_python_logger_with_canonical_boundary() -> None:
     logger_name = "VerCOR.test.injected-format"
     injected_logger = logging.getLogger(logger_name)

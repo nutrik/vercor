@@ -31,6 +31,9 @@ historical commands, failure messages, or detailed validation notes.
   2026-05-27.
 - Latest local runtime-run-boundary validation: Black, flake8, mypy, focused
   fast pytest, full fast pytest, and full pytest passed as of 2026-05-27.
+- Latest local runtime-view/component-boundary validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -56,6 +59,29 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Runtime View and Component Boundary Refactor
+
+- Moved component setup validation and component host/scanned execution policy
+  into explicit component-owned bridge modules:
+  `vercor.components.setup_validation` and
+  `vercor.components.runtime_execution`, removing runtime imports of the old
+  private component helper modules.
+- Added read helpers to `RuntimeComponentView` and routed diagnostics/output
+  field access through that view abstraction instead of iterating runtime store
+  internals directly.
+- Added `Coupler.runtime_component_views(...)` and updated multi-view examples
+  to reuse that public facade.
+- Updated boundary tests, `DESIGN.md`, and `DEPENDENCIES.md` for the new
+  ownership map.
+- Validation run for this change:
+  focused boundary/view fast pytest,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Runtime Run Boundary Refactor
 

@@ -86,10 +86,10 @@ class _HostStepOnlyComponent(base_module.HostRuntimeComponent):
 
 
 def test_component_runtime_execution_policy_helpers_detect_host_components() -> None:
-    assert importlib.util.find_spec("vercor.components._runtime_execution") is not None
+    assert importlib.util.find_spec("vercor.components.runtime_execution") is not None
     runtime_execution = cast(
         Any,
-        importlib.import_module("vercor.components._runtime_execution"),
+        importlib.import_module("vercor.components.runtime_execution"),
     )
     pure_component = _RuntimeOnlyComponent(name="ATM", grid=make_test_grid())
     host_component = _HostStepOnlyComponent(name="OCN", grid=make_test_grid())
@@ -102,10 +102,10 @@ def test_component_runtime_execution_policy_helpers_detect_host_components() -> 
 
 
 def test_component_runtime_execution_policy_steps_selected_runtime_path() -> None:
-    assert importlib.util.find_spec("vercor.components._runtime_execution") is not None
+    assert importlib.util.find_spec("vercor.components.runtime_execution") is not None
     runtime_execution = cast(
         Any,
-        importlib.import_module("vercor.components._runtime_execution"),
+        importlib.import_module("vercor.components.runtime_execution"),
     )
 
     class PureMarkerComponent(base_module.Component):

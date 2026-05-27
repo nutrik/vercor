@@ -37,21 +37,17 @@ def write_runtime_component_view_to_netcdf(
     )
 
     data_vars = {}
-    for store_name, store in (
-        ("incoming", view.incoming),
-        ("outgoing", view.outgoing),
-    ):
-        for name, value in zip(store.field_names, store.values):
-            data_vars[f"{store_name}_{name}"] = xr.DataArray(
-                data=runtime_array_to_host(value),
-                dims=("nlat", "nlon"),
-                coords={"latitude": lat, "longitude": lon},
-                attrs={
-                    "component": view.name,
-                    "runtime_store": store_name,
-                    "field_name": name,
-                },
-            )
+    for store_name, name, value in view.iter_store_fields("incoming", "outgoing"):
+        data_vars[f"{store_name}_{name}"] = xr.DataArray(
+            data=runtime_array_to_host(value),
+            dims=("nlat", "nlon"),
+            coords={"latitude": lat, "longitude": lon},
+            attrs={
+                "component": view.name,
+                "runtime_store": store_name,
+                "field_name": name,
+            },
+        )
 
     for name, value in (masks or {}).items():
         data_vars[name] = xr.DataArray(

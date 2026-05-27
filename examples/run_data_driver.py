@@ -95,6 +95,7 @@ if __name__ == "__main__":
     cpl.initialize()
     final_state = cpl.run()
     cpl.finalize(final_state)
+    views = cpl.runtime_component_views(final_state, names=("ATM", "OCN"))
 
     Metric = str | Callable[[Any], RuntimeArray | float]
 
@@ -110,10 +111,7 @@ if __name__ == "__main__":
     ]
 
     print_component_field_means_table(
-        components={
-            "ATM": cpl.runtime_component_view(final_state, "ATM"),
-            "OCN": cpl.runtime_component_view(final_state, "OCN"),
-        },
+        components=views,
         fields=variables,
         component_order=["ATM", "OCN"],
     )
@@ -122,14 +120,14 @@ if __name__ == "__main__":
         rows=[
             (
                 "ATM",
-                cpl.runtime_component_view(final_state, "ATM"),
+                views["ATM"],
                 total_surface_temperature,
                 "u_velocity",
                 "v_velocity",
             ),
             (
                 "OCN",
-                cpl.runtime_component_view(final_state, "OCN"),
+                views["OCN"],
                 "sea_surface_temperature",
                 "u_velocity",
                 "v_velocity",

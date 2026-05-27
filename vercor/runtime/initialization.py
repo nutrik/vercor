@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from vercor.clock import Clock
-from vercor.components._validation import validate_component_setup
+from vercor.components.setup_validation import validate_component_setup
 from vercor.dtypes import as_jax_real_array
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike

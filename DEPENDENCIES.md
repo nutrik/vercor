@@ -57,9 +57,9 @@
 57. `vercor/setups/jcm_setup_helpers.py` - paired JCM atmosphere/land setup construction with lazy optional JCM adapter imports built on (10, 32, 56)
 58. `vercor/setups/slab/atmosphere.py`, `ocean.py`, `land.py`, and `seaice.py` - slab model adapters built on (1, 9, 12)
 59. `vercor/runtime/contexts.py` - immutable setup and runtime step context payloads built on calendar, run-sequence, settings helpers, and (25)
-60. `vercor/runtime/views.py` - explicit runtime component metadata/field view used by diagnostics and output built on (12)
+60. `vercor/runtime/views.py` - explicit runtime component metadata plus read-only field view used by diagnostics and output built on (12)
 61. `vercor/diagnostics/fields.py`, `tables.py`, `plotting.py`, and `__init__.py` - derived diagnostic fields, console tables, optional plotting, and public reexports built on (10, 60)
-62. `vercor/components/_contracts.py`, `_lifecycle.py`, `_callable_wrappers.py`, `_runtime_fields.py`, `_runtime_validation.py`, `_runtime_execution.py`, `_validation.py`, `base.py`, and `factories.py` - component contracts, lifecycle hook storage/plumbing, callable-wrapper internals, runtime-field adapters, component-facing runtime validation, component host/scanned execution policy, setup validation, base author classes, and public factory helpers built on (1, 12, 14, 59)
+62. `vercor/components/_contracts.py`, `_lifecycle.py`, `_callable_wrappers.py`, `_runtime_fields.py`, `_runtime_validation.py`, `runtime_execution.py`, `setup_validation.py`, `base.py`, and `factories.py` - component contracts, lifecycle hook storage/plumbing, callable-wrapper internals, runtime-field adapters, component-facing runtime validation, component-owned runtime execution policy, setup validation, base author classes, and public factory helpers built on (1, 12, 14, 59)
 63. `vercor/runtime/contracts.py` - runtime import/export contracts, exchange-field flattening, stable exchange mask key names, and contract construction
 64. `vercor/runtime/stores.py`, `state.py`, and `__init__.py` - immutable runtime field stores, component/coupler runtime state containers, and internal runtime reexports built on (1, 3, 63)
 65. `vercor/runtime/time.py` - `RuntimeStepInfo` plus host-precomputed daily/monthly runtime step metadata built on (3, 6, 23, 64)
