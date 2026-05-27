@@ -297,12 +297,18 @@ hybrid/sigma-coordinate pressure and altitude helpers live in
 Adapter-specific runtime and file-output policy lives beside adapters in focused
 helpers instead of in factory/bootstrap modules. JAXGCM runtime payload,
 prefill, validation, stepping, and host recording live in
-`vercor.setups.external.jax_gcm_runtime`, while JAXGCM output cadence and
+`vercor.setups.external.jax_gcm_runtime`, which consumes the setup object through
+a private protocol rather than an unbounded state object. JAXGCM factory hooks
+are named callbacks bound to that setup state, keeping lifecycle wiring
+inspectable without changing the public factory API. JAXGCM output cadence and
 NetCDF writing live in `vercor.setups.external.jax_gcm_output`. Veros
 host-runtime flux application and substep orchestration live in
-`vercor.setups.external.veros_runtime`. CAMulator prediction-block and runtime
-step orchestration live in `vercor.setups.external.camulator_runtime`, while
-CAMulator CREDIT output writing lives in
+`vercor.setups.external.veros_runtime` behind a private runtime-state protocol;
+Veros backend settings are imported only inside the explicit configuration
+function so setup modules preserve lazy optional-dependency boundaries. CAMulator
+prediction-block and runtime step orchestration live in
+`vercor.setups.external.camulator_runtime` behind a private runtime-state
+protocol, while CAMulator CREDIT output writing lives in
 `vercor.setups.external.camulator_output`.
 
 `vercor.assets` owns generic cache, download, and checksum validation only.
@@ -326,7 +332,9 @@ split across
 `vercor.setups.external.camulator_land`, and
 `vercor.setups.external.camulator_init`. New code should import directly from
 these focused modules; the old one-hop CAMulator state and wind-filter facades
-have been removed.
+have been removed. CAMulator wind-filter configuration validates with explicit
+exceptions and avoids mutable function defaults so tests and callers see stable
+failure modes independent of Python optimization settings.
 
 ### Settings container
 

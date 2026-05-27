@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import jax
 import jax.numpy as jnp
@@ -13,6 +13,7 @@ from vercor.dtypes import as_jax_real_array, jax_zeros
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.pytree import PyTreeNodeMixin
 from vercor.pytree_utils import mean_leaf, stack_objects, unwrap_leading_dims
+from vercor.settings import VercorSettings
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
 from vercor.setups.external.jax_gcm_output import (
     should_write_period_output,
@@ -24,6 +25,19 @@ if TYPE_CHECKING:
     from vercor.runtime import RuntimeComponentContract, RuntimeComponentState
 
 JCM_REFERENCE_PRESSURE = 1.0e5
+
+
+class _JAXGCMRuntimeState(Protocol):
+    """Private protocol for the JAXGCM setup state consumed by runtime hooks."""
+
+    name: str
+    model: Any
+    sigma_levels: RuntimeArray
+    output_frequency: str | None
+    _state: Any
+    forcing: Any
+    _predictions_list: list[Any]
+    _step_function: Callable[[Any, Any], tuple[Any, Any]]
 
 
 @jax.tree_util.register_pytree_node_class
@@ -66,7 +80,9 @@ def jax_gcm_default_fields() -> dict[str, float]:
     return defaults
 
 
-def create_jax_gcm_runtime_payload(state: Any) -> JAXGCMRuntimePayload:
+def create_jax_gcm_runtime_payload(
+    state: _JAXGCMRuntimeState,
+) -> JAXGCMRuntimePayload:
     """Return immutable JCM state and forcing for runtime execution."""
 
     missing = [
@@ -88,7 +104,7 @@ def create_jax_gcm_runtime_payload(state: Any) -> JAXGCMRuntimePayload:
 
 
 def prefill_jax_gcm_runtime_fields(
-    state: Any,
+    state: _JAXGCMRuntimeState,
     component: Component,
     data: dict[str, RuntimeArray],
     incoming: dict[str, RuntimeArray],
@@ -119,7 +135,7 @@ def prefill_jax_gcm_runtime_fields(
 
 
 def validate_jax_gcm_runtime_state(
-    state: Any,
+    state: _JAXGCMRuntimeState,
     component: Component,
     component_state: "RuntimeComponentState",
     contract: "RuntimeComponentContract",
@@ -154,10 +170,10 @@ def validate_jax_gcm_runtime_state(
 
 
 def step_jax_gcm_runtime(
-    state: Any,
+    state: _JAXGCMRuntimeState,
     fields: Mapping[str, Any],
     payload: Any | None,
-    settings: Any,
+    settings: VercorSettings,
 ) -> tuple[ComponentStepResult, Any, Any]:
     """Advance JAXGCM runtime state and return raw prediction details."""
 
@@ -235,7 +251,7 @@ def step_jax_gcm_runtime(
 
 
 def record_jax_gcm_host_step(
-    state: Any,
+    state: _JAXGCMRuntimeState,
     *,
     step_result: ComponentStepResult,
     prediction: Any,
@@ -275,7 +291,7 @@ def record_jax_gcm_host_step(
 
 
 def step_jax_gcm_component(
-    state: Any,
+    state: _JAXGCMRuntimeState,
     fields: Mapping[str, Any],
     context: ComponentStepContext,
     payload: Any | None,

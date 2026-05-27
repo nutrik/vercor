@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol, cast
 
 import jax.numpy as jnp
 import torch
@@ -15,6 +15,32 @@ import vercor.setups.external.camulator_fields as _camulator_fields
 import vercor.setups.external.camulator_output as _camulator_output
 import vercor.setups.external.camulator_tensors as _camulator_tensors
 from vercor.types import RuntimeArray
+
+
+class _CAMulatorRuntimeState(Protocol):
+    """Private protocol for the CAMulator setup state consumed by runtime hooks."""
+
+    dynamic_ds: Any
+    device: str
+    forecast_hour: int
+    stepper: Any
+    state: torch.Tensor
+    static_forcing: torch.Tensor
+    LANDM_COSLAT: Any
+    accessor_input: Any
+    accessor_output: Any
+    latlons: Any
+    runtime_cursor: Any
+    lead_time_periods: int
+    metadata: dict[str, Any]
+    conf: dict[str, Any]
+    state_transformer: Any
+    P0: float
+    hyai: torch.Tensor
+    hybi: torch.Tensor
+    hyam: torch.Tensor
+    hybm: torch.Tensor
+    model_substeps: int
 
 
 def _coerce_camulator_datetime(time_obj: Any) -> datetime:
@@ -37,13 +63,13 @@ def _coerce_camulator_datetime(time_obj: Any) -> datetime:
 
 
 def _run_camulator_prediction_block(
-    state: Any,
+    state: _CAMulatorRuntimeState,
     fields: Mapping[str, Any],
     *,
     block_start: int,
     block_end: int,
     logger: LoggerLike | None,
-) -> tuple[Any, RuntimeArray]:
+) -> tuple[torch.Tensor, RuntimeArray]:
     """Run one CAMulator forcing block and return the final prediction and TS."""
 
     prediction = None
@@ -134,11 +160,11 @@ def _run_camulator_prediction_block(
             "check forcing availability and coupling timestep alignment."
         )
 
-    return prediction, last_total_surface_temperature
+    return cast(torch.Tensor, prediction), last_total_surface_temperature
 
 
 def step_camulator_runtime(
-    state: Any,
+    state: _CAMulatorRuntimeState,
     fields: Mapping[str, Any],
     context: ComponentStepContext,
     payload: Any | None,

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import timedelta
-from typing import Any
+from functools import partial
+from typing import Any, cast
 
 import jax.numpy as jnp
 
@@ -45,6 +46,17 @@ _VEROS_INPUT_FIELD_NAMES = (
 _VEROS_FIELD_DEFAULTS = {"sea_surface_temperature": 283.15}
 
 
+def _advance_veros_model_step(
+    veros_state: Any,
+    *,
+    step: Callable[[Any], Any],
+    jitted: bool,
+) -> Any:
+    """Advance a Veros state through the configured host step boundary."""
+
+    return _veros_state.pure(veros_state, jitted=jitted, step=step)
+
+
 class _VerosGCMState:
     name: str
     data: dict[str, RuntimeArray]
@@ -52,6 +64,7 @@ class _VerosGCMState:
     coupling_timestep: timedelta
     model_timestep: timedelta
     model_substeps: int
+    _step_function: Callable[[Any], Any]
 
     def __init__(
         self,
@@ -82,8 +95,13 @@ class _VerosGCMState:
         self.model = _veros_setup.CustomGlobalFourDegree(override=override)
         self.model.setup()
         self._veros_state = _veros_state.copy_state(self.model.state, jitted=jitted)
-        self._step_function = lambda state: _veros_state.pure(
-            state, jitted=jitted, step=self.model.step
+        self._step_function = cast(
+            Callable[[Any], Any],
+            partial(
+                _advance_veros_model_step,
+                step=self.model.step,
+                jitted=jitted,
+            ),
         )
 
         self.do_spinup = do_spinup

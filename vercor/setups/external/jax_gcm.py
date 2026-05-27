@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
+from functools import partial
 from typing import Any, Optional
 
 import jax
@@ -26,6 +27,8 @@ from jcm.physics_interface import (
 from vercor.components import (
     Component,
     ComponentSetupContext,
+    ComponentStepContext,
+    ComponentStepResult,
     differentiable_component,
 )
 from vercor.setups._time_helpers import (
@@ -236,6 +239,68 @@ class _JAXGCMState:
             )
 
 
+def _step_jax_gcm_runtime_callback(
+    state: _JAXGCMState,
+    fields: Mapping[str, Any],
+    context: ComponentStepContext,
+    payload: Any | None,
+) -> ComponentStepResult:
+    """Delegate callable component stepping to the JAXGCM runtime owner."""
+
+    return _jax_gcm_runtime.step_jax_gcm_component(
+        state,
+        fields,
+        context,
+        payload,
+    )
+
+
+def _create_jax_gcm_runtime_payload_callback(
+    state: _JAXGCMState,
+    component: Component,
+) -> JAXGCMRuntimePayload:
+    """Delegate runtime-payload creation to the JAXGCM runtime owner."""
+
+    _ = component
+    return _jax_gcm_runtime.create_jax_gcm_runtime_payload(state)
+
+
+def _prefill_jax_gcm_runtime_fields_callback(
+    state: _JAXGCMState,
+    component: Component,
+    data: dict[str, RuntimeArray],
+    incoming: dict[str, RuntimeArray],
+    outgoing: dict[str, RuntimeArray],
+    contract: Any,
+) -> None:
+    """Delegate runtime field prefill to the JAXGCM runtime owner."""
+
+    _jax_gcm_runtime.prefill_jax_gcm_runtime_fields(
+        state,
+        component,
+        data,
+        incoming,
+        outgoing,
+        contract,
+    )
+
+
+def _validate_jax_gcm_runtime_state_callback(
+    state: _JAXGCMState,
+    component: Component,
+    component_state: Any,
+    contract: Any,
+) -> None:
+    """Delegate runtime-state validation to the JAXGCM runtime owner."""
+
+    _jax_gcm_runtime.validate_jax_gcm_runtime_state(
+        state,
+        component,
+        component_state,
+        contract,
+    )
+
+
 def make_jax_gcm(
     coords: CoordinateSystem,
     terrain: TerrainData,
@@ -267,16 +332,7 @@ def make_jax_gcm(
     component = differentiable_component(
         name=name,
         grid=state.grid,
-        step=(
-            lambda fields, context, payload: (
-                _jax_gcm_runtime.step_jax_gcm_component(
-                    state,
-                    fields,
-                    context,
-                    payload,
-                )
-            )
-        ),
+        step=partial(_step_jax_gcm_runtime_callback, state),
         inputs=("land_surface_temperature", "sea_surface_temperature"),
         outputs=(
             "land_surface_temperature",
@@ -287,30 +343,17 @@ def make_jax_gcm(
         ),
         default_fields=_jax_gcm_runtime.jax_gcm_default_fields(),
         initialize=state.initialize,
-        create_runtime_payload=(
-            lambda component: _jax_gcm_runtime.create_jax_gcm_runtime_payload(state)
+        create_runtime_payload=partial(
+            _create_jax_gcm_runtime_payload_callback,
+            state,
         ),
-        prefill_runtime_state_fields=(
-            lambda component, data, incoming, outgoing, contract: (
-                _jax_gcm_runtime.prefill_jax_gcm_runtime_fields(
-                    state,
-                    component,
-                    data,
-                    incoming,
-                    outgoing,
-                    contract,
-                )
-            )
+        prefill_runtime_state_fields=partial(
+            _prefill_jax_gcm_runtime_fields_callback,
+            state,
         ),
-        validate_runtime_state=(
-            lambda component, component_state, contract: (
-                _jax_gcm_runtime.validate_jax_gcm_runtime_state(
-                    state,
-                    component,
-                    component_state,
-                    contract,
-                )
-            )
+        validate_runtime_state=partial(
+            _validate_jax_gcm_runtime_state_callback,
+            state,
         ),
     )
     return component

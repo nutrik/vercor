@@ -972,6 +972,62 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
 
 
 @pytest.mark.fast_always
+def test_external_runtime_helpers_use_private_state_protocols() -> None:
+    runtime_sources = {
+        "vercor/setups/external/jax_gcm_runtime.py": (
+            "_JAXGCMRuntimeState",
+            (
+                "\n    state: Any,",
+                "\n    settings: Any,",
+            ),
+        ),
+        "vercor/setups/external/veros_runtime.py": (
+            "_VerosRuntimeState",
+            ("\n    state: Any,",),
+        ),
+        "vercor/setups/external/camulator_runtime.py": (
+            "_CAMulatorRuntimeState",
+            ("\n    state: Any,",),
+        ),
+    }
+
+    for path_name, (protocol_name, forbidden_markers) in runtime_sources.items():
+        source = Path(path_name).read_text(encoding="utf-8")
+        assert "from typing import" in source and "Protocol" in source
+        assert f"class {protocol_name}(Protocol):" in source
+        for marker in forbidden_markers:
+            assert marker not in source, f"{path_name} still exposes {marker}"
+
+
+@pytest.mark.fast_always
+def test_jax_gcm_factory_uses_named_runtime_callbacks() -> None:
+    source = Path("vercor/setups/external/jax_gcm.py").read_text(encoding="utf-8")
+    factory_source = source.split("def make_jax_gcm(", 1)[1]
+
+    assert "from functools import partial" in source
+    assert "def _step_jax_gcm_runtime_callback(" in source
+    assert "def _create_jax_gcm_runtime_payload_callback(" in source
+    assert "def _prefill_jax_gcm_runtime_fields_callback(" in source
+    assert "def _validate_jax_gcm_runtime_state_callback(" in source
+    assert "lambda fields" not in factory_source
+    assert "lambda component" not in factory_source
+
+
+@pytest.mark.fast_always
+def test_veros_runtime_settings_imports_runtime_settings_lazily() -> None:
+    source = Path("vercor/setups/external/veros_runtime_settings.py").read_text(
+        encoding="utf-8"
+    )
+    before_function, function_body = source.split(
+        "def configure_veros_runtime() -> None:",
+        1,
+    )
+
+    assert "from veros import runtime_settings" not in before_function
+    assert "from veros import runtime_settings" in function_body
+
+
+@pytest.mark.fast_always
 def test_common_exchange_recipes_are_centralized_for_examples() -> None:
     import vercor.setups.exchange_recipes as exchange_recipes_module
 

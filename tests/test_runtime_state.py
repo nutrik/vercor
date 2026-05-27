@@ -408,6 +408,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         "from veros.setups.global_4deg import GlobalFourDegreeSetup"
     )
     assert "def configure_veros_runtime" in veros_runtime_settings_source
+    assert "target_levels: Sequence = range(" not in camulator_wind_filter_source
+    assert "target_vars: Sequence[str] = [" not in camulator_wind_filter_source
     assert "def _step_host_runtime_state" not in base_source
     assert "_step_host_runtime_state" not in runtime_driver_source
     for source in (veros_source, camulator_source, camulator_land_source):

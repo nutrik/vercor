@@ -49,6 +49,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local callable-component boundary validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local external-adapter state-boundary validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -74,6 +77,29 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: External Adapter State Boundary Refactor
+
+- Added private runtime-state protocols for JAXGCM, Veros, and CAMulator
+  runtime helpers so adapter runtime modules no longer accept unbounded setup
+  state objects in their public helper signatures.
+- Replaced JAXGCM factory lambda lifecycle wiring with named callbacks bound by
+  `functools.partial`, and replaced the Veros host step lambda with a named
+  private step adapter.
+- Kept Veros optional runtime settings lazy by importing `runtime_settings`
+  inside `configure_veros_runtime()`, and made CAMulator wind-filter
+  configuration fail with explicit `ValueError`s while removing mutable function
+  defaults.
+- Updated boundary/focused tests, `DESIGN.md`, and `DEPENDENCIES.md` for the
+  tightened external-adapter state ownership map.
+- Validation run for this change:
+  focused external/API/CAMulator fast pytest,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Callable Component Boundary Refactor
 

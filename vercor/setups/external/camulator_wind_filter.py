@@ -10,7 +10,8 @@ import torch.nn.functional as F
 
 
 from dataclasses import dataclass
-from typing import Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from vercor.jax_logging import get_default_logger
 
@@ -30,21 +31,17 @@ class WindArtifactFilterConfig:
     falloff_sigma: float = 4.0
 
     def validate(self) -> None:
-        assert (
-            self.dilation_zonal > 0 and self.dilation_meridional > 0
-        ), "Dilations must be positive"
-        assert (
-            self.smooth_sigma > 0 and self.falloff_sigma > 0
-        ), "Sigmas must be positive"
-        assert isinstance(
-            self.target_levels, (list, tuple)
-        ), "target_levels must be a sequence"
-        assert isinstance(
-            self.target_vars, (list, tuple)
-        ), "target_vars must be a sequence"
+        if self.dilation_zonal <= 0 or self.dilation_meridional <= 0:
+            raise ValueError("Dilations must be positive")
+        if self.smooth_sigma <= 0 or self.falloff_sigma <= 0:
+            raise ValueError("Sigmas must be positive")
+        if not isinstance(self.target_levels, Sequence):
+            raise ValueError("target_levels must be a sequence")
+        if not isinstance(self.target_vars, Sequence):
+            raise ValueError("target_vars must be a sequence")
 
 
-def load_wind_filter_config(conf: dict) -> WindArtifactFilterConfig:
+def load_wind_filter_config(conf: dict[str, Any]) -> WindArtifactFilterConfig:
     # Optional block in YAML:
     # conf["postprocessing"]["wind_artifact_filter"] = {
     #   "activate": true,
@@ -110,7 +107,7 @@ def wind_filter(
 
 
 def post_process_wind_artifacts(
-    x: torch.Tensor, conf: dict, enable_filtering: bool = True
+    x: torch.Tensor, conf: dict[str, Any], enable_filtering: bool = True
 ) -> None:
     """
     Apply wind artifact filtering post-processing to model state (in-place).
@@ -148,8 +145,8 @@ def apply_wind_artifact_filter_to_tensor(
     varname_upper: list[str],
     levels_per_var: int,
     mask_level: int = 14,
-    target_levels: Sequence = range(10, 20),
-    target_vars: Sequence[str] = ["U", "V", "T", "Q"],
+    target_levels: Sequence[int] | None = None,
+    target_vars: Sequence[str] | None = None,
     speed_threshold: float = 3.0193274566643846,
     smooth_sigma: float = 1.5,
     dilation_zonal: int = 15,
@@ -175,6 +172,8 @@ def apply_wind_artifact_filter_to_tensor(
         None (modifies x in-place)
     """
     log = get_default_logger()
+    selected_target_levels = range(10, 20) if target_levels is None else target_levels
+    selected_target_vars = ("U", "V", "T", "Q") if target_vars is None else target_vars
 
     # Step 1: Split tensor into variables
     channels = len(varname_upper)
@@ -208,7 +207,7 @@ def apply_wind_artifact_filter_to_tensor(
     )
 
     # Step 4: Apply mask to target levels of target variables
-    for var_name in target_vars:
+    for var_name in selected_target_vars:
         if var_name not in var_dict:
             log.warning(f"{var_name} not found, skipping")
             continue
@@ -218,7 +217,7 @@ def apply_wind_artifact_filter_to_tensor(
         start_idx = var_idx * levels_per_var
 
         # Apply filtering to each target level
-        for level in target_levels:
+        for level in selected_target_levels:
             if level >= var_dict[var_name].shape[1]:
                 log.warning(f"Level {level} exceeds available levels for {var_name}")
                 continue

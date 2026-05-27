@@ -21,6 +21,7 @@ import vercor.setups.external.camulator_land as camulator_land_module
 import vercor.setups.external.camulator_output as camulator_output_module
 import vercor.setups.external.camulator_runtime as camulator_runtime_module
 import vercor.setups.external.camulator_tensors as camulator_tensors_module
+import vercor.setups.external.camulator_wind_filter as camulator_wind_filter_module
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
@@ -109,6 +110,18 @@ def test_camulator_runtime_field_initializer_returns_jax_arrays() -> None:
     } <= set(fields)
     assert fields["temperature"].shape == (2, 3)
     assert_allclose_compact(fields["temperature"], np.zeros((2, 3)))
+
+
+def test_wind_artifact_filter_config_raises_value_error_for_invalid_values() -> None:
+    with pytest.raises(ValueError, match="Dilations must be positive"):
+        camulator_wind_filter_module.WindArtifactFilterConfig(
+            dilation_zonal=0
+        ).validate()
+
+    with pytest.raises(ValueError, match="target_levels must be a sequence"):
+        camulator_wind_filter_module.WindArtifactFilterConfig(
+            target_levels=cast(Any, 5)
+        ).validate()
 
 
 def test_prepare_camulator_surface_forcing_supports_jit_and_gradients() -> None:

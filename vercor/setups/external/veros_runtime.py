@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Any, Protocol
 
 from vercor.components import ComponentStepContext
 import vercor.setups.external.veros_fluxes as _veros_fluxes
 import vercor.setups.external.veros_state as _veros_state
 
 
+class _VerosRuntimeState(Protocol):
+    """Private protocol for the Veros setup state consumed by runtime hooks."""
+
+    _veros_state: Any
+    _step_function: Callable[[Any], Any]
+    restore_to_climatology: bool
+    jitted: bool
+    model_substeps: int
+
+
 def step_veros_runtime(
-    state: Any,
+    state: _VerosRuntimeState,
     fields: Mapping[str, Any],
     context: ComponentStepContext,
     payload: Any | None,
