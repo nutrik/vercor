@@ -250,14 +250,11 @@ def test_setup_components_use_explicit_metadata_mapping() -> None:
 
 
 @pytest.mark.fast_always
-def test_setup_forcing_reader_reexports_canonical_read_boundary() -> None:
-    import vercor.setups.data.forcing as setup_forcing_module
+def test_setup_forcing_reader_facade_is_removed() -> None:
     import vercor.forcing_data as forcing_data_module
 
-    forcing_source = Path("vercor/setups/data/forcing.py").read_text(encoding="utf-8")
-
-    assert setup_forcing_module.read_forcing is forcing_data_module.read_forcing
-    assert "def read_forcing(" not in forcing_source
+    assert callable(forcing_data_module.read_forcing)
+    assert not Path("vercor/setups/data/forcing.py").exists()
 
 
 @pytest.mark.fast_always
@@ -435,12 +432,12 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
 
     assert callable(calendar_module.is_leap_year)
     assert callable(calendar_module.daily_forcing_index)
-    assert calendar_module.DateTime360 is clock_module.DateTime360
-    assert calendar_module.DateTime365 is clock_module.DateTime365
-    assert calendar_module.ModelDateTime == clock_module.ModelDateTime
+    assert not hasattr(clock_module, "DateTime360")
+    assert not hasattr(clock_module, "DateTime365")
+    assert not hasattr(clock_module, "ModelDateTime")
     assert callable(grid_geometry_module.make_rectilinear_grid)
     assert callable(grid_geometry_module.centers_to_edges)
-    assert grid_masks_module.grids_identical is grid_geometry_module.grids_identical
+    assert not hasattr(grid_masks_module, "grids_identical")
     assert callable(vertical_module.compute_pressure_levels)
     assert callable(vertical_module.compute_sigma_pressure_levels)
     assert callable(vertical_module.compute_hybrid_pressure_levels)
@@ -451,10 +448,8 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert callable(pytree_utils_module.stack_objects)
     assert callable(pytree_utils_module.unwrap_leading_dims)
     assert "gravity" in physical_constants_module.PHYSICAL_CONSTANT_SETTINGS
-    assert (
-        exchange_module.VALID_EXCHANGE_FIELD_NAMES
-        is field_names_module.VALID_EXCHANGE_FIELD_NAMES
-    )
+    assert not hasattr(exchange_module, "VALID_EXCHANGE_FIELD_NAMES")
+    assert "sea_surface_temperature" in field_names_module.VALID_EXCHANGE_FIELD_NAMES
 
     clock_source = Path("vercor/clock.py").read_text(encoding="utf-8")
     runtime_time_source = Path("vercor/runtime/time.py").read_text(encoding="utf-8")
@@ -484,8 +479,11 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert "from vercor.field_names import VALID_EXCHANGE_FIELD_NAMES" in (
         runtime_validation_source
     )
-    assert "from vercor.field_names import" in exchange_source
-    assert "VALID_EXCHANGE_FIELD_NAMES as VALID_EXCHANGE_FIELD_NAMES" in exchange_source
+    assert "from vercor.field_names import" not in exchange_source
+    assert (
+        "VALID_EXCHANGE_FIELD_NAMES as VALID_EXCHANGE_FIELD_NAMES"
+        not in exchange_source
+    )
     assert "VALID_EXCHANGE_FIELD_NAMES: list[str]" not in exchange_source
     assert "def _compute_has_identical_grids(" not in regridder_base_source
     assert "grids_identical(" in regridder_base_source
@@ -513,8 +511,6 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
 def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     import vercor.diagnostics as diagnostics_module
     import vercor.host_arrays as host_arrays_module
-    import vercor.setups.jax_array_helpers as jax_array_helpers_module
-    import vercor.setups.data.camulator_land as camulator_land_compat_module
     import vercor.setups.external.camulator as camulator_module
     import vercor.setups.external.camulator_fields as camulator_fields_module
     import vercor.setups.external.camulator_land as camulator_land_module
@@ -525,18 +521,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     import vercor.setups.external.veros_setup as veros_setup_module
     import vercor.setups.external.veros_state as veros_state_module
 
-    assert (
-        jax_array_helpers_module.transposed_host_array
-        is host_arrays_module.transposed_host_array
-    )
-    assert (
-        jax_array_helpers_module.component_vector_speed
-        is diagnostics_module.component_vector_speed
-    )
-    assert (
-        camulator_land_compat_module.make_camulator_land
-        is camulator_land_module.make_camulator_land
-    )
+    assert callable(host_arrays_module.transposed_host_array)
+    assert callable(diagnostics_module.component_vector_speed)
+    assert callable(camulator_land_module.make_camulator_land)
     assert callable(camulator_fields_module._prepare_camulator_surface_forcing)
     assert callable(camulator_runtime_settings_module.configure_camulator_runtime)
     assert callable(veros_fluxes_module.compute_fluxes)
@@ -549,18 +536,6 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert not hasattr(veros_gcm_module, "compute_fluxes")
     assert not hasattr(veros_gcm_module, "copy_state")
     assert not hasattr(veros_gcm_module, "set_variable")
-    assert not hasattr(camulator_land_compat_module, "_CAMulatorLandState")
-    assert not hasattr(
-        camulator_land_compat_module,
-        "_prepare_camulator_land_surface_temperature",
-    )
-
-    helper_source = Path("vercor/setups/jax_array_helpers.py").read_text(
-        encoding="utf-8"
-    )
-    camulator_land_compat_source = Path(
-        "vercor/setups/data/camulator_land.py"
-    ).read_text(encoding="utf-8")
     jax_gcm_source = Path("vercor/setups/external/jax_gcm.py").read_text(
         encoding="utf-8"
     )
@@ -588,7 +563,6 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     camulator_imports_source = Path(
         "vercor/setups/external/camulator_imports.py"
     ).read_text(encoding="utf-8")
-    windpp_source = Path("vercor/setups/external/windpp.py").read_text(encoding="utf-8")
 
     assert Path("vercor/setups/external/camulator_land.py").exists()
     assert Path("vercor/setups/external/jax_gcm_output.py").exists()
@@ -600,11 +574,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert Path("vercor/setups/external/veros_fluxes.py").exists()
     assert Path("vercor/setups/external/veros_setup.py").exists()
     assert Path("vercor/setups/external/veros_state.py").exists()
-
-    assert "def transposed_host_array(" not in helper_source
-    assert "def component_vector_speed(" not in helper_source
-    assert "def make_camulator_land(" not in camulator_land_compat_source
-    assert "_CAMulatorLandState" not in camulator_land_compat_source
+    assert not Path("vercor/setups/jax_array_helpers.py").exists()
+    assert not Path("vercor/setups/data/camulator_land.py").exists()
+    assert not Path("vercor/setups/external/windpp.py").exists()
     assert "from vercor.runtime.validation import" not in jax_gcm_source
     assert "def asfloat(" not in jax_gcm_source
     assert "def _cleanup_surface_temperature_fields(" not in jax_gcm_source
@@ -632,7 +604,6 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "from vercor.setups.external.camulator_wind_filter import" in (
         camulator_imports_source
     )
-    assert "def apply_wind_artifact_filter_to_tensor(" not in windpp_source
 
 
 @pytest.mark.fast_always
@@ -698,7 +669,7 @@ def test_camulator_adapters_share_runtime_cursor_state_transition_helper() -> No
 
 
 @pytest.mark.fast_always
-def test_camulator_state_is_thin_facade_over_focused_modules() -> None:
+def test_camulator_state_facade_is_removed() -> None:
     focused_modules = (
         Path("vercor/setups/external/camulator_imports.py"),
         Path("vercor/setups/external/camulator_forcing.py"),
@@ -709,15 +680,7 @@ def test_camulator_state_is_thin_facade_over_focused_modules() -> None:
     for path in focused_modules:
         assert path.exists(), path
 
-    facade_source = Path("vercor/setups/external/camulator_state.py").read_text(
-        encoding="utf-8"
-    )
-    assert len(facade_source.splitlines()) <= 120
-    assert "class StateVariableAccessor" not in facade_source
-    assert "class StateManager" not in facade_source
-    assert "class CAMulatorStepper" not in facade_source
-    assert "def initialize_camulator(" not in facade_source
-    assert "def _load_credit_modules(" not in facade_source
+    assert not Path("vercor/setups/external/camulator_state.py").exists()
 
 
 @pytest.mark.fast_always
@@ -782,7 +745,6 @@ def test_data_and_host_factories_return_core_contract_instances() -> None:
         "import vercor.setups.data.era5_land",
         "from vercor.setups.data import make_era5_land",
         "import vercor.setups.external.camulator",
-        "import vercor.setups.external.camulator_state",
     ),
 )
 def test_unrelated_setup_imports_do_not_initialize_optional_adapters(

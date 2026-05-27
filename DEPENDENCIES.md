@@ -5,7 +5,7 @@
 5. `vercor/field_names.py` - canonical exchange-field vocabulary
 6. `vercor/calendar.py` - calendar constants, model-calendar datetime values, leap-year logic, noleap/360-day mapping, and daily forcing-index helpers
 7. `vercor/fluxes/vertical_coordinates.py` - hybrid/sigma-coordinate pressure and altitude helpers built on (1, 4)
-8. `vercor/fluxes/utilities.py` - JAX-native scalar/array thermodynamic helpers plus compatibility aliases built on (1, 4, 7)
+8. `vercor/fluxes/utilities.py` - JAX-native scalar/array thermodynamic helpers built on (1, 4)
 9. `vercor/fluxes/bulk_formula_cesm.py` - JAX-native atmosphere-ocean / atmosphere-ice bulk flux kernels built on (1, 4, 8)
 10. `vercor/host_arrays.py` - explicit JAX/NumPy host-transfer boundary for non-differentiable adapters and output
 11. `vercor/pytree_utils.py` - generic leafwise PyTree transforms and casting helpers used by setup adapters
@@ -19,7 +19,7 @@
 19. `vercor/regridders/conservative.py` - conservative regridder wrapper over (13, 16, 17)
 20. `vercor/grid_masks.py` - land/ocean mask construction and remap-conservation checks built on (1, 12, 13, 19)
 21. `vercor/assets.py` - generic asset cache/download/checksum boundary
-22. `vercor/forcing_data.py` - canonical NetCDF forcing-file read boundary and compatibility reader class for data components
+22. `vercor/forcing_data.py` - canonical NetCDF forcing-file read boundary and data-component forcing reader class
 23. `vercor/time_selection.py` - day-slice and periodic interpolation index helpers built on (6)
 24. `vercor/clock.py` - coupler clock and timestep iteration helpers built on (6)
 25. `vercor/jax_logging.py` - callback-backed logger protocol and setup helper for Python and traced JAX runtime diagnostics
@@ -45,7 +45,7 @@
 45. `vercor/setups/external/camulator_runtime_settings.py` - CAMulator TensorFlow/OpenMP/MKL import-time environment settings boundary
 46. `vercor/setups/external/camulator_output.py` - CAMulator CREDIT output writing helpers
 47. `vercor/setups/external/camulator_land.py` - CAMulator land host-runtime adapter with shared timestep/cursor setup built on (1, 12, 20, 26, 39)
-48. `vercor/setups/external/camulator_state.py` and `vercor/setups/external/camulator.py` - CAMulator compatibility facade plus host-runtime atmosphere adapter built on (7, 10, 26, 39, 40, 41, 44, 45, 46)
+48. `vercor/setups/external/camulator.py` - CAMulator host-runtime atmosphere adapter built on (7, 10, 26, 39, 40, 41, 44, 45, 46)
 49. `vercor/setups/data/assets.py` - concrete ERA/ECMWF setup forcing asset registry built on (21)
 50. `vercor/setups/data/_field_helpers.py` - shared JAX-backed data-adapter field normalization helpers built on (1, 14)
 51. `vercor/setups/data/_component_helpers.py` - shared data-component construction helper for time-interpolated forcing adapters built on (12, 23, 26)
@@ -54,20 +54,19 @@
 54. `vercor/setups/data/era5_land.py` - ERA5 land forcing adapter with canonical layout and runtime temperature storage built on (12, 14, 22, 49, 51)
 55. `vercor/setups/data/erainterim_ocean.py` - ERA-Interim ocean forcing adapter built on (12, 14, 22, 49, 50, 51)
 56. `vercor/setups/data/jcm_land.py` - JCM land forcing adapter with coordinate conversion and runtime storage built on (12, 14, 20)
-57. `vercor/setups/data/camulator_land.py` - public compatibility facade for (47)
-58. `vercor/setups/jcm_setup_helpers.py` - paired JCM atmosphere/land setup construction built on (10, 32, 56)
-59. `vercor/setups/slab/atmosphere.py`, `ocean.py`, `land.py`, and `seaice.py` - slab model adapters built on (1, 9, 12)
-60. `vercor/runtime/contexts.py` - immutable setup and runtime step context payloads built on calendar, run-sequence, settings helpers, and (25)
-61. `vercor/runtime/views.py` - explicit runtime component metadata/field view used by diagnostics and output built on (12)
-62. `vercor/diagnostics/fields.py`, `tables.py`, `plotting.py`, and `__init__.py` - derived diagnostic fields, console tables, optional plotting, and public reexports built on (10, 61)
-63. `vercor/components/_contracts.py`, `_callable_wrappers.py`, `_runtime_fields.py`, `_validation.py`, `base.py`, and `factories.py` - component contracts, callable-wrapper internals, runtime-field adapters, setup validation, base author classes, and public factory helpers built on (1, 12, 14, 60)
-64. `vercor/runtime/contracts.py` - runtime import/export contracts, exchange-field flattening, stable exchange mask key names, and contract construction
-65. `vercor/runtime/stores.py`, `state.py`, and `__init__.py` - immutable runtime field stores, component/coupler runtime state containers, and internal runtime reexports built on (1, 3, 64)
-66. `vercor/runtime/time.py` - `RuntimeStepInfo` plus host-precomputed daily/monthly runtime step metadata built on (3, 6, 23, 65)
-67. `vercor/runtime/component_state.py`, `field_transfer.py`, `validation.py`, and `components.py` - component runtime state creation, contract prefill, receive/send, time-sliced export selection, runtime validation, and compatibility reexports built on (1, 5, 14, 63, 64, 65, 66)
-68. `vercor/runtime/exchange_dispatch.py` and `driver.py` - exchange dispatch, component runtime stepping, outgoing priming, and host-adapter detection built on (6, 60, 63, 64, 65, 66, 67)
-69. `vercor/runtime/coupler_state.py` and `topology.py` - runtime coupler-state assembly, topology/name validation, dispatch-context construction, output-mask lookup, component lookup, and exchange topology setup built on (12, 19, 20, 60, 63, 64, 65, 67, 68)
-70. `vercor/runtime/runner.py` - host/scanned runtime loops, progress logging, compile-cache keys, JIT wrapping, donation checks, and interrupt translation built on (25, 66, 68)
-71. `vercor/output.py` - runtime-view NetCDF output boundary built on (10, 12, 61, 65)
-72. `vercor/coupler.py` - public runtime facade for `run()` and `create_runtime_state()` built on (25, 60, 63, 64, 65, 66, 67, 68, 69, 70, 71)
-73. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`
+57. `vercor/setups/jcm_setup_helpers.py` - paired JCM atmosphere/land setup construction built on (10, 32, 56)
+58. `vercor/setups/slab/atmosphere.py`, `ocean.py`, `land.py`, and `seaice.py` - slab model adapters built on (1, 9, 12)
+59. `vercor/runtime/contexts.py` - immutable setup and runtime step context payloads built on calendar, run-sequence, settings helpers, and (25)
+60. `vercor/runtime/views.py` - explicit runtime component metadata/field view used by diagnostics and output built on (12)
+61. `vercor/diagnostics/fields.py`, `tables.py`, `plotting.py`, and `__init__.py` - derived diagnostic fields, console tables, optional plotting, and public reexports built on (10, 60)
+62. `vercor/components/_contracts.py`, `_callable_wrappers.py`, `_runtime_fields.py`, `_validation.py`, `base.py`, and `factories.py` - component contracts, callable-wrapper internals, runtime-field adapters, setup validation, base author classes, and public factory helpers built on (1, 12, 14, 59)
+63. `vercor/runtime/contracts.py` - runtime import/export contracts, exchange-field flattening, stable exchange mask key names, and contract construction
+64. `vercor/runtime/stores.py`, `state.py`, and `__init__.py` - immutable runtime field stores, component/coupler runtime state containers, and internal runtime reexports built on (1, 3, 63)
+65. `vercor/runtime/time.py` - `RuntimeStepInfo` plus host-precomputed daily/monthly runtime step metadata built on (3, 6, 23, 64)
+66. `vercor/runtime/component_state.py`, `field_transfer.py`, and `validation.py` - component runtime state creation, contract prefill, receive/send, time-sliced export selection, and runtime validation built on (1, 5, 14, 62, 63, 64, 65)
+67. `vercor/runtime/exchange_dispatch.py` and `driver.py` - exchange dispatch, component runtime stepping, outgoing priming, and host-adapter detection built on (6, 59, 62, 63, 64, 65, 66)
+68. `vercor/runtime/coupler_state.py` and `topology.py` - runtime coupler-state assembly, topology/name validation, dispatch-context construction, output-mask lookup, component lookup, and exchange topology setup built on (12, 13, 19, 20, 59, 62, 63, 64, 66, 67)
+69. `vercor/runtime/runner.py` - host/scanned runtime loops, progress logging, compile-cache keys, JIT wrapping, donation checks, and interrupt translation built on (25, 65, 67)
+70. `vercor/output.py` - runtime-view NetCDF output boundary built on (10, 12, 60, 64)
+71. `vercor/coupler.py` - public runtime facade for `run()` and `create_runtime_state()` built on (25, 59, 62, 63, 64, 65, 66, 67, 68, 69, 70)
+72. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`

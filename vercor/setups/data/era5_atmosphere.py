@@ -21,10 +21,10 @@ from vercor.fluxes.vertical_coordinates import (
 )
 from vercor.grid import RectilinearGrid
 from vercor.components import ComponentSetupContext
+from vercor.forcing_data import read_forcing as _read_forcing
 from vercor.settings import VercorSettings
 from vercor.setups.data.assets import get_forcing_data
 from vercor.setups.data._component_helpers import time_interpolated_data_component
-from vercor.setups.data.forcing import read_forcing as _read_forcing
 
 _ERA5_ATMOSPHERE_FIELD_NAMES = (
     "surface_pressure",

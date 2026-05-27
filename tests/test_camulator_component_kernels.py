@@ -39,7 +39,7 @@ from vercor.runtime import (
     RuntimeComponentState,
     RuntimeFieldStore,
 )
-from vercor.runtime.components import create_runtime_component_state
+from vercor.runtime.component_state import create_runtime_component_state
 from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
 from vercor.jax_logging import DEFAULT_LOGGER_NAME

@@ -14,7 +14,6 @@ from vercor.setups._time_helpers import (
     run_logged_spinup,
     seed_grid_field_defaults,
 )
-import vercor.setups.external.camulator_state as camulator_state_module
 import vercor.setups.external.camulator_forcing as camulator_forcing_module
 from vercor.setups.external.camulator_forcing import initialize_camulator_forcing_cursor
 from tests._coverage_support import make_test_grid
@@ -164,7 +163,6 @@ def test_initialize_camulator_forcing_cursor_accepts_integer_index() -> None:
 
 
 def test_camulator_runtime_cursor_initializes_indexes_and_advances() -> None:
-    assert hasattr(camulator_state_module, "CamulatorRuntimeCursor")
     logger = _RecordingLogger()
     forcing_start = datetime(2000, 1, 1)
     dynamic_ds = SimpleNamespace(indexes={"time": _TimeIndex(4)})

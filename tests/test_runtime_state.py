@@ -21,10 +21,8 @@ from vercor.runtime import (
     RuntimeFieldStore,
     RuntimeStepInfo,
 )
-from vercor.runtime.components import (
-    create_runtime_component_state,
-    send_runtime_fields,
-)
+from vercor.runtime.component_state import create_runtime_component_state
+from vercor.runtime.field_transfer import send_runtime_fields
 
 
 class _RuntimeSendComponent(DataComponent):
@@ -58,9 +56,6 @@ def test_runtime_contract_prefill_uses_component_float32_policy() -> None:
 
 def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_source = Path("vercor/runtime/state.py").read_text(encoding="utf-8")
-    runtime_components_source = Path("vercor/runtime/components.py").read_text(
-        encoding="utf-8"
-    )
     runtime_driver_source = Path("vercor/runtime/driver.py").read_text(encoding="utf-8")
     runtime_time_source = Path("vercor/runtime/time.py").read_text(encoding="utf-8")
     runtime_coupler_state_path = Path("vercor/runtime/coupler_state.py")
@@ -123,6 +118,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     veros_source = Path("vercor/setups/external/veros_gcm.py").read_text(
         encoding="utf-8"
     )
+    veros_setup_source = Path("vercor/setups/external/veros_setup.py").read_text(
+        encoding="utf-8"
+    )
     camulator_source = Path("vercor/setups/external/camulator.py").read_text(
         encoding="utf-8"
     )
@@ -132,7 +130,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     veros_runtime_settings_source = Path(
         "vercor/setups/external/veros_runtime_settings.py"
     ).read_text(encoding="utf-8")
-    windpp_source = Path("vercor/setups/external/windpp.py").read_text(encoding="utf-8")
+    camulator_wind_filter_source = Path(
+        "vercor/setups/external/camulator_wind_filter.py"
+    ).read_text(encoding="utf-8")
 
     forbidden_component_markers = (
         "step_slab_component_state",
@@ -178,6 +178,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert not Path("vercor/runtime_driver.py").exists()
     assert not Path("vercor/runtime_time.py").exists()
     assert not Path("vercor/runtime_views.py").exists()
+    assert not Path("vercor/runtime/components.py").exists()
     assert "def runtime_step_info_from_times" in runtime_time_source
     assert "def step_runtime_component(" in runtime_driver_source
     assert "allow_host_runtime: bool" in runtime_driver_source
@@ -240,13 +241,6 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def validate_component_runtime_contract_fields" in runtime_validation_source
     assert "def check_not_empty_import_export_lists" in runtime_validation_source
     assert "def check_valid_exchange_field_names" in runtime_validation_source
-    assert "def create_runtime_component_state" not in runtime_components_source
-    assert "def receive_runtime_fields" not in runtime_components_source
-    assert "def send_runtime_fields" not in runtime_components_source
-    assert (
-        "def validate_component_runtime_contract_fields"
-        not in runtime_components_source
-    )
     assert "from vercor.runtime.components import" not in coupler_source
     assert "from vercor.runtime.components import" not in runtime_coupler_state_source
     assert "from vercor.runtime.components import" not in runtime_driver_source
@@ -297,8 +291,6 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "RuntimeComponentView" in diagnostics_source
     assert 'hasattr(store, "field_names")' not in diagnostics_source
     assert "elif field_name in store" not in diagnostics_source
-    assert "def runtime_contract" not in runtime_components_source
-    assert "RuntimeComponentContract | None" not in runtime_components_source
     assert "def make_jax_gcm" in jax_gcm_source
     assert "def make_veros_gcm" in veros_source
     assert "def make_camulator_gcm" in camulator_source
@@ -315,9 +307,11 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     )
     assert (
         "from vercor.setups.external.veros_runtime_settings import configure_veros_runtime"
-        in veros_source
+        in veros_setup_source
     )
-    assert veros_source.index("configure_veros_runtime()") < veros_source.index(
+    assert veros_setup_source.index(
+        "configure_veros_runtime()"
+    ) < veros_setup_source.index(
         "from veros.setups.global_4deg import GlobalFourDegreeSetup"
     )
     assert "def configure_veros_runtime" in veros_runtime_settings_source
@@ -333,13 +327,13 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def step_runtime_state" not in camulator_source
     assert "def step_runtime_state" not in camulator_land_source
     assert "component_state.data.to_mapping()" not in camulator_land_source
-    assert "post_process_wind_artifacts_deprecated" not in windpp_source
+    assert "post_process_wind_artifacts_deprecated" not in camulator_wind_filter_source
     assert "old_flux_atmOcn" not in flux_source
     assert "new_flux_atmOcn" not in flux_source
     assert "def compute_ocean_surface_fluxes" in flux_source
 
 
-def test_runtime_focused_modules_keep_compatibility_reexports() -> None:
+def test_runtime_focused_modules_keep_canonical_aggregator_exports() -> None:
     runtime_module = importlib.import_module("vercor.runtime")
     contracts_module = importlib.import_module("vercor.runtime.contracts")
     stores_module = importlib.import_module("vercor.runtime.stores")
@@ -347,10 +341,7 @@ def test_runtime_focused_modules_keep_compatibility_reexports() -> None:
     exchange_dispatch_module = importlib.import_module(
         "vercor.runtime.exchange_dispatch"
     )
-    components_module = importlib.import_module("vercor.runtime.components")
     component_state_module = importlib.import_module("vercor.runtime.component_state")
-    field_transfer_module = importlib.import_module("vercor.runtime.field_transfer")
-    validation_module = importlib.import_module("vercor.runtime.validation")
 
     assert runtime_module.RuntimeComponentContract is (
         contracts_module.RuntimeComponentContract
@@ -360,19 +351,8 @@ def test_runtime_focused_modules_keep_compatibility_reexports() -> None:
     assert runtime_module.dispatch_component_exchanges is (
         exchange_dispatch_module.dispatch_component_exchanges
     )
-    assert components_module.create_runtime_component_state is (
-        component_state_module.create_runtime_component_state
-    )
-    assert components_module.receive_runtime_fields is (
-        field_transfer_module.receive_runtime_fields
-    )
-    assert (
-        components_module.send_runtime_fields
-        is field_transfer_module.send_runtime_fields
-    )
-    assert components_module.validate_component_runtime_contract_fields is (
-        validation_module.validate_component_runtime_contract_fields
-    )
+    assert not Path("vercor/runtime/components.py").exists()
+    assert callable(component_state_module.create_runtime_component_state)
 
 
 def test_examples_use_coupler_runtime_component_view_factory() -> None:

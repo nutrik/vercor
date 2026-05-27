@@ -16,6 +16,9 @@ historical commands, failure messages, or detailed validation notes.
   2026-05-15.
 - Latest local organization-refactor validation: Black, flake8, mypy, and fast
   pytest passed as of 2026-05-26.
+- Latest local compatibility-facade cleanup validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -41,6 +44,32 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Deprecated Compatibility Import Facade Removal
+
+- Removed obsolete one-hop compatibility modules:
+  `vercor.runtime.components`, `vercor.setups.data.camulator_land`,
+  `vercor.setups.data.forcing`, `vercor.setups.external.camulator_state`,
+  `vercor.setups.external.windpp`, and `vercor.setups.jax_array_helpers`.
+- Routed remaining imports to canonical owners: runtime component-state,
+  field-transfer, and validation helpers; `vercor.forcing_data.read_forcing`;
+  calendar datetime classes; vertical-coordinate helpers; grid identity; and
+  exchange field names.
+- Removed compatibility reexports from `vercor.clock`, `vercor.exchange`,
+  `vercor.grid_masks`, and `vercor.fluxes.utilities` while preserving stable
+  package aggregators, `ComponentSettings`, settings attribute access, and
+  `ComponentForcingData`.
+- Updated boundary tests, `DESIGN.md`, and `DEPENDENCIES.md` for canonical
+  ownership. During full validation, corrected a stale Veros runtime-settings
+  boundary assertion to point at `vercor.setups.external.veros_setup`.
+- Validation run for this change:
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  focused cleanup tests,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-26: Code Organization Audit Implementation
 

@@ -7,7 +7,6 @@ from numpy.typing import NDArray
 import pytest
 
 import vercor.host_arrays as host_arrays_module
-import vercor.setups.jax_array_helpers as helpers_module
 from vercor.diagnostics import component_vector_speed
 from vercor.host_arrays import transposed_host_array
 from tests.assertions import assert_allclose_compact
@@ -31,8 +30,6 @@ def test_transposed_host_array_uses_canonical_host_transfer(
         calls.append(np.asarray(array))
         return np.asarray(array)
 
-    assert not hasattr(helpers_module, "to_host_array")
-    assert helpers_module.transposed_host_array is transposed_host_array
     monkeypatch.setattr(
         host_arrays_module, "runtime_array_to_host", fake_runtime_array_to_host
     )
@@ -45,7 +42,6 @@ def test_transposed_host_array_uses_canonical_host_transfer(
 
 
 def test_component_vector_speed_uses_jax_arrays() -> None:
-    assert helpers_module.component_vector_speed is component_vector_speed
     state = RuntimeComponentState(
         data=RuntimeFieldStore.from_mapping(
             {

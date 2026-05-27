@@ -26,10 +26,7 @@ from vercor.diagnostics import (
     safe_component_nanmean,
 )
 from vercor.runtime.topology import get_component
-from vercor.grid_masks import (
-    grids_identical,
-)
-from vercor.grid_geometry import grids_identical as geometry_grids_identical
+from vercor.grid_geometry import grids_identical
 
 matplotlib.use("Agg")
 
@@ -52,7 +49,6 @@ def test_grids_identical_detects_equal_and_unequal_grids() -> None:
 
     assert grids_identical(g0, g1)
     assert not grids_identical(g0, g2)
-    assert grids_identical is geometry_grids_identical
 
 
 def test_get_component_returns_single_and_raises_for_ambiguous_or_missing() -> None:

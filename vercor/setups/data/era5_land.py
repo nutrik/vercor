@@ -7,10 +7,10 @@ from jax.typing import ArrayLike
 from vercor.components import DataComponent
 from vercor.dtypes import as_jax_real_array
 from vercor.field_layout import canonicalize_time_last_surface_field
+from vercor.forcing_data import read_forcing as _read_forcing
 from vercor.grid import RectilinearGrid
 from vercor.setups.data.assets import get_forcing_data
 from vercor.setups.data._component_helpers import time_interpolated_data_component
-from vercor.setups.data.forcing import read_forcing as _read_forcing
 
 _ERA5_LAND_FIELD_NAMES = ("land_surface_temperature",)
 

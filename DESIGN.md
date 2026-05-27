@@ -272,8 +272,9 @@ across
 `vercor.setups.external.camulator_output`,
 `vercor.setups.external.camulator_wind_filter`,
 `vercor.setups.external.camulator_land`, and
-`vercor.setups.external.camulator_init`. The old `camulator_state` module is a
-thin compatibility facade over those focused modules.
+`vercor.setups.external.camulator_init`. New code should import directly from
+these focused modules; the old one-hop CAMulator state and wind-filter facades
+have been removed.
 
 ### Settings container
 

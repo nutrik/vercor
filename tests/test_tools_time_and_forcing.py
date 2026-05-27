@@ -15,7 +15,7 @@ import vercor.setups.data.assets as setup_assets_module
 from tests._tools_support import make_coupler
 from tests.assertions import assert_allclose_compact
 from tests.conftest import SelectFastCases
-from vercor.clock import DateTime360, DateTime365
+from vercor.calendar import DateTime360, DateTime365
 from vercor.exceptions import AssetError
 from vercor.calendar import is_leap_year
 from vercor.setups.data.assets import get_forcing_data

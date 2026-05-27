@@ -28,7 +28,7 @@ from vercor.setups.slab.land import make_slab_land
 from vercor.setups.slab.ocean import make_slab_ocean
 from vercor.setups.slab.seaice import make_slab_seaice
 from vercor.runtime import RuntimeComponentContract
-from vercor.runtime.components import create_runtime_component_state
+from vercor.runtime.component_state import create_runtime_component_state
 from vercor.types import RuntimeArray
 
 

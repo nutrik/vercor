@@ -3,9 +3,6 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Callable, Union
 
-from vercor.field_names import (  # noqa: F401
-    VALID_EXCHANGE_FIELD_NAMES as VALID_EXCHANGE_FIELD_NAMES,
-)
 from vercor.grid import Grid
 from vercor.regridders.bilinear import BilinearRectilinearRegridder
 from vercor.regridders.conservative import ConservativeRectilinearRegridder

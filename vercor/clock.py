@@ -3,14 +3,9 @@ from datetime import datetime, timedelta
 from math import floor
 from typing import Callable, Iterator, Literal
 
-from vercor.calendar import (
-    CustomDateTime,
-    DateTime360,
-    DateTime365,
-    ModelDateTime,
-)
+import vercor.calendar as _calendar
 
-__all__ = ["Clock", "CustomDateTime", "DateTime360", "DateTime365", "ModelDateTime"]
+__all__ = ["Clock"]
 
 
 @dataclass
@@ -41,16 +36,18 @@ class Clock:
 
         self._iter_impl: Callable[
             [],
-            Iterator[tuple[int, datetime | ModelDateTime, timedelta]],
+            Iterator[tuple[int, datetime | _calendar.ModelDateTime, timedelta]],
         ]
 
         if self.year_type in ("noleap", "360"):
             self._iter_impl = self._iter_model_calendar
-            self._datetime_class: type[DateTime365] | type[DateTime360]
+            self._datetime_class: (
+                type[_calendar.DateTime365] | type[_calendar.DateTime360]
+            )
             if self.year_type == "noleap":
-                self._datetime_class = DateTime365
+                self._datetime_class = _calendar.DateTime365
             else:
-                self._datetime_class = DateTime360
+                self._datetime_class = _calendar.DateTime360
 
             self._start_day_of_year = self._day_of_year_for_start(self.start)
             self._start_day_index = self._start_day_of_year - 1
@@ -74,7 +71,7 @@ class Clock:
         if start.month == 2 and start.day == 29:
             raise ValueError("for year_type='noleap', start date cannot be February 29")
 
-        return DateTime365._day_of_year_from_month_day(start.month, start.day)
+        return _calendar.DateTime365._day_of_year_from_month_day(start.month, start.day)
 
     @property
     def days_per_year(self) -> int | None:
@@ -96,7 +93,9 @@ class Clock:
             yield n, time, dt
             time += dt
 
-    def _iter_model_calendar(self) -> Iterator[tuple[int, ModelDateTime, timedelta]]:
+    def _iter_model_calendar(
+        self,
+    ) -> Iterator[tuple[int, _calendar.ModelDateTime, timedelta]]:
         """Iterator over simulation time steps in synthetic model calendars."""
         dt = timedelta(seconds=self.dt_seconds)
         days_per_year = self._datetime_class.DAYS_PER_YEAR
@@ -134,6 +133,8 @@ class Clock:
                 day_of_year=day_of_year,
             ), dt
 
-    def iter(self) -> Iterator[tuple[int, datetime | ModelDateTime, timedelta]]:
+    def iter(
+        self,
+    ) -> Iterator[tuple[int, datetime | _calendar.ModelDateTime, timedelta]]:
         """Iterator over simulation steps using the configured stepping strategy."""
         yield from self._iter_impl()

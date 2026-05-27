@@ -15,12 +15,14 @@ from vercor.fluxes.utilities import (
     cdn,
     compute_air_density,
     compute_potential_temperature,
-    compute_pressure_levels,
-    get_altitudes_hybrid_sigma_levels,
     psimhu,
     psixhu,
     qsat,
     qsat_august_eqn,
+)
+from vercor.fluxes.vertical_coordinates import (
+    compute_hybrid_pressure_levels as compute_pressure_levels,
+    get_altitudes_hybrid_sigma_levels,
 )
 from vercor.settings import VercorSettings
 

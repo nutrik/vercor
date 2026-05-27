@@ -12,8 +12,8 @@ from vercor.grid_masks import (
     check_remap_conservation,
     check_total_lnd_ocn_mask_sum,
     compute_ocn_lnd_masks_on_atm_grid,
-    grids_identical,
 )
+from vercor.grid_geometry import grids_identical
 from vercor.jax_logging import LoggerLike
 from vercor.regridders import (
     BilinearRectilinearRegridder,

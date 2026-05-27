@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from vercor.dtypes import as_jax_real_array
 from vercor.exceptions import RegridderError
 from vercor.grid import RectilinearGrid
-from vercor.grid_geometry import grids_identical as grids_identical  # noqa: F401
 from vercor.interpolators.conservative_remap_rectilinear import (
     ConservativeRectilinearRemapper,
 )

@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from tests.conftest import SelectFastCases
-from vercor.clock import Clock, DateTime360, DateTime365
+from vercor.calendar import DateTime360, DateTime365
+from vercor.clock import Clock
 
 
 @dataclass(frozen=True)

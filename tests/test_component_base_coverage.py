@@ -15,7 +15,7 @@ import vercor.components as components_module
 import vercor.components.base as base_module
 from tests._coverage_support import DummyComponent, make_test_grid
 from tests.assertions import assert_allclose_compact
-from vercor.setups.data.forcing import read_forcing
+from vercor.forcing_data import read_forcing
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.clock import Clock
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
@@ -29,12 +29,14 @@ from vercor.runtime import (
     RuntimeComponentState,
     RuntimeFieldStore,
 )
-from vercor.runtime.components import (
-    check_not_empty_import_export_lists,
-    check_valid_exchange_field_names,
-    create_runtime_component_state,
+from vercor.runtime.component_state import create_runtime_component_state
+from vercor.runtime.field_transfer import (
     receive_runtime_fields,
     send_runtime_fields,
+)
+from vercor.runtime.validation import (
+    check_not_empty_import_export_lists,
+    check_valid_exchange_field_names,
     validate_component_runtime_contract_fields,
 )
 from vercor.runtime.time import scalar_runtime_step_info
