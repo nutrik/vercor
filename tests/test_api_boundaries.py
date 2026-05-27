@@ -4,6 +4,7 @@ from datetime import datetime
 from inspect import signature
 from pathlib import Path
 import ast
+import importlib
 import subprocess
 import sys
 
@@ -12,10 +13,15 @@ import pytest
 import vercor
 import vercor.components as components_module
 import vercor.components.base as base_module
+import vercor.components.contracts as component_contracts_module
+import vercor.components.data as data_module
 import vercor.components.factories as factories_module
+import vercor.components.host as host_module
 import vercor.components.setup_validation as setup_validation_module
 from tests._coverage_support import make_test_grid
-from vercor.components.base import Component, DataComponent, HostRuntimeComponent
+from vercor.components.base import Component
+from vercor.components.data import DataComponent
+from vercor.components.host import HostRuntimeComponent
 from vercor.clock import Clock
 from vercor.exchange import Exchange
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
@@ -149,10 +155,10 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
     assert legacy_component_names.isdisjoint(set(vercor.__all__))
 
     assert vercor.Component is Component
-    assert vercor.ComponentFieldSpec is components_module.ComponentFieldSpec
+    assert vercor.ComponentFieldSpec is component_contracts_module.ComponentFieldSpec
     assert vercor.ComponentSetupContext is ComponentInitContext
     assert vercor.ComponentStepContext is RuntimeStepContext
-    assert vercor.ComponentStepResult is components_module.ComponentStepResult
+    assert vercor.ComponentStepResult is component_contracts_module.ComponentStepResult
     data_component_type = getattr(components_module, "DataComponent", None)
     assert data_component_type is not None
     assert getattr(vercor, "DataComponent", None) is data_component_type
@@ -167,6 +173,18 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
 
 @pytest.mark.fast_always
 def test_components_package_exports_only_component_author_contracts() -> None:
+    contracts_module = importlib.import_module("vercor.components.contracts")
+    imported_data_module = importlib.import_module("vercor.components.data")
+    imported_host_module = importlib.import_module("vercor.components.host")
+
+    assert base_module.__all__ == ["Component"]
+    assert not hasattr(base_module, "ComponentFieldSpec")
+    assert not hasattr(base_module, "ComponentSetupContext")
+    assert not hasattr(base_module, "ComponentStepContext")
+    assert not hasattr(base_module, "ComponentStepResult")
+    assert not hasattr(base_module, "DataComponent")
+    assert not hasattr(base_module, "HostRuntimeComponent")
+
     assert components_module.__all__ == [
         "Component",
         "ComponentFieldSpec",
@@ -180,12 +198,14 @@ def test_components_package_exports_only_component_author_contracts() -> None:
         "host_component",
     ]
     assert components_module.Component is Component
-    assert hasattr(components_module, "ComponentFieldSpec")
+    assert components_module.ComponentFieldSpec is contracts_module.ComponentFieldSpec
     assert components_module.ComponentSetupContext is ComponentInitContext
     assert components_module.ComponentStepContext is RuntimeStepContext
-    assert hasattr(components_module, "ComponentStepResult")
-    assert hasattr(components_module, "DataComponent")
-    assert components_module.HostRuntimeComponent is HostRuntimeComponent
+    assert components_module.ComponentStepResult is contracts_module.ComponentStepResult
+    assert data_module is imported_data_module
+    assert host_module is imported_host_module
+    assert components_module.DataComponent is data_module.DataComponent
+    assert components_module.HostRuntimeComponent is host_module.HostRuntimeComponent
     assert components_module.data_component is factories_module.data_component
     assert (
         components_module.differentiable_component
@@ -230,6 +250,11 @@ def test_component_base_internals_are_private_modules() -> None:
     contracts_source = Path("vercor/components/_contracts.py").read_text(
         encoding="utf-8"
     )
+    public_contracts_source = Path("vercor/components/contracts.py").read_text(
+        encoding="utf-8"
+    )
+    data_source = Path("vercor/components/data.py").read_text(encoding="utf-8")
+    host_source = Path("vercor/components/host.py").read_text(encoding="utf-8")
     callable_source = Path("vercor/components/_callable_wrappers.py").read_text(
         encoding="utf-8"
     )
@@ -252,8 +277,14 @@ def test_component_base_internals_are_private_modules() -> None:
         encoding="utf-8"
     )
 
-    assert "class ComponentFieldSpec" in contracts_source
-    assert "class ComponentStepResult" in contracts_source
+    assert "class ComponentFieldSpec" in public_contracts_source
+    assert "class ComponentStepResult" in public_contracts_source
+    assert "class ComponentFieldSpec" not in contracts_source
+    assert "class ComponentStepResult" not in contracts_source
+    assert "class DataComponent" in data_source
+    assert "class HostRuntimeComponent" in host_source
+    assert "class DataComponent" not in base_source
+    assert "class HostRuntimeComponent" not in base_source
     assert "def normalize_author_field_values" in contracts_source
     assert "class _CallableRuntimeMixin" in callable_source
     assert "def normalize_component_step_callable" in callable_source

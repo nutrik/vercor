@@ -37,6 +37,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local diagnostics-runtime-view validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local component-author API split validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -62,6 +65,26 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Component Author API Split
+
+- Added canonical public component-author modules:
+  `vercor.components.contracts` for field contracts/context aliases,
+  `vercor.components.data` for `DataComponent`, and
+  `vercor.components.host` for `HostRuntimeComponent`.
+- Slimmed `vercor.components.base` to the abstract `Component` contract and
+  moved concrete component-kind imports in factories, callable wrappers,
+  runtime execution policy, tests, and package facades to the new module owners.
+- Updated boundary tests, `DESIGN.md`, and `DEPENDENCIES.md` for the new
+  component-author ownership map.
+- Validation run for this change:
+  focused component/API fast pytest,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Diagnostics Runtime View Boundary Refactor
 

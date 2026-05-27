@@ -12,7 +12,7 @@ import pytest
 
 from tests._coverage_support import make_test_grid
 from tests.assertions import assert_allclose_compact
-from vercor.components.base import DataComponent
+from vercor.components.data import DataComponent
 from vercor.clock import Clock
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange

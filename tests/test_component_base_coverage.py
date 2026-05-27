@@ -15,6 +15,9 @@ import xarray as xr
 
 import vercor.components as components_module
 import vercor.components.base as base_module
+import vercor.components.contracts as contracts_module
+import vercor.components.data as data_module
+import vercor.components.host as host_module
 from vercor.components._contracts import merge_component_outputs
 from vercor.components._lifecycle import ComponentLifecycleHooks
 from tests._coverage_support import DummyComponent, make_test_grid
@@ -75,7 +78,7 @@ class _MissingSetupComponent(base_module.Component):
         return component_state
 
 
-class _HostStepOnlyComponent(base_module.HostRuntimeComponent):
+class _HostStepOnlyComponent(host_module.HostRuntimeComponent):
     def step_host_runtime_state(
         self,
         component_state: RuntimeComponentState,
@@ -122,7 +125,7 @@ def test_component_runtime_execution_policy_steps_selected_runtime_path() -> Non
                 )
             )
 
-    class HostMarkerComponent(base_module.HostRuntimeComponent):
+    class HostMarkerComponent(host_module.HostRuntimeComponent):
         def step_host_runtime_state(
             self,
             component_state: RuntimeComponentState,
@@ -179,7 +182,7 @@ def test_active_component_requires_explicit_runtime_step() -> None:
 
 @pytest.mark.fast_always
 def test_host_runtime_component_requires_explicit_host_step() -> None:
-    class MissingHostStep(base_module.HostRuntimeComponent):
+    class MissingHostStep(host_module.HostRuntimeComponent):
         pass
 
     with pytest.raises(TypeError, match="step_host_runtime_state"):
@@ -188,7 +191,7 @@ def test_host_runtime_component_requires_explicit_host_step() -> None:
 
 @pytest.mark.fast_always
 def test_data_component_uses_explicit_noop_runtime_step() -> None:
-    class StaticForcingComponent(base_module.DataComponent):
+    class StaticForcingComponent(data_module.DataComponent):
         pass
 
     grid = make_test_grid(name="data")
@@ -223,7 +226,7 @@ def test_data_component_seeds_canonical_fields() -> None:
         fields={"temperature": jnp.full(grid.shape, 281.0)},
     )
 
-    assert isinstance(component, base_module.DataComponent)
+    assert isinstance(component, data_module.DataComponent)
     assert_allclose_compact(
         component.data["temperature"],
         np.full(grid.shape, 281.0),
@@ -239,7 +242,7 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
         grid=grid,
         fields={"temperature": 281.0},
     )
-    assert isinstance(data_component, base_module.DataComponent)
+    assert isinstance(data_component, data_module.DataComponent)
     assert_allclose_compact(
         data_component.data["temperature"],
         np.full(grid.shape, 281.0),
@@ -247,7 +250,7 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: base_module.ComponentStepContext,
+        context: contracts_module.ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = payload
@@ -293,7 +296,7 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
         outputs=("temperature",),
         default_fields={"temperature": 1.0, "forcing": 4.0, "tendency": 0.0},
     )
-    assert isinstance(host, base_module.HostRuntimeComponent)
+    assert isinstance(host, host_module.HostRuntimeComponent)
     host_state = create_runtime_component_state(
         host,
         prefill_missing=True,
@@ -312,8 +315,8 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
 @pytest.mark.fast_always
 def test_legacy_wrapper_entrypoints_are_removed() -> None:
     assert not hasattr(base_module.Component, "wrap")
-    assert not hasattr(base_module.DataComponent, "wrap")
-    assert not hasattr(base_module.HostRuntimeComponent, "wrap")
+    assert not hasattr(data_module.DataComponent, "wrap")
+    assert not hasattr(host_module.HostRuntimeComponent, "wrap")
     assert not hasattr(base_module, "make_data_component")
     assert not hasattr(base_module, "make_differentiable_component")
     assert not hasattr(base_module, "make_host_component")
@@ -323,12 +326,12 @@ def test_legacy_wrapper_entrypoints_are_removed() -> None:
 def test_from_fields_and_from_model_facade_expand_scalar_defaults() -> None:
     grid = make_test_grid(name="facade")
 
-    data_component = base_module.DataComponent.from_fields(
+    data_component = data_module.DataComponent.from_fields(
         name="OBS",
         grid=grid,
         fields={"temperature": 281.0},
     )
-    assert isinstance(data_component, base_module.DataComponent)
+    assert isinstance(data_component, data_module.DataComponent)
     assert_allclose_compact(
         data_component.data["temperature"],
         np.full(grid.shape, 281.0),
@@ -396,7 +399,7 @@ def test_data_component_from_fields_normalizes_author_fields_once(
         counting_normalize,
     )
 
-    component = base_module.DataComponent.from_fields(
+    component = data_module.DataComponent.from_fields(
         name="OBS",
         grid=grid,
         fields={"temperature": 281.0},
@@ -606,7 +609,7 @@ def test_apply_step_result_updates_fields_and_payload() -> None:
 
     updated = component.apply_step_result(
         state,
-        base_module.ComponentStepResult(
+        contracts_module.ComponentStepResult(
             fields={"temperature": jnp.full(grid.shape, 281.0)},
             payload={"counter": 1},
         ),
@@ -634,7 +637,7 @@ def test_data_component_seeding_updates_declared_outputs() -> None:
 
 @pytest.mark.fast_always
 def test_merge_component_outputs_is_pure_and_preserves_contract_details() -> None:
-    field_spec = base_module.ComponentFieldSpec(
+    field_spec = contracts_module.ComponentFieldSpec(
         inputs=("forcing",),
         outputs=("temperature",),
         default_fields={"temperature": 280.0},
@@ -652,7 +655,7 @@ def test_merge_component_outputs_is_pure_and_preserves_contract_details() -> Non
 @pytest.mark.fast_always
 def test_data_component_seeding_preserves_inputs_and_defaults() -> None:
     grid = make_test_grid(name="data-contract-preserve")
-    component = base_module.DataComponent(name="DATA", grid=grid)
+    component = data_module.DataComponent(name="DATA", grid=grid)
     component.declare_fields(
         inputs=("forcing",),
         default_fields={"temperature": 280.0},
@@ -782,7 +785,7 @@ def test_seed_helpers_accept_scalar_author_values_and_expose_field_spec() -> Non
     assert not hasattr(component.field_spec, "required_fields")
     assert "pressure" in component.field_spec.default_fields
     with pytest.raises(AttributeError):
-        component.field_spec = base_module.ComponentFieldSpec()  # type: ignore[misc]
+        component.field_spec = contracts_module.ComponentFieldSpec()  # type: ignore[misc]
 
     component.seed_field("temperature", 280.0)
     component.seed_fields({"humidity": 0.5, "forcing": jnp.ones(grid.shape)})
@@ -803,7 +806,7 @@ def test_seeded_component_arrays_follow_float32_policy_with_global_x64_enabled()
     None
 ):
     grid = make_test_grid(name="seeded-policy")
-    component = base_module.DataComponent.from_fields(
+    component = data_module.DataComponent.from_fields(
         name="DATA",
         grid=grid,
         fields={
@@ -823,13 +826,13 @@ def test_required_fields_declaration_api_is_removed() -> None:
         return {"temperature": fields["temperature"]}
 
     rejected_callables: tuple[tuple[Any, dict[str, Any]], ...] = (
-        (base_module.ComponentFieldSpec, {}),
+        (contracts_module.ComponentFieldSpec, {}),
         (
             base_module.Component.from_model,
             {"name": "ATM", "grid": grid, "step": step},
         ),
         (
-            base_module.HostRuntimeComponent.from_model,
+            host_module.HostRuntimeComponent.from_model,
             {"name": "HOST", "grid": grid, "step": step},
         ),
         (
@@ -895,7 +898,7 @@ def test_host_runtime_component_from_model_uses_author_friendly_names() -> None:
         _ = payload
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
-    component = base_module.HostRuntimeComponent.from_model(
+    component = host_module.HostRuntimeComponent.from_model(
         name="HOST",
         grid=grid,
         step=step,
@@ -926,7 +929,7 @@ def test_subclasses_can_declare_fields_with_author_spec() -> None:
         def __init__(self, name: str, grid: Any) -> None:
             super().__init__(name, grid)
             self.declare_fields(
-                base_module.ComponentFieldSpec(
+                contracts_module.ComponentFieldSpec(
                     inputs=("forcing",),
                     outputs=("temperature",),
                     default_fields={"temperature": 280.0},
@@ -1271,10 +1274,10 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
         fields: Mapping[str, RuntimeArray],
         context: RuntimeStepContext,
         payload: Any | None,
-    ) -> base_module.ComponentStepResult:
+    ) -> contracts_module.ComponentStepResult:
         _ = context
         assert isinstance(payload, Mapping)
-        return base_module.ComponentStepResult(
+        return contracts_module.ComponentStepResult(
             fields={"temperature": fields["temperature"] + 1.0},
             payload={"offset": payload["offset"] + 1.0},
         )
@@ -1375,7 +1378,7 @@ def test_callable_component_rejects_unseeded_field_updates() -> None:
 def test_era5_atmosphere_uses_data_component_runtime_contract() -> None:
 
     assert callable(make_era5_atmosphere)
-    assert issubclass(base_module.DataComponent, base_module.Component)
+    assert issubclass(data_module.DataComponent, base_module.Component)
 
 
 @pytest.mark.fast_always

@@ -3,19 +3,17 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Self, cast, final
+from typing import TYPE_CHECKING, Any, Self
 
 from vercor.dtypes import PrecisionPolicy, jax_full, jax_zeros
-from vercor.components._contracts import (
-    ComponentStepResult as ComponentStepResult,
-)
-from vercor.components._contracts import (
+from vercor.components.contracts import (
     AuthorFieldValues as _AuthorFieldValues,
     AuthorStepCallable as _AuthorStepCallable,
-    ComponentFieldSpec,
+    ComponentFieldSpec as _ComponentFieldSpec,
     ComponentStepReturn as _ComponentStepReturn,
     FieldNames as _FieldNames,
-    merge_component_outputs as _merge_component_outputs,
+)
+from vercor.components._contracts import (
     normalize_author_field_values as _normalize_author_field_values,
     unique_field_names as _unique_field_names,
 )
@@ -41,16 +39,8 @@ if TYPE_CHECKING:
     )
 
 
-ComponentSetupContext = ComponentInitContext
-ComponentStepContext = RuntimeStepContext
 __all__ = [
     "Component",
-    "ComponentFieldSpec",
-    "ComponentSetupContext",
-    "ComponentStepContext",
-    "ComponentStepResult",
-    "DataComponent",
-    "HostRuntimeComponent",
 ]
 
 
@@ -63,8 +53,9 @@ class Component(ABC):
     seed fields into immutable runtime state containers so JAX can trace the
     integration. Active differentiable components must implement
     :meth:`step_runtime_state` while preserving its signature. Data-only forcing
-    adapters should inherit :class:`DataComponent`; non-differentiable adapters
-    should inherit :class:`HostRuntimeComponent`.
+    adapters should inherit :class:`vercor.components.DataComponent`;
+    non-differentiable adapters should inherit
+    :class:`vercor.components.HostRuntimeComponent`.
 
     Common exchange-field conventions:
         - fields use SI units
@@ -88,8 +79,8 @@ class Component(ABC):
     data: dict[str, RuntimeArray] = field(default_factory=dict)
     settings: VercorSettings = field(default_factory=VercorSettings)
     setup_metadata: dict[str, Any] = field(default_factory=dict)
-    _field_spec: ComponentFieldSpec = field(
-        default_factory=ComponentFieldSpec,
+    _field_spec: _ComponentFieldSpec = field(
+        default_factory=_ComponentFieldSpec,
         init=False,
         repr=False,
     )
@@ -145,12 +136,12 @@ class Component(ABC):
 
     def declare_fields(
         self,
-        field_spec: ComponentFieldSpec | None = None,
+        field_spec: _ComponentFieldSpec | None = None,
         *,
         inputs: _FieldNames = (),
         outputs: _FieldNames = (),
         default_fields: _AuthorFieldValues = None,
-    ) -> ComponentFieldSpec:
+    ) -> _ComponentFieldSpec:
         """Declare runtime data fields for subclasses using author-facing names.
 
         The base runtime hooks use this declaration to prefill output/default
@@ -158,12 +149,12 @@ class Component(ABC):
         needs can still override those hooks directly.
         """
 
-        declared = field_spec or ComponentFieldSpec(
+        declared = field_spec or _ComponentFieldSpec(
             inputs=inputs,
             outputs=outputs,
             default_fields=default_fields or {},
         )
-        self._field_spec = ComponentFieldSpec(
+        self._field_spec = _ComponentFieldSpec(
             inputs=declared.inputs,
             outputs=declared.outputs,
             default_fields=_normalize_author_field_values(
@@ -177,7 +168,7 @@ class Component(ABC):
         return self._field_spec
 
     @property
-    def field_spec(self) -> ComponentFieldSpec:
+    def field_spec(self) -> _ComponentFieldSpec:
         """Return this component's declared author-facing runtime field contract."""
 
         return self._field_spec
@@ -410,7 +401,7 @@ class Component(ABC):
     def prefill_runtime_fields(
         self,
         data: dict[str, RuntimeArray],
-        field_spec: ComponentFieldSpec | None = None,
+        field_spec: _ComponentFieldSpec | None = None,
         *,
         outputs: _FieldNames = (),
         default_fields: _AuthorFieldValues = None,
@@ -517,127 +508,3 @@ class Component(ABC):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r}, grid={repr(self.grid)})"
-
-
-class DataComponent(Component):
-    """Base class for data-only components that intentionally do not step.
-
-    Use this for forcing and boundary-condition adapters whose runtime behavior is
-    limited to importing/exporting seeded fields through the coupler contract.
-    Data components must not own active runtime stepping behavior; compute
-    plotting-only diagnostics outside runtime state. Active differentiable models
-    should inherit :class:`Component` and implement
-    :meth:`Component.step_runtime_state` instead.
-    """
-
-    @classmethod
-    def from_fields(
-        cls,
-        name: str,
-        grid: RectilinearGrid,
-        fields: _AuthorFieldValues = None,
-        settings: VercorSettings | None = None,
-    ) -> "DataComponent":
-        """Create a data-only component from user-provided grid fields.
-
-        Scalar field values expand to grid-shaped constants and seeded field
-        names are exposed as declared outputs.
-        """
-
-        if settings is None:
-            component = cls(name=name, grid=grid)
-        else:
-            component = cls(name=name, grid=grid, settings=settings)
-        if fields is not None:
-            component.seed_fields(fields)
-        return component
-
-    def seed_fields(
-        self,
-        fields: Mapping[str, object],
-        policy: PrecisionPolicy = None,
-    ) -> "DataComponent":
-        """Seed data fields and expose their names as declared outputs."""
-
-        super().seed_fields(fields, policy=policy)
-        self._field_spec = _merge_component_outputs(self.field_spec, fields.keys())
-        return self
-
-    @final
-    def step_runtime_state(
-        self,
-        component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
-    ) -> "RuntimeComponentState":
-        """Return the runtime state unchanged for data-only components."""
-
-        _ = context
-        return component_state
-
-
-class HostRuntimeComponent(Component):
-    """Base class for host-backed adapters that cannot run inside JAX scan."""
-
-    @classmethod
-    def from_model(
-        cls,
-        name: str,
-        grid: RectilinearGrid,
-        step: _AuthorStepCallable,
-        *,
-        payload: Any | None = None,
-        settings: VercorSettings | None = None,
-        inputs: _FieldNames = (),
-        outputs: _FieldNames = (),
-        default_fields: _AuthorFieldValues = None,
-        initialize: ComponentInitializeHook | None = None,
-        create_runtime_payload: ComponentCreatePayloadHook | None = None,
-        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-        validate_runtime_state: ComponentValidateHook | None = None,
-    ) -> "HostRuntimeComponent":
-        """Create a host-runtime component from a Python model callable."""
-
-        from vercor.components.factories import _callable_component_from_model
-
-        return cast(
-            "HostRuntimeComponent",
-            _callable_component_from_model(
-                runtime_kind="host",
-                name=name,
-                grid=grid,
-                step=step,
-                payload=payload,
-                settings=settings,
-                inputs=inputs,
-                outputs=outputs,
-                default_fields=default_fields,
-                initialize=initialize,
-                create_runtime_payload=create_runtime_payload,
-                prefill_runtime_state_fields=prefill_runtime_state_fields,
-                validate_runtime_state=validate_runtime_state,
-            ),
-        )
-
-    @final
-    def step_runtime_state(
-        self,
-        component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
-    ) -> "RuntimeComponentState":
-        """Reject accidental execution on the differentiable scanned runtime."""
-
-        _ = component_state, context
-        component_name = getattr(self, "name", self.__class__.__name__)
-        raise ComponentError(
-            f"Component '{component_name}' is host-backed and cannot run through "
-            "the differentiable scanned runtime. Use Coupler.run() so VerCOR can "
-            "select the host runtime path, or implement a differentiable Component."
-        )
-
-    @abstractmethod
-    def step_host_runtime_state(
-        self,
-        component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
-    ) -> "RuntimeComponentState":
-        """Advance this non-differentiable host adapter by one runtime step."""

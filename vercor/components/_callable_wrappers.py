@@ -3,7 +3,7 @@ from __future__ import annotations
 from inspect import Parameter, signature
 from typing import TYPE_CHECKING, Any, Mapping, cast
 
-from vercor.components._contracts import (
+from vercor.components.contracts import (
     AuthorStepCallable,
     ComponentFieldSpec,
     ComponentStepCallable,
@@ -22,10 +22,8 @@ from vercor.grid import RectilinearGrid
 from vercor.runtime.contexts import RuntimeStepContext
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
-from vercor.components.base import (
-    Component,
-    HostRuntimeComponent,
-)
+from vercor.components.base import Component
+from vercor.components.host import HostRuntimeComponent
 
 if TYPE_CHECKING:
     from vercor.runtime import RuntimeComponentState

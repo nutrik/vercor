@@ -1,62 +1,21 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
-from typing import Any, TypeAlias
+from collections.abc import Iterable
 
+from vercor.components.contracts import (
+    AuthorFieldValues,
+    AuthorStepCallable,
+    ComponentFieldSpec,
+    ComponentStepCallable,
+    ComponentStepResult,
+    ComponentStepReturn,
+    FieldDefaults,
+    FieldNames,
+)
 from vercor.dtypes import PrecisionPolicy, as_jax_real_array, jax_full
 from vercor.field_layout import validate_component_data_layout
 from vercor.grid import RectilinearGrid
-from vercor.runtime.contexts import RuntimeStepContext
 from vercor.types import RuntimeArray
-
-
-@dataclass(frozen=True)
-class ComponentStepResult:
-    """Result returned by callable component wrappers.
-
-    Attributes:
-        fields: Runtime data fields to update.
-        payload: Replacement runtime payload. Use a plain mapping return from a
-            callable step when the existing payload should be preserved.
-    """
-
-    fields: Mapping[str, RuntimeArray]
-    payload: Any | None = None
-
-
-ComponentStepReturn: TypeAlias = Mapping[str, RuntimeArray] | ComponentStepResult
-ComponentStepCallable: TypeAlias = Callable[
-    [Mapping[str, RuntimeArray], RuntimeStepContext, Any | None],
-    ComponentStepReturn,
-]
-AuthorStepCallable: TypeAlias = Callable[..., ComponentStepReturn]
-FieldNames: TypeAlias = Iterable[str]
-FieldDefaults: TypeAlias = Mapping[str, RuntimeArray] | None
-AuthorFieldValues: TypeAlias = Mapping[str, object] | None
-
-
-@dataclass(frozen=True)
-class ComponentFieldSpec:
-    """Author-facing declaration of a component's runtime data-field contract.
-
-    Attributes:
-        inputs: Fields the model expects to read from runtime data.
-        outputs: Fields the model may write. These are pre-seeded as grid-shaped
-            zeros before traced runtime execution.
-        default_fields: Field defaults used when runtime state is created.
-    """
-
-    inputs: FieldNames = ()
-    outputs: FieldNames = ()
-    default_fields: Mapping[str, object] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        """Normalize field-name iterables once while preserving declaration order."""
-
-        object.__setattr__(self, "inputs", unique_field_names(self.inputs))
-        object.__setattr__(self, "outputs", unique_field_names(self.outputs))
-        object.__setattr__(self, "default_fields", dict(self.default_fields))
 
 
 def normalize_author_field_values(
@@ -126,3 +85,19 @@ def unique_field_names(field_names: FieldNames) -> tuple[str, ...]:
         if field_name not in unique:
             unique.append(field_name)
     return tuple(unique)
+
+
+__all__ = [
+    "AuthorFieldValues",
+    "AuthorStepCallable",
+    "ComponentFieldSpec",
+    "ComponentStepCallable",
+    "ComponentStepResult",
+    "ComponentStepReturn",
+    "FieldDefaults",
+    "FieldNames",
+    "declared_runtime_field_names",
+    "merge_component_outputs",
+    "normalize_author_field_values",
+    "unique_field_names",
+]

@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
-from vercor.components.base import Component, HostRuntimeComponent
+from vercor.components.base import Component
+from vercor.components.host import HostRuntimeComponent
 
 if TYPE_CHECKING:
     from vercor.runtime.contexts import RuntimeStepContext

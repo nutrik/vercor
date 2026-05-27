@@ -144,8 +144,11 @@ immutable runtime containers used during traced integration.
   `make_*_component()` factory functions have been removed; component authors
   should use the helper facade, class-level `from_fields()` / `from_model()`
   constructors, or subclasses with `declare_fields(...)`. `vercor.components`
-  and `vercor` reexport the component-author facade. `vercor.components.base`
-  owns only the base classes and class-level authoring contracts, while
+  and `vercor` reexport the component-author facade.
+  `vercor.components.contracts` owns public author-facing contract types and
+  context aliases, `vercor.components.base` owns only the abstract
+  differentiable `Component` contract, `vercor.components.data` owns
+  `DataComponent`, `vercor.components.host` owns `HostRuntimeComponent`, and
   module-level factory helpers live in `vercor.components.factories`.
   Lifecycle hook type aliases, hook storage, and hook installation live in
   private `vercor.components._lifecycle`; factory-installed hooks are stored in

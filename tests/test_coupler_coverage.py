@@ -23,7 +23,8 @@ from tests._coverage_support import (
 )
 from tests.assertions import assert_allclose_compact
 from vercor.clock import Clock
-from vercor.components.base import Component, HostRuntimeComponent
+from vercor.components.base import Component
+from vercor.components.host import HostRuntimeComponent
 from vercor.runtime.contexts import RuntimeStepContext
 from vercor.coupler import Coupler
 from vercor.exceptions import ComponentError, CouplerError, ExchangerError

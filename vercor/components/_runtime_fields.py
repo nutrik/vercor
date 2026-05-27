@@ -3,12 +3,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
-from vercor.components._contracts import (
+from vercor.components.contracts import (
     AuthorFieldValues,
     ComponentFieldSpec,
     ComponentStepResult,
     ComponentStepReturn,
     FieldNames,
+)
+from vercor.components._contracts import (
     normalize_author_field_values,
     unique_field_names,
 )

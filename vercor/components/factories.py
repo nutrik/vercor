@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from vercor.components._contracts import (
+from vercor.components.contracts import (
     AuthorFieldValues,
     AuthorStepCallable,
     ComponentFieldSpec,
@@ -18,9 +18,9 @@ from vercor.components._lifecycle import (
 )
 from vercor.components.base import (
     Component,
-    DataComponent,
-    HostRuntimeComponent,
 )
+from vercor.components.data import DataComponent
+from vercor.components.host import HostRuntimeComponent
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
 

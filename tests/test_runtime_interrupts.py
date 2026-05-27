@@ -12,7 +12,8 @@ import pytest
 
 from tests._coverage_support import make_test_grid
 from vercor.clock import Clock
-from vercor.components.base import Component, HostRuntimeComponent
+from vercor.components.base import Component
+from vercor.components.host import HostRuntimeComponent
 from vercor.coupler import Coupler
 from vercor.run_sequence import RunSequence
 from vercor.runtime.contexts import RuntimeStepContext

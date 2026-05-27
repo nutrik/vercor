@@ -23,7 +23,7 @@ import vercor.setups.external.veros_setup as veros_setup_module
 import vercor.setups.external.veros_state as veros_state_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
-from vercor.components.base import DataComponent
+from vercor.components.data import DataComponent
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.runtime import (
     RuntimeComponentContract,

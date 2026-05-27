@@ -6,7 +6,7 @@ import pytest
 
 from tests._coverage_support import make_test_grid
 from vercor.clock import Clock
-from vercor.components.base import DataComponent
+from vercor.components.data import DataComponent
 from vercor.coupler import Coupler
 from vercor.dtypes import DTypePolicy, SupportsEnableX64
 from vercor.settings import (
