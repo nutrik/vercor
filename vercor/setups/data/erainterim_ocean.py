@@ -11,7 +11,10 @@ from vercor.forcing_data import read_forcing as _read_forcing
 from vercor.grid import RectilinearGrid
 from vercor.setups.data.assets import get_forcing_data
 from vercor.setups.data._component_helpers import time_interpolated_data_component
-from vercor.setups.data._field_helpers import mask_time_last_surface_field
+from vercor.setups.data._field_helpers import (
+    mask_time_last_surface_field,
+    positive_binary_mask,
+)
 
 _ERAINTERIM_OCEAN_FIELD_NAMES = ("sea_surface_temperature",)
 
@@ -56,7 +59,7 @@ def _assemble_erainterim_field(
 
 def _binary_ocean_mask_from_salinity(salinity: ArrayLike) -> jax.Array:
     """Create a binary ocean mask from a full-grid salinity field."""
-    return jnp.where(as_jax_real_array(salinity) > 0.0, 1.0, 0.0)[..., 0].T
+    return positive_binary_mask(salinity)[..., 0].T
 
 
 def make_erainterim_ocean(

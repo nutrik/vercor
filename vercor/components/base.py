@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Self, cast, final
 
@@ -19,7 +19,13 @@ from vercor.components._contracts import (
     normalize_author_field_values as _normalize_author_field_values,
     unique_field_names as _unique_field_names,
 )
-from vercor.components import _runtime_fields as _runtime_field_adapters
+import vercor.components._runtime_fields as _runtime_field_adapters
+from vercor.components._lifecycle import (
+    ComponentCreatePayloadHook,
+    ComponentInitializeHook,
+    ComponentPrefillHook,
+    ComponentValidateHook,
+)
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
@@ -35,20 +41,6 @@ if TYPE_CHECKING:
 
 ComponentSetupContext = ComponentInitContext
 ComponentStepContext = RuntimeStepContext
-ComponentInitializeHook = Callable[[Any, ComponentInitContext], None]
-ComponentCreatePayloadHook = Callable[[Any], Any | None]
-ComponentPrefillHook = Callable[
-    [
-        Any,
-        dict[str, RuntimeArray],
-        dict[str, RuntimeArray],
-        dict[str, RuntimeArray],
-        Any,
-    ],
-    None,
-]
-ComponentValidateHook = Callable[[Any, Any, Any], None]
-
 __all__ = [
     "Component",
     "ComponentFieldSpec",

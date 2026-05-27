@@ -9,6 +9,13 @@ from vercor.components._contracts import (
     ComponentStepCallable,
     ComponentStepReturn,
 )
+from vercor.components._lifecycle import (
+    ComponentCreatePayloadHook,
+    ComponentInitializeHook,
+    ComponentPrefillHook,
+    ComponentValidateHook,
+    install_lifecycle_hooks,
+)
 from vercor.components._runtime_fields import apply_step_result
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
@@ -17,10 +24,6 @@ from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 from vercor.components.base import (
     Component,
-    ComponentCreatePayloadHook,
-    ComponentInitializeHook,
-    ComponentPrefillHook,
-    ComponentValidateHook,
     HostRuntimeComponent,
 )
 
@@ -157,9 +160,8 @@ class _CallableRuntimeMixin:
         self._step = normalize_component_step_callable(step)
         self._payload = payload
         component.declare_fields(field_spec)
-        from vercor.components.factories import _install_lifecycle_hooks
 
-        _install_lifecycle_hooks(
+        install_lifecycle_hooks(
             component,
             initialize=initialize,
             create_runtime_payload=create_runtime_payload,

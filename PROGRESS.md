@@ -19,6 +19,8 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local compatibility-facade cleanup validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local boundary-cohesion validation: Black, flake8, mypy, focused fast
+  pytest, full fast pytest, and full pytest passed as of 2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -44,6 +46,28 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Boundary Cohesion Refactor
+
+- Moved component lifecycle hook type aliases and hook installation into
+  `vercor.components._lifecycle`, leaving `vercor.components.factories` focused
+  on public helper construction and breaking the top-level
+  `vercor.components` import cycle.
+- Switched base component runtime-field adapters to a direct private-module
+  import instead of importing through the package namespace.
+- Added shared setup-data helpers for positive binary masks and 2D/time-last
+  surface-field canonicalization, then routed ERA5 ocean, ERA-Interim ocean,
+  and JCM land preparation through those helpers.
+- Updated boundary and setup-data tests to cover lifecycle ownership, component
+  package import cycles, and shared field-helper behavior.
+- Validation run for this change:
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, focused API-boundary and
+  data-component kernel tests,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Deprecated Compatibility Import Facade Removal
 

@@ -2,24 +2,25 @@ from pathlib import Path
 from typing import Optional
 
 import jax
-import jax.numpy as jnp
 from jax.typing import ArrayLike
 
 from vercor.components import DataComponent
-from vercor.dtypes import as_jax_real_array
 from vercor.forcing_data import read_forcing as _read_forcing
 from vercor.grid import RectilinearGrid
 from vercor.setups.data.assets import get_forcing_data
 from vercor.setups.data._component_helpers import time_interpolated_data_component
-from vercor.setups.data._field_helpers import mask_time_last_surface_field
+from vercor.setups.data._field_helpers import (
+    mask_time_last_surface_field,
+    positive_binary_mask,
+)
 
 _ERA5_OCEAN_FIELD_NAMES = ("sea_surface_temperature",)
 
 
 def _ocean_binary_mask_from_land_fraction(land_fraction: ArrayLike) -> jax.Array:
     """Convert a fractional land mask into a binary ocean mask."""
-    land_fraction_array = as_jax_real_array(land_fraction)
-    return 1.0 - jnp.where(land_fraction_array > 0.0, 1.0, 0.0)
+
+    return 1.0 - positive_binary_mask(land_fraction)
 
 
 def make_era5_ocean(

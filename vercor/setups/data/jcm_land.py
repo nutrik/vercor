@@ -7,9 +7,9 @@ from jcm.forcing import ForcingData
 
 from vercor.components import DataComponent, data_component
 from vercor.dtypes import as_jax_real_array
-from vercor.field_layout import canonicalize_time_last_surface_field
 from vercor.grid import RectilinearGrid
 from vercor.grid_masks import create_lnd_mask_from_ocn
+from vercor.setups.data._field_helpers import canonicalize_surface_field
 
 _JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture")
 
@@ -35,25 +35,11 @@ def _prepare_jcm_land_runtime_fields(
     longitude, latitude = _jcm_coordinates_in_degrees(
         longitude_radians, latitude_radians
     )
-    land_surface_temperature_array = as_jax_real_array(land_surface_temperature)
-    soil_moisture_array = as_jax_real_array(soil_moisture)
-    if land_surface_temperature_array.ndim == 3:
-        prepared_land_surface_temperature = canonicalize_time_last_surface_field(
-            land_surface_temperature_array
-        )
-    else:
-        prepared_land_surface_temperature = land_surface_temperature_array.T
-    if soil_moisture_array.ndim == 3:
-        prepared_soil_moisture = canonicalize_time_last_surface_field(
-            soil_moisture_array
-        )
-    else:
-        prepared_soil_moisture = soil_moisture_array.T
     return (
         longitude,
         latitude,
-        prepared_land_surface_temperature,
-        prepared_soil_moisture,
+        canonicalize_surface_field(land_surface_temperature),
+        canonicalize_surface_field(soil_moisture),
     )
 
 

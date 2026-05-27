@@ -146,8 +146,9 @@ immutable runtime containers used during traced integration.
   constructors, or subclasses with `declare_fields(...)`. `vercor.components`
   and `vercor` reexport the component-author facade. `vercor.components.base`
   owns only the base classes and class-level authoring contracts, while
-  module-level factory helpers and lifecycle hook installation live in
-  `vercor.components.factories`. Field declarations and author-value
+  module-level factory helpers live in `vercor.components.factories`.
+  Lifecycle hook type aliases and hook installation live in private
+  `vercor.components._lifecycle`. Field declarations and author-value
   normalization live in private `vercor.components._contracts`, callable
   signature adaptation and callable-backed runtime components live in private
   `vercor.components._callable_wrappers`, component-facing runtime-field

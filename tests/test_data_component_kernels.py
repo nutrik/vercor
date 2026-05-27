@@ -10,7 +10,11 @@ from vercor.setups.data.era5_atmosphere import (
     _compute_monthly_diagnostics,
     _decode_surface_pressure,
 )
-from vercor.setups.data._field_helpers import mask_time_last_surface_field
+from vercor.setups.data._field_helpers import (
+    canonicalize_surface_field,
+    mask_time_last_surface_field,
+    positive_binary_mask,
+)
 from vercor.setups.data.era5_land import _prepare_era5_land_runtime_fields
 from vercor.setups.data.era5_ocean import (
     _ocean_binary_mask_from_land_fraction,
@@ -242,6 +246,30 @@ def test_shared_masked_surface_field_helper_supports_jit_and_gradients() -> None
         gradient,
         np.asarray([[[0.0, 0.0], [1.0, 1.0]], [[1.0, 1.0], [0.0, 0.0]]]),
     )
+
+
+def test_shared_field_helpers_canonicalize_surface_fields_and_positive_masks() -> None:
+    surface_2d = jnp.asarray([[280.0, 281.0], [282.0, 283.0]])
+    surface_time_last = jnp.asarray(
+        [
+            [[280.0, 281.0], [282.0, 283.0]],
+            [[284.0, 285.0], [286.0, 287.0]],
+        ]
+    )
+    mask_source = jnp.asarray([[0.0, 0.2], [-1.0, 3.0]])
+
+    prepared_2d = jax.jit(canonicalize_surface_field)(surface_2d)
+    prepared_time_series = jax.jit(canonicalize_surface_field)(surface_time_last)
+    binary_mask = jax.jit(positive_binary_mask)(mask_source)
+
+    assert_allclose_compact(prepared_2d, np.asarray(surface_2d).T)
+    assert_allclose_compact(
+        prepared_time_series,
+        np.asarray(
+            [[[280.0, 284.0], [282.0, 286.0]], [[281.0, 285.0], [283.0, 287.0]]]
+        ),
+    )
+    assert_allclose_compact(binary_mask, np.asarray([[0.0, 1.0], [0.0, 1.0]]))
 
 
 def test_erainterim_helpers_prepare_jax_backed_grid_and_masked_fields() -> None:

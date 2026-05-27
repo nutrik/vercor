@@ -8,12 +8,15 @@ from vercor.components._contracts import (
     ComponentFieldSpec,
     FieldNames,
 )
-from vercor.components.base import (
-    Component,
+from vercor.components._lifecycle import (
     ComponentCreatePayloadHook,
     ComponentInitializeHook,
     ComponentPrefillHook,
     ComponentValidateHook,
+    install_lifecycle_hooks,
+)
+from vercor.components.base import (
+    Component,
     DataComponent,
     HostRuntimeComponent,
 )
@@ -25,30 +28,6 @@ __all__ = [
     "differentiable_component",
     "host_component",
 ]
-
-
-def _install_lifecycle_hooks(
-    component: Component,
-    *,
-    initialize: ComponentInitializeHook | None = None,
-    create_runtime_payload: ComponentCreatePayloadHook | None = None,
-    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-    validate_runtime_state: ComponentValidateHook | None = None,
-) -> None:
-    """Attach optional lifecycle hooks to a factory-created component."""
-
-    if initialize is not None:
-        setattr(component, "_initialize_hook", initialize)
-    if create_runtime_payload is not None:
-        setattr(component, "_create_runtime_payload_hook", create_runtime_payload)
-    if prefill_runtime_state_fields is not None:
-        setattr(
-            component,
-            "_prefill_runtime_state_fields_hook",
-            prefill_runtime_state_fields,
-        )
-    if validate_runtime_state is not None:
-        setattr(component, "_validate_runtime_state_hook", validate_runtime_state)
 
 
 def _callable_component_from_model(
@@ -109,7 +88,7 @@ def data_component(
         fields=fields,
         settings=settings,
     )
-    _install_lifecycle_hooks(
+    install_lifecycle_hooks(
         component,
         initialize=initialize,
         create_runtime_payload=create_runtime_payload,

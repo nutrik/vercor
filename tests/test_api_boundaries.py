@@ -24,6 +24,90 @@ from vercor.runtime import RuntimeComponentState, RuntimeFieldStore
 from vercor.regridders import bilinear
 
 
+def _component_package_import_cycles() -> list[tuple[str, ...]]:
+    """Return top-level import cycles within ``vercor.components``."""
+
+    module_paths: dict[str, Path] = {}
+    for path in Path("vercor/components").glob("*.py"):
+        module_name = f"vercor.components.{path.stem}"
+        if path.name == "__init__.py":
+            module_name = "vercor.components"
+        module_paths[module_name] = path
+
+    def resolve_module(import_name: str) -> str | None:
+        if import_name in module_paths:
+            return import_name
+        parts = import_name.split(".")
+        while parts:
+            candidate = ".".join(parts)
+            if candidate in module_paths:
+                return candidate
+            parts.pop()
+        return None
+
+    graph: dict[str, set[str]] = {module_name: set() for module_name in module_paths}
+    for module_name, path in module_paths.items():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                imported_names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module is not None:
+                imported_names = [node.module]
+            else:
+                continue
+
+            for imported_name in imported_names:
+                if not imported_name.startswith("vercor.components"):
+                    continue
+                dependency = resolve_module(imported_name)
+                if dependency is not None and dependency != module_name:
+                    graph[module_name].add(dependency)
+
+    index_by_module: dict[str, int] = {}
+    lowlink_by_module: dict[str, int] = {}
+    stack: list[str] = []
+    on_stack: set[str] = set()
+    cycles: list[tuple[str, ...]] = []
+
+    def visit(module_name: str) -> None:
+        index_by_module[module_name] = len(index_by_module)
+        lowlink_by_module[module_name] = index_by_module[module_name]
+        stack.append(module_name)
+        on_stack.add(module_name)
+
+        for dependency in graph[module_name]:
+            if dependency not in index_by_module:
+                visit(dependency)
+                lowlink_by_module[module_name] = min(
+                    lowlink_by_module[module_name],
+                    lowlink_by_module[dependency],
+                )
+            elif dependency in on_stack:
+                lowlink_by_module[module_name] = min(
+                    lowlink_by_module[module_name],
+                    index_by_module[dependency],
+                )
+
+        if lowlink_by_module[module_name] != index_by_module[module_name]:
+            return
+
+        component: list[str] = []
+        while True:
+            dependency = stack.pop()
+            on_stack.remove(dependency)
+            component.append(dependency)
+            if dependency == module_name:
+                break
+        if len(component) > 1:
+            cycles.append(tuple(sorted(component)))
+
+    for module_name in sorted(module_paths):
+        if module_name not in index_by_module:
+            visit(module_name)
+
+    return sorted(cycles)
+
+
 @pytest.mark.fast_always
 def test_top_level_exports_public_orchestration_and_component_author_api() -> None:
     expected_public_names = {
@@ -155,6 +239,9 @@ def test_component_base_internals_are_private_modules() -> None:
     factories_source = Path("vercor/components/factories.py").read_text(
         encoding="utf-8"
     )
+    lifecycle_source = Path("vercor/components/_lifecycle.py").read_text(
+        encoding="utf-8"
+    )
     validation_source = Path("vercor/components/_validation.py").read_text(
         encoding="utf-8"
     )
@@ -177,11 +264,21 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def _author_field_spec(" not in base_source
     assert "def component_field_spec(" not in contracts_source
     assert "def _install_lifecycle_hooks(" not in base_source
+    assert "def _install_lifecycle_hooks(" not in callable_source
     assert "def _callable_component_from_model(" not in base_source
     assert "def data_component(" not in base_source
     assert "def differentiable_component(" not in base_source
     assert "def host_component(" not in base_source
-    assert "def _install_lifecycle_hooks(" in factories_source
+    assert "def _install_lifecycle_hooks(" not in factories_source
+    assert "def install_lifecycle_hooks(" in lifecycle_source
+    assert "ComponentInitializeHook" in lifecycle_source
+    assert "ComponentCreatePayloadHook" in lifecycle_source
+    assert "ComponentPrefillHook" in lifecycle_source
+    assert "ComponentValidateHook" in lifecycle_source
+    assert "from vercor.components import _runtime_fields" not in base_source
+    assert "from vercor.components.factories import _install_lifecycle_hooks" not in (
+        callable_source
+    )
     assert "def _callable_component_from_model(" in factories_source
     assert factories_source.count("_create_callable_component(") == 1
     assert "def data_component(" in factories_source
@@ -222,6 +319,11 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "_callable_wrappers" not in components_module.__all__
     assert "_runtime_fields" not in components_module.__all__
     assert "_validation" not in components_module.__all__
+
+
+@pytest.mark.fast_always
+def test_components_package_has_no_top_level_import_cycles() -> None:
+    assert _component_package_import_cycles() == []
 
 
 @pytest.mark.fast_always
