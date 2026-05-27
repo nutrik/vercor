@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, TypeAlias
 
+from vercor.components._field_names import unique_field_names as _unique_field_names
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.types import RuntimeArray
 
@@ -57,16 +58,6 @@ class ComponentFieldSpec:
         object.__setattr__(self, "inputs", _unique_field_names(self.inputs))
         object.__setattr__(self, "outputs", _unique_field_names(self.outputs))
         object.__setattr__(self, "default_fields", dict(self.default_fields))
-
-
-def _unique_field_names(field_names: FieldNames) -> tuple[str, ...]:
-    """Return field names without duplicates while preserving order."""
-
-    unique: list[str] = []
-    for field_name in field_names:
-        if field_name not in unique:
-            unique.append(field_name)
-    return tuple(unique)
 
 
 __all__ = [

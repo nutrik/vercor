@@ -117,7 +117,7 @@ if __name__ == "__main__":
     cpl.initialize()
     final_state = cpl.run()
     cpl.finalize(final_state)
-    views = cpl.runtime_component_views(final_state, names=("ATM", "OCN", "LND"))
+    views = cpl.runtime_component_views(final_state, names=("ATM", "OCN", "LND", "ICE"))
 
     # Inspect a few fields in a component-wise table.
     print_component_field_means_table(
@@ -134,13 +134,7 @@ if __name__ == "__main__":
     )
     print(
         "ICE ice_fraction mean:",
-        float(
-            jnp.nanmean(
-                jnp.asarray(
-                    final_state.get_component_state("ICE").data.get("ice_fraction")
-                )
-            )
-        ),
+        float(jnp.nanmean(jnp.asarray(views["ICE"].field("ice_fraction")))),
     )
 
     fig, axs, scalar_mappable = plot_component_scalar_vector_comparison(

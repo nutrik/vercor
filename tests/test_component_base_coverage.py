@@ -385,16 +385,19 @@ def test_data_component_from_fields_normalizes_author_fields_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     grid = make_test_grid(name="facade-normalize-once")
-    real_normalize = base_module._normalize_author_field_values
+    field_authoring_module = importlib.import_module(
+        "vercor.components._field_authoring"
+    )
+    real_normalize = field_authoring_module._normalize_author_field_values
     call_count = 0
 
     def counting_normalize(*args: Any, **kwargs: Any) -> dict[str, RuntimeArray] | None:
         nonlocal call_count
         call_count += 1
-        return real_normalize(*args, **kwargs)
+        return cast("dict[str, RuntimeArray] | None", real_normalize(*args, **kwargs))
 
     monkeypatch.setattr(
-        base_module,
+        field_authoring_module,
         "_normalize_author_field_values",
         counting_normalize,
     )

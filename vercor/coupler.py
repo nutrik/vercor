@@ -93,7 +93,7 @@ class Coupler:
     clock: Clock
     log_level: int | str = "INFO"
     logger: LoggerLike = field(default_factory=_setup_logger)
-    run_sequence: RunSequence = field(init=False)
+    run_sequence: RunSequence = field(default_factory=RunSequence)
     components: dict[str, Component] = field(default_factory=dict)
     exchanges: list[Exchange] = field(default_factory=list)
     settings: VercorSettings = field(default_factory=VercorSettings)
@@ -200,7 +200,7 @@ class Coupler:
             regridders=self._regridders,
             binary_masks=self._binary_masks,
             fractional_masks=self._fractional_masks,
-            run_sequence=getattr(self, "run_sequence", RunSequence(order=[])),
+            run_sequence=self.run_sequence,
             settings=self.settings,
             logger=self.logger,
             enable_x64_computations=enable_x64_computations,
@@ -245,9 +245,7 @@ class Coupler:
             exchanges=self.exchanges,
             regridders=self._regridders,
             contracts=self._runtime_contracts,
-            run_sequence=(
-                tuple(self.run_sequence) if hasattr(self, "run_sequence") else None
-            ),
+            run_sequence=tuple(self.run_sequence),
         )
 
     def _prepare_runtime_state(
@@ -275,7 +273,7 @@ class Coupler:
         runtime_state = self._runtime_state_from_components(
             prefill_missing=prefill_missing
         )
-        if prefill_missing and hasattr(self, "run_sequence"):
+        if prefill_missing and tuple(self.run_sequence):
             runtime_state = prime_runtime_outgoing(
                 runtime_state,
                 tuple(self.run_sequence),

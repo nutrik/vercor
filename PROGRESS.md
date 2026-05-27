@@ -40,6 +40,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local component-author API split validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local core-boundary mixin extraction validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -65,6 +68,27 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Core Boundary Mixin Extraction
+
+- Split `Component` helper behavior into focused private modules:
+  `_field_names`, `_field_authoring`, `_runtime_access`, and `_lifecycle_api`,
+  leaving `vercor.components.base` focused on the abstract component contract
+  and callable factory entrypoint.
+- Made `Coupler.run_sequence` an explicit empty `RunSequence` by default and
+  removed dynamic `hasattr`/`getattr` branches from runtime preparation.
+- Routed the slab example's ICE diagnostic read through `RuntimeComponentView`
+  instead of direct runtime-state store access.
+- Updated boundary tests, `DESIGN.md`, and `DEPENDENCIES.md` for the new helper
+  ownership map.
+- Validation run for this change:
+  focused boundary/component/coupler fast pytest,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Component Author API Split
 

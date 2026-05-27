@@ -12,6 +12,7 @@ from vercor.components.contracts import (
     FieldDefaults,
     FieldNames,
 )
+from vercor.components._field_names import unique_field_names
 from vercor.dtypes import PrecisionPolicy, as_jax_real_array, jax_full
 from vercor.field_layout import validate_component_data_layout
 from vercor.grid import RectilinearGrid
@@ -75,16 +76,6 @@ def merge_component_outputs(
         outputs=unique_field_names((*field_spec.outputs, *tuple(output_names))),
         default_fields=field_spec.default_fields,
     )
-
-
-def unique_field_names(field_names: FieldNames) -> tuple[str, ...]:
-    """Return field names without duplicates while preserving order."""
-
-    unique: list[str] = []
-    for field_name in field_names:
-        if field_name not in unique:
-            unique.append(field_name)
-    return tuple(unique)
 
 
 __all__ = [

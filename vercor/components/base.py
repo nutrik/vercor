@@ -1,24 +1,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
-from vercor.dtypes import PrecisionPolicy, jax_full, jax_zeros
 from vercor.components.contracts import (
     AuthorFieldValues as _AuthorFieldValues,
     AuthorStepCallable as _AuthorStepCallable,
     ComponentFieldSpec as _ComponentFieldSpec,
-    ComponentStepReturn as _ComponentStepReturn,
     FieldNames as _FieldNames,
 )
-from vercor.components._contracts import (
-    normalize_author_field_values as _normalize_author_field_values,
-    unique_field_names as _unique_field_names,
-)
-import vercor.components._runtime_fields as _runtime_field_adapters
-import vercor.components._runtime_validation as _runtime_field_validation
+from vercor.components._field_authoring import ComponentFieldAuthoringMixin
 from vercor.components._lifecycle import (
     ComponentCreatePayloadHook,
     ComponentInitializeHook,
@@ -26,15 +18,15 @@ from vercor.components._lifecycle import (
     ComponentPrefillHook,
     ComponentValidateHook,
 )
-from vercor.exceptions import ComponentError
+from vercor.components._lifecycle_api import ComponentLifecycleMixin
+from vercor.components._runtime_access import ComponentRuntimeAccessMixin
 from vercor.grid import RectilinearGrid
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
+from vercor.runtime.contexts import RuntimeStepContext
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.runtime import (
-        RuntimeComponentContract,
         RuntimeComponentState,
     )
 
@@ -45,7 +37,12 @@ __all__ = [
 
 
 @dataclass
-class Component(ABC):
+class Component(
+    ComponentFieldAuthoringMixin,
+    ComponentRuntimeAccessMixin,
+    ComponentLifecycleMixin,
+    ABC,
+):
     """Active differentiable component-author contract for VerCOR model adapters.
 
     Component instances own mutable setup-time metadata: name, grid, seed data,
@@ -132,361 +129,6 @@ class Component(ABC):
             create_runtime_payload=create_runtime_payload,
             prefill_runtime_state_fields=prefill_runtime_state_fields,
             validate_runtime_state=validate_runtime_state,
-        )
-
-    def declare_fields(
-        self,
-        field_spec: _ComponentFieldSpec | None = None,
-        *,
-        inputs: _FieldNames = (),
-        outputs: _FieldNames = (),
-        default_fields: _AuthorFieldValues = None,
-    ) -> _ComponentFieldSpec:
-        """Declare runtime data fields for subclasses using author-facing names.
-
-        The base runtime hooks use this declaration to prefill output/default
-        fields and validate required fields. Subclasses with special lifecycle
-        needs can still override those hooks directly.
-        """
-
-        declared = field_spec or _ComponentFieldSpec(
-            inputs=inputs,
-            outputs=outputs,
-            default_fields=default_fields or {},
-        )
-        self._field_spec = _ComponentFieldSpec(
-            inputs=declared.inputs,
-            outputs=declared.outputs,
-            default_fields=_normalize_author_field_values(
-                component_name=self.name,
-                grid=self.grid,
-                fields=declared.default_fields,
-                policy=self.settings,
-            )
-            or {},
-        )
-        return self._field_spec
-
-    @property
-    def field_spec(self) -> _ComponentFieldSpec:
-        """Return this component's declared author-facing runtime field contract."""
-
-        return self._field_spec
-
-    @property
-    def field_names(self) -> tuple[str, ...]:
-        """Return setup-time field names in insertion order."""
-
-        return tuple(self.data)
-
-    def update_settings(self, **values: object) -> Self:
-        """Update component settings by name and return this component.
-
-        This is a small convenience for component constructors that need to set
-        one or more existing ``VercorSettings`` values while preserving the
-        settings metadata and chainable authoring style.
-        """
-
-        for setting_name, setting_value in values.items():
-            self.settings.set_value(setting_name, setting_value)
-        return self
-
-    def grid_field_defaults(
-        self,
-        names: _FieldNames,
-        value: object = 0.0,
-        overrides: _AuthorFieldValues = None,
-        policy: PrecisionPolicy = None,
-    ) -> dict[str, RuntimeArray]:
-        """Return grid-shaped default fields for named runtime data fields.
-
-        ``value`` is applied to every name, then ``overrides`` replace specific
-        names. Scalars expand to this component's grid shape; array-like values
-        are validated against the canonical component-data layouts.
-        """
-
-        field_names = _unique_field_names(names)
-        defaults: dict[str, object] = {field_name: value for field_name in field_names}
-        for field_name, field_value in (overrides or {}).items():
-            if field_name not in defaults:
-                raise ComponentError(
-                    f"Default override field '{field_name}' is not declared for "
-                    f"component '{self.name}'."
-                )
-            defaults[field_name] = field_value
-
-        return (
-            _normalize_author_field_values(
-                component_name=self.name,
-                grid=self.grid,
-                fields=defaults,
-                policy=self.settings if policy is None else policy,
-            )
-            or {}
-        )
-
-    def seed_field(
-        self,
-        name: str,
-        value: object,
-        policy: PrecisionPolicy = None,
-    ) -> "Component":
-        """Seed one setup-time grid field and return this component.
-
-        Seeded fields must follow VerCOR's canonical component-data layout so
-        runtime state can be created with a stable PyTree structure.
-        """
-
-        return self.seed_fields({name: value}, policy=policy)
-
-    def seed_fields(
-        self,
-        fields: Mapping[str, object],
-        policy: PrecisionPolicy = None,
-    ) -> "Component":
-        """Seed setup-time grid fields and return this component."""
-
-        field_updates = _normalize_author_field_values(
-            component_name=self.name,
-            grid=self.grid,
-            fields=fields,
-            policy=self.settings if policy is None else policy,
-        )
-        self.data.update(field_updates or {})
-        return self
-
-    def seed_declared_defaults(
-        self,
-        policy: PrecisionPolicy = None,
-    ) -> "Component":
-        """Seed this component's declared default fields and return itself."""
-
-        default_fields = self._field_spec.default_fields
-        if default_fields:
-            self.seed_fields(default_fields, policy=policy)
-        return self
-
-    def seed_zero_field(
-        self,
-        name: str,
-        policy: PrecisionPolicy = None,
-    ) -> "Component":
-        """Seed one grid-shaped zero field and return this component."""
-
-        return self.seed_field(
-            name,
-            jax_zeros(
-                self.grid.shape,
-                self.settings if policy is None else policy,
-            ),
-        )
-
-    def seed_zero_fields(
-        self,
-        names: _FieldNames,
-        policy: PrecisionPolicy = None,
-    ) -> "Component":
-        """Seed multiple grid-shaped zero fields and return this component."""
-
-        for name in names:
-            self.seed_zero_field(name, policy)
-        return self
-
-    def seed_constant_field(
-        self,
-        name: str,
-        value: object,
-        policy: PrecisionPolicy = None,
-    ) -> "Component":
-        """Seed one grid-shaped constant field and return this component."""
-
-        return self.seed_field(
-            name,
-            jax_full(
-                self.grid.shape,
-                value,
-                self.settings if policy is None else policy,
-            ),
-        )
-
-    def runtime_fields(
-        self,
-        component_state: "RuntimeComponentState",
-    ) -> dict[str, RuntimeArray]:
-        """Return runtime data fields as a plain name-to-array mapping."""
-
-        return _runtime_field_adapters.runtime_fields(self, component_state)
-
-    def runtime_field(
-        self,
-        component_state: "RuntimeComponentState",
-        name: str,
-    ) -> RuntimeArray:
-        """Return one runtime data field with a component-oriented error."""
-
-        return _runtime_field_adapters.runtime_field(self, component_state, name)
-
-    def has_runtime_field(
-        self,
-        component_state: "RuntimeComponentState",
-        name: str,
-    ) -> bool:
-        """Return whether one runtime data field exists."""
-
-        return _runtime_field_adapters.has_runtime_field(self, component_state, name)
-
-    def runtime_field_or(
-        self,
-        component_state: "RuntimeComponentState",
-        name: str,
-        default: object,
-        policy: PrecisionPolicy = None,
-    ) -> RuntimeArray:
-        """Return one runtime field or a grid-shaped/default array fallback."""
-
-        return _runtime_field_adapters.runtime_field_or(
-            self,
-            component_state,
-            name,
-            default,
-            policy,
-        )
-
-    def runtime_field_or_zeros_like(
-        self,
-        component_state: "RuntimeComponentState",
-        name: str,
-        like: str | RuntimeArray,
-    ) -> RuntimeArray:
-        """Return one runtime field or zeros matching another field/array."""
-
-        return _runtime_field_adapters.runtime_field_or_zeros_like(
-            self,
-            component_state,
-            name,
-            like,
-        )
-
-    def with_runtime_fields(
-        self,
-        component_state: "RuntimeComponentState",
-        fields: Mapping[str, RuntimeArray],
-    ) -> "RuntimeComponentState":
-        """Return ``component_state`` with existing runtime data fields updated."""
-
-        return _runtime_field_adapters.with_runtime_fields(
-            self,
-            component_state,
-            fields,
-        )
-
-    def apply_step_result(
-        self,
-        component_state: "RuntimeComponentState",
-        result: _ComponentStepReturn,
-    ) -> "RuntimeComponentState":
-        """Apply a field mapping or ``ComponentStepResult`` to runtime state."""
-
-        return _runtime_field_adapters.apply_step_result(self, component_state, result)
-
-    def require_runtime_fields(
-        self,
-        component_state: "RuntimeComponentState",
-        *names: str,
-    ) -> None:
-        """Validate that named runtime data fields use canonical grid layout."""
-
-        _runtime_field_validation.require_runtime_fields(self, component_state, *names)
-
-    def prefill_runtime_fields(
-        self,
-        data: dict[str, RuntimeArray],
-        field_spec: _ComponentFieldSpec | None = None,
-        *,
-        outputs: _FieldNames = (),
-        default_fields: _AuthorFieldValues = None,
-        policy: PrecisionPolicy = None,
-    ) -> None:
-        """Prefill a mutable runtime data mapping with declared fields.
-
-        This helper is intended for ``prefill_runtime_state_fields()`` overrides.
-        Default fields are inserted first, then output fields are inserted as
-        grid-shaped zeros when they are still missing.
-        """
-
-        _runtime_field_adapters.prefill_runtime_fields(
-            self,
-            data,
-            field_spec,
-            outputs=outputs,
-            default_fields=default_fields,
-            policy=policy,
-        )
-
-    def initialize(self, context: ComponentInitContext) -> None:
-        """Optionally initialize component-owned runtime data before coupling.
-
-        Override this hook when setup depends on coupler context such as start
-        time, coupling timestep, run sequence, settings, or logger.
-        """
-
-        hook = self._lifecycle_hooks.initialize
-        if hook is not None:
-            hook(self, context)
-            return
-        self.seed_declared_defaults(context.settings)
-
-    def create_runtime_payload(self) -> Any | None:
-        """Return optional immutable payload carried by runtime component state.
-
-        Override this hook for differentiable models that need non-field PyTree
-        state, for example model internals or forcing containers.
-        """
-
-        hook = self._lifecycle_hooks.create_runtime_payload
-        if hook is not None:
-            return hook(self)
-        return None
-
-    def prefill_runtime_state_fields(
-        self,
-        data: dict[str, RuntimeArray],
-        incoming: dict[str, RuntimeArray],
-        outgoing: dict[str, RuntimeArray],
-        contract: RuntimeComponentContract,
-    ) -> None:
-        """Optionally pre-seed fields required by runtime execution.
-
-        Override this hook when a component creates fields during stepping and
-        those fields must exist before the first JAX scan iteration.
-        """
-
-        hook = self._lifecycle_hooks.prefill_runtime_state_fields
-        if hook is not None:
-            hook(self, data, incoming, outgoing, contract)
-            return
-        _runtime_field_adapters.prefill_declared_runtime_fields(self, data)
-        _ = incoming, outgoing, contract
-
-    def validate_runtime_state(
-        self,
-        component_state: "RuntimeComponentState",
-        contract: RuntimeComponentContract,
-    ) -> None:
-        """Optionally validate component-specific runtime fields before execution.
-
-        Override this hook to report missing payloads, diagnostic fields, or
-        non-standard shapes before traced runtime execution begins.
-        """
-
-        hook = self._lifecycle_hooks.validate_runtime_state
-        if hook is not None:
-            hook(self, component_state, contract)
-            return
-        _ = contract
-        _runtime_field_validation.validate_declared_runtime_fields(
-            self,
-            component_state,
         )
 
     @abstractmethod

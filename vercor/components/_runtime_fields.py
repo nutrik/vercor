@@ -12,8 +12,8 @@ from vercor.components.contracts import (
 )
 from vercor.components._contracts import (
     normalize_author_field_values,
-    unique_field_names,
 )
+from vercor.components._field_names import unique_field_names
 from vercor.dtypes import PrecisionPolicy, jax_zeros
 from vercor.exceptions import ComponentError
 from vercor.types import RuntimeArray

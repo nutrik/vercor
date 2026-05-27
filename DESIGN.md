@@ -150,21 +150,28 @@ immutable runtime containers used during traced integration.
   differentiable `Component` contract, `vercor.components.data` owns
   `DataComponent`, `vercor.components.host` owns `HostRuntimeComponent`, and
   module-level factory helpers live in `vercor.components.factories`.
-  Lifecycle hook type aliases, hook storage, and hook installation live in
-  private `vercor.components._lifecycle`; factory-installed hooks are stored in
+  Field-name de-duplication lives in private
+  `vercor.components._field_names`, and component authoring methods for field
+  declarations, setup seeding, and settings updates live in private
+  `vercor.components._field_authoring`. Lifecycle hook type aliases, hook
+  storage, and hook installation live in private
+  `vercor.components._lifecycle`; default lifecycle dispatch lives in private
+  `vercor.components._lifecycle_api`, and factory-installed hooks are stored in
   one private `ComponentLifecycleHooks` container rather than as ad-hoc
-  component attributes. Field declarations and author-value normalization live
-  in private `vercor.components._contracts`, callable
-  signature adaptation and callable-backed runtime components live in private
+  component attributes. Author-value normalization lives in private
+  `vercor.components._contracts`, callable signature adaptation and
+  callable-backed runtime components live in private
   `vercor.components._callable_wrappers`, component-facing runtime-field
   adapters live in private `vercor.components._runtime_fields`, component-facing
-  required-field validation lives in private
-  `vercor.components._runtime_validation`. Component host/scanned execution
-  policy lives in internal `vercor.components.runtime_execution`, and setup
-  validation lives in internal `vercor.components.setup_validation`, giving
-  runtime modules explicit component-owned bridge modules instead of importing
-  private component internals. These internals are not exported from
-  `vercor.components`. Subclasses should call
+  runtime-field convenience methods live in private
+  `vercor.components._runtime_access`, and component-facing required-field
+  validation lives in private `vercor.components._runtime_validation`.
+  Component host/scanned execution policy lives in internal
+  `vercor.components.runtime_execution`, and setup validation lives in internal
+  `vercor.components.setup_validation`, giving runtime modules explicit
+  component-owned bridge modules instead of importing private component
+  internals. These internals are not exported from `vercor.components`.
+  Subclasses should call
   the base constructor so `name`,
   `grid`, `data`, and a component-owned `VercorSettings` container are available
   during initialization, execution, and finalization. `Component.data` is a

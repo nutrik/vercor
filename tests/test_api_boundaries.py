@@ -379,6 +379,87 @@ def test_component_base_internals_are_private_modules() -> None:
 
 
 @pytest.mark.fast_always
+def test_component_base_gets_helper_methods_from_private_mixins() -> None:
+    expected_author_methods = {
+        "declare_fields",
+        "update_settings",
+        "grid_field_defaults",
+        "seed_field",
+        "seed_fields",
+        "seed_declared_defaults",
+        "seed_zero_field",
+        "seed_zero_fields",
+        "seed_constant_field",
+    }
+    expected_runtime_methods = {
+        "runtime_fields",
+        "runtime_field",
+        "has_runtime_field",
+        "runtime_field_or",
+        "runtime_field_or_zeros_like",
+        "with_runtime_fields",
+        "apply_step_result",
+        "require_runtime_fields",
+        "prefill_runtime_fields",
+    }
+    expected_lifecycle_methods = {
+        "initialize",
+        "create_runtime_payload",
+        "prefill_runtime_state_fields",
+        "validate_runtime_state",
+    }
+
+    for method_name in (
+        expected_author_methods | expected_runtime_methods | expected_lifecycle_methods
+    ):
+        assert hasattr(Component, method_name)
+
+    source = Path("vercor/components/base.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    component_class = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "Component"
+    )
+    directly_defined_methods = {
+        node.name for node in component_class.body if isinstance(node, ast.FunctionDef)
+    }
+
+    assert expected_author_methods.isdisjoint(directly_defined_methods)
+    assert expected_runtime_methods.isdisjoint(directly_defined_methods)
+    assert expected_lifecycle_methods.isdisjoint(directly_defined_methods)
+    assert "ComponentFieldAuthoringMixin" in source
+    assert "ComponentRuntimeAccessMixin" in source
+    assert "ComponentLifecycleMixin" in source
+
+
+@pytest.mark.fast_always
+def test_component_contract_modules_share_field_name_deduplication_owner() -> None:
+    field_names_module = importlib.import_module("vercor.components._field_names")
+    private_contracts_module = importlib.import_module("vercor.components._contracts")
+
+    assert field_names_module.unique_field_names(("a", "b", "a")) == ("a", "b")
+    assert (
+        component_contracts_module._unique_field_names
+        is field_names_module.unique_field_names
+    )
+    assert private_contracts_module.unique_field_names is (
+        field_names_module.unique_field_names
+    )
+
+    contracts_source = Path("vercor/components/contracts.py").read_text(
+        encoding="utf-8"
+    )
+    private_contracts_source = Path("vercor/components/_contracts.py").read_text(
+        encoding="utf-8"
+    )
+    assert "def _unique_field_names(" not in contracts_source
+    assert "def unique_field_names(" not in private_contracts_source
+    assert "vercor.components._field_names" in contracts_source
+    assert "vercor.components._field_names" in private_contracts_source
+
+
+@pytest.mark.fast_always
 def test_components_package_has_no_top_level_import_cycles() -> None:
     assert _component_package_import_cycles() == []
 
@@ -500,6 +581,20 @@ def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
 
 
 @pytest.mark.fast_always
+def test_coupler_run_sequence_is_explicit_empty_schedule_by_default() -> None:
+    coupler = vercor.Coupler(
+        Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1)
+    )
+
+    assert isinstance(coupler.run_sequence, RunSequence)
+    assert coupler.run_sequence.order == []
+
+    coupler_source = Path("vercor/coupler.py").read_text(encoding="utf-8")
+    assert 'hasattr(self, "run_sequence")' not in coupler_source
+    assert 'getattr(self, "run_sequence"' not in coupler_source
+
+
+@pytest.mark.fast_always
 def test_multi_exchange_setup_scripts_use_shared_add_exchanges_helper() -> None:
     multi_exchange_scripts = (
         Path("examples/run_data_driver.py"),
@@ -513,6 +608,15 @@ def test_multi_exchange_setup_scripts_use_shared_add_exchanges_helper() -> None:
         source = path.read_text(encoding="utf-8")
         assert "add_exchange_specs" in source, path
         assert "cpl.add_exchange(" not in source, path
+
+
+@pytest.mark.fast_always
+def test_slab_driver_uses_runtime_views_for_ice_diagnostics() -> None:
+    slab_source = Path("examples/run_slab_driver.py").read_text(encoding="utf-8")
+
+    assert 'names=("ATM", "OCN", "LND", "ICE")' in slab_source
+    assert 'views["ICE"].field("ice_fraction")' in slab_source
+    assert 'get_component_state("ICE").data.get("ice_fraction")' not in slab_source
 
 
 @pytest.mark.fast_always
