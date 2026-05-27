@@ -16,39 +16,19 @@ from vercor.jax_logging import (
     setup_logger as _setup_logger,
 )
 from vercor.run_sequence import RunSequence
-import vercor.output as _output
-from vercor.runtime import (
-    RuntimeComponentContract,
-    RuntimeCouplerState,
-)
-from vercor.runtime.coupler_state import (
-    refresh_runtime_contracts,
-    runtime_state_from_components,
-    validate_runtime_state as validate_coupler_runtime_state,
-)
-from vercor.runtime.dispatch_context import (
-    RuntimeDispatchContext,
-    build_runtime_dispatch_context,
-)
-from vercor.runtime.driver import prime_runtime_outgoing
-from vercor.runtime.initialization import (
-    initialize_coupler_runtime,
-    validate_registered_component_setup,
-)
+from vercor.runtime import facade as _runtime_facade
 from vercor.runtime.interrupts import RuntimeInterruptController
-from vercor.runtime.runner import (
-    run_coupler_runtime,
-    run_scanned_runtime,
-)
-from vercor.runtime.run_context import RuntimeRunContext
-from vercor.runtime.time import initial_runtime_step_info
-from vercor.runtime.topology import RuntimeRegridder
-from vercor.runtime.views import RuntimeComponentView
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components.base import Component
+    import vercor.runtime.contracts as _runtime_contracts_module
+    import vercor.runtime.dispatch_context as _runtime_dispatch_context_module
+    import vercor.runtime.run_context as _runtime_run_context_module
+    import vercor.runtime.state as _runtime_state_module
+    import vercor.runtime.topology as _runtime_topology_module
+    import vercor.runtime.views as _runtime_views_module
 
 
 @dataclass
@@ -102,7 +82,7 @@ class Coupler:
     lnd_fmask_on_atm_grid: RuntimeArray = field(init=False)
     _regridders: dict[
         tuple[str, str, str],
-        RuntimeRegridder,
+        _runtime_topology_module.RuntimeRegridder,
     ] = field(default_factory=dict)
     _binary_masks: dict[tuple[str, str, str], RuntimeArray] = field(
         default_factory=dict
@@ -110,12 +90,16 @@ class Coupler:
     _fractional_masks: dict[tuple[str, str, str], RuntimeArray] = field(
         default_factory=dict
     )
-    _runtime_contracts: dict[str, RuntimeComponentContract] = field(
-        default_factory=dict
-    )
+    _runtime_contracts: dict[
+        str,
+        _runtime_contracts_module.RuntimeComponentContract,
+    ] = field(default_factory=dict)
     _compiled_runtime_cache: dict[
         tuple[Any, ...],
-        Callable[[RuntimeCouplerState], RuntimeCouplerState],
+        Callable[
+            [_runtime_state_module.RuntimeCouplerState],
+            _runtime_state_module.RuntimeCouplerState,
+        ],
     ] = field(default_factory=dict, init=False, repr=False)
     _runtime_interrupts: RuntimeInterruptController = field(
         default_factory=RuntimeInterruptController,
@@ -139,7 +123,7 @@ class Coupler:
 
     def register(
         self,
-        component: Component,
+        component: "Component",
     ) -> None:
         """
         Register a component with the coupler.
@@ -148,7 +132,7 @@ class Coupler:
             component: component instance to register
         """
 
-        validate_registered_component_setup(component)
+        _runtime_facade.validate_registered_component_setup(component)
         if component.name in self.components:
             raise CouplerError(f"Component {component.name} already registered")
 
@@ -193,7 +177,7 @@ class Coupler:
         Initialize the coupler and all registered components.
         """
 
-        initialized = initialize_coupler_runtime(
+        initialized = _runtime_facade.initialize_coupler_runtime(
             clock=self.clock,
             components=self.components,
             exchanges=self.exchanges,
@@ -217,127 +201,132 @@ class Coupler:
 
     def _runtime_state_from_components(
         self, *, prefill_missing: bool = False
-    ) -> RuntimeCouplerState:
-        self._runtime_contracts = refresh_runtime_contracts(
-            self.components,
-            self.exchanges,
-            validate_endpoints=False,
-        )
-        return runtime_state_from_components(
-            self.components,
-            self.exchanges,
-            self._fractional_masks,
-            self._binary_masks,
-            contracts=self._runtime_contracts,
+    ) -> _runtime_state_module.RuntimeCouplerState:
+        prepared = _runtime_facade.runtime_state_from_components(
+            components=self.components,
+            exchanges=self.exchanges,
+            fractional_masks=self._fractional_masks,
+            binary_masks=self._binary_masks,
             prefill_missing=prefill_missing,
         )
+        self._runtime_contracts = prepared.runtime_contracts
+        return prepared.runtime_state
 
-    def _validate_runtime_state(self, runtime_state: RuntimeCouplerState) -> None:
-        self._runtime_contracts = refresh_runtime_contracts(
-            self.components,
-            self.exchanges,
-            validate_endpoints=False,
-        )
-
-        validate_coupler_runtime_state(
+    def _validate_runtime_state(
+        self,
+        runtime_state: _runtime_state_module.RuntimeCouplerState,
+    ) -> None:
+        self._runtime_contracts = _runtime_facade.validate_runtime_state(
             runtime_state,
             components=self.components,
             exchanges=self.exchanges,
             regridders=self._regridders,
-            contracts=self._runtime_contracts,
-            run_sequence=tuple(self.run_sequence),
+            run_sequence=self.run_sequence,
         )
 
     def _prepare_runtime_state(
         self,
-        initial_state: RuntimeCouplerState | None,
+        initial_state: _runtime_state_module.RuntimeCouplerState | None,
         *,
         validate_state: bool = True,
-    ) -> RuntimeCouplerState:
+    ) -> _runtime_state_module.RuntimeCouplerState:
         """Return a runtime state ready for execution."""
 
-        runtime_state = (
-            self.create_runtime_state(prefill_missing=True)
-            if initial_state is None
-            else initial_state
+        prepared = _runtime_facade.prepare_runtime_state(
+            initial_state,
+            components=self.components,
+            exchanges=self.exchanges,
+            regridders=self._regridders,
+            fractional_masks=self._fractional_masks,
+            binary_masks=self._binary_masks,
+            runtime_contracts=self._runtime_contracts,
+            run_sequence=self.run_sequence,
+            clock=self.clock,
+            settings=self.settings,
+            validate_state=validate_state,
         )
-        if validate_state:
-            self._validate_runtime_state(runtime_state)
-        return runtime_state
+        self._runtime_contracts = prepared.runtime_contracts
+        return prepared.runtime_state
 
     def create_runtime_state(
         self, *, prefill_missing: bool = True
-    ) -> RuntimeCouplerState:
+    ) -> _runtime_state_module.RuntimeCouplerState:
         """Create and validate the immutable state used by the unified runtime."""
 
-        runtime_state = self._runtime_state_from_components(
-            prefill_missing=prefill_missing
+        prepared = _runtime_facade.create_runtime_state(
+            components=self.components,
+            exchanges=self.exchanges,
+            regridders=self._regridders,
+            fractional_masks=self._fractional_masks,
+            binary_masks=self._binary_masks,
+            run_sequence=self.run_sequence,
+            clock=self.clock,
+            settings=self.settings,
+            prefill_missing=prefill_missing,
         )
-        if prefill_missing and tuple(self.run_sequence):
-            runtime_state = prime_runtime_outgoing(
-                runtime_state,
-                tuple(self.run_sequence),
-                dispatch_context=self._runtime_dispatch_context(),
-                step_info=initial_runtime_step_info(self.clock, self.settings),
-            )
-        self._validate_runtime_state(runtime_state)
-        return runtime_state
+        self._runtime_contracts = prepared.runtime_contracts
+        return prepared.runtime_state
 
-    def _runtime_dispatch_context(self) -> RuntimeDispatchContext:
+    def _runtime_dispatch_context(
+        self,
+    ) -> _runtime_dispatch_context_module.RuntimeDispatchContext:
         """Return static runtime dispatch plumbing for the current coupler state."""
 
-        return build_runtime_dispatch_context(
-            self.components,
-            self.exchanges,
-            self._regridders,
-            self._runtime_contracts,
-            dt_seconds=self.clock.dt_seconds,
+        return _runtime_facade.runtime_dispatch_context(
+            components=self.components,
+            exchanges=self.exchanges,
+            regridders=self._regridders,
+            runtime_contracts=self._runtime_contracts,
+            clock=self.clock,
             settings=self.settings,
         )
 
-    def _runtime_run_context(self) -> RuntimeRunContext:
+    def _runtime_run_context(self) -> _runtime_run_context_module.RuntimeRunContext:
         """Return static runtime inputs bundled for execution."""
 
-        dispatch_context = self._runtime_dispatch_context()
-        return RuntimeRunContext(
-            run_sequence=tuple(self.run_sequence),
+        return _runtime_facade.runtime_run_context(
+            run_sequence=self.run_sequence,
             clock=self.clock,
             logger=self.logger,
             log_level=self.log_level,
-            dispatch_context=dispatch_context,
+            components=self.components,
+            exchanges=self.exchanges,
+            regridders=self._regridders,
+            runtime_contracts=self._runtime_contracts,
+            settings=self.settings,
             compiled_runtime_cache=self._compiled_runtime_cache,
             interrupts=self._runtime_interrupts,
         )
 
     def runtime_component_view(
         self,
-        runtime_state: RuntimeCouplerState,
+        runtime_state: _runtime_state_module.RuntimeCouplerState,
         name: str,
-    ) -> RuntimeComponentView:
+    ) -> _runtime_views_module.RuntimeComponentView:
         """Return a single object containing component metadata and runtime fields."""
 
-        return RuntimeComponentView.from_component_state(
-            name,
-            self.components[name].grid,
-            runtime_state.get_component_state(name),
+        return _runtime_facade.runtime_component_view(
+            components=self.components,
+            runtime_state=runtime_state,
+            name=name,
         )
 
     def runtime_component_views(
         self,
-        runtime_state: RuntimeCouplerState,
+        runtime_state: _runtime_state_module.RuntimeCouplerState,
         names: Sequence[str] | None = None,
-    ) -> dict[str, RuntimeComponentView]:
+    ) -> dict[str, _runtime_views_module.RuntimeComponentView]:
         """Return named runtime component views in component or requested order."""
 
-        selected_names = tuple(self.components) if names is None else tuple(names)
-        return {
-            name: self.runtime_component_view(runtime_state, name)
-            for name in selected_names
-        }
+        return _runtime_facade.runtime_component_views(
+            components=self.components,
+            runtime_state=runtime_state,
+            names=names,
+        )
 
     def finalize(
         self,
-        final_state: RuntimeCouplerState,
+        final_state: _runtime_state_module.RuntimeCouplerState,
         output_file_mask: Optional[Path] = None,
     ) -> None:
         """
@@ -349,9 +338,7 @@ class Coupler:
         """
 
         self.logger.info(" ------------ Finalizing coupler and components ------------")
-        for component in self.components.values():
-            validate_registered_component_setup(component)
-        _output.write_coupler_runtime_outputs(
+        _runtime_facade.finalize(
             final_state=final_state,
             components=self.components,
             exchanges=self.exchanges,
@@ -380,10 +367,10 @@ class Coupler:
 
     def run(
         self,
-        initial_state: RuntimeCouplerState | None = None,
+        initial_state: _runtime_state_module.RuntimeCouplerState | None = None,
         *,
         donate_state: bool = False,
-    ) -> RuntimeCouplerState:
+    ) -> _runtime_state_module.RuntimeCouplerState:
         """
         Run all registered components through the unified runtime entrypoint.
 
@@ -394,30 +381,43 @@ class Coupler:
         """
 
         runtime_state = self._prepare_runtime_state(initial_state)
-        return run_coupler_runtime(
+        return _runtime_facade.run(
             runtime_state,
-            context=self._runtime_run_context(),
+            run_sequence=self.run_sequence,
+            clock=self.clock,
+            logger=self.logger,
+            log_level=self.log_level,
+            components=self.components,
+            exchanges=self.exchanges,
+            regridders=self._regridders,
+            runtime_contracts=self._runtime_contracts,
+            settings=self.settings,
+            compiled_runtime_cache=self._compiled_runtime_cache,
+            interrupts=self._runtime_interrupts,
             donate_state=donate_state,
         )
 
     def _run_scanned_runtime(
         self,
-        initial_state: RuntimeCouplerState | None = None,
+        initial_state: _runtime_state_module.RuntimeCouplerState | None = None,
         *,
         validate_state: bool = True,
-    ) -> RuntimeCouplerState:
+    ) -> _runtime_state_module.RuntimeCouplerState:
         """Run the unified scanned runtime path and return state."""
 
         runtime_state = self._prepare_runtime_state(
             initial_state,
             validate_state=validate_state,
         )
-        return run_scanned_runtime(
+        return _runtime_facade.run_scanned(
             runtime_state,
-            run_sequence=tuple(self.run_sequence),
+            run_sequence=self.run_sequence,
             clock=self.clock,
-            settings=self.settings,
             logger=self.logger,
-            dispatch_context=self._runtime_dispatch_context(),
+            components=self.components,
+            exchanges=self.exchanges,
+            regridders=self._regridders,
+            runtime_contracts=self._runtime_contracts,
+            settings=self.settings,
             interrupts=self._runtime_interrupts,
         )

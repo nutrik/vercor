@@ -86,6 +86,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_validation_path = Path("vercor/runtime/validation.py")
     runtime_topology_path = Path("vercor/runtime/topology.py")
     runtime_initialization_path = Path("vercor/runtime/initialization.py")
+    runtime_facade_path = Path("vercor/runtime/facade.py")
     assert runtime_contracts_path.exists()
     assert runtime_stores_path.exists()
     assert runtime_exchange_dispatch_path.exists()
@@ -98,6 +99,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_validation_path.exists()
     assert runtime_topology_path.exists()
     assert runtime_initialization_path.exists()
+    assert runtime_facade_path.exists()
     runtime_contracts_source = runtime_contracts_path.read_text(encoding="utf-8")
     runtime_stores_source = runtime_stores_path.read_text(encoding="utf-8")
     runtime_exchange_dispatch_source = runtime_exchange_dispatch_path.read_text(
@@ -120,6 +122,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_initialization_source = runtime_initialization_path.read_text(
         encoding="utf-8"
     )
+    runtime_facade_source = runtime_facade_path.read_text(encoding="utf-8")
     regridder_source = Path("vercor/regridders/base.py").read_text(encoding="utf-8")
     coupler_source = Path("vercor/coupler.py").read_text(encoding="utf-8")
     base_source = Path("vercor/components/base.py").read_text(encoding="utf-8")
@@ -228,14 +231,18 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def runtime_state_from_components(" in runtime_coupler_state_source
     assert "def validate_runtime_state(" in runtime_coupler_state_source
     assert "def runtime_dispatch_context(" not in runtime_coupler_state_source
-    assert "build_runtime_dispatch_context(" in coupler_source
+    assert "from vercor.runtime import facade as _runtime_facade" in coupler_source
+    assert "build_runtime_dispatch_context(" not in coupler_source
+    assert "build_runtime_dispatch_context(" in runtime_facade_source
     assert "def output_masks_for_component(" in runtime_coupler_state_source
     assert "def refresh_runtime_contracts(" in runtime_coupler_state_source
-    assert "refresh_runtime_contracts(" in coupler_source
+    assert "refresh_runtime_contracts(" not in coupler_source
+    assert "refresh_runtime_contracts(" in runtime_facade_source
     assert "build_runtime_contracts(" not in coupler_source
     assert "def prime_runtime_state(" not in runtime_coupler_state_source
     assert "prime_runtime_state(" not in coupler_source
-    assert "prime_runtime_outgoing(" in coupler_source
+    assert "prime_runtime_outgoing(" not in coupler_source
+    assert "prime_runtime_outgoing(" in runtime_facade_source
     assert "def run_host_runtime(" in runtime_runner_source
     assert "def run_scanned_runtime(" in runtime_runner_source
     assert "def run_coupler_runtime(" in runtime_runner_source
@@ -247,7 +254,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "contracts:" not in runtime_run_context_source
     assert "settings:" not in runtime_run_context_source
     assert "context: RuntimeRunContext" in runtime_runner_source
-    assert "from vercor.runtime.run_context import" in coupler_source
+    assert "from vercor.runtime.run_context import" not in coupler_source
+    assert "from vercor.runtime.run_context import" in runtime_facade_source
     assert "from vercor.runtime.run_context import" in runtime_runner_source
     assert "def compiled_scanned_runtime(" not in runtime_runner_source
     assert "def compiled_runtime_cache_key(" not in runtime_runner_source
@@ -265,8 +273,12 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def _prepare_runtime_state(" in coupler_source
     assert "self._prepare_runtime_state(" in run_body
     assert "self._prepare_runtime_state(" in scanned_body
-    assert "run_coupler_runtime(" in run_body
-    assert "run_scanned_runtime(" in scanned_body
+    assert "run_coupler_runtime(" not in run_body
+    assert "run_scanned_runtime(" not in scanned_body
+    assert "_runtime_facade.run(" in run_body
+    assert "_runtime_facade.run_scanned(" in scanned_body
+    assert "run_coupler_runtime(" in runtime_facade_source
+    assert "run_scanned_runtime(" in runtime_facade_source
     assert "jax.lax.scan" not in coupler_source
     assert "jax.debug.callback" not in coupler_source
     assert "jax.debug.callback" not in runtime_runner_source
@@ -313,7 +325,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         "from vercor.components.setup_validation import validate_component_setup"
         in (runtime_initialization_source)
     )
-    assert "from vercor.runtime.initialization import" in coupler_source
+    assert "from vercor.runtime.initialization import" not in coupler_source
+    assert "from vercor.runtime.initialization import" in runtime_facade_source
     assert "def _apply_run_precision_to_component(" not in coupler_source
     assert "from vercor.components._validation import" not in coupler_source
     for source in (
@@ -354,7 +367,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def create_exchange_masks(" in runtime_topology_source
     assert "def validate_land_mask_consistency(" in runtime_topology_source
     assert "def patch_exchange_masks(" in runtime_topology_source
-    assert "from vercor.runtime.topology import" in coupler_source
+    assert "from vercor.runtime.topology import" not in coupler_source
+    assert "from vercor.runtime.topology import" in runtime_facade_source
     assert "def _create_exchange_masks(" not in coupler_source
     assert "def _validate_land_mask_consistency(" not in coupler_source
     assert "def _patch_exchange_masks(" not in coupler_source
