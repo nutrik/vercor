@@ -23,6 +23,9 @@ historical commands, failure messages, or detailed validation notes.
   pytest, full fast pytest, and full pytest passed as of 2026-05-27.
 - Latest local boundary-import validation: Black, flake8, mypy, focused fast
   pytest, full fast pytest, and full pytest passed as of 2026-05-27.
+- Latest local cohesion-boundary implementation validation: Black, flake8,
+  mypy, focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -48,6 +51,34 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Cohesion and Boundary Refactor Implementation
+
+- Made component contract output merging pure, stored factory lifecycle hooks in
+  a single private `ComponentLifecycleHooks` container, and moved
+  component-facing runtime required-field validation into
+  `vercor.components._runtime_validation`.
+- Added runtime-owned contract refresh, bundled runner execution inputs in
+  `RuntimeRunContext`, delegated final-output iteration to `vercor.output`, and
+  kept `vercor.coupler.setup_logger` private to the facade implementation.
+- Added `ExchangeSpec`, `build_exchanges()`, and `add_exchange_specs()` for
+  setup recipes, then migrated examples and the profiling harness away from
+  repeated raw `Exchange(...)` wiring.
+- Lazied the paired JCM setup helper's optional JCM imports, moved JCM land
+  type-only optional imports behind `TYPE_CHECKING`, and extracted focused
+  JAXGCM host-recording and CAMulator prediction-block helpers.
+- Updated `DESIGN.md`, `DEPENDENCIES.md`, and boundary tests for the new
+  ownership map.
+- Validation run for this change:
+  focused component/runtime/API fast pytest,
+  focused setup/CAMulator/external fast pytest,
+  focused runtime-cache fast pytest,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Runtime Component Boundary Import Refactor
 

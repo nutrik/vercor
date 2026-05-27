@@ -68,6 +68,21 @@ def runtime_state_from_components(
     )
 
 
+def refresh_runtime_contracts(
+    components: Mapping[str, Component],
+    exchanges: Sequence[Exchange],
+    *,
+    validate_endpoints: bool = False,
+) -> dict[str, RuntimeComponentContract]:
+    """Return runtime contracts for the current component and exchange topology."""
+
+    return build_runtime_contracts(
+        tuple(components),
+        exchanges,
+        validate_endpoints=validate_endpoints,
+    )
+
+
 def runtime_dispatch_context(
     components: Mapping[str, Component],
     exchanges: Sequence[Exchange],

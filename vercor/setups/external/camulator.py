@@ -44,6 +44,122 @@ configure_camulator_runtime()
 # ============================================================================
 
 
+def _run_camulator_prediction_block(
+    state: "_CAMulatorGCMState",
+    fields: Mapping[str, Any],
+    *,
+    block_start: int,
+    block_end: int,
+    logger: LoggerLike | None,
+) -> tuple[Any, RuntimeArray]:
+    """Run one CAMulator forcing block and return the final prediction and TS."""
+
+    prediction = None
+    last_total_surface_temperature: RuntimeArray | None = None
+
+    ds_slice = state.dynamic_ds.isel(time=slice(block_start, block_end)).load()
+    ds_slice_times = ds_slice["time"].values
+
+    dynamic_forcing_chunk = _camulator_fields._prepare_camulator_dynamic_forcing_chunk(
+        ds_slice.to_array(dim="dynamic_variable").values
+    )
+    gpu_forcing_chunk = _camulator_tensors._torch_tensor_from_jax_array(
+        dynamic_forcing_chunk[:, :, jnp.newaxis, :, :],
+        state.device,
+        pin_memory=True,
+    )
+
+    for t in range(gpu_forcing_chunk.shape[0]):
+        time_obj = ds_slice_times[t]
+
+        if hasattr(time_obj, "item"):
+            time_obj = time_obj.item()
+
+        if isinstance(time_obj, datetime):
+            utc_datetime = time_obj
+        else:
+            utc_datetime = datetime(
+                time_obj.year,
+                time_obj.month,
+                time_obj.day,
+                time_obj.hour,
+                time_obj.minute,
+                time_obj.second,
+            )
+
+        if logger is not None:
+            logger.info(
+                "    CAMulator step: " f"{state.forecast_hour:05}, time: {utc_datetime}"
+            )
+
+        dynamic_forcing_t = gpu_forcing_chunk[t].unsqueeze(0)
+
+        if state.forecast_hour != 1:
+            model_input = state.stepper.state_manager.build_input_with_forcing(
+                state.state,
+                dynamic_forcing_t,
+                state.static_forcing,
+            )
+        else:
+            model_input = state.state
+
+        total_ts, rescaled_total_ts = (
+            _camulator_fields._prepare_camulator_surface_forcing(
+                fields["sea_surface_temperature"],
+                fields["land_surface_temperature"],
+                state.LANDM_COSLAT,
+            )
+        )
+        last_total_surface_temperature = total_ts
+
+        if logger is not None:
+            logger.info(
+                "    Rescaled ts stats - max: "
+                f"{float(jnp.max(rescaled_total_ts)):.4f}, min: "
+                f"{float(jnp.min(rescaled_total_ts)):.4f}"
+            )
+
+        state.accessor_input.set_state_var(
+            model_input,
+            "SST",
+            _camulator_tensors._torch_tensor_from_jax_array(
+                _camulator_fields._prepare_camulator_sst_input(rescaled_total_ts),
+                state.device,
+            ),
+        )
+
+        with torch.no_grad():
+            prediction = state.stepper.model(model_input.float())
+
+        prediction = state.stepper._apply_postprocessing(prediction, model_input)
+
+        _camulator_output.write_camulator_prediction_output(
+            prediction,
+            utc_datetime,
+            latitude=state.latlons.latitude.values,
+            longitude=state.latlons.longitude.values,
+            init_str=state.runtime_cursor.init_str,
+            lead_time_periods=state.lead_time_periods,
+            forecast_hour=state.forecast_hour,
+            metadata=state.metadata,
+            conf=state.conf,
+        )
+
+        state.state = state.stepper.state_manager.shift_state_forward(
+            state.state,
+            prediction,
+        )
+        state.forecast_hour += 1
+
+    if prediction is None or last_total_surface_temperature is None:
+        raise ValueError(
+            "No CAMulator timesteps were generated from the forcing slice; "
+            "check forcing availability and coupling timestep alignment."
+        )
+
+    return prediction, last_total_surface_temperature
+
+
 class _CAMulatorGCMState:
     coupling_timestep: timedelta
     model_timestep: timedelta
@@ -218,133 +334,17 @@ class _CAMulatorGCMState:
             return {}
 
         settings = context.settings
-        prediction = None
-        last_total_surface_temperature: RuntimeArray | None = None
 
         block_start = self.runtime_cursor.current_index()
         block_end = block_start + self.model_substeps
 
-        # Load chunk of dynamic forcing data
-        ds_slice = self.dynamic_ds.isel(time=slice(block_start, block_end)).load()
-        ds_slice_times = ds_slice["time"].values
-
-        dynamic_forcing_chunk = (
-            _camulator_fields._prepare_camulator_dynamic_forcing_chunk(
-                ds_slice.to_array(dim="dynamic_variable").values
-            )
+        prediction, last_total_surface_temperature = _run_camulator_prediction_block(
+            self,
+            fields,
+            block_start=block_start,
+            block_end=block_end,
+            logger=logger,
         )
-        gpu_forcing_chunk = _camulator_tensors._torch_tensor_from_jax_array(
-            dynamic_forcing_chunk[:, :, jnp.newaxis, :, :],
-            self.device,
-            pin_memory=True,
-        )
-
-        # Step through each time in the chunk
-        for t in range(gpu_forcing_chunk.shape[0]):
-            time_obj = ds_slice_times[t]
-
-            # Convert to Python datetime for output formatting.
-            # Normalize NumPy scalar time objects before type checks.
-            if hasattr(time_obj, "item"):
-                time_obj = time_obj.item()
-
-            if isinstance(time_obj, datetime):
-                utc_datetime = time_obj
-            else:
-                # cftime object - convert to Python datetime
-                utc_datetime = datetime(
-                    time_obj.year,
-                    time_obj.month,
-                    time_obj.day,
-                    time_obj.hour,
-                    time_obj.minute,
-                    time_obj.second,
-                )
-
-            if logger is not None:
-                logger.info(
-                    "    CAMulator step: "
-                    f"{self.forecast_hour:05}, time: {utc_datetime}"
-                )
-
-            dynamic_forcing_t = gpu_forcing_chunk[t].unsqueeze(0)
-
-            # CAMulator's first state already contains forcing. Later states need
-            # the next forcing slice appended before inference.
-            if self.forecast_hour != 1:
-                # Build forcing from dynamic + static
-                model_input = self.stepper.state_manager.build_input_with_forcing(
-                    self.state, dynamic_forcing_t, self.static_forcing
-                )
-            else:
-                # First iteration: initial state already contains forcing
-                model_input = self.state
-
-            total_ts, rescaled_total_ts = (
-                _camulator_fields._prepare_camulator_surface_forcing(
-                    fields["sea_surface_temperature"],
-                    fields["land_surface_temperature"],
-                    self.LANDM_COSLAT,
-                )
-            )
-            last_total_surface_temperature = total_ts
-
-            # Land surface temperature is already rescaled in the same way as sst
-            if logger is not None:
-                logger.info(
-                    "    Rescaled ts stats - max: "
-                    f"{float(jnp.max(rescaled_total_ts)):.4f}, min: "
-                    f"{float(jnp.min(rescaled_total_ts)):.4f}"
-                )
-
-            self.accessor_input.set_state_var(
-                model_input,
-                "SST",
-                _camulator_tensors._torch_tensor_from_jax_array(
-                    _camulator_fields._prepare_camulator_sst_input(rescaled_total_ts),
-                    self.device,
-                ),
-            )
-
-            # Run model
-            with torch.no_grad():
-                prediction = self.stepper.model(model_input.float())
-
-            # Apply post-processing
-            prediction = self.stepper._apply_postprocessing(prediction, model_input)
-
-            _camulator_output.write_camulator_prediction_output(
-                prediction,
-                utc_datetime,
-                latitude=self.latlons.latitude.values,
-                longitude=self.latlons.longitude.values,
-                init_str=self.runtime_cursor.init_str,
-                lead_time_periods=self.lead_time_periods,
-                forecast_hour=self.forecast_hour,
-                metadata=self.metadata,
-                conf=self.conf,
-            )
-
-            # ================================================================
-            # SHIFT STATE FORWARD FOR NEXT TIMESTEP
-            # ================================================================
-
-            self.state = self.stepper.state_manager.shift_state_forward(
-                self.state, prediction
-            )
-
-            self.forecast_hour += 1
-
-        # ================================================================
-        # Deposit final prediction into data dict for coupling (after chunk loop)
-        # ================================================================
-
-        if prediction is None or last_total_surface_temperature is None:
-            raise ValueError(
-                "No CAMulator timesteps were generated from the forcing slice; "
-                "check forcing availability and coupling timestep alignment."
-            )
-
         self.runtime_cursor.advance()
 
         mapped_fields = _camulator_fields._map_camulator_prediction_to_runtime_fields(

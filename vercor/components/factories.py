@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from vercor.components._contracts import (
@@ -30,6 +31,23 @@ __all__ = [
 ]
 
 
+@dataclass(frozen=True)
+class CallableComponentRequest:
+    """Internal request object for callable-backed component construction."""
+
+    runtime_kind: str
+    name: str
+    grid: RectilinearGrid
+    step: AuthorStepCallable
+    payload: Any | None
+    settings: VercorSettings | None
+    field_spec: ComponentFieldSpec
+    initialize: ComponentInitializeHook | None
+    create_runtime_payload: ComponentCreatePayloadHook | None
+    prefill_runtime_state_fields: ComponentPrefillHook | None
+    validate_runtime_state: ComponentValidateHook | None
+
+
 def _callable_component_from_model(
     *,
     runtime_kind: str,
@@ -50,7 +68,7 @@ def _callable_component_from_model(
 
     from vercor.components._callable_wrappers import _create_callable_component
 
-    return _create_callable_component(
+    request = CallableComponentRequest(
         runtime_kind=runtime_kind,
         name=name,
         grid=grid,
@@ -66,6 +84,19 @@ def _callable_component_from_model(
         create_runtime_payload=create_runtime_payload,
         prefill_runtime_state_fields=prefill_runtime_state_fields,
         validate_runtime_state=validate_runtime_state,
+    )
+    return _create_callable_component(
+        runtime_kind=request.runtime_kind,
+        name=request.name,
+        grid=request.grid,
+        step=request.step,
+        payload=request.payload,
+        settings=request.settings,
+        field_spec=request.field_spec,
+        initialize=request.initialize,
+        create_runtime_payload=request.create_runtime_payload,
+        prefill_runtime_state_fields=request.prefill_runtime_state_fields,
+        validate_runtime_state=request.validate_runtime_state,
     )
 
 

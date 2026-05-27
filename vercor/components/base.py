@@ -20,9 +20,11 @@ from vercor.components._contracts import (
     unique_field_names as _unique_field_names,
 )
 import vercor.components._runtime_fields as _runtime_field_adapters
+import vercor.components._runtime_validation as _runtime_field_validation
 from vercor.components._lifecycle import (
     ComponentCreatePayloadHook,
     ComponentInitializeHook,
+    ComponentLifecycleHooks,
     ComponentPrefillHook,
     ComponentValidateHook,
 )
@@ -88,6 +90,11 @@ class Component(ABC):
     setup_metadata: dict[str, Any] = field(default_factory=dict)
     _field_spec: ComponentFieldSpec = field(
         default_factory=ComponentFieldSpec,
+        init=False,
+        repr=False,
+    )
+    _lifecycle_hooks: ComponentLifecycleHooks = field(
+        default_factory=ComponentLifecycleHooks,
         init=False,
         repr=False,
     )
@@ -398,7 +405,7 @@ class Component(ABC):
     ) -> None:
         """Validate that named runtime data fields use canonical grid layout."""
 
-        _runtime_field_adapters.require_runtime_fields(self, component_state, *names)
+        _runtime_field_validation.require_runtime_fields(self, component_state, *names)
 
     def prefill_runtime_fields(
         self,
@@ -432,7 +439,7 @@ class Component(ABC):
         time, coupling timestep, run sequence, settings, or logger.
         """
 
-        hook = getattr(self, "_initialize_hook", None)
+        hook = self._lifecycle_hooks.initialize
         if hook is not None:
             hook(self, context)
             return
@@ -445,7 +452,7 @@ class Component(ABC):
         state, for example model internals or forcing containers.
         """
 
-        hook = getattr(self, "_create_runtime_payload_hook", None)
+        hook = self._lifecycle_hooks.create_runtime_payload
         if hook is not None:
             return hook(self)
         return None
@@ -463,7 +470,7 @@ class Component(ABC):
         those fields must exist before the first JAX scan iteration.
         """
 
-        hook = getattr(self, "_prefill_runtime_state_fields_hook", None)
+        hook = self._lifecycle_hooks.prefill_runtime_state_fields
         if hook is not None:
             hook(self, data, incoming, outgoing, contract)
             return
@@ -481,12 +488,12 @@ class Component(ABC):
         non-standard shapes before traced runtime execution begins.
         """
 
-        hook = getattr(self, "_validate_runtime_state_hook", None)
+        hook = self._lifecycle_hooks.validate_runtime_state
         if hook is not None:
             hook(self, component_state, contract)
             return
         _ = contract
-        _runtime_field_adapters.validate_declared_runtime_fields(
+        _runtime_field_validation.validate_declared_runtime_fields(
             self,
             component_state,
         )
@@ -553,7 +560,7 @@ class DataComponent(Component):
         """Seed data fields and expose their names as declared outputs."""
 
         super().seed_fields(fields, policy=policy)
-        _merge_component_outputs(self, fields.keys())
+        self._field_spec = _merge_component_outputs(self.field_spec, fields.keys())
         return self
 
     @final

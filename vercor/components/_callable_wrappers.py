@@ -172,9 +172,10 @@ class _CallableRuntimeMixin:
     def create_runtime_payload(self) -> Any | None:
         """Return the payload supplied to the callable component factory."""
 
-        hook = getattr(self, "_create_runtime_payload_hook", None)
+        component = cast("Component", self)
+        hook = component._lifecycle_hooks.create_runtime_payload
         if hook is not None:
-            return hook(cast("Component", self))
+            return hook(component)
         return self._payload
 
     def _step_callable_runtime_state(

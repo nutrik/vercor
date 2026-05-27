@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib
+from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
@@ -11,6 +13,9 @@ import pytest
 from tests._coverage_support import make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.components.base import DataComponent
+from vercor.clock import Clock
+from vercor.coupler import Coupler
+from vercor.exchange import Exchange
 from vercor.runtime.contexts import ComponentInitContext
 from vercor.settings import VercorSettings
 from vercor.setups.external.jax_gcm import JAXGCMRuntimePayload
@@ -194,15 +199,17 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def validate_runtime_state(" in runtime_coupler_state_source
     assert "def runtime_dispatch_context(" in runtime_coupler_state_source
     assert "def output_masks_for_component(" in runtime_coupler_state_source
-    assert "def refresh_runtime_contracts(" not in runtime_coupler_state_source
-    assert "refresh_runtime_contracts(" not in coupler_source
-    assert "build_runtime_contracts(" in coupler_source
+    assert "def refresh_runtime_contracts(" in runtime_coupler_state_source
+    assert "refresh_runtime_contracts(" in coupler_source
+    assert "build_runtime_contracts(" not in coupler_source
     assert "def prime_runtime_state(" not in runtime_coupler_state_source
     assert "prime_runtime_state(" not in coupler_source
     assert "prime_runtime_outgoing(" in coupler_source
     assert "def run_host_runtime(" in runtime_runner_source
     assert "def run_scanned_runtime(" in runtime_runner_source
     assert "def run_coupler_runtime(" in runtime_runner_source
+    assert "class RuntimeRunContext" in runtime_runner_source
+    assert "context: RuntimeRunContext" in runtime_runner_source
     assert "def compiled_scanned_runtime(" in runtime_runner_source
     assert "def compiled_runtime_cache_key(" in runtime_runner_source
     assert "def _run_host_runtime" not in coupler_source
@@ -210,7 +217,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     run_body = coupler_source.split("def run", 1)[1]
     scanned_body = coupler_source.split("def _run_scanned_runtime", 1)[1]
     assert "host_component_names(self.components)" not in run_body
-    assert "host_component_names(components)" in runtime_runner_source
+    assert "host_component_names(context.components)" in runtime_runner_source
     assert "def _prepare_runtime_state(" in coupler_source
     assert "self._prepare_runtime_state(" in run_body
     assert "self._prepare_runtime_state(" in scanned_body
@@ -300,6 +307,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "write_runtime_component_view_to_netcdf" not in components_source
     assert "def _write_runtime_component_to_netcdf" not in output_source
     assert "def write_runtime_component_view_to_netcdf" in output_source
+    assert "def write_coupler_runtime_outputs" in output_source
     assert not Path("vercor/tools.py").exists()
     assert "class RuntimeComponentView" not in diagnostics_source
     assert "RuntimeComponentView =" not in diagnostics_source
@@ -346,6 +354,46 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "old_flux_atmOcn" not in flux_source
     assert "new_flux_atmOcn" not in flux_source
     assert "def compute_ocean_surface_fluxes" in flux_source
+
+
+@pytest.mark.fast_always
+def test_runtime_contracts_refresh_after_exchange_changes() -> None:
+    atmosphere = DataComponent.from_fields(
+        name="ATM",
+        grid=make_test_grid(name="contract-atm"),
+        fields={"temperature": 280.0, "humidity": 0.5},
+    )
+    ocean = DataComponent.from_fields(
+        name="OCN",
+        grid=make_test_grid(name="contract-ocn"),
+        fields={"sea_surface_temperature": 281.0},
+    )
+    coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
+    coupler.register(cast(Any, atmosphere))
+    coupler.register(cast(Any, ocean))
+    coupler.add_exchange(
+        Exchange(
+            source="ATM",
+            destination="OCN",
+            field_names=("temperature",),
+            regridder_factory=cast(Any, lambda source, destination: object()),
+        )
+    )
+
+    coupler._runtime_state_from_components(prefill_missing=True)
+    assert coupler._runtime_contracts["ATM"].exports == ("temperature",)
+
+    coupler.add_exchange(
+        Exchange(
+            source="ATM",
+            destination="OCN",
+            field_names=("humidity",),
+            regridder_factory=cast(Any, lambda source, destination: object()),
+        )
+    )
+    coupler._runtime_state_from_components(prefill_missing=True)
+
+    assert coupler._runtime_contracts["ATM"].exports == ("temperature", "humidity")
 
 
 def test_runtime_focused_modules_keep_canonical_aggregator_exports() -> None:

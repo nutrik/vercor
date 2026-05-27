@@ -147,14 +147,18 @@ immutable runtime containers used during traced integration.
   and `vercor` reexport the component-author facade. `vercor.components.base`
   owns only the base classes and class-level authoring contracts, while
   module-level factory helpers live in `vercor.components.factories`.
-  Lifecycle hook type aliases and hook installation live in private
-  `vercor.components._lifecycle`. Field declarations and author-value
-  normalization live in private `vercor.components._contracts`, callable
+  Lifecycle hook type aliases, hook storage, and hook installation live in
+  private `vercor.components._lifecycle`; factory-installed hooks are stored in
+  one private `ComponentLifecycleHooks` container rather than as ad-hoc
+  component attributes. Field declarations and author-value normalization live
+  in private `vercor.components._contracts`, callable
   signature adaptation and callable-backed runtime components live in private
   `vercor.components._callable_wrappers`, component-facing runtime-field
-  adapters live in private `vercor.components._runtime_fields`, and setup
-  validation lives in private `vercor.components._validation`. These private
-  modules are not exported from `vercor.components`. Subclasses should call
+  adapters live in private `vercor.components._runtime_fields`, component-facing
+  required-field validation lives in private
+  `vercor.components._runtime_validation`, and setup validation lives in private
+  `vercor.components._validation`. These private modules are not exported from
+  `vercor.components`. Subclasses should call
   the base constructor so `name`,
   `grid`, `data`, and a component-owned `VercorSettings` container are available
   during initialization, execution, and finalization. `Component.data` is a
@@ -221,17 +225,20 @@ immutable runtime containers used during traced integration.
   `vercor.runtime.component_state`, field receive/send mechanics live in
   `vercor.runtime.field_transfer`, and runtime validation lives in
   `vercor.runtime.validation`. Runtime coupler-state assembly,
-  dispatch-context creation, and final-output mask lookup live in
+  runtime-contract refresh, dispatch-context creation, and final-output mask lookup live in
   `vercor.runtime.coupler_state`; exchange topology mask/regridder setup lives
   in `vercor.runtime.topology`, which returns an explicit
   `ExchangeTopologyState` for the public facade to store. Setup-time component
   precision synchronization, initialization context construction, component
   setup validation, runtime contract validation, and topology handoff live in
   `vercor.runtime.initialization`. Host/scanned runtime loops, progress
-  logging, compiled-runtime cache keys, JIT wrapping, donation checks, and
-  interrupt translation live in `vercor.runtime.runner`. `Coupler` delegates to
-  these modules and remains the public setup/finalization facade rather than the
-  owner of runtime adapter mechanics.
+  logging, compiled-runtime cache keys, bundled `RuntimeRunContext` execution
+  inputs, JIT wrapping, donation checks, and interrupt translation live in
+  `vercor.runtime.runner`. Final runtime output iteration and view writing live
+  in `vercor.output`, with `Coupler.finalize()` acting as a validation and
+  delegation wrapper. `Coupler` delegates to these modules and remains the
+  public setup/finalization facade rather than the owner of runtime adapter
+  mechanics.
   payload pytrees carried through `jax.lax.scan` must preserve every leaf's
   shape and dtype between input and output; per-step slices or adapted forcing
   objects should be local values unless they are shape-stable runtime state.
@@ -244,7 +251,10 @@ Reusable concrete adapters live under the canonical packaged namespace
 should not depend on a top-level `setups` package. Setup adapters use
 `ComponentSetupContext`, `ComponentStepContext`, and plain runtime-array
 mappings at their author boundary instead of importing runtime context/store
-internals directly.
+internals directly. Shared setup orchestration helpers in
+`vercor.setups.coupler_helpers` own component registration and compact
+`ExchangeSpec` recipes, so examples share source/destination/regridder wiring
+instead of repeating raw `Exchange(...)` construction.
 
 Core helper ownership follows the same boundary. Calendar constants,
 model-calendar datetime values, leap-year logic, 360/noleap daily mapping, and

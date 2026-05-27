@@ -13,6 +13,8 @@ import xarray as xr
 
 import vercor.components as components_module
 import vercor.components.base as base_module
+from vercor.components._contracts import merge_component_outputs
+from vercor.components._lifecycle import ComponentLifecycleHooks
 from tests._coverage_support import DummyComponent, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.forcing_data import read_forcing
@@ -543,6 +545,140 @@ def test_data_component_seeding_updates_declared_outputs() -> None:
 
     assert component.field_spec.outputs == ("temperature", "humidity", "pressure")
     assert component.field_names == ("temperature", "humidity", "pressure")
+
+
+@pytest.mark.fast_always
+def test_merge_component_outputs_is_pure_and_preserves_contract_details() -> None:
+    field_spec = base_module.ComponentFieldSpec(
+        inputs=("forcing",),
+        outputs=("temperature",),
+        default_fields={"temperature": 280.0},
+    )
+
+    merged = merge_component_outputs(field_spec, ("humidity", "temperature"))
+
+    assert merged is not field_spec
+    assert field_spec.outputs == ("temperature",)
+    assert merged.inputs == ("forcing",)
+    assert merged.outputs == ("temperature", "humidity")
+    assert merged.default_fields == {"temperature": 280.0}
+
+
+@pytest.mark.fast_always
+def test_data_component_seeding_preserves_inputs_and_defaults() -> None:
+    grid = make_test_grid(name="data-contract-preserve")
+    component = base_module.DataComponent(name="DATA", grid=grid)
+    component.declare_fields(
+        inputs=("forcing",),
+        default_fields={"temperature": 280.0},
+    )
+
+    component.seed_fields({"humidity": 0.5})
+
+    assert component.field_spec.inputs == ("forcing",)
+    assert component.field_spec.outputs == ("humidity",)
+    assert "temperature" in component.field_spec.default_fields
+
+
+@pytest.mark.fast_always
+def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> None:
+    grid = make_test_grid(name="lifecycle-container")
+    events: list[str] = []
+
+    def step(fields: Mapping[str, RuntimeArray]) -> Mapping[str, RuntimeArray]:
+        return {"temperature": fields["temperature"] + 1.0}
+
+    def initialize(component: Any, context: ComponentInitContext) -> None:
+        _ = context
+        events.append(f"initialize:{component.name}")
+
+    def create_runtime_payload(component: Any) -> dict[str, int]:
+        events.append(f"payload:{component.name}")
+        return {"counter": 1}
+
+    def prefill(
+        component: Any,
+        data: dict[str, RuntimeArray],
+        incoming: dict[str, RuntimeArray],
+        outgoing: dict[str, RuntimeArray],
+        contract: RuntimeComponentContract,
+    ) -> None:
+        _ = incoming, outgoing, contract
+        events.append(f"prefill:{component.name}")
+        component.prefill_runtime_fields(data, outputs=("temperature",))
+
+    def validate(
+        component: Any,
+        state: RuntimeComponentState,
+        contract: RuntimeComponentContract,
+    ) -> None:
+        _ = contract
+        events.append(f"validate:{component.name}")
+        component.require_runtime_fields(state, "temperature")
+
+    factories = (
+        components_module.data_component(
+            name="DATA",
+            grid=grid,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill,
+            validate_runtime_state=validate,
+        ),
+        components_module.differentiable_component(
+            name="ATM",
+            grid=grid,
+            step=step,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill,
+            validate_runtime_state=validate,
+        ),
+        components_module.host_component(
+            name="HOST",
+            grid=grid,
+            step=step,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill,
+            validate_runtime_state=validate,
+        ),
+    )
+
+    for component in factories:
+        assert isinstance(component._lifecycle_hooks, ComponentLifecycleHooks)
+        assert not hasattr(component, "_initialize_hook")
+        assert not hasattr(component, "_create_runtime_payload_hook")
+        component.initialize(
+            ComponentInitContext(
+                start=datetime(2000, 1, 1),
+                dt_seconds=60.0,
+                logger=cast(Any, None),
+                settings=VercorSettings(),
+                run_sequence=RunSequence(order=[component.name]),
+            )
+        )
+        state = create_runtime_component_state(
+            component,
+            prefill_missing=True,
+            contract=RuntimeComponentContract(),
+        )
+        component.validate_runtime_state(state, RuntimeComponentContract())
+
+    assert events == [
+        "initialize:DATA",
+        "prefill:DATA",
+        "payload:DATA",
+        "validate:DATA",
+        "initialize:ATM",
+        "prefill:ATM",
+        "payload:ATM",
+        "validate:ATM",
+        "initialize:HOST",
+        "prefill:HOST",
+        "payload:HOST",
+        "validate:HOST",
+    ]
 
 
 @pytest.mark.fast_always

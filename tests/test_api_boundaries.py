@@ -236,6 +236,9 @@ def test_component_base_internals_are_private_modules() -> None:
     runtime_fields_source = Path("vercor/components/_runtime_fields.py").read_text(
         encoding="utf-8"
     )
+    runtime_validation_source = Path(
+        "vercor/components/_runtime_validation.py"
+    ).read_text(encoding="utf-8")
     factories_source = Path("vercor/components/factories.py").read_text(
         encoding="utf-8"
     )
@@ -258,8 +261,10 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def with_runtime_fields(" in runtime_fields_source
     assert "def apply_step_result(" in runtime_fields_source
     assert "def prefill_runtime_fields(" in runtime_fields_source
-    assert "def require_runtime_fields(" in runtime_fields_source
-    assert "def validate_declared_runtime_fields(" in runtime_fields_source
+    assert "def require_runtime_fields(" not in runtime_fields_source
+    assert "def validate_declared_runtime_fields(" not in runtime_fields_source
+    assert "def require_runtime_fields(" in runtime_validation_source
+    assert "def validate_declared_runtime_fields(" in runtime_validation_source
     assert "def validate_component_setup" in validation_source
     assert "def _author_field_spec(" not in base_source
     assert "def component_field_spec(" not in contracts_source
@@ -271,6 +276,7 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def host_component(" not in base_source
     assert "def _install_lifecycle_hooks(" not in factories_source
     assert "def install_lifecycle_hooks(" in lifecycle_source
+    assert "class ComponentLifecycleHooks" in lifecycle_source
     assert "ComponentInitializeHook" in lifecycle_source
     assert "ComponentCreatePayloadHook" in lifecycle_source
     assert "ComponentPrefillHook" in lifecycle_source
@@ -280,6 +286,7 @@ def test_component_base_internals_are_private_modules() -> None:
         callable_source
     )
     assert "def _callable_component_from_model(" in factories_source
+    assert "class CallableComponentRequest" in factories_source
     assert factories_source.count("_create_callable_component(") == 1
     assert "def data_component(" in factories_source
     assert "def differentiable_component(" in factories_source
@@ -312,6 +319,8 @@ def test_component_base_internals_are_private_modules() -> None:
         "component_state.data.replace_many(fields)",
         "validate_runtime_component_data_field",
         "from vercor.runtime.validation import",
+        "_initialize_hook",
+        "_create_runtime_payload_hook",
     )
     for marker in private_markers:
         assert marker not in base_source
@@ -326,6 +335,7 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "_callable_wrappers" not in components_module.__all__
     assert "_runtime_fields" not in components_module.__all__
     assert "_validation" not in components_module.__all__
+    assert "_runtime_validation" not in components_module.__all__
 
 
 @pytest.mark.fast_always
@@ -393,7 +403,13 @@ def test_setup_forcing_reader_facade_is_removed() -> None:
 
 @pytest.mark.fast_always
 def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
-    from vercor.setups.coupler_helpers import add_exchanges, build_coupler
+    from vercor.setups.coupler_helpers import (
+        ExchangeSpec,
+        add_exchange_specs,
+        add_exchanges,
+        build_coupler,
+        build_exchanges,
+    )
 
     grid = make_test_grid(name="shared")
     ocean = DataComponent(name="OCN", grid=grid)
@@ -419,6 +435,30 @@ def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
     assert coupler.run_sequence is run_sequence
     assert coupler.exchanges == [exchange]
 
+    specs = (
+        ExchangeSpec(
+            source="OCN",
+            destination="ATM",
+            field_names=("sea_surface_temperature",),
+            regridder_factory=bilinear,
+        ),
+    )
+    built = build_exchanges(specs)
+    assert len(built) == 1
+    assert built[0].source == exchange.source
+    assert built[0].destination == exchange.destination
+    assert tuple(built[0].field_names) == tuple(exchange.field_names)
+    assert built[0].regridder_factory is exchange.regridder_factory
+
+    second_coupler = build_coupler(
+        clock=clock,
+        components=(ocean, atmosphere),
+        run_sequence=run_sequence,
+    )
+    add_exchange_specs(second_coupler, specs)
+    assert len(second_coupler.exchanges) == 1
+    assert second_coupler.exchanges[0].field_names == ("sea_surface_temperature",)
+
 
 @pytest.mark.fast_always
 def test_multi_exchange_setup_scripts_use_shared_add_exchanges_helper() -> None:
@@ -432,7 +472,7 @@ def test_multi_exchange_setup_scripts_use_shared_add_exchanges_helper() -> None:
 
     for path in multi_exchange_scripts:
         source = path.read_text(encoding="utf-8")
-        assert "add_exchanges" in source, path
+        assert "add_exchange_specs" in source, path
         assert "cpl.add_exchange(" not in source, path
 
 
@@ -768,6 +808,8 @@ def test_common_exchange_recipes_are_centralized_for_examples() -> None:
     for path in recipe_users:
         source = path.read_text(encoding="utf-8")
         assert "from vercor.setups.exchange_recipes import" in source, path
+        if path.name.startswith("run_"):
+            assert "ExchangeSpec(" in source, path
 
 
 @pytest.mark.fast_always
@@ -873,12 +915,13 @@ def test_data_and_host_factories_return_core_contract_instances() -> None:
 @pytest.mark.parametrize(
     "import_statement",
     (
-        "import vercor.setups.external.jax_gcm",
-        "from vercor.setups.external import jax_gcm as jax_gcm_module",
-        "from vercor.setups.external import make_jax_gcm",
+        "import vercor.setups.external",
+        "import vercor.setups.data",
+        "import vercor.setups.jcm_setup_helpers",
+        "from vercor.setups.external import __all__",
+        "from vercor.setups.data import __all__",
         "import vercor.setups.data.era5_land",
         "from vercor.setups.data import make_era5_land",
-        "import vercor.setups.external.camulator",
     ),
 )
 def test_unrelated_setup_imports_do_not_initialize_optional_adapters(
@@ -903,3 +946,17 @@ def test_unrelated_setup_imports_do_not_initialize_optional_adapters(
     )
     for marker in forbidden_markers:
         assert marker not in output
+
+    module_probe = (
+        "import sys\n"
+        f"{import_statement}\n"
+        "heavy = {'torch', 'jcm', 'dinosaur', 'veros'} & set(sys.modules)\n"
+        "assert not heavy, sorted(heavy)\n"
+    )
+    subprocess.run(
+        [sys.executable, "-c", module_probe],
+        cwd=Path(__file__).resolve().parents[1],
+        text=True,
+        capture_output=True,
+        check=True,
+    )

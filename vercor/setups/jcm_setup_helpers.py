@@ -4,11 +4,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from vercor.setups.data.jcm_land import make_jcm_land
-from vercor.setups.external.jax_gcm import make_jax_gcm
-from vercor.setups.external.jax_gcm_tools import (
-    generate_jcm_coords_forcing_topography_files,
-)
 from vercor.host_arrays import transposed_host_array
 from vercor.components import Component, DataComponent
 from vercor.grid import RectilinearGrid
@@ -23,6 +18,32 @@ class JCMLandAtmosphereSetup:
     coords: Any
     terrain: Any
     forcing: Any
+
+
+def generate_jcm_coords_forcing_topography_files(*args: Any, **kwargs: Any) -> Any:
+    """Load JCM setup data through the optional JCM dependency boundary."""
+
+    from vercor.setups.external.jax_gcm_tools import (
+        generate_jcm_coords_forcing_topography_files as _generate,
+    )
+
+    return _generate(*args, **kwargs)
+
+
+def make_jcm_land(*args: Any, **kwargs: Any) -> DataComponent:
+    """Create a JCM land component through the optional JCM dependency boundary."""
+
+    from vercor.setups.data.jcm_land import make_jcm_land as _make_jcm_land
+
+    return _make_jcm_land(*args, **kwargs)
+
+
+def make_jax_gcm(*args: Any, **kwargs: Any) -> Component:
+    """Create a JAXGCM component through the optional JCM dependency boundary."""
+
+    from vercor.setups.external.jax_gcm import make_jax_gcm as _make_jax_gcm
+
+    return _make_jax_gcm(*args, **kwargs)
 
 
 def build_jcm_land_atmosphere_components(

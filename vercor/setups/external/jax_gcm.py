@@ -466,6 +466,25 @@ class _JAXGCMState:
         if time is None:
             return step_result
 
+        self._record_jax_gcm_host_step(
+            step_result=step_result,
+            prediction=prediction,
+            applied_forcing=applied_forcing,
+            context=context,
+        )
+        return step_result
+
+    def _record_jax_gcm_host_step(
+        self,
+        *,
+        step_result: ComponentStepResult,
+        prediction: Predictions,
+        applied_forcing: Any,
+        context: ComponentStepContext,
+    ) -> None:
+        """Record host-side JAXGCM mirrors and optional period output."""
+
+        logger = context.logger
         if isinstance(step_result.payload, JAXGCMRuntimePayload):
             self._state = step_result.payload.jcm_state
             self.forcing = applied_forcing
@@ -483,7 +502,8 @@ class _JAXGCMState:
                 jnp.sum(cold_surface_cells),
             )
 
-        if should_write_period_output(
+        time = context.time
+        if time is not None and should_write_period_output(
             time=time,
             dt=timedelta(seconds=context.dt_seconds),
             output_frequency=self.output_frequency,
@@ -494,8 +514,6 @@ class _JAXGCMState:
                 output=f"jcm.averages.{date_time}.nc",
                 logger=logger,
             )
-
-        return step_result
 
 
 def make_jax_gcm(

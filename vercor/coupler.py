@@ -12,17 +12,16 @@ from vercor.jax_logging import (
     JaxCallbackLogger,
     LoggerLike,
     configure_python_logger,
-    setup_logger,
+    setup_logger as _setup_logger,
 )
 from vercor.run_sequence import RunSequence
-from vercor.output import write_runtime_component_view_to_netcdf
+import vercor.output as _output
 from vercor.runtime import (
     RuntimeComponentContract,
     RuntimeCouplerState,
-    build_runtime_contracts,
 )
 from vercor.runtime.coupler_state import (
-    output_masks_for_component,
+    refresh_runtime_contracts,
     runtime_dispatch_context,
     runtime_state_from_components,
     validate_runtime_state as validate_coupler_runtime_state,
@@ -33,7 +32,11 @@ from vercor.runtime.initialization import (
     validate_registered_component_setup,
 )
 from vercor.runtime.interrupts import RuntimeInterruptController
-from vercor.runtime.runner import run_coupler_runtime, run_scanned_runtime
+from vercor.runtime.runner import (
+    RuntimeRunContext,
+    run_coupler_runtime,
+    run_scanned_runtime,
+)
 from vercor.runtime.time import initial_runtime_step_info
 from vercor.runtime.topology import RuntimeRegridder
 from vercor.runtime.views import RuntimeComponentView
@@ -62,7 +65,6 @@ class Coupler:
         components: mapping of component name to component instance
         exchanges: list of all Exchange instances
         settings: VercorSettings instance for coupler settings
-        ocn_bmask_on_atm_grid: binary ocean mask regridded onto atmosphere grid
         lnd_bmask_on_atm_grid: binary land mask regridded onto atmosphere grid
         ocn_fmask_on_atm_grid: fractional ocean mask regridded onto atmosphere grid
         lnd_fmask_on_atm_grid: fractional land mask regridded onto atmosphere grid
@@ -86,12 +88,11 @@ class Coupler:
 
     clock: Clock
     log_level: int | str = "INFO"
-    logger: LoggerLike = field(default_factory=setup_logger)
+    logger: LoggerLike = field(default_factory=_setup_logger)
     run_sequence: RunSequence = field(init=False)
     components: dict[str, Component] = field(default_factory=dict)
     exchanges: list[Exchange] = field(default_factory=list)
     settings: VercorSettings = field(default_factory=VercorSettings)
-    ocn_bmask_on_atm_grid: RuntimeArray = field(init=False)
     lnd_bmask_on_atm_grid: RuntimeArray = field(init=False)
     ocn_fmask_on_atm_grid: RuntimeArray = field(init=False)
     lnd_fmask_on_atm_grid: RuntimeArray = field(init=False)
@@ -213,8 +214,8 @@ class Coupler:
     def _runtime_state_from_components(
         self, *, prefill_missing: bool = False
     ) -> RuntimeCouplerState:
-        self._runtime_contracts = build_runtime_contracts(
-            tuple(self.components),
+        self._runtime_contracts = refresh_runtime_contracts(
+            self.components,
             self.exchanges,
             validate_endpoints=False,
         )
@@ -228,12 +229,11 @@ class Coupler:
         )
 
     def _validate_runtime_state(self, runtime_state: RuntimeCouplerState) -> None:
-        if set(self._runtime_contracts) != set(self.components):
-            self._runtime_contracts = build_runtime_contracts(
-                tuple(self.components),
-                self.exchanges,
-                validate_endpoints=False,
-            )
+        self._runtime_contracts = refresh_runtime_contracts(
+            self.components,
+            self.exchanges,
+            validate_endpoints=False,
+        )
 
         validate_coupler_runtime_state(
             runtime_state,
@@ -293,6 +293,24 @@ class Coupler:
             settings=self.settings,
         )
 
+    def _runtime_run_context(self) -> RuntimeRunContext:
+        """Return static runtime inputs bundled for execution."""
+
+        return RuntimeRunContext(
+            components=self.components,
+            run_sequence=tuple(self.run_sequence),
+            exchanges=self.exchanges,
+            regridders=self._regridders,
+            contracts=self._runtime_contracts,
+            clock=self.clock,
+            settings=self.settings,
+            logger=self.logger,
+            log_level=self.log_level,
+            dispatch_context=self._runtime_dispatch_context(),
+            compiled_runtime_cache=self._compiled_runtime_cache,
+            interrupts=self._runtime_interrupts,
+        )
+
     def runtime_component_view(
         self,
         runtime_state: RuntimeCouplerState,
@@ -320,24 +338,17 @@ class Coupler:
         """
 
         self.logger.info(" ------------ Finalizing coupler and components ------------")
-        for name, component in self.components.items():
+        for component in self.components.values():
             validate_registered_component_setup(component)
-            if output_file_mask is None:
-                filepath = Path(f"{name.lower()}_component_runtime_fields.nc")
-            else:
-                filepath = Path(f"{name.lower()}_{output_file_mask}.nc")
-            view = self.runtime_component_view(final_state, name)
-            write_runtime_component_view_to_netcdf(
-                view,
-                filepath,
-                masks=output_masks_for_component(
-                    name,
-                    self.exchanges,
-                    self._binary_masks,
-                    self._fractional_masks,
-                ),
-            )
-            self.logger.info(f" Finalized {name}")
+        _output.write_coupler_runtime_outputs(
+            final_state=final_state,
+            components=self.components,
+            exchanges=self.exchanges,
+            binary_masks=self._binary_masks,
+            fractional_masks=self._fractional_masks,
+            output_file_mask=output_file_mask,
+            logger=self.logger,
+        )
 
     def __str__(self) -> str:
         return (
@@ -374,18 +385,7 @@ class Coupler:
         runtime_state = self._prepare_runtime_state(initial_state)
         return run_coupler_runtime(
             runtime_state,
-            components=self.components,
-            run_sequence=tuple(self.run_sequence),
-            exchanges=self.exchanges,
-            regridders=self._regridders,
-            contracts=self._runtime_contracts,
-            clock=self.clock,
-            settings=self.settings,
-            logger=self.logger,
-            log_level=self.log_level,
-            dispatch_context=self._runtime_dispatch_context(),
-            compiled_runtime_cache=self._compiled_runtime_cache,
-            interrupts=self._runtime_interrupts,
+            context=self._runtime_run_context(),
             donate_state=donate_state,
         )
 

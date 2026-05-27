@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
@@ -35,6 +36,24 @@ if TYPE_CHECKING:
 CompiledRuntime = Callable[[RuntimeCouplerState], RuntimeCouplerState]
 
 
+@dataclass
+class RuntimeRunContext:
+    """Static inputs required to run one configured coupler runtime."""
+
+    components: Mapping[str, Component]
+    run_sequence: Sequence[str]
+    exchanges: Sequence[Exchange]
+    regridders: Mapping[tuple[str, str, str], Any]
+    contracts: Mapping[str, RuntimeComponentContract]
+    clock: Clock
+    settings: VercorSettings
+    logger: LoggerLike
+    log_level: int | str
+    dispatch_context: RuntimeDispatchContext
+    compiled_runtime_cache: MutableMapping[tuple[Any, ...], CompiledRuntime]
+    interrupts: RuntimeInterruptController
+
+
 def runtime_step_progress_message(n: int, time: object, dt: object) -> str:
     """Return the shared host/scanned runtime step progress message."""
 
@@ -50,38 +69,18 @@ def runtime_component_progress_message(component_name: str) -> str:
 def run_coupler_runtime(
     runtime_state: RuntimeCouplerState,
     *,
-    components: Mapping[str, Component],
-    run_sequence: Sequence[str],
-    exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], Any],
-    contracts: Mapping[str, RuntimeComponentContract],
-    clock: Clock,
-    settings: VercorSettings,
-    logger: LoggerLike,
-    log_level: int | str,
-    dispatch_context: RuntimeDispatchContext,
-    compiled_runtime_cache: MutableMapping[tuple[Any, ...], CompiledRuntime],
-    interrupts: RuntimeInterruptController,
+    context: RuntimeRunContext,
     donate_state: bool,
 ) -> RuntimeCouplerState:
     """Run a validated runtime state through the host or compiled scanned path."""
 
-    with interrupts.signal_scope():
-        host_names = host_component_names(components)
+    with context.interrupts.signal_scope():
+        host_names = host_component_names(context.components)
         if not host_names:
             try:
                 cache_key = compiled_runtime_cache_key(
                     donate_state=donate_state,
-                    components=components,
-                    run_sequence=run_sequence,
-                    exchanges=exchanges,
-                    regridders=regridders,
-                    logger=logger,
-                    interrupts=interrupts,
-                    log_level=log_level,
-                    contracts=contracts,
-                    clock=clock,
-                    settings=settings,
+                    context=context,
                 )
 
                 def scanned_runtime(
@@ -89,22 +88,22 @@ def run_coupler_runtime(
                 ) -> RuntimeCouplerState:
                     return run_scanned_runtime(
                         state,
-                        run_sequence=run_sequence,
-                        clock=clock,
-                        settings=settings,
-                        logger=logger,
-                        dispatch_context=dispatch_context,
-                        interrupts=interrupts,
+                        run_sequence=context.run_sequence,
+                        clock=context.clock,
+                        settings=context.settings,
+                        logger=context.logger,
+                        dispatch_context=context.dispatch_context,
+                        interrupts=context.interrupts,
                     )
 
                 return compiled_scanned_runtime(
                     scanned_runtime,
-                    cache=compiled_runtime_cache,
+                    cache=context.compiled_runtime_cache,
                     cache_key=cache_key,
                     donate_state=donate_state,
                 )(runtime_state)
             except JaxRuntimeError as error:
-                interrupts.raise_if_jax_callback_interrupted(
+                context.interrupts.raise_if_jax_callback_interrupted(
                     error,
                     "compiled scanned runtime",
                 )
@@ -118,12 +117,12 @@ def run_coupler_runtime(
 
         return run_host_runtime(
             runtime_state,
-            run_sequence=run_sequence,
-            clock=clock,
-            settings=settings,
-            logger=logger,
-            dispatch_context=dispatch_context,
-            interrupts=interrupts,
+            run_sequence=context.run_sequence,
+            clock=context.clock,
+            settings=context.settings,
+            logger=context.logger,
+            dispatch_context=context.dispatch_context,
+            interrupts=context.interrupts,
         )
 
 
@@ -285,23 +284,14 @@ def compiled_scanned_runtime(
 def compiled_runtime_cache_key(
     *,
     donate_state: bool,
-    components: Mapping[str, Component],
-    run_sequence: Sequence[str],
-    exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], Any],
-    logger: LoggerLike,
-    interrupts: RuntimeInterruptController,
-    log_level: int | str,
-    contracts: Mapping[str, RuntimeComponentContract],
-    clock: Clock,
-    settings: VercorSettings,
+    context: RuntimeRunContext,
 ) -> tuple[Any, ...]:
     """Return a static cache key for the compiled pure-runtime wrapper."""
 
     return (
         donate_state,
-        tuple((name, id(component)) for name, component in components.items()),
-        tuple(run_sequence),
+        tuple((name, id(component)) for name, component in context.components.items()),
+        tuple(context.run_sequence),
         tuple(
             (
                 id(exchange),
@@ -310,19 +300,19 @@ def compiled_runtime_cache_key(
                 exchange.interpolation_type,
                 tuple(exchange.field_names),
             )
-            for exchange in exchanges
+            for exchange in context.exchanges
         ),
-        tuple(sorted((key, id(value)) for key, value in regridders.items())),
-        id(logger),
-        id(interrupts),
-        effective_log_level(logger, log_level),
+        tuple(sorted((key, id(value)) for key, value in context.regridders.items())),
+        id(context.logger),
+        id(context.interrupts),
+        effective_log_level(context.logger, context.log_level),
         tuple(
             (name, contract.imports, contract.exports)
-            for name, contract in sorted(contracts.items())
+            for name, contract in sorted(context.contracts.items())
         ),
-        repr(clock.start),
-        clock.dt_seconds,
-        clock.steps,
-        clock.year_type,
-        settings.year_in_seconds,
+        repr(context.clock.start),
+        context.clock.dt_seconds,
+        context.clock.steps,
+        context.clock.year_type,
+        context.settings.year_in_seconds,
     )

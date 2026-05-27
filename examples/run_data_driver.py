@@ -1,9 +1,13 @@
 from datetime import datetime
 from typing import Any, Callable
 
-from vercor import Clock, Exchange, RunSequence
+from vercor import Clock, RunSequence
 from vercor.diagnostics import component_vector_speed
-from vercor.setups.coupler_helpers import add_exchanges, build_coupler
+from vercor.setups.coupler_helpers import (
+    ExchangeSpec,
+    add_exchange_specs,
+    build_coupler,
+)
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.setups.data.era5_land import make_era5_land
 from vercor.setups.data.erainterim_ocean import make_erainterim_ocean
@@ -46,40 +50,40 @@ if __name__ == "__main__":
     # Exchanges
     # scalar fields (vector field))
     # ["qbot", "zbot", ("ubot", "vbot")]
-    add_exchanges(
+    add_exchange_specs(
         cpl,
         (
-            Exchange(
+            ExchangeSpec(
                 source="ATM",
                 destination="OCN",
                 field_names=ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
                 regridder_factory=bilinear,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="ATM",
                 destination="OCN",
                 field_names=ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
                 regridder_factory=conservative,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="ATM",
                 destination="LND",
                 field_names=ATMOSPHERE_TO_LAND_STATE_FIELDS,
                 regridder_factory=bilinear,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="ATM",
                 destination="LND",
                 field_names=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
                 regridder_factory=conservative,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="OCN",
                 destination="ATM",
                 field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="LND",
                 destination="ATM",
                 field_names=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,

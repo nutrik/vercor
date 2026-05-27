@@ -13,6 +13,8 @@ import numpy as np
 import pytest
 
 import vercor.runtime.topology as topology_module
+import vercor.coupler as coupler_module
+import vercor.output as output_module
 from tests._coverage_support import (
     DummyComponent,
     RecordingRegridder,
@@ -23,7 +25,7 @@ from tests.assertions import assert_allclose_compact
 from vercor.clock import Clock
 from vercor.components.base import Component, HostRuntimeComponent
 from vercor.runtime.contexts import RuntimeStepContext
-from vercor.coupler import Coupler, setup_logger
+from vercor.coupler import Coupler
 from vercor.exceptions import ComponentError, CouplerError, ExchangerError
 from vercor.exchange import Exchange
 from vercor.jax_logging import (
@@ -32,6 +34,7 @@ from vercor.jax_logging import (
     DEFAULT_LOGGER_NAME,
     JaxCallbackLogger,
     get_default_logger,
+    setup_logger,
 )
 from vercor.regridders.bilinear import bilinear
 from vercor.regridders.conservative import conservative
@@ -279,6 +282,11 @@ def test_coupler_accepts_log_level_at_instantiation() -> None:
 
     assert not coupler.logger.isEnabledFor(logging.INFO)
     assert coupler.logger.isEnabledFor(logging.WARNING)
+
+
+@pytest.mark.fast_always
+def test_coupler_module_does_not_reexport_logger_setup_helper() -> None:
+    assert not hasattr(coupler_module, "setup_logger")
 
 
 def test_coupler_wraps_injected_python_logger_for_scanned_runtime() -> None:
@@ -1043,6 +1051,36 @@ def test_coupler_finalize_writes_runtime_outputs_for_all_components(
     }
     coupler.components = cast(Any, components)
     state = coupler._runtime_state_from_components(prefill_missing=True)
+    captured: dict[str, Any] = {}
+
+    def fake_write_outputs(**kwargs: Any) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        output_module, "write_coupler_runtime_outputs", fake_write_outputs
+    )
+
+    coupler.finalize(state, Path("snapshot"))
+
+    assert captured["final_state"] is state
+    assert captured["components"] is coupler.components
+    assert captured["exchanges"] is coupler.exchanges
+    assert captured["binary_masks"] is coupler._binary_masks
+    assert captured["fractional_masks"] is coupler._fractional_masks
+    assert captured["output_file_mask"] == Path("snapshot")
+    assert captured["logger"] is coupler.logger
+
+
+def test_output_boundary_builds_runtime_views_filenames_and_masks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coupler = make_coupler()
+    components = {
+        "ATM": DummyComponent(name="ATM", grid=make_test_grid(name="atm")),
+        "OCN": DummyComponent(name="OCN", grid=make_test_grid(name="ocn")),
+    }
+    coupler.components = cast(Any, components)
+    state = coupler._runtime_state_from_components(prefill_missing=True)
     captured: list[tuple[str, Any, Path, dict[str, Any]]] = []
 
     def fake_write(
@@ -1054,10 +1092,18 @@ def test_coupler_finalize_writes_runtime_outputs_for_all_components(
         captured.append((view.name, view, filename, masks or {}))
 
     monkeypatch.setattr(
-        "vercor.coupler.write_runtime_component_view_to_netcdf", fake_write
+        output_module, "write_runtime_component_view_to_netcdf", fake_write
     )
 
-    coupler.finalize(state, Path("snapshot"))
+    output_module.write_coupler_runtime_outputs(
+        final_state=state,
+        components=coupler.components,
+        exchanges=coupler.exchanges,
+        binary_masks=coupler._binary_masks,
+        fractional_masks=coupler._fractional_masks,
+        output_file_mask=Path("snapshot"),
+        logger=coupler.logger,
+    )
 
     assert [item[0] for item in captured] == ["ATM", "OCN"]
     assert captured[0][1].grid is components["ATM"].grid

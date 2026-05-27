@@ -106,13 +106,12 @@ def declared_runtime_field_names(field_spec: ComponentFieldSpec) -> tuple[str, .
 
 
 def merge_component_outputs(
-    component: Any,
+    field_spec: ComponentFieldSpec,
     output_names: Iterable[str],
-) -> None:
-    """Merge output names into a component field declaration."""
+) -> ComponentFieldSpec:
+    """Return ``field_spec`` with additional output names merged in."""
 
-    field_spec = component.field_spec
-    component._field_spec = ComponentFieldSpec(
+    return ComponentFieldSpec(
         inputs=field_spec.inputs,
         outputs=unique_field_names((*field_spec.outputs, *tuple(output_names))),
         default_fields=field_spec.default_fields,

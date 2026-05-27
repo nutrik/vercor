@@ -1,9 +1,18 @@
 from pathlib import Path
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING
 import xarray as xr
 
+from vercor.exchange import Exchange
 from vercor.host_arrays import runtime_array_to_host
+from vercor.runtime.coupler_state import output_masks_for_component
+from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.views import RuntimeComponentView
 from vercor.types import RuntimeArray
+
+if TYPE_CHECKING:
+    from vercor.components.base import Component
+    from vercor.jax_logging import LoggerLike
 
 
 def write_runtime_component_view_to_netcdf(
@@ -60,3 +69,39 @@ def write_runtime_component_view_to_netcdf(
         data_vars=data_vars,
         coords={"latitude": lat, "longitude": lon},
     ).to_netcdf(filename)
+
+
+def write_coupler_runtime_outputs(
+    *,
+    final_state: RuntimeCouplerState,
+    components: Mapping[str, "Component"],
+    exchanges: Sequence[Exchange],
+    binary_masks: Mapping[tuple[str, str, str], RuntimeArray],
+    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray],
+    output_file_mask: Path | None = None,
+    logger: "LoggerLike | None" = None,
+) -> None:
+    """Write final runtime component views for all configured components."""
+
+    for name, component in components.items():
+        if output_file_mask is None:
+            filepath = Path(f"{name.lower()}_component_runtime_fields.nc")
+        else:
+            filepath = Path(f"{name.lower()}_{output_file_mask}.nc")
+        view = RuntimeComponentView.from_component_state(
+            name,
+            component.grid,
+            final_state.get_component_state(name),
+        )
+        write_runtime_component_view_to_netcdf(
+            view,
+            filepath,
+            masks=output_masks_for_component(
+                name,
+                exchanges,
+                binary_masks,
+                fractional_masks,
+            ),
+        )
+        if logger is not None:
+            logger.info(f" Finalized {name}")

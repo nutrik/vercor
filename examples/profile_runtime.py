@@ -8,7 +8,8 @@ from typing import Sequence
 
 import jax
 
-from vercor import Clock, Coupler, Exchange, RunSequence
+from vercor import Clock, Coupler, RunSequence
+from vercor.setups.coupler_helpers import ExchangeSpec, add_exchange_specs
 from vercor.setups.slab.atmosphere import make_slab_atmosphere
 from vercor.setups.slab.land import make_slab_land
 from vercor.setups.slab.ocean import make_slab_ocean
@@ -139,53 +140,46 @@ def build_slab_coupler(
     ):
         coupler.register(component)
     coupler.set_components_run_sequence(RunSequence(order=["OCN", "ATM", "LND", "ICE"]))
-    coupler.add_exchange(
-        Exchange(
-            source="OCN",
-            destination="ATM",
-            field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
-            regridder_factory=bilinear,
-        )
-    )
-    coupler.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="OCN",
-            field_names=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
-            regridder_factory=bilinear,
-        )
-    )
-    coupler.add_exchange(
-        Exchange(
-            source="ATM",
-            destination="LND",
-            field_names=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-            regridder_factory=conservative,
-        )
-    )
-    coupler.add_exchange(
-        Exchange(
-            source="LND",
-            destination="ATM",
-            field_names=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
-            regridder_factory=bilinear,
-        )
-    )
-    coupler.add_exchange(
-        Exchange(
-            source="OCN",
-            destination="ICE",
-            field_names=OCEAN_TO_SEAICE_SURFACE_FIELDS,
-            regridder_factory=bilinear,
-        )
-    )
-    coupler.add_exchange(
-        Exchange(
-            source="ICE",
-            destination="OCN",
-            field_names=SEAICE_TO_OCEAN_FIELDS,
-            regridder_factory=conservative,
-        )
+    add_exchange_specs(
+        coupler,
+        (
+            ExchangeSpec(
+                source="OCN",
+                destination="ATM",
+                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+                regridder_factory=bilinear,
+            ),
+            ExchangeSpec(
+                source="ATM",
+                destination="OCN",
+                field_names=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+                regridder_factory=bilinear,
+            ),
+            ExchangeSpec(
+                source="ATM",
+                destination="LND",
+                field_names=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+                regridder_factory=conservative,
+            ),
+            ExchangeSpec(
+                source="LND",
+                destination="ATM",
+                field_names=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
+                regridder_factory=bilinear,
+            ),
+            ExchangeSpec(
+                source="OCN",
+                destination="ICE",
+                field_names=OCEAN_TO_SEAICE_SURFACE_FIELDS,
+                regridder_factory=bilinear,
+            ),
+            ExchangeSpec(
+                source="ICE",
+                destination="OCN",
+                field_names=SEAICE_TO_OCEAN_FIELDS,
+                regridder_factory=conservative,
+            ),
+        ),
     )
     coupler.initialize()
     return coupler

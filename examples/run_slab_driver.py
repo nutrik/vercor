@@ -4,8 +4,12 @@ from typing import Any, cast
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from vercor import Clock, Exchange, RunSequence
-from vercor.setups.coupler_helpers import add_exchanges, build_coupler
+from vercor import Clock, RunSequence
+from vercor.setups.coupler_helpers import (
+    ExchangeSpec,
+    add_exchange_specs,
+    build_coupler,
+)
 from vercor.setups.slab.atmosphere import make_slab_atmosphere
 from vercor.setups.slab.land import make_slab_land
 from vercor.setups.slab.ocean import make_slab_ocean
@@ -62,46 +66,46 @@ if __name__ == "__main__":
     # Exchanges
     # scalar fields (vector field))
     # ["SHF", "LHF", ("u10m", "v10m")]
-    add_exchanges(
+    add_exchange_specs(
         cpl,
         (
-            Exchange(
+            ExchangeSpec(
                 source="ATM",
                 destination="OCN",
                 field_names=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
                 regridder_factory=bilinear,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="OCN",
                 destination="ATM",
                 field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="OCN",
                 destination="ICE",
                 field_names=OCEAN_TO_SEAICE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="LND",
                 destination="ATM",
                 field_names=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
                 regridder_factory=bilinear,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="ATM",
                 destination="LND",
                 field_names=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
                 regridder_factory=conservative,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="OCN",
                 destination="ICE",
                 field_names=OCEAN_TO_SEAICE_SURFACE_FIELDS,
                 regridder_factory=conservative,
             ),
-            Exchange(
+            ExchangeSpec(
                 source="ICE",
                 destination="OCN",
                 field_names=SEAICE_TO_OCEAN_FIELDS,

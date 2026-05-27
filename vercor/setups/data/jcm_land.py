@@ -1,15 +1,17 @@
 import jax
 import jax.numpy as jnp
 from jax.typing import ArrayLike
-
-from dinosaur.coordinate_systems import CoordinateSystem
-from jcm.forcing import ForcingData
+from typing import TYPE_CHECKING, Any
 
 from vercor.components import DataComponent, data_component
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
 from vercor.grid_masks import create_lnd_mask_from_ocn
 from vercor.setups.data._field_helpers import canonicalize_surface_field
+
+if TYPE_CHECKING:
+    from dinosaur.coordinate_systems import CoordinateSystem
+    from jcm.forcing import ForcingData
 
 _JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture")
 
@@ -44,8 +46,8 @@ def _prepare_jcm_land_runtime_fields(
 
 
 def make_jcm_land(
-    jcm_coords: CoordinateSystem,
-    jcm_forcing: ForcingData,
+    jcm_coords: "CoordinateSystem | Any",
+    jcm_forcing: "ForcingData | Any",
     ocn_grid: RectilinearGrid,
     name: str = "LND",
 ) -> DataComponent:
