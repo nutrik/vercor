@@ -46,6 +46,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local external-adapter runtime-boundary validation: Black, flake8,
   mypy, focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local callable-component boundary validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -71,6 +74,30 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Callable Component Boundary Refactor
+
+- Moved concrete callable-backed component classes next to their owning public
+  runtime-kind bases: `vercor.components.base` now owns the differentiable
+  callable wrapper and `vercor.components.host` now owns the host-runtime
+  callable wrapper.
+- Slimmed `vercor.components._callable_wrappers` to shared callable signature
+  normalization and runtime step-result application, and kept
+  `vercor.components.factories` as public helper delegates instead of an
+  internal callable construction owner.
+- Strengthened boundary tests to reject the old factory import path, callable
+  wrapper imports of concrete component bases, and the removed
+  `_create_callable_component` / `CallableComponentRequest` construction path.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the callable wrapper ownership
+  map.
+- Validation run for this change:
+  focused API/callable fast pytest,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: External Adapter Runtime Boundary Refactor
 

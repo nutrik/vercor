@@ -159,11 +159,14 @@ immutable runtime containers used during traced integration.
   `vercor.components._lifecycle_api`, and factory-installed hooks are stored in
   one private `ComponentLifecycleHooks` container rather than as ad-hoc
   component attributes. Author-value normalization lives in private
-  `vercor.components._contracts`, callable signature adaptation and
-  callable-backed runtime components live in private
-  `vercor.components._callable_wrappers`, component-facing runtime-field
-  adapters live in private `vercor.components._runtime_fields`, component-facing
-  runtime-field convenience methods live in private
+  `vercor.components._contracts`; callable signature adaptation and shared
+  callable runtime mechanics live in private
+  `vercor.components._callable_wrappers`. The concrete callable-backed
+  differentiable wrapper is owned by `vercor.components.base`, and the concrete
+  callable-backed host wrapper is owned by `vercor.components.host`, keeping
+  each runtime kind beside its public abstract base. Component-facing
+  runtime-field adapters live in private `vercor.components._runtime_fields`,
+  component-facing runtime-field convenience methods live in private
   `vercor.components._runtime_access`, and component-facing required-field
   validation lives in private `vercor.components._runtime_validation`.
   Component host/scanned execution policy lives in internal
@@ -215,11 +218,14 @@ immutable runtime containers used during traced integration.
   wrappers may accept `(fields)`, `(fields, context)`, or
   `(fields, context, payload)` and return either a field-update mapping or
   `ComponentStepResult(fields, payload)` when the runtime payload must
-  be replaced. Callable-backed differentiable and host components share one
-  private construction path, declare their runtime contract with the same
-  `ComponentFieldSpec` path used by subclasses, and apply step results through
-  the runtime-owned field replacement helpers. Runtime prefill and validation
-  depend only on `inputs`, `outputs`, and `default_fields`.
+  be replaced. Callable-backed differentiable and host components share
+  signature normalization and step-result application helpers, while
+  `Component.from_model()` and `HostRuntimeComponent.from_model()` construct
+  their own private runtime-kind wrappers directly. Both declare their runtime
+  contract with the same `ComponentFieldSpec` path used by subclasses, and
+  apply step results through the runtime-owned field replacement helpers.
+  Runtime prefill and validation depend only on `inputs`, `outputs`, and
+  `default_fields`.
   These helpers still enforce the same stable runtime-state
   contract: updated fields must already exist through seeded data, declared
   outputs/defaults, or exchange prefill, and scanned payload pytrees must keep

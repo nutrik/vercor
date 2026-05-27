@@ -308,6 +308,8 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def _install_lifecycle_hooks(" not in base_source
     assert "def _install_lifecycle_hooks(" not in callable_source
     assert "def _callable_component_from_model(" not in base_source
+    assert "from vercor.components.factories import" not in base_source
+    assert "from vercor.components.factories import" not in host_source
     assert "def data_component(" not in base_source
     assert "def differentiable_component(" not in base_source
     assert "def host_component(" not in base_source
@@ -322,9 +324,17 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "from vercor.components.factories import _install_lifecycle_hooks" not in (
         callable_source
     )
-    assert "def _callable_component_from_model(" in factories_source
-    assert "class CallableComponentRequest" in factories_source
-    assert factories_source.count("_create_callable_component(") == 1
+    assert "from vercor.components.base import Component" not in callable_source
+    assert "from vercor.components.host import HostRuntimeComponent" not in (
+        callable_source
+    )
+    assert "def _callable_component_from_model(" not in factories_source
+    assert "class CallableComponentRequest" not in factories_source
+    assert "_create_callable_component(" not in factories_source
+    assert "Component.from_model(" in factories_source
+    assert "HostRuntimeComponent.from_model(" in factories_source
+    assert "class _CallableComponent" in base_source
+    assert "class _CallableHostRuntimeComponent" in host_source
     assert "def data_component(" in factories_source
     assert "def differentiable_component(" in factories_source
     assert "def host_component(" in factories_source
@@ -337,11 +347,10 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def apply_callable_step_result" not in callable_source
     assert "def make_callable_component" not in callable_source
     assert "def make_callable_host_component" not in callable_source
-    assert "def _create_callable_component" in callable_source
+    assert "def _create_callable_component" not in callable_source
 
     private_markers = (
         "class _CallableRuntimeMixin",
-        "class _CallableComponent",
         "class _CallableHostRuntimeComponent",
         "def _normalize_component_step_callable",
         "def _component_step_signature_error",

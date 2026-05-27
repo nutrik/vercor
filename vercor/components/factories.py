@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from vercor.components.contracts import (
     AuthorFieldValues,
     AuthorStepCallable,
-    ComponentFieldSpec,
     FieldNames,
 )
 from vercor.components._lifecycle import (
@@ -29,75 +27,6 @@ __all__ = [
     "differentiable_component",
     "host_component",
 ]
-
-
-@dataclass(frozen=True)
-class CallableComponentRequest:
-    """Internal request object for callable-backed component construction."""
-
-    runtime_kind: str
-    name: str
-    grid: RectilinearGrid
-    step: AuthorStepCallable
-    payload: Any | None
-    settings: VercorSettings | None
-    field_spec: ComponentFieldSpec
-    initialize: ComponentInitializeHook | None
-    create_runtime_payload: ComponentCreatePayloadHook | None
-    prefill_runtime_state_fields: ComponentPrefillHook | None
-    validate_runtime_state: ComponentValidateHook | None
-
-
-def _callable_component_from_model(
-    *,
-    runtime_kind: str,
-    name: str,
-    grid: RectilinearGrid,
-    step: AuthorStepCallable,
-    payload: Any | None = None,
-    settings: VercorSettings | None = None,
-    inputs: FieldNames = (),
-    outputs: FieldNames = (),
-    default_fields: AuthorFieldValues = None,
-    initialize: ComponentInitializeHook | None = None,
-    create_runtime_payload: ComponentCreatePayloadHook | None = None,
-    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-    validate_runtime_state: ComponentValidateHook | None = None,
-) -> Component:
-    """Create a callable-backed component from the shared author facade."""
-
-    from vercor.components._callable_wrappers import _create_callable_component
-
-    request = CallableComponentRequest(
-        runtime_kind=runtime_kind,
-        name=name,
-        grid=grid,
-        step=step,
-        payload=payload,
-        settings=settings,
-        field_spec=ComponentFieldSpec(
-            inputs=inputs,
-            outputs=outputs,
-            default_fields=default_fields or {},
-        ),
-        initialize=initialize,
-        create_runtime_payload=create_runtime_payload,
-        prefill_runtime_state_fields=prefill_runtime_state_fields,
-        validate_runtime_state=validate_runtime_state,
-    )
-    return _create_callable_component(
-        runtime_kind=request.runtime_kind,
-        name=request.name,
-        grid=request.grid,
-        step=request.step,
-        payload=request.payload,
-        settings=request.settings,
-        field_spec=request.field_spec,
-        initialize=request.initialize,
-        create_runtime_payload=request.create_runtime_payload,
-        prefill_runtime_state_fields=request.prefill_runtime_state_fields,
-        validate_runtime_state=request.validate_runtime_state,
-    )
 
 
 def data_component(

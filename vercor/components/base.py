@@ -10,6 +10,7 @@ from vercor.components.contracts import (
     ComponentFieldSpec as _ComponentFieldSpec,
     FieldNames as _FieldNames,
 )
+from vercor.components._callable_wrappers import _CallableRuntimeMixin
 from vercor.components._field_authoring import ComponentFieldAuthoringMixin
 from vercor.components._lifecycle import (
     ComponentCreatePayloadHook,
@@ -113,18 +114,17 @@ class Component(
         component's grid shape.
         """
 
-        from vercor.components.factories import _callable_component_from_model
-
-        return _callable_component_from_model(
-            runtime_kind="differentiable",
+        return _CallableComponent(
             name=name,
             grid=grid,
             step=step,
             payload=payload,
             settings=settings,
-            inputs=inputs,
-            outputs=outputs,
-            default_fields=default_fields,
+            field_spec=_ComponentFieldSpec(
+                inputs=inputs,
+                outputs=outputs,
+                default_fields=default_fields or {},
+            ),
             initialize=initialize,
             create_runtime_payload=create_runtime_payload,
             prefill_runtime_state_fields=prefill_runtime_state_fields,
@@ -150,3 +150,44 @@ class Component(
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r}, grid={repr(self.grid)})"
+
+
+class _CallableComponent(_CallableRuntimeMixin, Component):
+    """Differentiable component backed by an author-provided step callable."""
+
+    def __init__(
+        self,
+        name: str,
+        grid: RectilinearGrid,
+        *,
+        step: _AuthorStepCallable,
+        payload: Any | None = None,
+        settings: VercorSettings | None = None,
+        field_spec: _ComponentFieldSpec | None = None,
+        initialize: ComponentInitializeHook | None = None,
+        create_runtime_payload: ComponentCreatePayloadHook | None = None,
+        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+        validate_runtime_state: ComponentValidateHook | None = None,
+    ) -> None:
+        if settings is None:
+            Component.__init__(self, name=name, grid=grid)
+        else:
+            Component.__init__(self, name=name, grid=grid, settings=settings)
+        self._initialize_callable_runtime(
+            step=step,
+            payload=payload,
+            field_spec=field_spec or _ComponentFieldSpec(),
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
+        )
+
+    def step_runtime_state(
+        self,
+        component_state: "RuntimeComponentState",
+        context: RuntimeStepContext,
+    ) -> "RuntimeComponentState":
+        """Advance this callable-backed differentiable component one step."""
+
+        return self._step_callable_runtime_state(component_state, context)

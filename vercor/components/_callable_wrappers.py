@@ -18,12 +18,8 @@ from vercor.components._lifecycle import (
 )
 from vercor.components._runtime_fields import apply_step_result
 from vercor.exceptions import ComponentError
-from vercor.grid import RectilinearGrid
 from vercor.runtime.contexts import RuntimeStepContext
-from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
-from vercor.components.base import Component
-from vercor.components.host import HostRuntimeComponent
 
 if TYPE_CHECKING:
     from vercor.runtime import RuntimeComponentState
@@ -139,22 +135,15 @@ class _CallableRuntimeMixin:
     def _initialize_callable_runtime(
         self,
         *,
-        name: str,
-        grid: RectilinearGrid,
         step: AuthorStepCallable,
         payload: Any | None,
-        settings: VercorSettings | None,
         field_spec: ComponentFieldSpec,
         initialize: ComponentInitializeHook | None,
         create_runtime_payload: ComponentCreatePayloadHook | None,
         prefill_runtime_state_fields: ComponentPrefillHook | None,
         validate_runtime_state: ComponentValidateHook | None,
     ) -> None:
-        component = cast("Component", self)
-        if settings is None:
-            Component.__init__(component, name=name, grid=grid)
-        else:
-            Component.__init__(component, name=name, grid=grid, settings=settings)
+        component = cast(Any, self)
         self._step = normalize_component_step_callable(step)
         self._payload = payload
         component.declare_fields(field_spec)
@@ -170,7 +159,7 @@ class _CallableRuntimeMixin:
     def create_runtime_payload(self) -> Any | None:
         """Return the payload supplied to the callable component factory."""
 
-        component = cast("Component", self)
+        component = cast(Any, self)
         hook = component._lifecycle_hooks.create_runtime_payload
         if hook is not None:
             return hook(component)
@@ -183,7 +172,7 @@ class _CallableRuntimeMixin:
     ) -> "RuntimeComponentState":
         """Advance callable-backed runtime state using the normalized step."""
 
-        component = cast("Component", self)
+        component = cast(Any, self)
         return apply_step_result(
             component,
             component_state,
@@ -193,126 +182,3 @@ class _CallableRuntimeMixin:
                 component_state.runtime_payload,
             ),
         )
-
-
-class _CallableComponent(_CallableRuntimeMixin, Component):
-    """Differentiable component backed by a user-provided step callable."""
-
-    def __init__(
-        self,
-        name: str,
-        grid: RectilinearGrid,
-        *,
-        step: AuthorStepCallable,
-        payload: Any | None = None,
-        settings: VercorSettings | None = None,
-        field_spec: ComponentFieldSpec | None = None,
-        initialize: ComponentInitializeHook | None = None,
-        create_runtime_payload: ComponentCreatePayloadHook | None = None,
-        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-        validate_runtime_state: ComponentValidateHook | None = None,
-    ) -> None:
-        self._initialize_callable_runtime(
-            name=name,
-            grid=grid,
-            step=step,
-            payload=payload,
-            settings=settings,
-            field_spec=field_spec or ComponentFieldSpec(),
-            initialize=initialize,
-            create_runtime_payload=create_runtime_payload,
-            prefill_runtime_state_fields=prefill_runtime_state_fields,
-            validate_runtime_state=validate_runtime_state,
-        )
-
-    def step_runtime_state(
-        self,
-        component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
-    ) -> "RuntimeComponentState":
-        """Advance this callable-backed differentiable component one step."""
-
-        return self._step_callable_runtime_state(component_state, context)
-
-
-class _CallableHostRuntimeComponent(
-    _CallableRuntimeMixin,
-    HostRuntimeComponent,
-):
-    """Host-runtime component backed by a user-provided step callable."""
-
-    def __init__(
-        self,
-        name: str,
-        grid: RectilinearGrid,
-        *,
-        step: AuthorStepCallable,
-        payload: Any | None = None,
-        settings: VercorSettings | None = None,
-        field_spec: ComponentFieldSpec | None = None,
-        initialize: ComponentInitializeHook | None = None,
-        create_runtime_payload: ComponentCreatePayloadHook | None = None,
-        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-        validate_runtime_state: ComponentValidateHook | None = None,
-    ) -> None:
-        self._initialize_callable_runtime(
-            name=name,
-            grid=grid,
-            step=step,
-            payload=payload,
-            settings=settings,
-            field_spec=field_spec or ComponentFieldSpec(),
-            initialize=initialize,
-            create_runtime_payload=create_runtime_payload,
-            prefill_runtime_state_fields=prefill_runtime_state_fields,
-            validate_runtime_state=validate_runtime_state,
-        )
-
-    def step_host_runtime_state(
-        self,
-        component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
-    ) -> "RuntimeComponentState":
-        """Advance this callable-backed host component one step."""
-
-        return self._step_callable_runtime_state(component_state, context)
-
-
-def _create_callable_component(
-    name: str,
-    grid: RectilinearGrid,
-    *,
-    runtime_kind: str,
-    step: AuthorStepCallable,
-    payload: Any | None = None,
-    settings: VercorSettings | None = None,
-    field_spec: ComponentFieldSpec | None = None,
-    initialize: ComponentInitializeHook | None = None,
-    create_runtime_payload: ComponentCreatePayloadHook | None = None,
-    prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-    validate_runtime_state: ComponentValidateHook | None = None,
-) -> "Component":
-    """Create a callable-backed component for the selected runtime kind."""
-
-    wrapper_type: type[Any]
-    if runtime_kind == "differentiable":
-        wrapper_type = _CallableComponent
-    elif runtime_kind == "host":
-        wrapper_type = _CallableHostRuntimeComponent
-    else:
-        raise ValueError(
-            f"Unsupported callable component runtime kind {runtime_kind!r}"
-        )
-
-    return wrapper_type(
-        name=name,
-        grid=grid,
-        step=step,
-        payload=payload,
-        settings=settings,
-        field_spec=field_spec,
-        initialize=initialize,
-        create_runtime_payload=create_runtime_payload,
-        prefill_runtime_state_fields=prefill_runtime_state_fields,
-        validate_runtime_state=validate_runtime_state,
-    )
