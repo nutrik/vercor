@@ -382,6 +382,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "RuntimeComponentView" in diagnostics_source
     assert 'hasattr(store, "field_names")' not in diagnostics_source
     assert "elif field_name in store" not in diagnostics_source
+    assert ".data.get(" not in diagnostics_source
+    assert "getattr(" not in diagnostics_source
     assert "def make_jax_gcm" in jax_gcm_source
     assert "def make_veros_gcm" in veros_source
     assert "def make_camulator_gcm" in camulator_source

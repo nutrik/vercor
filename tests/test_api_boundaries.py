@@ -838,6 +838,12 @@ def test_assets_and_diagnostics_have_focused_ownership_boundaries() -> None:
     assert Path("vercor/diagnostics/tables.py").exists()
     assert Path("vercor/diagnostics/plotting.py").exists()
     assert not Path("vercor/diagnostics.py").exists()
+    diagnostics_fields_source = Path("vercor/diagnostics/fields.py").read_text(
+        encoding="utf-8"
+    )
+    assert ".data.get(" not in diagnostics_fields_source
+    assert "getattr(" not in diagnostics_fields_source
+    assert "runtime_field(" in diagnostics_fields_source
 
 
 @pytest.mark.fast_always

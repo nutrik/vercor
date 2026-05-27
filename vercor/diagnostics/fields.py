@@ -4,22 +4,26 @@ from typing import Callable
 
 import jax.numpy as jnp
 
-from vercor.runtime.views import RuntimeComponentView
+from vercor.runtime.views import (
+    RuntimeComponentView,
+    RuntimeFieldSource,
+    runtime_field,
+    runtime_field_candidates,
+)
 from vercor.types import RuntimeArray
 
 ComponentMetric = str | Callable[[RuntimeComponentView], RuntimeArray | float]
 
 
 def component_vector_speed(
-    component_state: object,
+    component_state: RuntimeFieldSource,
     u_field: str = "u_velocity",
     v_field: str = "v_velocity",
 ) -> RuntimeArray:
     """Return vector speed from a runtime component state."""
 
-    data = getattr(component_state, "data")
-    u = jnp.asarray(data.get(u_field))
-    v = jnp.asarray(data.get(v_field))
+    u = jnp.asarray(runtime_field(component_state, u_field))
+    v = jnp.asarray(runtime_field(component_state, v_field))
     return jnp.sqrt(u**2 + v**2)
 
 
@@ -62,13 +66,13 @@ def view_field_candidates(
 ) -> list[RuntimeArray]:
     """Return matching fields from an explicit runtime component view."""
 
-    return component.field_candidates(field_name)
+    return runtime_field_candidates(component, field_name)
 
 
 def view_field(component: RuntimeComponentView, field_name: str) -> RuntimeArray:
     """Return a field from an explicit runtime component view."""
 
-    return component.field(field_name)
+    return runtime_field(component, field_name)
 
 
 def component_plot_field(

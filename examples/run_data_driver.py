@@ -1,8 +1,16 @@
 from datetime import datetime
-from typing import Any, Callable
 
-from vercor import Clock, RunSequence
-from vercor.diagnostics import component_vector_speed
+import matplotlib.pyplot as plt
+
+from vercor import Clock, Component, RunSequence
+from vercor.diagnostics import (
+    ComponentMetric,
+    component_vector_speed,
+    plot_component_scalar_vector_comparison,
+    print_component_field_means_table,
+    total_surface_temperature,
+)
+from vercor.regridders import bilinear, conservative
 from vercor.setups.coupler_helpers import (
     ExchangeSpec,
     add_exchange_specs,
@@ -19,15 +27,6 @@ from vercor.setups.exchange_recipes import (
     LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
-from vercor.regridders import bilinear, conservative
-from vercor.types import RuntimeArray
-from vercor.diagnostics import (
-    plot_component_scalar_vector_comparison,
-    print_component_field_means_table,
-    total_surface_temperature,
-)
-
-import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     # Build components
@@ -40,7 +39,7 @@ if __name__ == "__main__":
     run_sequence = RunSequence(order=["OCN", "ATM", "LND"])
 
     # Coupler
-    components: list[Any] = [atm, ocn, lnd]
+    components: list[Component] = [atm, ocn, lnd]
     cpl = build_coupler(
         clock=clock,
         components=components,
@@ -97,17 +96,12 @@ if __name__ == "__main__":
     cpl.finalize(final_state)
     views = cpl.runtime_component_views(final_state, names=("ATM", "OCN"))
 
-    Metric = str | Callable[[Any], RuntimeArray | float]
-
-    variables: list[tuple[Metric, str]] = [
+    variables: list[tuple[ComponentMetric, str]] = [
         ("sea_surface_temperature", "sst"),
         ("specific_humidity", "qbot"),
         ("potential_temperature", "tbot"),
         ("model_level_height", "zbot"),
-        (
-            lambda component: component_vector_speed(component),
-            "speed",
-        ),
+        (component_vector_speed, "speed"),
     ]
 
     print_component_field_means_table(

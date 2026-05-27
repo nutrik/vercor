@@ -34,6 +34,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime-view/component-boundary validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local diagnostics-runtime-view validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -59,6 +62,29 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Diagnostics Runtime View Boundary Refactor
+
+- Added runtime-owned `runtime_field_candidates(...)` and `runtime_field(...)`
+  helpers in `vercor.runtime.views`, and routed `RuntimeComponentView` read
+  helpers through them.
+- Updated diagnostics to use the runtime-view field lookup boundary instead of
+  reaching into runtime stores with `.data.get(...)` or `getattr(...)`, while
+  preserving `component_vector_speed(...)` compatibility with runtime states.
+- Cleaned `examples/run_data_driver.py` diagnostics wiring and kept its
+  component typing on the public top-level facade. A first full-suite run caught
+  the direct `vercor.components` example import boundary regression; the example
+  now imports `Component` from `vercor`.
+- Updated boundary tests, `DESIGN.md`, and `DEPENDENCIES.md` for the shared
+  runtime field-resolution ownership.
+- Validation run for this change:
+  focused diagnostics/runtime-view fast pytest,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Runtime View and Component Boundary Refactor
 

@@ -241,9 +241,12 @@ immutable runtime containers used during traced integration.
   messages plus traced callbacks live in `vercor.runtime.progress`. Host/scanned
   runtime loops, run-mode selection, donation checks, and interrupt translation
   live in `vercor.runtime.runner`. Runtime component metadata and read-only field
-  access for diagnostics/output live in `vercor.runtime.views`; `Coupler`
-  exposes `runtime_component_view()` and `runtime_component_views()` as the
-  public facade for creating those views. Final runtime output iteration and
+  resolution for diagnostics/output live in `vercor.runtime.views`;
+  `RuntimeComponentView`, `runtime_field_candidates(...)`, and
+  `runtime_field(...)` own data/incoming/outgoing lookup for explicit views and
+  compatible runtime states. `Coupler` exposes `runtime_component_view()` and
+  `runtime_component_views()` as the public facade for creating those views.
+  Final runtime output iteration and
   view writing live in `vercor.output`, with `Coupler.finalize()` acting as a
   validation and delegation wrapper. `Coupler` delegates to these modules and
   remains the public setup/finalization facade rather than the owner of runtime
@@ -283,8 +286,9 @@ helpers, such as `vercor.setups.external.jax_gcm_output` and
 Concrete forcing product registries and `get_forcing_data(...)` defaults live
 with setup data adapters in `vercor.setups.data.assets`. Diagnostics are split
 into `vercor.diagnostics.fields`, `vercor.diagnostics.tables`, and
-`vercor.diagnostics.plotting`, with `vercor.diagnostics` preserving the public
-reexport surface.
+`vercor.diagnostics.plotting`, with field lookup delegated to
+`vercor.runtime.views` and `vercor.diagnostics` preserving the public reexport
+surface.
 
 CAMulator optional-dependency loading, forcing cursors, tensor accessors,
 stepping, output, wind filtering, land forcing, and initialization are split

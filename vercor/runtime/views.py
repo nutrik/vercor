@@ -22,19 +22,12 @@ class RuntimeComponentView:
     def field_candidates(self, name: str) -> list[RuntimeArray]:
         """Return all runtime fields named ``name`` in data, incoming, outgoing order."""
 
-        candidates: list[RuntimeArray] = []
-        for store in (self.data, self.incoming, self.outgoing):
-            if name in store:
-                candidates.append(store.get(name))
-        return candidates
+        return runtime_field_candidates(self, name)
 
     def field(self, name: str) -> RuntimeArray:
         """Return the first runtime field named ``name`` from this view."""
 
-        candidates = self.field_candidates(name)
-        if candidates:
-            return candidates[0]
-        raise KeyError(f"Field {name!r} not found")
+        return runtime_field(self, name)
 
     def iter_store_fields(
         self,
@@ -72,3 +65,28 @@ class RuntimeComponentView:
             incoming=component_state.incoming,
             outgoing=component_state.outgoing,
         )
+
+
+RuntimeFieldSource = RuntimeComponentView | RuntimeComponentState
+
+
+def runtime_field_candidates(
+    source: RuntimeFieldSource,
+    name: str,
+) -> list[RuntimeArray]:
+    """Return all runtime fields named ``name`` in data, incoming, outgoing order."""
+
+    candidates: list[RuntimeArray] = []
+    for store in (source.data, source.incoming, source.outgoing):
+        if name in store:
+            candidates.append(store.get(name))
+    return candidates
+
+
+def runtime_field(source: RuntimeFieldSource, name: str) -> RuntimeArray:
+    """Return the first runtime field named ``name`` from a view or state."""
+
+    candidates = runtime_field_candidates(source, name)
+    if candidates:
+        return candidates[0]
+    raise KeyError(f"Field {name!r} not found")

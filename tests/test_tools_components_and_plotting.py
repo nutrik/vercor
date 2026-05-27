@@ -164,7 +164,7 @@ def test_print_component_field_means_table_with_callable_metric(
         fields=[
             ("temp", "temp"),
             (
-                lambda view: np.sqrt(view.data.get("u") ** 2 + view.data.get("v") ** 2),
+                lambda view: np.sqrt(view.field("u") ** 2 + view.field("v") ** 2),
                 "speed",
             ),
         ],

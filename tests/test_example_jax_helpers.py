@@ -8,10 +8,12 @@ import pytest
 
 import vercor.host_arrays as host_arrays_module
 from vercor.diagnostics import component_vector_speed
+from vercor.grid import RectilinearGrid
 from vercor.host_arrays import transposed_host_array
 from tests.assertions import assert_allclose_compact
 from vercor.host_arrays import runtime_array_to_host
 from vercor.runtime import RuntimeComponentState, RuntimeFieldStore
+from vercor.runtime.views import RuntimeComponentView
 
 
 def test_runtime_array_to_host_is_canonical_host_transfer() -> None:
@@ -56,3 +58,26 @@ def test_component_vector_speed_uses_jax_arrays() -> None:
 
     assert isinstance(speed, jax.Array)
     assert_allclose_compact(speed, np.asarray([[5.0, 0.0], [5.0, 0.0]]))
+
+
+def test_component_vector_speed_reads_runtime_component_view() -> None:
+    grid = RectilinearGrid(
+        "dummy",
+        longitude=np.array([0.0, 1.0]),
+        latitude=np.array([0.0, 1.0]),
+    )
+    view = RuntimeComponentView(
+        name="ATM",
+        grid=grid,
+        incoming=RuntimeFieldStore.from_mapping(
+            {
+                "u": jnp.asarray([[5.0, 0.0], [12.0, 0.0]]),
+                "v": jnp.asarray([[12.0, 0.0], [5.0, 0.0]]),
+            }
+        ),
+    )
+
+    speed = component_vector_speed(view, "u", "v")
+
+    assert isinstance(speed, jax.Array)
+    assert_allclose_compact(speed, np.asarray([[13.0, 0.0], [13.0, 0.0]]))
