@@ -29,6 +29,8 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime-dispatch-boundary validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local runtime-run-boundary validation: Black, flake8, mypy, focused
+  fast pytest, full fast pytest, and full pytest passed as of 2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -54,6 +56,28 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Runtime Run Boundary Refactor
+
+- Moved `RuntimeRunContext` and the compiled-runtime type alias into
+  `vercor.runtime.run_context`, leaving static topology on
+  `RuntimeDispatchContext` instead of duplicating it in the run context.
+- Moved compiled-runtime cache-key and JIT wrapping policy into
+  `vercor.runtime.cache`, and moved host/scanned progress formatting plus JAX
+  callback logging helpers into `vercor.runtime.progress`.
+- Slimmed `vercor.runtime.runner` to run-mode selection, host/scanned loops,
+  donation checks, and interrupt translation while preserving `Coupler.run()`
+  behavior and runtime PyTree shapes.
+- Updated boundary tests, `DESIGN.md`, and `DEPENDENCIES.md` for the new
+  ownership map.
+- Validation run for this change:
+  focused runtime fast pytest,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Runtime Dispatch Boundary Refactor
 

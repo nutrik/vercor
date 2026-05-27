@@ -67,7 +67,8 @@
 67. `vercor/runtime/dispatch_context.py`, `exchange_dispatch.py`, and `driver.py` - static dispatch context construction, exchange dispatch, component runtime stepping orchestration, and outgoing priming built on (6, 59, 62, 63, 64, 65, 66)
 68. `vercor/runtime/coupler_state.py` and `topology.py` - runtime coupler-state assembly, runtime-contract refresh, topology/name validation, output-mask lookup, component lookup, explicit exchange topology state, and exchange topology setup built on (12, 13, 19, 20, 59, 62, 63, 64, 66, 67)
 69. `vercor/runtime/initialization.py` - setup-time precision synchronization, component initialization, setup validation, runtime contract validation, and exchange-topology handoff built on (24, 59, 62, 63, 66, 68)
-70. `vercor/runtime/runner.py` - host/scanned runtime loops, bundled run-context inputs, progress logging, compile-cache keys, JIT wrapping, donation checks, and interrupt translation built on (25, 65, 67)
-71. `vercor/output.py` - runtime-view and coupler-final-output NetCDF output boundary built on (10, 12, 60, 64, 68)
-72. `vercor/coupler.py` - public runtime facade for `run()` and `create_runtime_state()` built on (25, 59, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71)
-73. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`
+70. `vercor/runtime/run_context.py`, `cache.py`, `progress.py`, and `interrupts.py` - bundled runtime execution context, compile-cache/JIT policy, progress callbacks, and cancellation controller built on (24, 25, 64, 67)
+71. `vercor/runtime/runner.py` - host/scanned runtime loops, run-mode selection, donation checks, and interrupt translation built on (65, 67, 70)
+72. `vercor/output.py` - runtime-view and coupler-final-output NetCDF output boundary built on (10, 12, 60, 64, 68)
+73. `vercor/coupler.py` - public runtime facade for `run()` and `create_runtime_state()` built on (25, 59, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72)
+74. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`

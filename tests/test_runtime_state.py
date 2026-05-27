@@ -78,6 +78,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_stores_path = Path("vercor/runtime/stores.py")
     runtime_exchange_dispatch_path = Path("vercor/runtime/exchange_dispatch.py")
     runtime_dispatch_context_path = Path("vercor/runtime/dispatch_context.py")
+    runtime_run_context_path = Path("vercor/runtime/run_context.py")
+    runtime_cache_path = Path("vercor/runtime/cache.py")
+    runtime_progress_path = Path("vercor/runtime/progress.py")
     runtime_component_state_path = Path("vercor/runtime/component_state.py")
     runtime_field_transfer_path = Path("vercor/runtime/field_transfer.py")
     runtime_validation_path = Path("vercor/runtime/validation.py")
@@ -87,6 +90,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_stores_path.exists()
     assert runtime_exchange_dispatch_path.exists()
     assert runtime_dispatch_context_path.exists()
+    assert runtime_run_context_path.exists()
+    assert runtime_cache_path.exists()
+    assert runtime_progress_path.exists()
     assert runtime_component_state_path.exists()
     assert runtime_field_transfer_path.exists()
     assert runtime_validation_path.exists()
@@ -100,6 +106,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_dispatch_context_source = runtime_dispatch_context_path.read_text(
         encoding="utf-8"
     )
+    runtime_run_context_source = runtime_run_context_path.read_text(encoding="utf-8")
+    runtime_cache_source = runtime_cache_path.read_text(encoding="utf-8")
+    runtime_progress_source = runtime_progress_path.read_text(encoding="utf-8")
     runtime_component_state_source = runtime_component_state_path.read_text(
         encoding="utf-8"
     )
@@ -230,16 +239,29 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def run_host_runtime(" in runtime_runner_source
     assert "def run_scanned_runtime(" in runtime_runner_source
     assert "def run_coupler_runtime(" in runtime_runner_source
-    assert "class RuntimeRunContext" in runtime_runner_source
+    assert "class RuntimeRunContext" not in runtime_runner_source
+    assert "class RuntimeRunContext" in runtime_run_context_source
+    assert "components:" not in runtime_run_context_source
+    assert "exchanges:" not in runtime_run_context_source
+    assert "regridders:" not in runtime_run_context_source
+    assert "contracts:" not in runtime_run_context_source
+    assert "settings:" not in runtime_run_context_source
     assert "context: RuntimeRunContext" in runtime_runner_source
-    assert "def compiled_scanned_runtime(" in runtime_runner_source
-    assert "def compiled_runtime_cache_key(" in runtime_runner_source
+    assert "from vercor.runtime.run_context import" in coupler_source
+    assert "from vercor.runtime.run_context import" in runtime_runner_source
+    assert "def compiled_scanned_runtime(" not in runtime_runner_source
+    assert "def compiled_runtime_cache_key(" not in runtime_runner_source
+    assert "def compiled_scanned_runtime(" in runtime_cache_source
+    assert "def compiled_runtime_cache_key(" in runtime_cache_source
+    assert "from vercor.runtime.cache import" in runtime_runner_source
     assert "def _run_host_runtime" not in coupler_source
     assert "def _compiled_runtime_cache_key" not in coupler_source
     run_body = coupler_source.split("def run", 1)[1]
     scanned_body = coupler_source.split("def _run_scanned_runtime", 1)[1]
     assert "host_component_names(self.components)" not in run_body
-    assert "host_component_names(context.components)" in runtime_runner_source
+    assert "host_component_names(context.dispatch_context.components)" in (
+        runtime_runner_source
+    )
     assert "def _prepare_runtime_state(" in coupler_source
     assert "self._prepare_runtime_state(" in run_body
     assert "self._prepare_runtime_state(" in scanned_body
@@ -247,9 +269,19 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "run_scanned_runtime(" in scanned_body
     assert "jax.lax.scan" not in coupler_source
     assert "jax.debug.callback" not in coupler_source
+    assert "jax.debug.callback" not in runtime_runner_source
+    assert "jax.debug.callback" in runtime_progress_source
     assert "RuntimeFieldStore.from_mapping" not in coupler_source
     assert "_runtime_step_progress_message" not in coupler_source
     assert "_runtime_component_progress_message" not in coupler_source
+    assert "def runtime_step_progress_message(" not in runtime_runner_source
+    assert "def runtime_component_progress_message(" not in runtime_runner_source
+    assert "def log_scanned_step_progress(" not in runtime_runner_source
+    assert "def log_scanned_component_progress(" not in runtime_runner_source
+    assert "def runtime_step_progress_message(" in runtime_progress_source
+    assert "def runtime_component_progress_message(" in runtime_progress_source
+    assert "def log_scanned_step_progress(" in runtime_progress_source
+    assert "def log_scanned_component_progress(" in runtime_progress_source
     assert "def _apply_scalar" not in regridder_source
     assert "def _apply_vector" not in regridder_source
     assert "handlers: dict" not in regridder_source

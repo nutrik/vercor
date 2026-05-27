@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, MutableMapping, Sequence
-from dataclasses import dataclass
-import logging
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Sequence
+from typing import Any
 
 import jax
 from jax.errors import JaxRuntimeError
@@ -11,57 +9,24 @@ from jax.errors import JaxRuntimeError
 from vercor.clock import Clock
 from vercor.components._runtime_execution import host_component_names
 from vercor.exceptions import CouplerError
-from vercor.exchange import Exchange
-from vercor.jax_logging import (
-    LoggerLike,
-    effective_log_level,
-    emit_host_log,
-    logger_enabled_for,
-)
+from vercor.jax_logging import LoggerLike
 from vercor.dtypes import as_jax_index_array
-from vercor.runtime.contracts import RuntimeComponentContract
+from vercor.runtime.cache import compiled_runtime_cache_key, compiled_scanned_runtime
 from vercor.runtime.dispatch_context import RuntimeDispatchContext
 from vercor.runtime.driver import step_runtime_component
 from vercor.runtime.interrupts import RuntimeInterruptController
+from vercor.runtime.progress import (
+    log_scanned_component_progress,
+    log_scanned_step_progress,
+    runtime_component_progress_message,
+    runtime_step_progress_message,
+    runtime_step_progress_messages,
+)
+from vercor.runtime.run_context import RuntimeRunContext
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.time import build_runtime_step_info, scalar_runtime_step_info
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
-
-if TYPE_CHECKING:
-    from vercor.components.base import Component
-
-CompiledRuntime = Callable[[RuntimeCouplerState], RuntimeCouplerState]
-
-
-@dataclass
-class RuntimeRunContext:
-    """Static inputs required to run one configured coupler runtime."""
-
-    components: Mapping[str, Component]
-    run_sequence: Sequence[str]
-    exchanges: Sequence[Exchange]
-    regridders: Mapping[tuple[str, str, str], Any]
-    contracts: Mapping[str, RuntimeComponentContract]
-    clock: Clock
-    settings: VercorSettings
-    logger: LoggerLike
-    log_level: int | str
-    dispatch_context: RuntimeDispatchContext
-    compiled_runtime_cache: MutableMapping[tuple[Any, ...], CompiledRuntime]
-    interrupts: RuntimeInterruptController
-
-
-def runtime_step_progress_message(n: int, time: object, dt: object) -> str:
-    """Return the shared host/scanned runtime step progress message."""
-
-    return f" ====== Step: {n:05d} ====== Date: {time} ====== Δt: {dt} "
-
-
-def runtime_component_progress_message(component_name: str) -> str:
-    """Return the shared host/scanned runtime component progress message."""
-
-    return f" Run component: {component_name}"
 
 
 def run_coupler_runtime(
@@ -73,7 +38,7 @@ def run_coupler_runtime(
     """Run a validated runtime state through the host or compiled scanned path."""
 
     with context.interrupts.signal_scope():
-        host_names = host_component_names(context.components)
+        host_names = host_component_names(context.dispatch_context.components)
         if not host_names:
             try:
                 cache_key = compiled_runtime_cache_key(
@@ -88,7 +53,7 @@ def run_coupler_runtime(
                         state,
                         run_sequence=context.run_sequence,
                         clock=context.clock,
-                        settings=context.settings,
+                        settings=context.dispatch_context.settings,
                         logger=context.logger,
                         dispatch_context=context.dispatch_context,
                         interrupts=context.interrupts,
@@ -117,7 +82,7 @@ def run_coupler_runtime(
             runtime_state,
             run_sequence=context.run_sequence,
             clock=context.clock,
-            settings=context.settings,
+            settings=context.dispatch_context.settings,
             logger=context.logger,
             dispatch_context=context.dispatch_context,
             interrupts=context.interrupts,
@@ -173,36 +138,7 @@ def run_scanned_runtime(
 
     step_infos = build_runtime_step_info(clock, settings)
     step_indices = as_jax_index_array(range(clock.steps))
-    step_progress_messages = tuple(
-        runtime_step_progress_message(n, time, dt) for n, time, dt in clock.iter()
-    )
-
-    def log_scanned_step_progress(step_index: RuntimeArray) -> None:
-        if not logger_enabled_for(logger, logging.INFO):
-            return
-
-        def emit(index: RuntimeArray) -> None:
-            host_index = int(jax.device_get(index).item())
-            emit_host_log(
-                logger,
-                logging.INFO,
-                step_progress_messages[host_index],
-            )
-
-        jax.debug.callback(emit, step_index, ordered=True)
-
-    def log_scanned_component_progress(component_name: str) -> None:
-        if not logger_enabled_for(logger, logging.INFO):
-            return
-
-        jax.debug.callback(
-            lambda: emit_host_log(
-                logger,
-                logging.INFO,
-                runtime_component_progress_message(component_name),
-            ),
-            ordered=True,
-        )
+    step_progress_messages = runtime_step_progress_messages(clock)
 
     def step_all_components(
         state: RuntimeCouplerState,
@@ -213,13 +149,13 @@ def run_scanned_runtime(
             "scanned runtime step",
             step_index,
         )
-        log_scanned_step_progress(step_index)
+        log_scanned_step_progress(logger, step_index, step_progress_messages)
         for cname in run_sequence:
             interrupts.scanned_checkpoint(
                 f"scanned runtime component {cname}",
                 step_index,
             )
-            log_scanned_component_progress(cname)
+            log_scanned_component_progress(logger, cname)
             state = step_runtime_component(
                 state,
                 cname,
@@ -251,66 +187,3 @@ def run_scanned_runtime(
             "scanned runtime",
         )
     return final_state
-
-
-def compiled_scanned_runtime(
-    scanned_runtime: CompiledRuntime,
-    *,
-    cache: MutableMapping[tuple[Any, ...], CompiledRuntime],
-    cache_key: tuple[Any, ...],
-    donate_state: bool,
-) -> CompiledRuntime:
-    """Return a cached JIT-scanned runtime for one static topology key."""
-
-    if cache_key in cache:
-        return cache[cache_key]
-
-    if donate_state:
-        compiled_runtime = cast(
-            CompiledRuntime,
-            jax.jit(scanned_runtime, donate_argnums=(0,)),
-        )
-    else:
-        compiled_runtime = cast(
-            CompiledRuntime,
-            jax.jit(scanned_runtime),
-        )
-    cache[cache_key] = compiled_runtime
-    return compiled_runtime
-
-
-def compiled_runtime_cache_key(
-    *,
-    donate_state: bool,
-    context: RuntimeRunContext,
-) -> tuple[Any, ...]:
-    """Return a static cache key for the compiled pure-runtime wrapper."""
-
-    return (
-        donate_state,
-        tuple((name, id(component)) for name, component in context.components.items()),
-        tuple(context.run_sequence),
-        tuple(
-            (
-                id(exchange),
-                exchange.source,
-                exchange.destination,
-                exchange.interpolation_type,
-                tuple(exchange.field_names),
-            )
-            for exchange in context.exchanges
-        ),
-        tuple(sorted((key, id(value)) for key, value in context.regridders.items())),
-        id(context.logger),
-        id(context.interrupts),
-        effective_log_level(context.logger, context.log_level),
-        tuple(
-            (name, contract.imports, contract.exports)
-            for name, contract in sorted(context.contracts.items())
-        ),
-        repr(context.clock.start),
-        context.clock.dt_seconds,
-        context.clock.steps,
-        context.clock.year_type,
-        context.settings.year_in_seconds,
-    )

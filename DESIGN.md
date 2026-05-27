@@ -233,14 +233,16 @@ immutable runtime containers used during traced integration.
   `ExchangeTopologyState` for the public facade to store. Setup-time component
   precision synchronization, initialization context construction, component
   setup validation, runtime contract validation, and topology handoff live in
-  `vercor.runtime.initialization`. Host/scanned runtime loops, progress
-  logging, compiled-runtime cache keys, bundled `RuntimeRunContext` execution
-  inputs, JIT wrapping, donation checks, and interrupt translation live in
-  `vercor.runtime.runner`. Final runtime output iteration and view writing live
-  in `vercor.output`, with `Coupler.finalize()` acting as a validation and
-  delegation wrapper. `Coupler` delegates to these modules and remains the
-  public setup/finalization facade rather than the owner of runtime adapter
-  mechanics.
+  `vercor.runtime.initialization`. Bundled `RuntimeRunContext` execution inputs
+  live in `vercor.runtime.run_context`, compiled-runtime cache keys and JIT
+  wrapping live in `vercor.runtime.cache`, and shared host/scanned progress
+  messages plus traced callbacks live in `vercor.runtime.progress`. Host/scanned
+  runtime loops, run-mode selection, donation checks, and interrupt translation
+  live in `vercor.runtime.runner`. Final runtime output iteration and view
+  writing live in `vercor.output`, with `Coupler.finalize()` acting as a
+  validation and delegation wrapper. `Coupler` delegates to these modules and
+  remains the public setup/finalization facade rather than the owner of runtime
+  adapter mechanics.
   payload pytrees carried through `jax.lax.scan` must preserve every leaf's
   shape and dtype between input and output; per-step slices or adapted forcing
   objects should be local values unless they are shape-stable runtime state.
@@ -347,11 +349,11 @@ coupler context use the default `VerCOR` Python logger from
 `vercor.jax_logging.get_default_logger()`. Helpers reached from
 `Coupler.initialize()`, `Coupler.run()`, or component runtime contexts receive
 the coupler logger explicitly instead of writing directly to stdout.
-The host and scanned coupler runtime paths in `vercor.runtime.runner` emit the
-same step and component progress messages. The scanned path precomputes datetime
-and timestep labels on the host, then selects the per-step label inside ordered
-callbacks so progress logging remains traceable without putting Python datetime
-objects in the scan carry.
+The host and scanned coupler runtime paths share progress formatting and traced
+callback helpers in `vercor.runtime.progress`. The scanned path precomputes
+datetime and timestep labels on the host, then selects the per-step label inside
+ordered callbacks so progress logging remains traceable without putting Python
+datetime objects in the scan carry.
 
 ### Runtime interruption across host and scanned integrations
 

@@ -352,7 +352,6 @@ def test_runtime_component_type_imports_are_annotation_only() -> None:
         Path("vercor/runtime/initialization.py"),
         Path("vercor/runtime/topology.py"),
         Path("vercor/runtime/coupler_state.py"),
-        Path("vercor/runtime/runner.py"),
     )
 
     for path in modules_with_annotation_only_component_usage:

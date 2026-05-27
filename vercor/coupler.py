@@ -36,10 +36,10 @@ from vercor.runtime.initialization import (
 )
 from vercor.runtime.interrupts import RuntimeInterruptController
 from vercor.runtime.runner import (
-    RuntimeRunContext,
     run_coupler_runtime,
     run_scanned_runtime,
 )
+from vercor.runtime.run_context import RuntimeRunContext
 from vercor.runtime.time import initial_runtime_step_info
 from vercor.runtime.topology import RuntimeRegridder
 from vercor.runtime.views import RuntimeComponentView
@@ -299,17 +299,13 @@ class Coupler:
     def _runtime_run_context(self) -> RuntimeRunContext:
         """Return static runtime inputs bundled for execution."""
 
+        dispatch_context = self._runtime_dispatch_context()
         return RuntimeRunContext(
-            components=self.components,
             run_sequence=tuple(self.run_sequence),
-            exchanges=self.exchanges,
-            regridders=self._regridders,
-            contracts=self._runtime_contracts,
             clock=self.clock,
-            settings=self.settings,
             logger=self.logger,
             log_level=self.log_level,
-            dispatch_context=self._runtime_dispatch_context(),
+            dispatch_context=dispatch_context,
             compiled_runtime_cache=self._compiled_runtime_cache,
             interrupts=self._runtime_interrupts,
         )
