@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import jax.numpy as jnp
 
-from vercor.components.base import Component
 from vercor.dtypes import jax_ones
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.exchange import Exchange
@@ -22,6 +22,9 @@ from vercor.regridders import (
 )
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
+
+if TYPE_CHECKING:
+    from vercor.components.base import Component
 
 RuntimeRegridder = BilinearRectilinearRegridder | ConservativeRectilinearRegridder
 VALID_TOPOLOGY_COMPONENT_NAMES = ("ATM", "OCN", "LND", "ICE")

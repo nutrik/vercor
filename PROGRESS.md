@@ -21,6 +21,8 @@ historical commands, failure messages, or detailed validation notes.
   2026-05-27.
 - Latest local boundary-cohesion validation: Black, flake8, mypy, focused fast
   pytest, full fast pytest, and full pytest passed as of 2026-05-27.
+- Latest local boundary-import validation: Black, flake8, mypy, focused fast
+  pytest, full fast pytest, and full pytest passed as of 2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -46,6 +48,27 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Runtime Component Boundary Import Refactor
+
+- Moved component-facing required runtime field validation into
+  `vercor.components._runtime_fields`, removing its hidden dependency on
+  `vercor.runtime.validation` while preserving the existing `CouplerError`
+  messages for missing and non-canonical fields.
+- Converted annotation-only `Component` imports in the public coupler facade and
+  setup/runtime helper modules to `TYPE_CHECKING` imports, keeping runtime
+  imports focused on behavior dependencies.
+- Added boundary tests that pin `_runtime_fields` away from runtime validation
+  internals and guard the planned type-only import shape for coupler/runtime
+  modules.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_component_base_coverage.py tests/test_runtime_state.py -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Runtime Facade Cohesion Refactor
 

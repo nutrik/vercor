@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, MutableMapping, Sequence
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import jax
 from jax.errors import JaxRuntimeError
 
 from vercor.clock import Clock
-from vercor.components.base import Component
 from vercor.exceptions import CouplerError
 from vercor.exchange import Exchange
 from vercor.jax_logging import (
@@ -29,6 +28,9 @@ from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.time import build_runtime_step_info, scalar_runtime_step_info
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
+
+if TYPE_CHECKING:
+    from vercor.components.base import Component
 
 CompiledRuntime = Callable[[RuntimeCouplerState], RuntimeCouplerState]
 

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from vercor.clock import Clock
 from vercor.components._validation import validate_component_setup
-from vercor.components.base import Component
 from vercor.dtypes import as_jax_real_array
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike
@@ -24,6 +24,9 @@ from vercor.runtime.validation import (
 )
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
+
+if TYPE_CHECKING:
+    from vercor.components.base import Component
 
 
 @dataclass(frozen=True)

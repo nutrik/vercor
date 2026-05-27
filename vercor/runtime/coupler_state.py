@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import jax.numpy as jnp
 
-from vercor.components.base import Component
 from vercor.exceptions import CouplerError
 from vercor.exchange import Exchange
 from vercor.runtime.component_state import create_runtime_component_state
@@ -22,6 +21,9 @@ from vercor.runtime.validation import (
 )
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
+
+if TYPE_CHECKING:
+    from vercor.components.base import Component
 
 
 def runtime_state_from_components(

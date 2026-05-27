@@ -970,7 +970,7 @@ def test_component_helpers_seed_and_update_runtime_fields() -> None:
     assert "validate_runtime_component_data_field" not in base_source
     assert "component_state.data.to_mapping()" in runtime_fields_source
     assert "component_state.data.replace_many(fields)" in runtime_fields_source
-    assert "validate_runtime_component_data_field" in runtime_fields_source
+    assert "from vercor.runtime.validation import" not in runtime_fields_source
 
 
 @pytest.mark.fast_always

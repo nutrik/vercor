@@ -311,9 +311,16 @@ def test_component_base_internals_are_private_modules() -> None:
         "component_state.data.to_mapping()",
         "component_state.data.replace_many(fields)",
         "validate_runtime_component_data_field",
+        "from vercor.runtime.validation import",
     )
     for marker in private_markers:
         assert marker not in base_source
+
+    for marker in (
+        "validate_runtime_component_data_field",
+        "from vercor.runtime.validation import",
+    ):
+        assert marker not in runtime_fields_source
 
     assert "_contracts" not in components_module.__all__
     assert "_callable_wrappers" not in components_module.__all__
@@ -324,6 +331,31 @@ def test_component_base_internals_are_private_modules() -> None:
 @pytest.mark.fast_always
 def test_components_package_has_no_top_level_import_cycles() -> None:
     assert _component_package_import_cycles() == []
+
+
+@pytest.mark.fast_always
+def test_runtime_component_type_imports_are_annotation_only() -> None:
+    """Runtime facade modules should not import Component for annotations only."""
+
+    modules_with_annotation_only_component_usage = (
+        Path("vercor/coupler.py"),
+        Path("vercor/runtime/initialization.py"),
+        Path("vercor/runtime/topology.py"),
+        Path("vercor/runtime/coupler_state.py"),
+        Path("vercor/runtime/runner.py"),
+    )
+
+    for path in modules_with_annotation_only_component_usage:
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        for node in tree.body:
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module == "vercor.components.base"
+            ):
+                imported_names = {alias.name for alias in node.names}
+                assert "Component" not in imported_names, path
+        assert "if TYPE_CHECKING:" in source, path
 
 
 @pytest.mark.fast_always

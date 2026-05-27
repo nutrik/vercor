@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
+import jax.numpy as jnp
+
 from vercor.components._contracts import (
     AuthorFieldValues,
     ComponentFieldSpec,
@@ -14,7 +16,11 @@ from vercor.components._contracts import (
     unique_field_names,
 )
 from vercor.dtypes import PrecisionPolicy, jax_zeros
-from vercor.exceptions import ComponentError
+from vercor.exceptions import ComponentError, CouplerError
+from vercor.field_layout import (
+    canonical_data_layout_description,
+    is_canonical_grid_field_shape,
+)
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
@@ -145,10 +151,24 @@ def require_runtime_fields(
 ) -> None:
     """Validate that named runtime data fields use canonical grid layout."""
 
-    from vercor.runtime.validation import validate_runtime_component_data_field
-
     for field_name in names:
-        validate_runtime_component_data_field(component, component_state, field_name)
+        if field_name not in component_state.data:
+            raise CouplerError(
+                "Runtime missing required data field "
+                f"'{field_name}' for component '{component.name}'"
+            )
+        field_shape = tuple(
+            int(size)
+            for size in jnp.asarray(component_state.data.get(field_name)).shape
+        )
+        if not is_canonical_grid_field_shape(field_shape, component.grid.shape):
+            raise CouplerError(
+                "Runtime required data field "
+                f"'{field_name}' for component '{component.name}' has shape "
+                f"{field_shape}; expected canonical grid-field layout "
+                f"{canonical_data_layout_description()} with trailing grid shape "
+                f"{component.grid.shape}"
+            )
 
 
 def prefill_runtime_fields(

@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from vercor.clock import Clock
-from vercor.components.base import Component
 from vercor.exceptions import CouplerError
 from vercor.exchange import Exchange
 from vercor.jax_logging import (
@@ -38,6 +39,9 @@ from vercor.runtime.topology import RuntimeRegridder
 from vercor.runtime.views import RuntimeComponentView
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
+
+if TYPE_CHECKING:
+    from vercor.components.base import Component
 
 
 @dataclass
