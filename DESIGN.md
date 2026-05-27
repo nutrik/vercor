@@ -156,9 +156,10 @@ immutable runtime containers used during traced integration.
   `vercor.components._callable_wrappers`, component-facing runtime-field
   adapters live in private `vercor.components._runtime_fields`, component-facing
   required-field validation lives in private
-  `vercor.components._runtime_validation`, and setup validation lives in private
-  `vercor.components._validation`. These private modules are not exported from
-  `vercor.components`. Subclasses should call
+  `vercor.components._runtime_validation`, component host/scanned execution
+  policy lives in private `vercor.components._runtime_execution`, and setup
+  validation lives in private `vercor.components._validation`. These private
+  modules are not exported from `vercor.components`. Subclasses should call
   the base constructor so `name`,
   `grid`, `data`, and a component-owned `VercorSettings` container are available
   during initialization, execution, and finalization. `Component.data` is a
@@ -220,12 +221,13 @@ immutable runtime containers used during traced integration.
   roundtrips, fallback reads, and replacement of existing fields while
   preserving established dtypes. Import/export contract construction lives in
   `vercor.runtime.contracts`, exchange dispatch lives in
-  `vercor.runtime.exchange_dispatch`, runtime step metadata lives in
+  `vercor.runtime.exchange_dispatch`, static dispatch context construction
+  lives in `vercor.runtime.dispatch_context`, runtime step metadata lives in
   `vercor.runtime.time`, component state creation lives in
   `vercor.runtime.component_state`, field receive/send mechanics live in
   `vercor.runtime.field_transfer`, and runtime validation lives in
   `vercor.runtime.validation`. Runtime coupler-state assembly,
-  runtime-contract refresh, dispatch-context creation, and final-output mask lookup live in
+  runtime-contract refresh, and final-output mask lookup live in
   `vercor.runtime.coupler_state`; exchange topology mask/regridder setup lives
   in `vercor.runtime.topology`, which returns an explicit
   `ExchangeTopologyState` for the public facade to store. Setup-time component

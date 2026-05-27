@@ -77,6 +77,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_contracts_path = Path("vercor/runtime/contracts.py")
     runtime_stores_path = Path("vercor/runtime/stores.py")
     runtime_exchange_dispatch_path = Path("vercor/runtime/exchange_dispatch.py")
+    runtime_dispatch_context_path = Path("vercor/runtime/dispatch_context.py")
     runtime_component_state_path = Path("vercor/runtime/component_state.py")
     runtime_field_transfer_path = Path("vercor/runtime/field_transfer.py")
     runtime_validation_path = Path("vercor/runtime/validation.py")
@@ -85,6 +86,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_contracts_path.exists()
     assert runtime_stores_path.exists()
     assert runtime_exchange_dispatch_path.exists()
+    assert runtime_dispatch_context_path.exists()
     assert runtime_component_state_path.exists()
     assert runtime_field_transfer_path.exists()
     assert runtime_validation_path.exists()
@@ -93,6 +95,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_contracts_source = runtime_contracts_path.read_text(encoding="utf-8")
     runtime_stores_source = runtime_stores_path.read_text(encoding="utf-8")
     runtime_exchange_dispatch_source = runtime_exchange_dispatch_path.read_text(
+        encoding="utf-8"
+    )
+    runtime_dispatch_context_source = runtime_dispatch_context_path.read_text(
         encoding="utf-8"
     )
     runtime_component_state_source = runtime_component_state_path.read_text(
@@ -109,6 +114,11 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     regridder_source = Path("vercor/regridders/base.py").read_text(encoding="utf-8")
     coupler_source = Path("vercor/coupler.py").read_text(encoding="utf-8")
     base_source = Path("vercor/components/base.py").read_text(encoding="utf-8")
+    component_runtime_execution_path = Path("vercor/components/_runtime_execution.py")
+    assert component_runtime_execution_path.exists()
+    component_runtime_execution_source = component_runtime_execution_path.read_text(
+        encoding="utf-8"
+    )
     runtime_fields_source = Path("vercor/components/_runtime_fields.py").read_text(
         encoding="utf-8"
     )
@@ -160,7 +170,14 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "import_fields" not in coupler_source
     assert 'hasattr(component, "step_host_runtime_state")' not in coupler_source
     assert "isinstance(component, HostRuntimeComponent)" not in coupler_source
-    assert "isinstance(component, HostRuntimeComponent)" in runtime_driver_source
+    assert "HostRuntimeComponent" not in runtime_driver_source
+    assert "def component_requires_host_runtime(" in component_runtime_execution_source
+    assert "def host_component_names(" in component_runtime_execution_source
+    assert "def step_component_runtime_state(" in component_runtime_execution_source
+    assert (
+        "isinstance(component, HostRuntimeComponent)"
+        in component_runtime_execution_source
+    )
     assert "time is not None and isinstance" not in runtime_driver_source
     assert "def _step_runtime_component" not in coupler_source
     assert "def _runtime_step_info_from_times" not in coupler_source
@@ -181,6 +198,10 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "class RuntimeStepInfo" not in runtime_source
     assert "def dispatch_component_exchanges" in runtime_exchange_dispatch_source
     assert "def dispatch_component_exchanges" not in runtime_source
+    assert "class RuntimeDispatchContext" in runtime_dispatch_context_source
+    assert "def build_runtime_dispatch_context(" in runtime_dispatch_context_source
+    assert "class RuntimeDispatchContext" not in runtime_driver_source
+    assert "class RuntimeDispatchContext" not in runtime_coupler_state_source
     assert not Path("vercor/runtime_contracts.py").exists()
     assert not Path("vercor/runtime.py").exists()
     assert not Path("vercor/runtime_components.py").exists()
@@ -197,7 +218,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def compile_runtime" not in coupler_source
     assert "def runtime_state_from_components(" in runtime_coupler_state_source
     assert "def validate_runtime_state(" in runtime_coupler_state_source
-    assert "def runtime_dispatch_context(" in runtime_coupler_state_source
+    assert "def runtime_dispatch_context(" not in runtime_coupler_state_source
+    assert "build_runtime_dispatch_context(" in coupler_source
     assert "def output_masks_for_component(" in runtime_coupler_state_source
     assert "def refresh_runtime_contracts(" in runtime_coupler_state_source
     assert "refresh_runtime_contracts(" in coupler_source
@@ -270,7 +292,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "RuntimeComponentContract.empty" not in runtime_driver_source
     assert "def build_runtime_contracts_for_components" not in runtime_source
     assert "build_runtime_contracts_for_components" not in coupler_source
-    assert "RuntimeDispatchContext" in runtime_driver_source
+    assert "RuntimeDispatchContext" in runtime_dispatch_context_source
     assert "dispatch_context: RuntimeDispatchContext" in runtime_driver_source
     assert "contracts.get(" not in runtime_driver_source
     assert "_runtime_contracts.get(" not in coupler_source

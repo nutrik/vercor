@@ -13,13 +13,11 @@ from vercor.runtime.contracts import (
     build_runtime_contracts,
     exchange_key_name,
 )
-from vercor.runtime.driver import RuntimeDispatchContext
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.runtime.validation import (
     validate_component_runtime_contract_fields,
 )
-from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
@@ -80,35 +78,6 @@ def refresh_runtime_contracts(
         tuple(components),
         exchanges,
         validate_endpoints=validate_endpoints,
-    )
-
-
-def runtime_dispatch_context(
-    components: Mapping[str, Component],
-    exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], Any],
-    contracts: Mapping[str, RuntimeComponentContract],
-    *,
-    dt_seconds: float,
-    settings: VercorSettings,
-) -> RuntimeDispatchContext:
-    """Return static runtime dispatch plumbing for a configured coupler."""
-
-    exchanges_by_destination: dict[str, list[Exchange]] = {}
-    for exchange in exchanges:
-        exchanges_by_destination.setdefault(exchange.destination, []).append(exchange)
-
-    return RuntimeDispatchContext(
-        components=components,
-        exchanges=exchanges,
-        exchanges_by_destination={
-            name: tuple(destination_exchanges)
-            for name, destination_exchanges in exchanges_by_destination.items()
-        },
-        regridders=regridders,
-        contracts=contracts,
-        dt_seconds=dt_seconds,
-        settings=settings,
     )
 
 

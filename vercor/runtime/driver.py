@@ -1,49 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
 
 from vercor.calendar import ModelDateTime
-from vercor.components.base import Component, HostRuntimeComponent
-from vercor.exchange import Exchange
+from vercor.components._runtime_execution import step_component_runtime_state
 from vercor.jax_logging import LoggerLike
-from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.contexts import RuntimeStepContext
+from vercor.runtime.dispatch_context import RuntimeDispatchContext
 from vercor.runtime.exchange_dispatch import dispatch_component_exchanges
 from vercor.runtime.field_transfer import receive_runtime_fields, send_runtime_fields
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.time import RuntimeStepInfo
-from vercor.settings import VercorSettings
-
-
-@dataclass(frozen=True)
-class RuntimeDispatchContext:
-    """Static runtime plumbing shared by per-component dispatch helpers."""
-
-    components: Mapping[str, Component]
-    exchanges: Sequence[Exchange]
-    exchanges_by_destination: Mapping[str, tuple[Exchange, ...]]
-    regridders: Mapping[tuple[str, str, str], Any]
-    contracts: Mapping[str, RuntimeComponentContract]
-    dt_seconds: float
-    settings: VercorSettings
-
-    def destination_exchanges(self, component_name: str) -> tuple[Exchange, ...]:
-        """Return exchanges targeting ``component_name``."""
-
-        return self.exchanges_by_destination.get(component_name, ())
-
-
-def host_component_names(components: Mapping[str, Component]) -> list[str]:
-    """Return names of components that require the Python host runtime."""
-
-    return [
-        name
-        for name, component in components.items()
-        if isinstance(component, HostRuntimeComponent)
-    ]
 
 
 def step_runtime_component(
@@ -77,16 +45,12 @@ def step_runtime_component(
         time=time,
         logger=logger,
     )
-    if allow_host_runtime and isinstance(component, HostRuntimeComponent):
-        component_state = component.step_host_runtime_state(
-            component_state,
-            step_context,
-        )
-    else:
-        component_state = component.step_runtime_state(
-            component_state,
-            step_context,
-        )
+    component_state = step_component_runtime_state(
+        component,
+        component_state,
+        step_context,
+        allow_host_runtime=allow_host_runtime,
+    )
     component_state = send_runtime_fields(
         component,
         component_state,

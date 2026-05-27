@@ -26,6 +26,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local cohesion-boundary implementation validation: Black, flake8,
   mypy, focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local runtime-dispatch-boundary validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -51,6 +54,27 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Runtime Dispatch Boundary Refactor
+
+- Moved static runtime dispatch context construction into
+  `vercor.runtime.dispatch_context`, leaving `vercor.runtime.coupler_state`
+  focused on runtime state assembly, contract refresh, validation, and output
+  masks.
+- Added private `vercor.components._runtime_execution` for host-component
+  detection and host/scanned component step selection, so `vercor.runtime.driver`
+  no longer owns `HostRuntimeComponent` classification.
+- Updated `Coupler`, runtime runner/driver imports, boundary tests, and the
+  architecture ownership docs for the new dispatch and component-execution
+  boundaries.
+- Validation run for this change:
+  focused runtime/component fast pytest,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Cohesion and Boundary Refactor Implementation
 

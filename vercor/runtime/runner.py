@@ -9,6 +9,7 @@ import jax
 from jax.errors import JaxRuntimeError
 
 from vercor.clock import Clock
+from vercor.components._runtime_execution import host_component_names
 from vercor.exceptions import CouplerError
 from vercor.exchange import Exchange
 from vercor.jax_logging import (
@@ -19,11 +20,8 @@ from vercor.jax_logging import (
 )
 from vercor.dtypes import as_jax_index_array
 from vercor.runtime.contracts import RuntimeComponentContract
-from vercor.runtime.driver import (
-    RuntimeDispatchContext,
-    host_component_names,
-    step_runtime_component,
-)
+from vercor.runtime.dispatch_context import RuntimeDispatchContext
+from vercor.runtime.driver import step_runtime_component
 from vercor.runtime.interrupts import RuntimeInterruptController
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.time import build_runtime_step_info, scalar_runtime_step_info

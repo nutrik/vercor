@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
+import importlib
+import importlib.util
 from pathlib import Path
 from typing import Any, cast
 
@@ -81,6 +83,89 @@ class _HostStepOnlyComponent(base_module.HostRuntimeComponent):
     ) -> RuntimeComponentState:
         _ = context
         return component_state
+
+
+def test_component_runtime_execution_policy_helpers_detect_host_components() -> None:
+    assert importlib.util.find_spec("vercor.components._runtime_execution") is not None
+    runtime_execution = cast(
+        Any,
+        importlib.import_module("vercor.components._runtime_execution"),
+    )
+    pure_component = _RuntimeOnlyComponent(name="ATM", grid=make_test_grid())
+    host_component = _HostStepOnlyComponent(name="OCN", grid=make_test_grid())
+
+    assert runtime_execution.component_requires_host_runtime(pure_component) is False
+    assert runtime_execution.component_requires_host_runtime(host_component) is True
+    assert runtime_execution.host_component_names(
+        {"ATM": pure_component, "OCN": host_component}
+    ) == ["OCN"]
+
+
+def test_component_runtime_execution_policy_steps_selected_runtime_path() -> None:
+    assert importlib.util.find_spec("vercor.components._runtime_execution") is not None
+    runtime_execution = cast(
+        Any,
+        importlib.import_module("vercor.components._runtime_execution"),
+    )
+
+    class PureMarkerComponent(base_module.Component):
+        def step_runtime_state(
+            self,
+            component_state: RuntimeComponentState,
+            context: RuntimeStepContext,
+        ) -> RuntimeComponentState:
+            _ = context
+            return component_state.with_data(
+                component_state.data.set(
+                    "marker",
+                    component_state.data.get("marker") + 1.0,
+                )
+            )
+
+    class HostMarkerComponent(base_module.HostRuntimeComponent):
+        def step_host_runtime_state(
+            self,
+            component_state: RuntimeComponentState,
+            context: RuntimeStepContext,
+        ) -> RuntimeComponentState:
+            _ = context
+            return component_state.with_data(
+                component_state.data.set(
+                    "marker",
+                    component_state.data.get("marker") + 2.0,
+                )
+            )
+
+    grid = make_test_grid()
+    context = RuntimeStepContext(dt_seconds=1.0, settings=VercorSettings())
+    state = RuntimeComponentState(
+        data=RuntimeFieldStore.from_mapping({"marker": jnp.asarray(0.0)}),
+        incoming=RuntimeFieldStore.empty(),
+        outgoing=RuntimeFieldStore.empty(),
+    )
+
+    pure_state = runtime_execution.step_component_runtime_state(
+        PureMarkerComponent(name="ATM", grid=grid),
+        state,
+        context,
+        allow_host_runtime=False,
+    )
+    host_state = runtime_execution.step_component_runtime_state(
+        HostMarkerComponent(name="OCN", grid=grid),
+        state,
+        context,
+        allow_host_runtime=True,
+    )
+
+    assert_allclose_compact(pure_state.data.get("marker"), np.asarray(1.0))
+    assert_allclose_compact(host_state.data.get("marker"), np.asarray(2.0))
+    with pytest.raises(ComponentError, match="host-backed"):
+        runtime_execution.step_component_runtime_state(
+            HostMarkerComponent(name="LND", grid=grid),
+            state,
+            context,
+            allow_host_runtime=False,
+        )
 
 
 @pytest.mark.fast_always

@@ -15,7 +15,7 @@ from vercor.runtime import (
     RuntimeFieldStore,
     dispatch_component_exchanges,
 )
-from vercor.runtime.driver import RuntimeDispatchContext
+from vercor.runtime.dispatch_context import RuntimeDispatchContext
 
 
 class _ScalingRegridder:

@@ -22,11 +22,14 @@ from vercor.runtime import (
 )
 from vercor.runtime.coupler_state import (
     refresh_runtime_contracts,
-    runtime_dispatch_context,
     runtime_state_from_components,
     validate_runtime_state as validate_coupler_runtime_state,
 )
-from vercor.runtime.driver import RuntimeDispatchContext, prime_runtime_outgoing
+from vercor.runtime.dispatch_context import (
+    RuntimeDispatchContext,
+    build_runtime_dispatch_context,
+)
+from vercor.runtime.driver import prime_runtime_outgoing
 from vercor.runtime.initialization import (
     initialize_coupler_runtime,
     validate_registered_component_setup,
@@ -284,7 +287,7 @@ class Coupler:
     def _runtime_dispatch_context(self) -> RuntimeDispatchContext:
         """Return static runtime dispatch plumbing for the current coupler state."""
 
-        return runtime_dispatch_context(
+        return build_runtime_dispatch_context(
             self.components,
             self.exchanges,
             self._regridders,
