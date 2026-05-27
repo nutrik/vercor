@@ -288,9 +288,16 @@ lookup for exchange topology is private to `vercor.runtime.topology`. Generic
 hybrid/sigma-coordinate pressure and altitude helpers live in
 `vercor.fluxes.vertical_coordinates`, and generic PyTree transforms live in
 `vercor.pytree_utils`.
-Adapter-specific file output policy lives beside adapters in focused output
-helpers, such as `vercor.setups.external.jax_gcm_output` and
-`vercor.setups.external.camulator_output`, instead of in stepping adapters.
+Adapter-specific runtime and file-output policy lives beside adapters in focused
+helpers instead of in factory/bootstrap modules. JAXGCM runtime payload,
+prefill, validation, stepping, and host recording live in
+`vercor.setups.external.jax_gcm_runtime`, while JAXGCM output cadence and
+NetCDF writing live in `vercor.setups.external.jax_gcm_output`. Veros
+host-runtime flux application and substep orchestration live in
+`vercor.setups.external.veros_runtime`. CAMulator prediction-block and runtime
+step orchestration live in `vercor.setups.external.camulator_runtime`, while
+CAMulator CREDIT output writing lives in
+`vercor.setups.external.camulator_output`.
 
 `vercor.assets` owns generic cache, download, and checksum validation only.
 Concrete forcing product registries and `get_forcing_data(...)` defaults live
@@ -301,12 +308,13 @@ into `vercor.diagnostics.fields`, `vercor.diagnostics.tables`, and
 surface.
 
 CAMulator optional-dependency loading, forcing cursors, tensor accessors,
-stepping, output, wind filtering, land forcing, and initialization are split
-across
+runtime stepping, output, wind filtering, land forcing, and initialization are
+split across
 `vercor.setups.external.camulator_imports`,
 `vercor.setups.external.camulator_forcing`,
 `vercor.setups.external.camulator_tensors`,
 `vercor.setups.external.camulator_stepper`,
+`vercor.setups.external.camulator_runtime`,
 `vercor.setups.external.camulator_output`,
 `vercor.setups.external.camulator_wind_filter`,
 `vercor.setups.external.camulator_land`, and

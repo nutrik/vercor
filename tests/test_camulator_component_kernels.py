@@ -19,6 +19,7 @@ import vercor.setups.external.camulator_imports as camulator_imports_module
 import vercor.setups.external.camulator_init as camulator_init_module
 import vercor.setups.external.camulator_land as camulator_land_module
 import vercor.setups.external.camulator_output as camulator_output_module
+import vercor.setups.external.camulator_runtime as camulator_runtime_module
 import vercor.setups.external.camulator_tensors as camulator_tensors_module
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
@@ -863,7 +864,12 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
         time=start,
         logger=cast(Any, _RecordingLogger()),
     )
-    updates = component.step(component_state.data.to_mapping(), step_context, None)
+    updates = camulator_runtime_module.step_camulator_runtime(
+        component,
+        component_state.data.to_mapping(),
+        step_context,
+        None,
+    )
     component_state = component_state.with_data(component_state.data.set_many(updates))
 
     assert captured["dynamic_forcing"].shape == (1, 2, 1, 2, 2)

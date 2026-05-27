@@ -11,7 +11,7 @@ from vercor.setups._lazy_imports import (
 )
 
 _LAZY_EXPORTS = {
-    "JAXGCMRuntimePayload": LazyExport("jax_gcm", "JAXGCMRuntimePayload"),
+    "JAXGCMRuntimePayload": LazyExport("jax_gcm_runtime", "JAXGCMRuntimePayload"),
     "JCMState": LazyExport("jax_gcm", "JCMState"),
     "camulator_land": LazyExport("camulator_land"),
     "jax_gcm": LazyExport("jax_gcm"),

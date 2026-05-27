@@ -17,8 +17,10 @@ import xarray as xr
 import vercor.setups.external.jax_gcm as jax_gcm_module
 import vercor.setups.external.jax_gcm_fields as jax_gcm_fields_module
 import vercor.setups.external.jax_gcm_output as jax_gcm_output_module
+import vercor.setups.external.jax_gcm_runtime as jax_gcm_runtime_module
 import vercor.setups.external.veros_fluxes as veros_fluxes_module
 import vercor.setups.external.veros_gcm as veros_gcm_module
+import vercor.setups.external.veros_runtime as veros_runtime_module
 import vercor.setups.external.veros_setup as veros_setup_module
 import vercor.setups.external.veros_state as veros_state_module
 from tests._coverage_support import capture_logger_output, make_test_grid
@@ -647,9 +649,9 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
             prediction,
         ),
     )
-    monkeypatch.setattr(jax_gcm_module, "stack_objects", lambda objs: objs[0])
-    monkeypatch.setattr(jax_gcm_module, "unwrap_leading_dims", lambda obj: obj)
-    monkeypatch.setattr(jax_gcm_module, "mean_leaf", lambda obj, axis: obj)
+    monkeypatch.setattr(jax_gcm_runtime_module, "stack_objects", lambda objs: objs[0])
+    monkeypatch.setattr(jax_gcm_runtime_module, "unwrap_leading_dims", lambda obj: obj)
+    monkeypatch.setattr(jax_gcm_runtime_module, "mean_leaf", lambda obj, axis: obj)
     monkeypatch.setattr(
         jax_gcm_fields_module,
         "compute_sigma_pressure_levels",
@@ -682,12 +684,12 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
         predictions.clear()
 
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_runtime_module,
         "should_write_period_output",
         lambda time, dt, output_frequency: True,
     )
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_runtime_module,
         "write_jax_gcm_averages_output",
         fake_write_jax_gcm_averages_output,
     )
@@ -704,7 +706,8 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
         grid=component.grid,
         settings=component.settings,
     )
-    component.prefill_runtime_state_fields(
+    jax_gcm_runtime_module.prefill_jax_gcm_runtime_fields(
+        component,
         cast(Any, hook_component),
         runtime_data,
         runtime_incoming,
@@ -715,7 +718,9 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
         data=RuntimeFieldStore.from_mapping(runtime_data),
         incoming=RuntimeFieldStore.from_mapping(runtime_incoming),
         outgoing=RuntimeFieldStore.from_mapping(runtime_outgoing),
-        runtime_payload=component.create_runtime_payload(),
+        runtime_payload=jax_gcm_runtime_module.create_jax_gcm_runtime_payload(
+            component
+        ),
     )
     step_context = RuntimeStepContext(
         dt_seconds=timedelta(days=1).total_seconds(),
@@ -723,7 +728,8 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
         time=datetime(2000, 1, 2),
         logger=coupler.logger,
     )
-    step_result = component.step(
+    step_result = jax_gcm_runtime_module.step_jax_gcm_component(
+        component,
         component_state.data.to_mapping(),
         step_context,
         component_state.runtime_payload,
@@ -1276,7 +1282,12 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
         time=datetime(2000, 1, 1),
         logger=coupler.logger,
     )
-    updates = component.step(component_state.data.to_mapping(), step_context, None)
+    updates = veros_runtime_module.step_veros_runtime(
+        component,
+        component_state.data.to_mapping(),
+        step_context,
+        None,
+    )
     component_state = component_state.with_data(component_state.data.set_many(updates))
 
     expected_names = ["taux", "tauy", "qnet", "qnec"]
@@ -1340,7 +1351,12 @@ def test_veros_step_nan_cleans_forcing_fields_before_set_variable(
         time=datetime(2000, 1, 1),
         logger=coupler.logger,
     )
-    _ = component.step(component_state.data.to_mapping(), step_context, None)
+    _ = veros_runtime_module.step_veros_runtime(
+        component,
+        component_state.data.to_mapping(),
+        step_context,
+        None,
+    )
 
     assert [name for name, _ in set_calls] == ["taux", "tauy", "qnet", "qnec"]
     assert_allclose_compact(

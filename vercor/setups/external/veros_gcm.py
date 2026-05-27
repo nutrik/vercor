@@ -18,7 +18,7 @@ from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
     run_logged_spinup,
 )
-import vercor.setups.external.veros_fluxes as _veros_fluxes
+import vercor.setups.external.veros_runtime as _veros_runtime
 import vercor.setups.external.veros_setup as _veros_setup
 import vercor.setups.external.veros_state as _veros_state
 from vercor.types import RuntimeArray
@@ -148,40 +148,9 @@ class _VerosGCMState:
         context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, Any]:
-        """Advance the private host-backed Veros boundary."""
+        """Delegate Veros host-runtime advancement to the runtime helper."""
 
-        _ = payload
-        time = context.time
-        logger = context.logger
-        if time is None:
-            return {}
-
-        taux, tauy, qnet, qnec = _veros_fluxes.compute_fluxes(
-            self._veros_state,
-            fields,
-            context.settings,
-        )
-        forcing_fields = _veros_state._prepare_surface_forcing_fields(
-            taux, tauy, qnet, qnec, self.restore_to_climatology
-        )
-
-        self._veros_state = _veros_state._apply_veros_forcing_fields(
-            self._veros_state,
-            forcing_fields,
-            jitted=self.jitted,
-        )
-        self._veros_state = _veros_state._advance_veros_substeps(
-            self._veros_state,
-            step_function=self._step_function,
-            model_substeps=self.model_substeps,
-            logger=logger,
-        )
-
-        return {
-            "sea_surface_temperature": _veros_state._extract_veros_runtime_sst(
-                self._veros_state
-            )
-        }
+        return _veros_runtime.step_veros_runtime(self, fields, context, payload)
 
 
 def make_veros_gcm(

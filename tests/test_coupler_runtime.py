@@ -25,6 +25,7 @@ from vercor.setups.data.jcm_land import make_jcm_land
 from vercor.setups.external import jax_gcm as jax_gcm_module
 from vercor.setups.external.jax_gcm import JCMState
 from vercor.setups.external.jax_gcm_fields import JAXGCM_OUTPUT_GRID_FIELD_NAMES
+import vercor.setups.external.jax_gcm_runtime as jax_gcm_runtime_module
 from vercor.setups.slab.atmosphere import make_slab_atmosphere
 from vercor.setups.slab.land import make_slab_land
 from vercor.setups.slab.ocean import make_slab_ocean
@@ -222,7 +223,16 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
     component = differentiable_component(
         name="ATM",
         grid=grid,
-        step=state.step,
+        step=(
+            lambda fields, context, payload: (
+                jax_gcm_runtime_module.step_jax_gcm_component(
+                    state,
+                    fields,
+                    context,
+                    payload,
+                )
+            )
+        ),
         inputs=("land_surface_temperature", "sea_surface_temperature"),
         outputs=(
             "land_surface_temperature",
@@ -233,13 +243,37 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
         ),
         default_fields={
             field_name: 0.0
-            for field_name in jax_gcm_module._jax_gcm_default_field_names(
+            for field_name in jax_gcm_runtime_module.jax_gcm_default_field_names(
                 include_total_surface_temperature=True
             )
         },
-        create_runtime_payload=lambda component: state.create_runtime_payload(),
-        prefill_runtime_state_fields=state.prefill_runtime_state_fields,
-        validate_runtime_state=state.validate_runtime_state,
+        create_runtime_payload=(
+            lambda component: jax_gcm_runtime_module.create_jax_gcm_runtime_payload(
+                state
+            )
+        ),
+        prefill_runtime_state_fields=(
+            lambda component, data, incoming, outgoing, contract: (
+                jax_gcm_runtime_module.prefill_jax_gcm_runtime_fields(
+                    state,
+                    component,
+                    data,
+                    incoming,
+                    outgoing,
+                    contract,
+                )
+            )
+        ),
+        validate_runtime_state=(
+            lambda component, component_state, contract: (
+                jax_gcm_runtime_module.validate_jax_gcm_runtime_state(
+                    state,
+                    component,
+                    component_state,
+                    contract,
+                )
+            )
+        ),
     )
     component.seed_fields(state.data)
     return _JAXGCMFixture(component=component, state=state)

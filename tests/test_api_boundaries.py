@@ -856,12 +856,18 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     jax_gcm_source = Path("vercor/setups/external/jax_gcm.py").read_text(
         encoding="utf-8"
     )
+    jax_gcm_runtime_source = Path(
+        "vercor/setups/external/jax_gcm_runtime.py"
+    ).read_text(encoding="utf-8")
     jax_gcm_fields_source = Path("vercor/setups/external/jax_gcm_fields.py").read_text(
         encoding="utf-8"
     )
     camulator_source = Path("vercor/setups/external/camulator.py").read_text(
         encoding="utf-8"
     )
+    camulator_runtime_source = Path(
+        "vercor/setups/external/camulator_runtime.py"
+    ).read_text(encoding="utf-8")
     camulator_fields_source = Path(
         "vercor/setups/external/camulator_fields.py"
     ).read_text(encoding="utf-8")
@@ -877,13 +883,18 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     veros_gcm_source = Path("vercor/setups/external/veros_gcm.py").read_text(
         encoding="utf-8"
     )
+    veros_runtime_source = Path("vercor/setups/external/veros_runtime.py").read_text(
+        encoding="utf-8"
+    )
     camulator_imports_source = Path(
         "vercor/setups/external/camulator_imports.py"
     ).read_text(encoding="utf-8")
 
     assert Path("vercor/setups/external/camulator_land.py").exists()
+    assert Path("vercor/setups/external/camulator_runtime.py").exists()
     assert Path("vercor/setups/external/jax_gcm_output.py").exists()
     assert Path("vercor/setups/external/jax_gcm_fields.py").exists()
+    assert Path("vercor/setups/external/jax_gcm_runtime.py").exists()
     assert Path("vercor/setups/external/camulator_output.py").exists()
     assert Path("vercor/setups/external/camulator_fields.py").exists()
     assert Path("vercor/setups/external/camulator_runtime_settings.py").exists()
@@ -891,10 +902,23 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert Path("vercor/setups/external/veros_fluxes.py").exists()
     assert Path("vercor/setups/external/veros_setup.py").exists()
     assert Path("vercor/setups/external/veros_state.py").exists()
+    assert Path("vercor/setups/external/veros_runtime.py").exists()
     assert not Path("vercor/setups/jax_array_helpers.py").exists()
     assert not Path("vercor/setups/data/camulator_land.py").exists()
     assert not Path("vercor/setups/external/windpp.py").exists()
     assert "from vercor.runtime.validation import" not in jax_gcm_source
+    assert "class JAXGCMRuntimePayload" not in jax_gcm_source
+    assert "class JAXGCMRuntimePayload" in jax_gcm_runtime_source
+    assert "def create_jax_gcm_runtime_payload(" in jax_gcm_runtime_source
+    assert "def prefill_jax_gcm_runtime_fields(" in jax_gcm_runtime_source
+    assert "def validate_jax_gcm_runtime_state(" in jax_gcm_runtime_source
+    assert "def step_jax_gcm_runtime(" in jax_gcm_runtime_source
+    assert "def record_jax_gcm_host_step(" in jax_gcm_runtime_source
+    assert "def create_runtime_payload(" not in jax_gcm_source
+    assert "def prefill_runtime_state_fields(" not in jax_gcm_source
+    assert "def validate_runtime_state(" not in jax_gcm_source
+    assert "def _step_jax_gcm_component_state(" not in jax_gcm_source
+    assert "def _record_jax_gcm_host_step(" not in jax_gcm_source
     assert "def asfloat(" not in jax_gcm_source
     assert "def _cleanup_surface_temperature_fields(" not in jax_gcm_source
     assert "def _prepare_surface_temperature_forcing(" not in jax_gcm_source
@@ -904,6 +928,10 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def _write_output(" not in jax_gcm_source
     assert "os.environ[" not in camulator_source
     assert "def configure_camulator_runtime(" in camulator_runtime_settings_source
+    assert "def _coerce_camulator_datetime(" in camulator_runtime_source
+    assert "def _run_camulator_prediction_block(" in camulator_runtime_source
+    assert "def step_camulator_runtime(" in camulator_runtime_source
+    assert "def _run_camulator_prediction_block(" not in camulator_source
     assert "def _prepare_camulator_surface_forcing(" not in camulator_source
     assert "def _map_camulator_prediction_arrays(" not in camulator_source
     assert "def _prepare_camulator_surface_forcing(" in camulator_fields_source
@@ -918,9 +946,20 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def compute_fluxes(" not in veros_gcm_source
     assert "def copy_state(" not in veros_gcm_source
     assert "def set_variable(" not in veros_gcm_source
+    assert "def step_veros_runtime(" in veros_runtime_source
+    assert "compute_fluxes(" in veros_runtime_source
+    assert "_apply_veros_forcing_fields(" in veros_runtime_source
+    assert "_advance_veros_substeps(" in veros_runtime_source
+    assert "compute_fluxes(" not in veros_gcm_source
+    assert "_apply_veros_forcing_fields(" not in veros_gcm_source
+    assert "_advance_veros_substeps(" not in veros_gcm_source
     assert "from vercor.setups.external.camulator_wind_filter import" in (
         camulator_imports_source
     )
+    import vercor.setups.external as external_module
+
+    payload_export = external_module._LAZY_EXPORTS["JAXGCMRuntimePayload"]
+    assert payload_export.module == "jax_gcm_runtime"
 
 
 @pytest.mark.fast_always

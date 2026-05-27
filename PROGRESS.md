@@ -43,6 +43,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local core-boundary mixin extraction validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local external-adapter runtime-boundary validation: Black, flake8,
+  mypy, focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -68,6 +71,29 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: External Adapter Runtime Boundary Refactor
+
+- Added focused runtime owners for external adapter behavior:
+  `jax_gcm_runtime.py` owns JAXGCM runtime payload, defaults, prefill,
+  validation, stepping, and host recording; `camulator_runtime.py` owns
+  CAMulator datetime coercion, prediction-block execution, and runtime step
+  mapping; `veros_runtime.py` owns Veros flux application, host substeps, and
+  SST refresh.
+- Slimmed `jax_gcm.py`, `camulator.py`, and `veros_gcm.py` back toward
+  optional-dependency loading, model construction, setup initialization, spinup,
+  and factory wiring while preserving existing public factories and the
+  compatibility `JAXGCMRuntimePayload` reexport.
+- Updated boundary/focused tests, `DESIGN.md`, and `DEPENDENCIES.md` for the
+  new external-adapter ownership map.
+- Validation run for this change:
+  focused external/runtime fast pytest,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Core Boundary Mixin Extraction
 

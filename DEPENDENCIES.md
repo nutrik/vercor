@@ -29,12 +29,12 @@
 29. `vercor/setups/external/jax_gcm_tools.py` - JCM-specific parameter and input-data helpers built on (1, 7, 8, 11)
 30. `vercor/setups/external/jax_gcm_fields.py` - JCM output-field mapping and surface-temperature forcing helpers built on (1, 7)
 31. `vercor/setups/external/jax_gcm_output.py` - JAXGCM output cadence and NetCDF writing helpers built on (6, 25)
-32. `vercor/setups/external/jax_gcm.py` - JCM adapter boundary that stores translated kernel outputs built on (1, 3, 11, 26, 29, 30, 31)
+32. `vercor/setups/external/jax_gcm_runtime.py` and `jax_gcm.py` - JAXGCM runtime payload/hooks/stepping plus JCM adapter factory and setup boundary built on (1, 3, 11, 26, 29, 30, 31, 62)
 33. `vercor/setups/external/veros_runtime_settings.py` - Veros backend/runtime configuration side-effect boundary
 34. `vercor/setups/external/veros_setup.py` - concrete Veros setup subclass and setup policy built on (33)
 35. `vercor/setups/external/veros_fluxes.py` - Veros-to-VerCOR flux conversion built on (1, 4, 9, 33)
 36. `vercor/setups/external/veros_state.py` - Veros host-state copy, mutation, forcing, and stepping helpers built on (1, 10, 33)
-37. `vercor/setups/external/veros_gcm.py` - Veros host-runtime adapter and factory boundary built on (26, 34, 35, 36)
+37. `vercor/setups/external/veros_runtime.py` and `veros_gcm.py` - Veros host-runtime stepping helper plus adapter factory/setup boundary built on (26, 34, 35, 36)
 38. `vercor/setups/external/camulator_imports.py` - lazy CREDIT/postblock/CAMulator wind-filter optional-dependency loading
 39. `vercor/setups/external/camulator_forcing.py` - CAMulator config loading, forcing context, and runtime forcing cursors built on (26, 38)
 40. `vercor/setups/external/camulator_tensors.py` - CAMulator tensor indexing, static forcing tensor staging, and JAX-to-Torch transfer helpers
@@ -45,7 +45,7 @@
 45. `vercor/setups/external/camulator_runtime_settings.py` - CAMulator TensorFlow/OpenMP/MKL import-time environment settings boundary
 46. `vercor/setups/external/camulator_output.py` - CAMulator CREDIT output writing helpers
 47. `vercor/setups/external/camulator_land.py` - CAMulator land host-runtime adapter with shared timestep/cursor setup built on (1, 12, 20, 26, 39)
-48. `vercor/setups/external/camulator.py` - CAMulator host-runtime atmosphere adapter built on (7, 10, 26, 39, 40, 41, 44, 45, 46)
+48. `vercor/setups/external/camulator_runtime.py` and `camulator.py` - CAMulator host-runtime prediction-block/step helpers plus atmosphere adapter factory/setup boundary built on (7, 10, 26, 39, 40, 41, 44, 45, 46)
 49. `vercor/setups/data/assets.py` - concrete ERA/ECMWF setup forcing asset registry built on (21)
 50. `vercor/setups/data/_field_helpers.py` - shared JAX-backed data-adapter positive masks, surface canonicalization, and field normalization helpers built on (1, 14)
 51. `vercor/setups/data/_component_helpers.py` - shared data-component construction helper for time-interpolated forcing adapters built on (12, 23, 26)
