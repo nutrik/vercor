@@ -65,8 +65,9 @@
 65. `vercor/runtime/time.py` - `RuntimeStepInfo` plus host-precomputed daily/monthly runtime step metadata built on (3, 6, 23, 64)
 66. `vercor/runtime/component_state.py`, `field_transfer.py`, and `validation.py` - component runtime state creation, contract prefill, receive/send, time-sliced export selection, and runtime validation built on (1, 5, 14, 62, 63, 64, 65)
 67. `vercor/runtime/exchange_dispatch.py` and `driver.py` - exchange dispatch, component runtime stepping, outgoing priming, and host-adapter detection built on (6, 59, 62, 63, 64, 65, 66)
-68. `vercor/runtime/coupler_state.py` and `topology.py` - runtime coupler-state assembly, topology/name validation, dispatch-context construction, output-mask lookup, component lookup, and exchange topology setup built on (12, 13, 19, 20, 59, 62, 63, 64, 66, 67)
-69. `vercor/runtime/runner.py` - host/scanned runtime loops, progress logging, compile-cache keys, JIT wrapping, donation checks, and interrupt translation built on (25, 65, 67)
-70. `vercor/output.py` - runtime-view NetCDF output boundary built on (10, 12, 60, 64)
-71. `vercor/coupler.py` - public runtime facade for `run()` and `create_runtime_state()` built on (25, 59, 62, 63, 64, 65, 66, 67, 68, 69, 70)
-72. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`
+68. `vercor/runtime/coupler_state.py` and `topology.py` - runtime coupler-state assembly, topology/name validation, dispatch-context construction, output-mask lookup, component lookup, explicit exchange topology state, and exchange topology setup built on (12, 13, 19, 20, 59, 62, 63, 64, 66, 67)
+69. `vercor/runtime/initialization.py` - setup-time precision synchronization, component initialization, setup validation, runtime contract validation, and exchange-topology handoff built on (24, 59, 62, 63, 66, 68)
+70. `vercor/runtime/runner.py` - host/scanned runtime loops, progress logging, compile-cache keys, JIT wrapping, donation checks, and interrupt translation built on (25, 65, 67)
+71. `vercor/output.py` - runtime-view NetCDF output boundary built on (10, 12, 60, 64)
+72. `vercor/coupler.py` - public runtime facade for `run()` and `create_runtime_state()` built on (25, 59, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71)
+73. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`

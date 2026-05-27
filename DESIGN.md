@@ -223,11 +223,15 @@ immutable runtime containers used during traced integration.
   `vercor.runtime.validation`. Runtime coupler-state assembly,
   dispatch-context creation, and final-output mask lookup live in
   `vercor.runtime.coupler_state`; exchange topology mask/regridder setup lives
-  in `vercor.runtime.topology`. Host/scanned runtime loops, progress logging,
-  compiled-runtime cache keys, JIT wrapping, donation checks, and interrupt
-  translation live in `vercor.runtime.runner`. `Coupler` delegates to these
-  modules and remains the public setup/finalization facade rather than the owner
-  of runtime adapter mechanics.
+  in `vercor.runtime.topology`, which returns an explicit
+  `ExchangeTopologyState` for the public facade to store. Setup-time component
+  precision synchronization, initialization context construction, component
+  setup validation, runtime contract validation, and topology handoff live in
+  `vercor.runtime.initialization`. Host/scanned runtime loops, progress
+  logging, compiled-runtime cache keys, JIT wrapping, donation checks, and
+  interrupt translation live in `vercor.runtime.runner`. `Coupler` delegates to
+  these modules and remains the public setup/finalization facade rather than the
+  owner of runtime adapter mechanics.
   payload pytrees carried through `jax.lax.scan` must preserve every leaf's
   shape and dtype between input and output; per-step slices or adapted forcing
   objects should be local values unless they are shape-stable runtime state.

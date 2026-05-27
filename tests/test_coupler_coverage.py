@@ -12,7 +12,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import vercor.coupler as coupler_module
+import vercor.runtime.topology as topology_module
 from tests._coverage_support import (
     DummyComponent,
     RecordingRegridder,
@@ -39,10 +39,13 @@ from vercor.run_sequence import RunSequence
 from vercor.runtime import RuntimeComponentContract, dispatch_component_exchanges
 from vercor.runtime.coupler_state import output_masks_for_component
 from vercor.runtime.topology import (
+    ExchangeTopologyState,
+    build_exchange_topology,
     create_exchange_masks,
     patch_exchange_masks,
     validate_land_mask_consistency,
 )
+from vercor.settings import VercorSettings
 
 
 class _RecordingLogger:
@@ -127,6 +130,24 @@ class _HostRunComponent(HostRuntimeComponent):
 
 def make_coupler() -> Coupler:
     return Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
+
+
+def _topology_components() -> dict[str, DummyComponent]:
+    lnd_mask = np.asarray([[1.0, 0.0], [0.0, 1.0]])
+    return {
+        "ATM": DummyComponent(name="ATM", grid=make_test_grid(name="atm")),
+        "OCN": DummyComponent(
+            name="OCN",
+            grid=make_test_grid(
+                name="ocn",
+                binary_mask=np.asarray([[0.0, 1.0], [1.0, 0.0]]),
+            ),
+        ),
+        "LND": DummyComponent(
+            name="LND",
+            grid=make_test_grid(name="lnd", binary_mask=lnd_mask),
+        ),
+    }
 
 
 def _dispatch_runtime_fields(
@@ -522,7 +543,7 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
         return np.full((2, 2), 0.4), np.full((2, 2), 0.6), lnd_mask
 
     monkeypatch.setattr(
-        coupler_module,
+        topology_module,
         "create_exchange_masks",
         fake_create_exchange_masks,
     )
@@ -568,6 +589,131 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
     assert_allclose_compact(
         coupler._binary_masks[("LND", "ATM", "bilinear")],
         lnd_mask,
+    )
+
+
+@pytest.mark.fast_always
+def test_build_exchange_topology_returns_explicit_patched_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    components = _topology_components()
+    exchange = Exchange(
+        source="OCN",
+        destination="ATM",
+        field_names=["temperature"],
+        regridder_factory=bilinear,
+    )
+    monkeypatch.setattr(
+        topology_module,
+        "create_exchange_masks",
+        lambda *args, **kwargs: (
+            np.full((2, 2), 0.4),
+            np.full((2, 2), 0.6),
+            np.asarray([[1.0, 0.0], [0.0, 1.0]]),
+        ),
+    )
+
+    state = build_exchange_topology(
+        components=cast(Any, components),
+        exchanges=(exchange,),
+        settings=VercorSettings(),
+        logger=cast(Any, _RecordingLogger()),
+    )
+
+    assert isinstance(state, ExchangeTopologyState)
+    assert set(state.regridders) == {("OCN", "ATM", "bilinear")}
+    assert_allclose_compact(
+        state.fractional_masks[("OCN", "ATM", "bilinear")],
+        np.full((2, 2), 0.4),
+    )
+    assert_allclose_compact(
+        state.lnd_bmask_on_atm_grid,
+        np.asarray([[1.0, 0.0], [0.0, 1.0]]),
+    )
+
+
+@pytest.mark.fast_always
+def test_build_exchange_topology_preserves_duplicate_regridder_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    components = _topology_components()
+    logger = _RecordingLogger()
+    exchanges = (
+        Exchange(
+            source="OCN",
+            destination="ATM",
+            field_names=["temperature"],
+            regridder_factory=bilinear,
+        ),
+        Exchange(
+            source="OCN",
+            destination="ATM",
+            field_names=["specific_humidity"],
+            regridder_factory=bilinear,
+        ),
+    )
+    monkeypatch.setattr(
+        topology_module,
+        "create_exchange_masks",
+        lambda *args, **kwargs: (
+            np.ones((2, 2)),
+            np.zeros((2, 2)),
+            np.asarray([[1.0, 0.0], [0.0, 1.0]]),
+        ),
+    )
+
+    state = build_exchange_topology(
+        components=cast(Any, components),
+        exchanges=exchanges,
+        settings=VercorSettings(),
+        logger=cast(Any, logger),
+    )
+
+    assert len(state.regridders) == 1
+    assert any("already exists" in message for message in logger.warning_messages)
+
+
+@pytest.mark.fast_always
+def test_build_exchange_topology_does_not_mutate_existing_mappings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    components = _topology_components()
+    exchange = Exchange(
+        source="LND",
+        destination="ATM",
+        field_names=["soil_moisture"],
+        regridder_factory=bilinear,
+    )
+    existing_regridders: dict[tuple[str, str, str], Any] = {}
+    existing_binary_masks: dict[tuple[str, str, str], Any] = {}
+    existing_fractional_masks: dict[tuple[str, str, str], Any] = {}
+    monkeypatch.setattr(
+        topology_module,
+        "create_exchange_masks",
+        lambda *args, **kwargs: (
+            np.zeros((2, 2)),
+            np.full((2, 2), 0.75),
+            np.asarray([[1.0, 0.0], [0.0, 1.0]]),
+        ),
+    )
+
+    state = build_exchange_topology(
+        components=cast(Any, components),
+        exchanges=(exchange,),
+        regridders=existing_regridders,
+        binary_masks=existing_binary_masks,
+        fractional_masks=existing_fractional_masks,
+        settings=VercorSettings(),
+        logger=cast(Any, _RecordingLogger()),
+    )
+
+    assert existing_regridders == {}
+    assert existing_binary_masks == {}
+    assert existing_fractional_masks == {}
+    assert state.regridders is not existing_regridders
+    assert_allclose_compact(
+        state.binary_masks[("LND", "ATM", "bilinear")],
+        np.asarray([[1.0, 0.0], [0.0, 1.0]]),
     )
 
 

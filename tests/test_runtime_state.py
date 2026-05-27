@@ -76,6 +76,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_field_transfer_path = Path("vercor/runtime/field_transfer.py")
     runtime_validation_path = Path("vercor/runtime/validation.py")
     runtime_topology_path = Path("vercor/runtime/topology.py")
+    runtime_initialization_path = Path("vercor/runtime/initialization.py")
     assert runtime_contracts_path.exists()
     assert runtime_stores_path.exists()
     assert runtime_exchange_dispatch_path.exists()
@@ -83,6 +84,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_field_transfer_path.exists()
     assert runtime_validation_path.exists()
     assert runtime_topology_path.exists()
+    assert runtime_initialization_path.exists()
     runtime_contracts_source = runtime_contracts_path.read_text(encoding="utf-8")
     runtime_stores_source = runtime_stores_path.read_text(encoding="utf-8")
     runtime_exchange_dispatch_source = runtime_exchange_dispatch_path.read_text(
@@ -96,6 +98,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     )
     runtime_validation_source = runtime_validation_path.read_text(encoding="utf-8")
     runtime_topology_source = runtime_topology_path.read_text(encoding="utf-8")
+    runtime_initialization_source = runtime_initialization_path.read_text(
+        encoding="utf-8"
+    )
     regridder_source = Path("vercor/regridders/base.py").read_text(encoding="utf-8")
     coupler_source = Path("vercor/coupler.py").read_text(encoding="utf-8")
     base_source = Path("vercor/components/base.py").read_text(encoding="utf-8")
@@ -241,6 +246,14 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def validate_component_runtime_contract_fields" in runtime_validation_source
     assert "def check_not_empty_import_export_lists" in runtime_validation_source
     assert "def check_valid_exchange_field_names" in runtime_validation_source
+    assert "def apply_run_precision_to_component(" in runtime_initialization_source
+    assert "def initialize_coupler_runtime(" in runtime_initialization_source
+    assert "from vercor.components._validation import validate_component_setup" in (
+        runtime_initialization_source
+    )
+    assert "from vercor.runtime.initialization import" in coupler_source
+    assert "def _apply_run_precision_to_component(" not in coupler_source
+    assert "from vercor.components._validation import" not in coupler_source
     assert "from vercor.runtime.components import" not in coupler_source
     assert "from vercor.runtime.components import" not in runtime_coupler_state_source
     assert "from vercor.runtime.components import" not in runtime_driver_source
@@ -261,6 +274,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def merge(" not in runtime_source
     assert "_runtime_contracts" in coupler_source
     assert "def initialize_regridders_and_masks(" in runtime_topology_source
+    assert "class ExchangeTopologyState" in runtime_topology_source
+    assert "def build_exchange_topology(" in runtime_topology_source
     assert "def create_exchange_masks(" in runtime_topology_source
     assert "def validate_land_mask_consistency(" in runtime_topology_source
     assert "def patch_exchange_masks(" in runtime_topology_source

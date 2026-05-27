@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import MutableMapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
 
 import jax.numpy as jnp
 
@@ -24,6 +25,18 @@ from vercor.types import RuntimeArray
 
 RuntimeRegridder = BilinearRectilinearRegridder | ConservativeRectilinearRegridder
 VALID_TOPOLOGY_COMPONENT_NAMES = ("ATM", "OCN", "LND", "ICE")
+
+
+@dataclass(frozen=True)
+class ExchangeTopologyState:
+    """Exchange regridders, masks, and derived land/ocean topology arrays."""
+
+    regridders: dict[tuple[str, str, str], RuntimeRegridder]
+    binary_masks: dict[tuple[str, str, str], RuntimeArray]
+    fractional_masks: dict[tuple[str, str, str], RuntimeArray]
+    ocn_fmask_on_atm_grid: RuntimeArray
+    lnd_fmask_on_atm_grid: RuntimeArray
+    lnd_bmask_on_atm_grid: RuntimeArray
 
 
 def validate_component_topology_names(components: dict[str, Component]) -> None:
@@ -169,3 +182,56 @@ def patch_exchange_masks(
             elif source == "LND" and destination == "ATM":
                 binary_masks[key] = lnd_bmask_on_atm_grid
                 fractional_masks[key] = lnd_fmask_on_atm_grid
+
+
+def build_exchange_topology(
+    *,
+    components: dict[str, Component],
+    exchanges: Sequence[Exchange],
+    settings: VercorSettings,
+    logger: LoggerLike,
+    regridders: Mapping[tuple[str, str, str], RuntimeRegridder] | None = None,
+    binary_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
+    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
+) -> ExchangeTopologyState:
+    """Build exchange regridders and masks as an explicit topology state."""
+
+    (
+        ocn_fmask_on_atm_grid,
+        lnd_fmask_on_atm_grid,
+        lnd_bmask_on_atm_grid,
+    ) = create_exchange_masks(components, logger=logger)
+    validate_land_mask_consistency(
+        components,
+        lnd_bmask_on_atm_grid,
+    )
+    logger.info(" LND <--> ATM & OCN <--> ATM masks initialization complete")
+
+    topology_regridders = dict(regridders or {})
+    topology_binary_masks = dict(binary_masks or {})
+    topology_fractional_masks = dict(fractional_masks or {})
+    initialize_regridders_and_masks(
+        components=components,
+        exchanges=exchanges,
+        regridders=topology_regridders,
+        binary_masks=topology_binary_masks,
+        fractional_masks=topology_fractional_masks,
+        settings=settings,
+        logger=logger,
+    )
+    patch_exchange_masks(
+        binary_masks=topology_binary_masks,
+        fractional_masks=topology_fractional_masks,
+        ocn_fmask_on_atm_grid=ocn_fmask_on_atm_grid,
+        lnd_bmask_on_atm_grid=lnd_bmask_on_atm_grid,
+        lnd_fmask_on_atm_grid=lnd_fmask_on_atm_grid,
+    )
+    logger.info(" Exchange masks patching complete")
+    return ExchangeTopologyState(
+        regridders=topology_regridders,
+        binary_masks=topology_binary_masks,
+        fractional_masks=topology_fractional_masks,
+        ocn_fmask_on_atm_grid=ocn_fmask_on_atm_grid,
+        lnd_fmask_on_atm_grid=lnd_fmask_on_atm_grid,
+        lnd_bmask_on_atm_grid=lnd_bmask_on_atm_grid,
+    )

@@ -5,8 +5,6 @@ from typing import Any, Callable, Optional
 
 from vercor.clock import Clock
 from vercor.components.base import Component
-from vercor.components._validation import validate_component_setup
-from vercor.dtypes import as_jax_real_array
 from vercor.exceptions import CouplerError
 from vercor.exchange import Exchange
 from vercor.jax_logging import (
@@ -22,11 +20,6 @@ from vercor.runtime import (
     RuntimeCouplerState,
     build_runtime_contracts,
 )
-from vercor.runtime.contexts import ComponentInitContext
-from vercor.runtime.validation import (
-    check_not_empty_import_export_lists,
-    check_valid_exchange_field_names,
-)
 from vercor.runtime.coupler_state import (
     output_masks_for_component,
     runtime_dispatch_context,
@@ -34,41 +27,17 @@ from vercor.runtime.coupler_state import (
     validate_runtime_state as validate_coupler_runtime_state,
 )
 from vercor.runtime.driver import RuntimeDispatchContext, prime_runtime_outgoing
+from vercor.runtime.initialization import (
+    initialize_coupler_runtime,
+    validate_registered_component_setup,
+)
 from vercor.runtime.interrupts import RuntimeInterruptController
 from vercor.runtime.runner import run_coupler_runtime, run_scanned_runtime
 from vercor.runtime.time import initial_runtime_step_info
-from vercor.runtime.topology import (
-    RuntimeRegridder,
-    create_exchange_masks,
-    initialize_regridders_and_masks,
-    patch_exchange_masks,
-    validate_component_topology_names,
-    validate_land_mask_consistency,
-)
+from vercor.runtime.topology import RuntimeRegridder
 from vercor.runtime.views import RuntimeComponentView
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
-
-
-def _apply_run_precision_to_component(
-    component: Component,
-    settings: VercorSettings,
-) -> None:
-    """Synchronize component-owned setup arrays with the coupler precision."""
-
-    component.settings.set_value("enable_x64", settings.enable_x64)
-    component.grid = component.grid.with_precision(settings)
-    component.data = {
-        field_name: as_jax_real_array(field_value, settings)
-        for field_name, field_value in component.data.items()
-    }
-    field_spec = component.field_spec
-    if field_spec.default_fields:
-        component.declare_fields(
-            inputs=field_spec.inputs,
-            outputs=field_spec.outputs,
-            default_fields=field_spec.default_fields,
-        )
 
 
 @dataclass
@@ -170,7 +139,7 @@ class Coupler:
             component: component instance to register
         """
 
-        validate_component_setup(component)
+        validate_registered_component_setup(component)
         if component.name in self.components:
             raise CouplerError(f"Component {component.name} already registered")
 
@@ -215,78 +184,27 @@ class Coupler:
         Initialize the coupler and all registered components.
         """
 
-        self.logger.info(" Initializing coupler and components")
-
-        if enable_x64_computations is not None:
-            self.settings.set_value("enable_x64", enable_x64_computations)
-
-        self.logger.info(
-            f" Setting default precision for JAX computations: {self.settings.enable_x64}"
-        )
-
-        if self.settings.enable_x64:
-            import jax
-
-            jax.config.update("jax_enable_x64", True)
-
-        for component in self.components.values():
-            _apply_run_precision_to_component(component, self.settings)
-
-        init_context = ComponentInitContext(
-            start=self.clock.start,
-            dt_seconds=self.clock.dt_seconds,
-            run_sequence=getattr(self, "run_sequence", RunSequence(order=[])),
-            settings=self.settings,
-            logger=self.logger,
-        )
-
-        # Initialize each component
-        for name, component in self.components.items():
-            component.initialize(init_context)
-            validate_component_topology_names({name: component})
-            self.logger.info(f" Initialized {name}")
-
-        self._runtime_contracts = build_runtime_contracts(
-            tuple(self.components),
-            self.exchanges,
-            validate_endpoints=True,
-        )
-
-        for name, component in self.components.items():
-            validate_component_setup(component)
-            contract = self._runtime_contracts[name]
-            check_not_empty_import_export_lists(component, contract)
-            check_valid_exchange_field_names(component, contract)
-
-        (
-            self.ocn_fmask_on_atm_grid,
-            self.lnd_fmask_on_atm_grid,
-            self.lnd_bmask_on_atm_grid,
-        ) = create_exchange_masks(self.components, logger=self.logger)
-        validate_land_mask_consistency(
-            self.components,
-            self.lnd_bmask_on_atm_grid,
-        )
-        self.logger.info(" LND <--> ATM & OCN <--> ATM masks initialization complete")
-
-        initialize_regridders_and_masks(
+        initialized = initialize_coupler_runtime(
+            clock=self.clock,
             components=self.components,
             exchanges=self.exchanges,
             regridders=self._regridders,
             binary_masks=self._binary_masks,
             fractional_masks=self._fractional_masks,
+            run_sequence=getattr(self, "run_sequence", RunSequence(order=[])),
             settings=self.settings,
             logger=self.logger,
+            enable_x64_computations=enable_x64_computations,
         )
 
-        patch_exchange_masks(
-            binary_masks=self._binary_masks,
-            fractional_masks=self._fractional_masks,
-            ocn_fmask_on_atm_grid=self.ocn_fmask_on_atm_grid,
-            lnd_bmask_on_atm_grid=self.lnd_bmask_on_atm_grid,
-            lnd_fmask_on_atm_grid=self.lnd_fmask_on_atm_grid,
-        )
-        self.logger.info(" Exchange masks patching complete")
+        self._runtime_contracts = initialized.runtime_contracts
+        topology = initialized.topology
+        self._regridders = topology.regridders
+        self._binary_masks = topology.binary_masks
+        self._fractional_masks = topology.fractional_masks
+        self.ocn_fmask_on_atm_grid = topology.ocn_fmask_on_atm_grid
+        self.lnd_fmask_on_atm_grid = topology.lnd_fmask_on_atm_grid
+        self.lnd_bmask_on_atm_grid = topology.lnd_bmask_on_atm_grid
 
     def _runtime_state_from_components(
         self, *, prefill_missing: bool = False
@@ -399,7 +317,7 @@ class Coupler:
 
         self.logger.info(" ------------ Finalizing coupler and components ------------")
         for name, component in self.components.items():
-            validate_component_setup(component)
+            validate_registered_component_setup(component)
             if output_file_mask is None:
                 filepath = Path(f"{name.lower()}_component_runtime_fields.nc")
             else:

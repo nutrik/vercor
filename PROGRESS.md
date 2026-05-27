@@ -47,6 +47,26 @@ historical commands, failure messages, or detailed validation notes.
 
 ## Recent Work
 
+### 2026-05-27: Runtime Facade Cohesion Refactor
+
+- Added `vercor.runtime.initialization` as the setup-time boundary for run
+  precision synchronization, component initialization contexts, component setup
+  validation, runtime contract validation, and exchange-topology handoff.
+- Added explicit `ExchangeTopologyState` and `build_exchange_topology(...)` so
+  exchange regridders and masks are assembled through a returned state object
+  instead of only mutating caller-owned dictionaries.
+- Slimmed `Coupler.initialize()` to delegate initialization wiring while
+  preserving existing private runtime-state helpers and topology map
+  compatibility attributes.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_coupler_coverage.py tests/test_runtime_state.py -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+
 ### 2026-05-27: Boundary Cohesion Refactor
 
 - Moved component lifecycle hook type aliases and hook installation into
