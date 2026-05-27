@@ -354,14 +354,71 @@ def test_state_variable_accessor_builds_exact_index_maps() -> None:
 
 
 @pytest.mark.fast_always
+def test_state_variable_accessor_exposes_typed_indices_with_dict_compatibility() -> (
+    None
+):
+    accessor = camulator_tensors_module.StateVariableAccessor(
+        _state_variable_accessor_conf(),
+        tensor_type="state",
+    )
+
+    variable_index = accessor.get_var_index("U")
+
+    assert isinstance(variable_index, camulator_tensors_module.TensorVariableIndex)
+    assert variable_index.channel_slice == slice(0, 3)
+    assert variable_index.to_mapping() == {
+        "start_idx": 0,
+        "end_idx": 3,
+        "n_channels": 3,
+        "is_3d": True,
+        "available": True,
+    }
+    assert accessor.get_var_info("U") == variable_index.to_mapping()
+    assert accessor.get_var_index("FSNS").to_mapping() == {
+        "available": False,
+        "reason": "Diagnostics not in state tensor",
+    }
+
+
+@pytest.mark.fast_always
+def test_state_variable_accessor_tensor_access_uses_typed_index_path(
+    monkeypatch: Any,
+) -> None:
+    accessor = camulator_tensors_module.StateVariableAccessor(
+        _state_variable_accessor_conf(),
+        tensor_type="state",
+    )
+    tensor = torch.arange(1 * 8 * 2 * 2 * 2, dtype=torch.float32).reshape(
+        1,
+        8,
+        2,
+        2,
+        2,
+    )
+
+    def _fail_dict_info(var_name: str) -> None:
+        raise AssertionError(f"dict metadata path used for {var_name}")
+
+    monkeypatch.setattr(accessor, "get_var_info", _fail_dict_info)
+
+    assert torch.equal(accessor.get_state_var(tensor, "V"), tensor[:, 3:6, ...])
+
+    replacement = torch.full((1, 1, 2, 2, 2), -1.0)
+    accessor.set_state_var(tensor, "TS", replacement)
+
+    assert torch.equal(tensor[:, 6:7, ...], replacement)
+
+
+@pytest.mark.fast_always
 def test_state_variable_accessor_uses_shared_index_map_builders() -> None:
     source = Path("vercor/setups/external/camulator_tensors.py").read_text(
         encoding="utf-8"
     )
 
+    assert "class TensorVariableIndex" in source
     assert "def _append_indexed_variables(" in source
     assert "def _mark_unavailable_variables(" in source
-    assert source.count('"start_idx": idx') == 1
+    assert "def get_var_index(" in source
 
 
 def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions() -> (

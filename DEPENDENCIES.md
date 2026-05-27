@@ -37,7 +37,7 @@
 37. `vercor/setups/external/veros_runtime.py` and `veros_gcm.py` - Veros private runtime-state protocol, host-runtime stepping helper, named host step adapter, and adapter factory/setup boundary built on (26, 34, 35, 36)
 38. `vercor/setups/external/camulator_imports.py` - lazy CREDIT/postblock/CAMulator wind-filter optional-dependency loading
 39. `vercor/setups/external/camulator_forcing.py` - CAMulator config loading, forcing context, and runtime forcing cursors built on (26, 38)
-40. `vercor/setups/external/camulator_tensors.py` - CAMulator tensor indexing, static forcing tensor staging, and JAX-to-Torch transfer helpers
+40. `vercor/setups/external/camulator_tensors.py` - typed CAMulator tensor-variable indexing, static forcing tensor staging, and JAX-to-Torch transfer helpers
 41. `vercor/setups/external/camulator_fields.py` - CAMulator runtime field initialization, forcing prep, and prediction-field mapping built on (1, 7, 10, 40)
 42. `vercor/setups/external/camulator_wind_filter.py` - CAMulator-only wind artifact post-processing with explicit configuration validation
 43. `vercor/setups/external/camulator_stepper.py` - CAMulator state shifting, forcing concatenation, stepping, and optional post-processing built on (38, 40, 42)
@@ -70,5 +70,6 @@
 70. `vercor/runtime/run_context.py`, `cache.py`, `progress.py`, and `interrupts.py` - bundled runtime execution context, compile-cache/JIT policy, progress callbacks, and cancellation controller built on (24, 25, 64, 67)
 71. `vercor/runtime/runner.py` - host/scanned runtime loops, run-mode selection, donation checks, and interrupt translation built on (65, 67, 70)
 72. `vercor/output.py` - runtime-view and coupler-final-output NetCDF output boundary built on (10, 12, 60, 64, 68)
-73. `vercor/coupler.py` - public runtime facade for `run()` and `create_runtime_state()` built on (25, 59, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72)
-74. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`
+73. `vercor/runtime/facade.py` - high-level runtime orchestration boundary for the public coupler facade built on (24, 25, 59, 60, 63, 64, 67, 68, 69, 70, 71, 72)
+74. `vercor/coupler.py` - public setup/finalization facade for `run()` and `create_runtime_state()` built on (25, 59, 62, 64, 70, 73)
+75. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`

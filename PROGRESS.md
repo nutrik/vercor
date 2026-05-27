@@ -52,6 +52,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local external-adapter state-boundary validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local runtime-facade/CAMulator-index validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-27.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -77,6 +80,25 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-27: Runtime Facade and CAMulator Tensor Index Refactor
+
+- Added `vercor.runtime.facade` as the high-level orchestration boundary used by
+  `Coupler` for runtime-state creation, validation, dispatch/run context
+  construction, execution, runtime views, and final output delegation.
+- Slimmed `vercor.coupler` so it delegates runtime internals through the facade
+  while preserving public and private compatibility methods used by tests.
+- Added typed `TensorVariableIndex` metadata for CAMulator tensor access while
+  keeping `StateVariableAccessor.get_var_info(...)` dictionary-compatible.
+- Updated boundary/CAMulator tests, `DESIGN.md`, and `DEPENDENCIES.md`.
+- Validation run for this change:
+  focused runtime/API/Coupler/CAMulator fast pytest,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: External Adapter State Boundary Refactor
 

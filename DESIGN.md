@@ -256,15 +256,21 @@ immutable runtime containers used during traced integration.
   wrapping live in `vercor.runtime.cache`, and shared host/scanned progress
   messages plus traced callbacks live in `vercor.runtime.progress`. Host/scanned
   runtime loops, run-mode selection, donation checks, and interrupt translation
-  live in `vercor.runtime.runner`. Runtime component metadata and read-only field
+  live in `vercor.runtime.runner`. High-level runtime orchestration for the
+  public `Coupler` facade lives in `vercor.runtime.facade`: runtime-state
+  creation, validation, dispatch/run context construction, host/scanned
+  execution, runtime views, and final output delegation enter through this
+  module instead of direct `Coupler` imports of runtime implementation helpers.
+  Runtime component metadata and read-only field
   resolution for diagnostics/output live in `vercor.runtime.views`;
   `RuntimeComponentView`, `runtime_field_candidates(...)`, and
   `runtime_field(...)` own data/incoming/outgoing lookup for explicit views and
   compatible runtime states. `Coupler` exposes `runtime_component_view()` and
   `runtime_component_views()` as the public facade for creating those views.
   Final runtime output iteration and
-  view writing live in `vercor.output`, with `Coupler.finalize()` acting as a
-  validation and delegation wrapper. `Coupler` delegates to these modules and
+  view writing live in `vercor.output`, with `vercor.runtime.facade` validating
+  and delegating output writes for `Coupler.finalize()`. `Coupler` delegates to
+  the runtime facade and
   remains the public setup/finalization facade rather than the owner of runtime
   adapter mechanics.
   payload pytrees carried through `jax.lax.scan` must preserve every leaf's
@@ -332,9 +338,12 @@ split across
 `vercor.setups.external.camulator_land`, and
 `vercor.setups.external.camulator_init`. New code should import directly from
 these focused modules; the old one-hop CAMulator state and wind-filter facades
-have been removed. CAMulator wind-filter configuration validates with explicit
-exceptions and avoids mutable function defaults so tests and callers see stable
-failure modes independent of Python optimization settings.
+have been removed. CAMulator tensor channel metadata is stored internally as
+typed `TensorVariableIndex` values in `camulator_tensors`, while
+`StateVariableAccessor.get_var_info(...)` keeps the legacy dictionary shape for
+callers that inspect metadata. CAMulator wind-filter configuration validates
+with explicit exceptions and avoids mutable function defaults so tests and
+callers see stable failure modes independent of Python optimization settings.
 
 ### Settings container
 

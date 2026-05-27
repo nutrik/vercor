@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any, Literal, Optional
 
 import torch
@@ -10,6 +11,74 @@ import xarray as xr
 
 from vercor.host_arrays import runtime_array_to_host
 from vercor.types import RuntimeArray
+
+
+@dataclass(frozen=True)
+class TensorVariableIndex:
+    """Typed channel metadata for one CAMulator tensor variable."""
+
+    start_idx: int = 0
+    end_idx: int = 0
+    n_channels: int = 0
+    is_3d: bool = False
+    available: bool = True
+    reason: str | None = None
+
+    @classmethod
+    def for_channels(
+        cls,
+        *,
+        start_idx: int,
+        n_channels: int,
+        is_3d: bool,
+    ) -> "TensorVariableIndex":
+        """Return metadata for a variable present in a tensor."""
+
+        return cls(
+            start_idx=start_idx,
+            end_idx=start_idx + n_channels,
+            n_channels=n_channels,
+            is_3d=is_3d,
+            available=True,
+        )
+
+    @classmethod
+    def unavailable(cls, *, reason: str) -> "TensorVariableIndex":
+        """Return metadata for a known variable absent from a tensor."""
+
+        return cls(available=False, reason=reason)
+
+    @property
+    def channel_slice(self) -> slice:
+        """Return the channel slice occupied by this variable."""
+
+        return slice(self.start_idx, self.end_idx)
+
+    def require_available(self, *, tensor_type: str, var_name: str) -> None:
+        """Raise a user-facing error if the variable is absent from the tensor."""
+
+        if self.available:
+            return
+        raise ValueError(
+            f"Variable '{var_name}' not available in '{tensor_type}' tensor. "
+            f"Reason: {self.reason or 'Unknown'}"
+        )
+
+    def to_mapping(self) -> dict[str, Any]:
+        """Return the legacy dictionary representation used by callers."""
+
+        if not self.available:
+            return {
+                "available": False,
+                "reason": self.reason or "Unknown",
+            }
+        return {
+            "start_idx": self.start_idx,
+            "end_idx": self.end_idx,
+            "n_channels": self.n_channels,
+            "is_3d": self.is_3d,
+            "available": True,
+        }
 
 
 def _torch_tensor_from_jax_array(
@@ -27,7 +96,7 @@ def _torch_tensor_from_jax_array(
 
 
 def _append_indexed_variables(
-    indices: dict[str, dict[str, Any]],
+    indices: dict[str, TensorVariableIndex],
     variable_names: Sequence[str],
     *,
     start_index: int,
@@ -38,19 +107,17 @@ def _append_indexed_variables(
 
     idx = start_index
     for var in variable_names:
-        indices[var] = {
-            "start_idx": idx,
-            "end_idx": idx + n_channels,
-            "n_channels": n_channels,
-            "is_3d": is_3d,
-            "available": True,
-        }
+        indices[var] = TensorVariableIndex.for_channels(
+            start_idx=idx,
+            n_channels=n_channels,
+            is_3d=is_3d,
+        )
         idx += n_channels
     return idx
 
 
 def _mark_unavailable_variables(
-    indices: dict[str, dict[str, Any]],
+    indices: dict[str, TensorVariableIndex],
     variable_names: Sequence[str],
     *,
     reason: str,
@@ -58,7 +125,7 @@ def _mark_unavailable_variables(
     """Mark variables that are recognized by config but absent from a tensor type."""
 
     for var in variable_names:
-        indices[var] = {"available": False, "reason": reason}
+        indices[var] = TensorVariableIndex.unavailable(reason=reason)
 
 
 def _prepare_static_forcing_tensor(
@@ -105,7 +172,7 @@ class StateVariableAccessor:
     def _build_index_maps(self) -> None:
         """Build index mappings for every supported tensor type."""
 
-        self.var_indices: dict[str, dict[str, dict[str, Any]]] = {}
+        self.var_indices: dict[str, dict[str, TensorVariableIndex]] = {}
         self._build_state_indices()
         self._build_input_indices()
         self._build_output_indices()
@@ -113,7 +180,7 @@ class StateVariableAccessor:
     def _build_state_indices(self) -> None:
         """Build indices for pure state tensors with no forcing or diagnostics."""
 
-        indices: dict[str, dict[str, Any]] = {}
+        indices: dict[str, TensorVariableIndex] = {}
         idx = _append_indexed_variables(
             indices,
             self.prognostic_vars,
@@ -143,7 +210,7 @@ class StateVariableAccessor:
     def _build_input_indices(self) -> None:
         """Build indices for model input tensors with forcing appended to state."""
 
-        indices: dict[str, dict[str, Any]] = {}
+        indices: dict[str, TensorVariableIndex] = {}
         idx = _append_indexed_variables(
             indices,
             self.prognostic_vars,
@@ -183,7 +250,7 @@ class StateVariableAccessor:
     def _build_output_indices(self) -> None:
         """Build indices for model output tensors with diagnostics appended."""
 
-        indices: dict[str, dict[str, Any]] = {}
+        indices: dict[str, TensorVariableIndex] = {}
         idx = _append_indexed_variables(
             indices,
             self.prognostic_vars,
@@ -212,8 +279,8 @@ class StateVariableAccessor:
         )
         self.var_indices["output"] = indices
 
-    def get_var_info(self, var_name: str) -> Any:
-        """Return indexing metadata for a configured CAMulator variable."""
+    def get_var_index(self, var_name: str) -> TensorVariableIndex:
+        """Return typed indexing metadata for a configured CAMulator variable."""
 
         indices = self.var_indices[self.tensor_type]
         if var_name not in indices:
@@ -230,6 +297,11 @@ class StateVariableAccessor:
             )
         return indices[var_name]
 
+    def get_var_info(self, var_name: str) -> dict[str, Any]:
+        """Return legacy dictionary metadata for a configured variable."""
+
+        return self.get_var_index(var_name).to_mapping()
+
     def get_state_var(
         self,
         state_tensor: torch.Tensor,
@@ -238,16 +310,10 @@ class StateVariableAccessor:
     ) -> torch.Tensor:
         """Extract a named variable view from a CAMulator tensor."""
 
-        info = self.get_var_info(var_name)
-        if not info["available"]:
-            raise ValueError(
-                f"Variable '{var_name}' not available in '{self.tensor_type}' tensor. "
-                f"Reason: {info.get('reason', 'Unknown')}"
-            )
+        index = self.get_var_index(var_name)
+        index.require_available(tensor_type=self.tensor_type, var_name=var_name)
 
-        var_slice = state_tensor[
-            :, info["start_idx"] : info["end_idx"], ...  # noqa: E203
-        ]
+        var_slice = state_tensor[:, index.channel_slice, ...]  # noqa: E203
         if time_idx is not None:
             if time_idx >= state_tensor.shape[2]:
                 raise IndexError(
@@ -265,18 +331,14 @@ class StateVariableAccessor:
     ) -> None:
         """Set a named variable in a CAMulator tensor in place."""
 
-        info = self.get_var_info(var_name)
-        if not info["available"]:
-            raise ValueError(
-                f"Variable '{var_name}' not available in '{self.tensor_type}' tensor. "
-                f"Reason: {info.get('reason', 'Unknown')}"
-            )
+        index = self.get_var_index(var_name)
+        index.require_available(tensor_type=self.tensor_type, var_name=var_name)
 
         expected_shape: tuple[int, ...]
         if time_idx is None:
             expected_shape = (
                 state_tensor.shape[0],
-                info["n_channels"],
+                index.n_channels,
                 state_tensor.shape[2],
                 state_tensor.shape[3],
                 state_tensor.shape[4],
@@ -284,7 +346,7 @@ class StateVariableAccessor:
         else:
             expected_shape = (
                 state_tensor.shape[0],
-                info["n_channels"],
+                index.n_channels,
                 state_tensor.shape[3],
                 state_tensor.shape[4],
             )
@@ -294,26 +356,25 @@ class StateVariableAccessor:
             )
 
         if time_idx is None:
-            state_tensor[:, info["start_idx"] : info["end_idx"], ...] = (  # noqa: E203
+            state_tensor[:, index.channel_slice, ...] = var_data  # noqa: E203
+        else:
+            state_tensor[:, index.channel_slice, time_idx, :, :] = (  # noqa: E203
                 var_data
             )
-        else:
-            state_tensor[
-                :, info["start_idx"] : info["end_idx"], time_idx, :, :  # noqa: E203
-            ] = var_data
 
     def list_available_vars(self) -> dict[str, dict[str, Any]]:
         """Return variables available in this accessor's tensor type."""
 
         return {
-            var: info
+            var: info.to_mapping()
             for var, info in self.var_indices[self.tensor_type].items()
-            if info.get("available", False)
+            if info.available
         }
 
 
 __all__ = [
     "StateVariableAccessor",
+    "TensorVariableIndex",
     "_append_indexed_variables",
     "_mark_unavailable_variables",
     "_prepare_static_forcing_tensor",
