@@ -268,6 +268,30 @@ def test_obsolete_compatibility_api_surfaces_are_removed() -> None:
 
 
 @pytest.mark.fast_always
+def test_active_progress_does_not_advertise_removed_compatibility_surfaces() -> None:
+    progress_source = Path("PROGRESS.md").read_text(encoding="utf-8")
+
+    stale_progress_markers = (
+        "while preserving the\n  existing private compatibility aliases for tests and profiling helpers",
+        "preserving public and private compatibility methods used by tests",
+        "keeping `StateVariableAccessor.get_var_info(...)` dictionary-compatible",
+        "compatibility `JAXGCMRuntimePayload` reexport",
+        "preserving stable package aggregators, `ComponentSettings`",
+        "preserving `vercor.clock` compatibility reexports",
+        "leaving old flux utility import paths as\n  compatibility aliases",
+        "a thin compatibility facade",
+        "Preserved intentional compatibility surfaces, including settings attribute\n"
+        "  compatibility, `ComponentSettings`",
+        "reexports, `ComponentForcingData._read_forcing()`",
+        "`Coupler._run_scanned_runtime()`",
+        "`_runtime_state_from_components()`",
+    )
+
+    for marker in stale_progress_markers:
+        assert marker not in progress_source
+
+
+@pytest.mark.fast_always
 def test_coupler_private_compatibility_aliases_are_removed() -> None:
     removed_names = (
         "_regridders",

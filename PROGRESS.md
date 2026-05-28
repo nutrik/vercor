@@ -61,6 +61,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local obsolete compatibility API cleanup validation: Black, flake8,
   mypy, focused compatibility pytest, full fast pytest, and full pytest passed
   as of 2026-05-28.
+- Latest local obsolete compatibility API active-doc audit validation:
+  API-boundary fast pytest, full fast pytest, Black, flake8, mypy, and full
+  pytest passed as of 2026-05-28.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -86,6 +89,29 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-28: Obsolete Compatibility Active-Doc Audit
+
+- Audited live source, tests, examples, `README.md`, `DESIGN.md`,
+  `DEPENDENCIES.md`, and active `PROGRESS.md` for obsolete compatibility import
+  paths and shim modules while leaving the historical archive untouched.
+- Confirmed the removed facade modules and shim paths remain absent from the
+  live tree; remaining runtime-payload references use the canonical
+  `vercor.setups.external.jax_gcm_runtime` owner or boundary tests that assert
+  removed reexports stay removed.
+- Tightened API-boundary coverage so active `PROGRESS.md` no longer advertises
+  removed compatibility surfaces as current preserved API, then refreshed stale
+  progress entries to point at later canonical ownership.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_api_boundaries.py -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- No failed implementation approaches. The audit found no remaining live
+  obsolete shim modules requiring production-code deletion.
 
 ### 2026-05-28: Obsolete Compatibility API Cleanup
 
@@ -116,8 +142,9 @@ historical commands, failure messages, or detailed validation notes.
 - Added `vercor.runtime.resources.CouplerRuntimeResources` as the owner for
   per-coupler runtime topology maps, refreshed runtime contracts, compiled
   runtime cache, and interrupt controller.
-- Updated `Coupler` to store one runtime resource holder while preserving the
-  existing private compatibility aliases for tests and profiling helpers.
+- Updated `Coupler` to store one runtime resource holder while keeping
+  then-current private runtime test/profiling aliases; a later cleanup removed
+  those aliases.
 - Routed runtime facade initialization, state creation, validation, dispatch/run
   context construction, execution, and finalization through the resource holder
   instead of repeated map/cache/interrupt arguments.
@@ -138,9 +165,11 @@ historical commands, failure messages, or detailed validation notes.
   `Coupler` for runtime-state creation, validation, dispatch/run context
   construction, execution, runtime views, and final output delegation.
 - Slimmed `vercor.coupler` so it delegates runtime internals through the facade
-  while preserving public and private compatibility methods used by tests.
-- Added typed `TensorVariableIndex` metadata for CAMulator tensor access while
-  keeping `StateVariableAccessor.get_var_info(...)` dictionary-compatible.
+  while retaining then-current test delegates; later cleanup removed the
+  private compatibility methods.
+- Added typed `TensorVariableIndex` metadata for CAMulator tensor access; the
+  temporary dictionary metadata accessor was later removed in favor of
+  `StateVariableAccessor.get_var_index(...)`.
 - Updated boundary/CAMulator tests, `DESIGN.md`, and `DEPENDENCIES.md`.
 - Validation run for this change:
   focused runtime/API/Coupler/CAMulator fast pytest,
@@ -208,8 +237,9 @@ historical commands, failure messages, or detailed validation notes.
   SST refresh.
 - Slimmed `jax_gcm.py`, `camulator.py`, and `veros_gcm.py` back toward
   optional-dependency loading, model construction, setup initialization, spinup,
-  and factory wiring while preserving existing public factories and the
-  compatibility `JAXGCMRuntimePayload` reexport.
+  and factory wiring while preserving existing public factories. The JAXGCM
+  runtime payload is now owned by `jax_gcm_runtime.py` rather than reexported by
+  `jax_gcm.py`.
 - Updated boundary/focused tests, `DESIGN.md`, and `DEPENDENCIES.md` for the
   new external-adapter ownership map.
 - Validation run for this change:
@@ -409,8 +439,8 @@ historical commands, failure messages, or detailed validation notes.
   exchange regridders and masks are assembled through a returned state object
   instead of only mutating caller-owned dictionaries.
 - Slimmed `Coupler.initialize()` to delegate initialization wiring while
-  preserving existing private runtime-state helpers and topology map
-  compatibility attributes.
+  preserving existing private runtime-state helpers and topology map aliases.
+  Later cleanup removed those private compatibility attributes.
 - Validation run for this change:
   `conda run -n scipy pytest tests/test_coupler_coverage.py tests/test_runtime_state.py -q --fast --tb=short`,
   `conda run -n scipy pytest tests/ -q --fast --tb=short`,
@@ -453,9 +483,10 @@ historical commands, failure messages, or detailed validation notes.
   calendar datetime classes; vertical-coordinate helpers; grid identity; and
   exchange field names.
 - Removed compatibility reexports from `vercor.clock`, `vercor.exchange`,
-  `vercor.grid_masks`, and `vercor.fluxes.utilities` while preserving stable
-  package aggregators, `ComponentSettings`, settings attribute access, and
-  `ComponentForcingData`.
+  `vercor.grid_masks`, and `vercor.fluxes.utilities` while keeping stable
+  package aggregators and settings attribute access. The remaining
+  settings/forcing aliases were removed by the later obsolete compatibility API
+  cleanup.
 - Updated boundary tests, `DESIGN.md`, and `DEPENDENCIES.md` for canonical
   ownership. During full validation, corrected a stale Veros runtime-settings
   boundary assertion to point at `vercor.setups.external.veros_setup`.
@@ -501,14 +532,14 @@ historical commands, failure messages, or detailed validation notes.
 
 ### 2026-05-26: Ownership Boundary Refactor Follow-Up
 
-- Moved model-calendar datetime values into `vercor.calendar` while preserving
-  `vercor.clock` compatibility reexports.
+- Moved model-calendar datetime values into `vercor.calendar`; later cleanup
+  removed the `vercor.clock` reexports.
 - Split canonical exchange-field vocabulary into `vercor.field_names`, unified
   grid identity in `vercor.grid_geometry`, and removed the runtime daily-index
   wrapper in favor of `vercor.calendar.daily_forcing_index`.
 - Consolidated hybrid/sigma pressure and altitude helpers in
-  `vercor.fluxes.vertical_coordinates`, leaving old flux utility import paths as
-  compatibility aliases.
+  `vercor.fluxes.vertical_coordinates`; later cleanup removed the old flux
+  utility import aliases.
 - Moved setup helper ownership to `vercor.host_arrays` and
   `vercor.diagnostics.fields`; moved CAMulator land, CAMulator output, CAMulator
   wind filtering, and JAXGCM output helpers under `vercor.setups.external`.
@@ -538,8 +569,8 @@ historical commands, failure messages, or detailed validation notes.
 - Moved mask math into `vercor.grid_masks` and component topology lookup into
   `vercor.runtime.topology`.
 - Split CAMulator optional imports, forcing cursors, tensor accessors, stepping,
-  and initialization into focused modules while keeping `camulator_state.py` as
-  a thin compatibility facade.
+  and initialization into focused modules before later cleanup removed the
+  `camulator_state.py` facade.
 - Focused checks passed for API boundaries, component factories, setup imports,
   runtime-boundary imports, shared helper ownership, assets/diagnostics
   separation, and CAMulator decomposition.
@@ -564,12 +595,11 @@ historical commands, failure messages, or detailed validation notes.
   writer.
 - Removed obsolete TODO/commented print blocks from conservative rectilinear
   regridder edge derivation.
-- Preserved intentional compatibility surfaces, including settings attribute
-  compatibility, `ComponentSettings`, component author facades/context aliases,
-  `vercor.runtime.components` reexports, setup lazy exports, setup forcing
-  reexports, `ComponentForcingData._read_forcing()`,
-  `Coupler._run_scanned_runtime()`, `_runtime_state_from_components()`,
-  regridder class/factory APIs, and `Exchange.create()`.
+- Deferred removal of then-intentional compatibility surfaces such as settings
+  aliases, component author facades/context aliases, runtime reexports, setup
+  lazy exports, setup forcing reexports, private runtime delegates, regridder
+  class/factory APIs, and `Exchange.create()`. Later refactors removed the
+  obsolete aliases and shims while preserving documented public facades.
 
 ### 2026-05-15: Runtime Helper Consolidation
 
