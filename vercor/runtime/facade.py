@@ -49,6 +49,18 @@ class PreparedRuntimeState:
     runtime_contracts: dict[str, RuntimeComponentContract]
 
 
+@dataclass(frozen=True)
+class RuntimeFacadeInputs:
+    """Repeated static coupler inputs consumed by runtime facade helpers."""
+
+    components: Mapping[str, "Component"]
+    exchanges: Sequence[Exchange]
+    runtime_resources: CouplerRuntimeResources
+    run_sequence: RunSequence
+    clock: Clock
+    settings: VercorSettings
+
+
 def validate_registered_component_setup(component: "Component") -> None:
     """Validate one public component through the runtime setup boundary."""
 
@@ -57,145 +69,117 @@ def validate_registered_component_setup(component: "Component") -> None:
 
 def initialize_coupler_runtime(
     *,
-    clock: Clock,
-    components: dict[str, "Component"],
-    exchanges: Sequence[Exchange],
-    run_sequence: RunSequence,
-    settings: VercorSettings,
+    inputs: RuntimeFacadeInputs,
     logger: LoggerLike,
-    runtime_resources: CouplerRuntimeResources,
     enable_x64_computations: bool | None = None,
 ) -> RuntimeInitializationState:
     """Initialize components, runtime contracts, and exchange topology."""
 
     initialized = _initialize_coupler_runtime(
-        clock=clock,
-        components=components,
-        exchanges=exchanges,
-        regridders=runtime_resources.regridders,
-        binary_masks=runtime_resources.binary_masks,
-        fractional_masks=runtime_resources.fractional_masks,
-        run_sequence=run_sequence,
-        settings=settings,
+        clock=inputs.clock,
+        components=dict(inputs.components),
+        exchanges=inputs.exchanges,
+        regridders=inputs.runtime_resources.regridders,
+        binary_masks=inputs.runtime_resources.binary_masks,
+        fractional_masks=inputs.runtime_resources.fractional_masks,
+        run_sequence=inputs.run_sequence,
+        settings=inputs.settings,
         logger=logger,
         enable_x64_computations=enable_x64_computations,
     )
-    runtime_resources.replace_contracts(initialized.runtime_contracts)
-    runtime_resources.replace_topology(initialized.topology)
+    inputs.runtime_resources.replace_contracts(initialized.runtime_contracts)
+    inputs.runtime_resources.replace_topology(initialized.topology)
     return initialized
 
 
 def runtime_state_from_components(
     *,
-    components: Mapping[str, "Component"],
-    exchanges: Sequence[Exchange],
-    runtime_resources: CouplerRuntimeResources,
+    inputs: RuntimeFacadeInputs,
     prefill_missing: bool,
 ) -> PreparedRuntimeState:
     """Build immutable runtime state from setup components and exchanges."""
 
     runtime_contracts = refresh_runtime_contracts(
-        components,
-        exchanges,
+        inputs.components,
+        inputs.exchanges,
         validate_endpoints=False,
     )
-    runtime_resources.replace_contracts(runtime_contracts)
+    inputs.runtime_resources.replace_contracts(runtime_contracts)
     runtime_state = _runtime_state_from_components(
-        components,
-        exchanges,
-        runtime_resources.fractional_masks,
-        runtime_resources.binary_masks,
-        contracts=runtime_resources.contracts,
+        inputs.components,
+        inputs.exchanges,
+        inputs.runtime_resources.fractional_masks,
+        inputs.runtime_resources.binary_masks,
+        contracts=inputs.runtime_resources.contracts,
         prefill_missing=prefill_missing,
     )
-    return PreparedRuntimeState(runtime_state, runtime_resources.contracts)
+    return PreparedRuntimeState(runtime_state, inputs.runtime_resources.contracts)
 
 
 def validate_runtime_state(
     runtime_state: RuntimeCouplerState,
     *,
-    components: Mapping[str, "Component"],
-    exchanges: Sequence[Exchange],
-    runtime_resources: CouplerRuntimeResources,
-    run_sequence: RunSequence,
+    inputs: RuntimeFacadeInputs,
 ) -> dict[str, RuntimeComponentContract]:
     """Validate runtime state and return the contracts used for validation."""
 
     runtime_contracts = refresh_runtime_contracts(
-        components,
-        exchanges,
+        inputs.components,
+        inputs.exchanges,
         validate_endpoints=False,
     )
-    runtime_resources.replace_contracts(runtime_contracts)
+    inputs.runtime_resources.replace_contracts(runtime_contracts)
     _validate_runtime_state(
         runtime_state,
-        components=components,
-        exchanges=exchanges,
-        regridders=runtime_resources.regridders,
-        contracts=runtime_resources.contracts,
-        run_sequence=tuple(run_sequence),
+        components=inputs.components,
+        exchanges=inputs.exchanges,
+        regridders=inputs.runtime_resources.regridders,
+        contracts=inputs.runtime_resources.contracts,
+        run_sequence=tuple(inputs.run_sequence),
     )
-    return runtime_resources.contracts
+    return inputs.runtime_resources.contracts
 
 
 def runtime_dispatch_context(
     *,
-    components: Mapping[str, "Component"],
-    exchanges: Sequence[Exchange],
-    runtime_resources: CouplerRuntimeResources,
-    clock: Clock,
-    settings: VercorSettings,
+    inputs: RuntimeFacadeInputs,
 ) -> RuntimeDispatchContext:
     """Return static runtime dispatch plumbing for a configured coupler."""
 
     return build_runtime_dispatch_context(
-        components,
-        exchanges,
-        runtime_resources.regridders,
-        runtime_resources.contracts,
-        dt_seconds=clock.dt_seconds,
-        settings=settings,
+        inputs.components,
+        inputs.exchanges,
+        inputs.runtime_resources.regridders,
+        inputs.runtime_resources.contracts,
+        dt_seconds=inputs.clock.dt_seconds,
+        settings=inputs.settings,
     )
 
 
 def create_runtime_state(
     *,
-    components: Mapping[str, "Component"],
-    exchanges: Sequence[Exchange],
-    runtime_resources: CouplerRuntimeResources,
-    run_sequence: RunSequence,
-    clock: Clock,
-    settings: VercorSettings,
+    inputs: RuntimeFacadeInputs,
     prefill_missing: bool,
 ) -> PreparedRuntimeState:
     """Create, prime, and validate immutable runtime state."""
 
     prepared = runtime_state_from_components(
-        components=components,
-        exchanges=exchanges,
-        runtime_resources=runtime_resources,
+        inputs=inputs,
         prefill_missing=prefill_missing,
     )
     runtime_state = prepared.runtime_state
-    if prefill_missing and tuple(run_sequence):
+    if prefill_missing and tuple(inputs.run_sequence):
         runtime_state = prime_runtime_outgoing(
             runtime_state,
-            tuple(run_sequence),
+            tuple(inputs.run_sequence),
             dispatch_context=runtime_dispatch_context(
-                components=components,
-                exchanges=exchanges,
-                runtime_resources=runtime_resources,
-                clock=clock,
-                settings=settings,
+                inputs=inputs,
             ),
-            step_info=initial_runtime_step_info(clock, settings),
+            step_info=initial_runtime_step_info(inputs.clock, inputs.settings),
         )
     runtime_contracts = validate_runtime_state(
         runtime_state,
-        components=components,
-        exchanges=exchanges,
-        runtime_resources=runtime_resources,
-        run_sequence=run_sequence,
+        inputs=inputs,
     )
     return PreparedRuntimeState(runtime_state, runtime_contracts)
 
@@ -203,79 +187,55 @@ def create_runtime_state(
 def prepare_runtime_state(
     initial_state: RuntimeCouplerState | None,
     *,
-    components: Mapping[str, "Component"],
-    exchanges: Sequence[Exchange],
-    runtime_resources: CouplerRuntimeResources,
-    run_sequence: RunSequence,
-    clock: Clock,
-    settings: VercorSettings,
+    inputs: RuntimeFacadeInputs,
     validate_state: bool = True,
 ) -> PreparedRuntimeState:
     """Return a runtime state ready for execution."""
 
     if initial_state is None:
         return create_runtime_state(
-            components=components,
-            exchanges=exchanges,
-            runtime_resources=runtime_resources,
-            run_sequence=run_sequence,
-            clock=clock,
-            settings=settings,
+            inputs=inputs,
             prefill_missing=True,
         )
     if validate_state:
         refreshed_contracts = validate_runtime_state(
             initial_state,
-            components=components,
-            exchanges=exchanges,
-            runtime_resources=runtime_resources,
-            run_sequence=run_sequence,
+            inputs=inputs,
         )
         return PreparedRuntimeState(initial_state, refreshed_contracts)
-    return PreparedRuntimeState(initial_state, dict(runtime_resources.contracts))
+    return PreparedRuntimeState(
+        initial_state,
+        dict(inputs.runtime_resources.contracts),
+    )
 
 
 def runtime_run_context(
     *,
-    run_sequence: RunSequence,
-    clock: Clock,
+    inputs: RuntimeFacadeInputs,
     logger: LoggerLike,
     log_level: int | str,
-    components: Mapping[str, "Component"],
-    exchanges: Sequence[Exchange],
-    runtime_resources: CouplerRuntimeResources,
-    settings: VercorSettings,
 ) -> RuntimeRunContext:
     """Return static runtime inputs bundled for execution."""
 
     return RuntimeRunContext(
-        run_sequence=tuple(run_sequence),
-        clock=clock,
+        run_sequence=tuple(inputs.run_sequence),
+        clock=inputs.clock,
         logger=logger,
         log_level=log_level,
         dispatch_context=runtime_dispatch_context(
-            components=components,
-            exchanges=exchanges,
-            runtime_resources=runtime_resources,
-            clock=clock,
-            settings=settings,
+            inputs=inputs,
         ),
-        compiled_runtime_cache=runtime_resources.compiled_runtime_cache,
-        interrupts=runtime_resources.interrupts,
+        compiled_runtime_cache=inputs.runtime_resources.compiled_runtime_cache,
+        interrupts=inputs.runtime_resources.interrupts,
     )
 
 
 def run(
     runtime_state: RuntimeCouplerState,
     *,
-    run_sequence: RunSequence,
-    clock: Clock,
+    inputs: RuntimeFacadeInputs,
     logger: LoggerLike,
     log_level: int | str,
-    components: Mapping[str, "Component"],
-    exchanges: Sequence[Exchange],
-    runtime_resources: CouplerRuntimeResources,
-    settings: VercorSettings,
     donate_state: bool,
 ) -> RuntimeCouplerState:
     """Run a validated runtime state through the selected runtime path."""
@@ -283,14 +243,9 @@ def run(
     return run_coupler_runtime(
         runtime_state,
         context=runtime_run_context(
-            run_sequence=run_sequence,
-            clock=clock,
+            inputs=inputs,
             logger=logger,
             log_level=log_level,
-            components=components,
-            exchanges=exchanges,
-            runtime_resources=runtime_resources,
-            settings=settings,
         ),
         donate_state=donate_state,
     )
@@ -299,30 +254,21 @@ def run(
 def run_scanned(
     runtime_state: RuntimeCouplerState,
     *,
-    run_sequence: RunSequence,
-    clock: Clock,
+    inputs: RuntimeFacadeInputs,
     logger: LoggerLike,
-    components: Mapping[str, "Component"],
-    exchanges: Sequence[Exchange],
-    runtime_resources: CouplerRuntimeResources,
-    settings: VercorSettings,
 ) -> RuntimeCouplerState:
     """Run the unified scanned runtime path and return final state."""
 
     return run_scanned_runtime(
         runtime_state,
-        run_sequence=tuple(run_sequence),
-        clock=clock,
-        settings=settings,
+        run_sequence=tuple(inputs.run_sequence),
+        clock=inputs.clock,
+        settings=inputs.settings,
         logger=logger,
         dispatch_context=runtime_dispatch_context(
-            components=components,
-            exchanges=exchanges,
-            runtime_resources=runtime_resources,
-            clock=clock,
-            settings=settings,
+            inputs=inputs,
         ),
-        interrupts=runtime_resources.interrupts,
+        interrupts=inputs.runtime_resources.interrupts,
     )
 
 
@@ -363,22 +309,20 @@ def runtime_component_views(
 def finalize(
     *,
     final_state: RuntimeCouplerState,
-    components: Mapping[str, "Component"],
-    exchanges: Sequence[Exchange],
-    runtime_resources: CouplerRuntimeResources,
+    inputs: RuntimeFacadeInputs,
     output_file_mask: Path | None,
     logger: LoggerLike,
 ) -> None:
     """Validate components and write final runtime output files."""
 
-    for component in components.values():
+    for component in inputs.components.values():
         validate_registered_component_setup(component)
     _output.write_coupler_runtime_outputs(
         final_state=final_state,
-        components=components,
-        exchanges=exchanges,
-        binary_masks=runtime_resources.binary_masks,
-        fractional_masks=runtime_resources.fractional_masks,
+        components=inputs.components,
+        exchanges=inputs.exchanges,
+        binary_masks=inputs.runtime_resources.binary_masks,
+        fractional_masks=inputs.runtime_resources.fractional_masks,
         output_file_mask=output_file_mask,
         logger=logger,
     )
@@ -386,6 +330,7 @@ def finalize(
 
 __all__ = [
     "PreparedRuntimeState",
+    "RuntimeFacadeInputs",
     "create_runtime_state",
     "finalize",
     "initialize_coupler_runtime",

@@ -10,26 +10,8 @@ from vercor.dtypes import PrecisionPolicy, as_jax_real_array, jax_full
 from vercor.fluxes.vertical_coordinates import compute_hybrid_sigma_full_level_altitudes
 from vercor.host_arrays import runtime_array_to_host
 from vercor.settings import VercorSettings
+from vercor.setups.external.camulator_contracts import CAMULATOR_RUNTIME_FIELD_NAMES
 from vercor.setups.external.camulator_tensors import StateVariableAccessor
-
-_CAMULATOR_RUNTIME_FIELD_NAMES = (
-    "specific_humidity",
-    "net_shortwave_radiation_flux",
-    "downward_longwave_radiation_flux",
-    "sea_surface_temperature",
-    "land_surface_temperature",
-    "u_velocity",
-    "v_velocity",
-    "temperature",
-    "potential_temperature",
-    "density",
-    "latent_heat_flux",
-    "sensible_heat_flux",
-    "model_level_height",
-    "total_surface_temperature",
-    "temperature_3d",
-    "specific_humidity_3d",
-)
 
 
 def _initialize_camulator_runtime_fields(
@@ -39,7 +21,7 @@ def _initialize_camulator_runtime_fields(
     """Create JAX-backed zero fields for CAMulator exchange storage."""
 
     zeros = jax_full(grid_shape, 0.0, policy)
-    return {field_name: zeros for field_name in _CAMULATOR_RUNTIME_FIELD_NAMES}
+    return {field_name: zeros for field_name in CAMULATOR_RUNTIME_FIELD_NAMES}
 
 
 @jax.jit
@@ -236,7 +218,6 @@ def _map_camulator_prediction_to_runtime_fields(
 
 
 __all__ = [
-    "_CAMULATOR_RUNTIME_FIELD_NAMES",
     "_initialize_camulator_runtime_fields",
     "_map_camulator_prediction_arrays",
     "_map_camulator_prediction_to_runtime_fields",

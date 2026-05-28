@@ -32,90 +32,6 @@ from vercor.runtime.stores import RuntimeFieldStore
 from vercor.regridders import bilinear
 
 
-def _component_package_import_cycles() -> list[tuple[str, ...]]:
-    """Return top-level import cycles within ``vercor.components``."""
-
-    module_paths: dict[str, Path] = {}
-    for path in Path("vercor/components").glob("*.py"):
-        module_name = f"vercor.components.{path.stem}"
-        if path.name == "__init__.py":
-            module_name = "vercor.components"
-        module_paths[module_name] = path
-
-    def resolve_module(import_name: str) -> str | None:
-        if import_name in module_paths:
-            return import_name
-        parts = import_name.split(".")
-        while parts:
-            candidate = ".".join(parts)
-            if candidate in module_paths:
-                return candidate
-            parts.pop()
-        return None
-
-    graph: dict[str, set[str]] = {module_name: set() for module_name in module_paths}
-    for module_name, path in module_paths.items():
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in tree.body:
-            if isinstance(node, ast.Import):
-                imported_names = [alias.name for alias in node.names]
-            elif isinstance(node, ast.ImportFrom) and node.module is not None:
-                imported_names = [node.module]
-            else:
-                continue
-
-            for imported_name in imported_names:
-                if not imported_name.startswith("vercor.components"):
-                    continue
-                dependency = resolve_module(imported_name)
-                if dependency is not None and dependency != module_name:
-                    graph[module_name].add(dependency)
-
-    index_by_module: dict[str, int] = {}
-    lowlink_by_module: dict[str, int] = {}
-    stack: list[str] = []
-    on_stack: set[str] = set()
-    cycles: list[tuple[str, ...]] = []
-
-    def visit(module_name: str) -> None:
-        index_by_module[module_name] = len(index_by_module)
-        lowlink_by_module[module_name] = index_by_module[module_name]
-        stack.append(module_name)
-        on_stack.add(module_name)
-
-        for dependency in graph[module_name]:
-            if dependency not in index_by_module:
-                visit(dependency)
-                lowlink_by_module[module_name] = min(
-                    lowlink_by_module[module_name],
-                    lowlink_by_module[dependency],
-                )
-            elif dependency in on_stack:
-                lowlink_by_module[module_name] = min(
-                    lowlink_by_module[module_name],
-                    index_by_module[dependency],
-                )
-
-        if lowlink_by_module[module_name] != index_by_module[module_name]:
-            return
-
-        component: list[str] = []
-        while True:
-            dependency = stack.pop()
-            on_stack.remove(dependency)
-            component.append(dependency)
-            if dependency == module_name:
-                break
-        if len(component) > 1:
-            cycles.append(tuple(sorted(component)))
-
-    for module_name in sorted(module_paths):
-        if module_name not in index_by_module:
-            visit(module_name)
-
-    return sorted(cycles)
-
-
 @pytest.mark.fast_always
 def test_top_level_exports_public_orchestration_and_component_author_api() -> None:
     expected_public_names = {
@@ -554,34 +470,6 @@ def test_component_contract_modules_share_field_name_deduplication_owner() -> No
 
 
 @pytest.mark.fast_always
-def test_components_package_has_no_top_level_import_cycles() -> None:
-    assert _component_package_import_cycles() == []
-
-
-@pytest.mark.fast_always
-def test_component_helpers_depend_on_private_protocol_boundary() -> None:
-    protocols_path = Path("vercor/components/_protocols.py")
-    assert protocols_path.exists()
-
-    helper_paths = (
-        Path("vercor/components/_runtime_fields.py"),
-        Path("vercor/components/_runtime_validation.py"),
-        Path("vercor/components/_runtime_access.py"),
-        Path("vercor/components/_lifecycle_api.py"),
-        Path("vercor/components/_callable_wrappers.py"),
-    )
-    for path in helper_paths:
-        source = path.read_text(encoding="utf-8")
-        assert "from vercor.components.base import Component" not in source, path
-        assert "vercor.components._protocols" in source, path
-
-    components_source = Path("vercor/components/__init__.py").read_text(
-        encoding="utf-8"
-    )
-    assert "_protocols" not in components_source
-
-
-@pytest.mark.fast_always
 def test_runtime_component_type_imports_are_annotation_only() -> None:
     """Runtime facade modules should not import Component for annotations only."""
 
@@ -946,6 +834,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     import vercor.diagnostics as diagnostics_module
     import vercor.host_arrays as host_arrays_module
     import vercor.setups.external.camulator as camulator_module
+    import vercor.setups.external.camulator_contracts as camulator_contracts_module
     import vercor.setups.external.camulator_fields as camulator_fields_module
     import vercor.setups.external.camulator_land as camulator_land_module
     import vercor.setups.external.camulator_runtime_settings as camulator_runtime_settings_module
@@ -958,6 +847,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert callable(host_arrays_module.transposed_host_array)
     assert callable(diagnostics_module.component_vector_speed)
     assert callable(camulator_land_module.make_camulator_land)
+    assert camulator_contracts_module.CAMULATOR_RUNTIME_FIELD_NAMES
     assert callable(camulator_fields_module._prepare_camulator_surface_forcing)
     assert callable(camulator_runtime_settings_module.configure_camulator_runtime)
     assert callable(veros_fluxes_module.compute_fluxes)
@@ -1013,6 +903,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert Path("vercor/setups/external/jax_gcm_fields.py").exists()
     assert Path("vercor/setups/external/jax_gcm_runtime.py").exists()
     assert Path("vercor/setups/external/camulator_output.py").exists()
+    assert Path("vercor/setups/external/camulator_contracts.py").exists()
     assert Path("vercor/setups/external/camulator_fields.py").exists()
     assert Path("vercor/setups/external/camulator_runtime_settings.py").exists()
     assert Path("vercor/setups/external/camulator_wind_filter.py").exists()

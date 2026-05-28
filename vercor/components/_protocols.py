@@ -21,7 +21,6 @@ class ComponentRuntimeProtocol(Protocol):
 
     name: str
     grid: RectilinearGrid
-    data: dict[str, RuntimeArray]
     settings: VercorSettings
 
     @property

@@ -6,10 +6,7 @@ import jax.numpy as jnp
 
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.field_names import VALID_EXCHANGE_FIELD_NAMES
-from vercor.field_layout import (
-    canonical_data_layout_description,
-    is_canonical_grid_field_shape,
-)
+from vercor.field_layout import validate_canonical_grid_field_shape
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.state import RuntimeComponentState
 from vercor.runtime.stores import RuntimeFieldStore
@@ -80,17 +77,16 @@ def validate_runtime_component_data_field(
     """Validate that a runtime data field exists and has canonical grid layout."""
 
     validate_runtime_data_field_exists(component, component_state, field_name)
-    field_shape = tuple(
-        int(size) for size in jnp.asarray(component_state.data.get(field_name)).shape
-    )
-    if not is_canonical_grid_field_shape(field_shape, component.grid.shape):
-        raise CouplerError(
-            "Runtime required data field "
-            f"'{field_name}' for component '{component.name}' has shape "
-            f"{field_shape}; expected canonical grid-field layout "
-            f"{canonical_data_layout_description()} with trailing grid shape "
-            f"{component.grid.shape}"
+    try:
+        validate_canonical_grid_field_shape(
+            field_name=field_name,
+            value=component_state.data.get(field_name),
+            grid_shape=component.grid.shape,
+            owner_description="Runtime required data field",
+            owner_name=component.name,
         )
+    except ValueError as exc:
+        raise CouplerError(str(exc)) from exc
 
 
 def validate_component_runtime_contract_fields(

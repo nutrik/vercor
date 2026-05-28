@@ -11,7 +11,7 @@
 11. `vercor/pytree_utils.py` - generic leafwise PyTree transforms and casting helpers used by setup adapters
 12. `vercor/grid.py` - JAX-friendly `RectilinearGrid` holder with eager validation and PyTree registration built on (3)
 13. `vercor/grid_geometry.py` - rectilinear grid construction, center-to-edge geometry, and grid identity built on (1, 12)
-14. `vercor/field_layout.py` - canonical component data-field layout validation and time-last forcing normalization helpers built on (12)
+14. `vercor/field_layout.py` - shared canonical grid-field shape validation, component data-field layout validation, and time-last forcing normalization helpers built on (12)
 15. `vercor/interpolators/bilinear_rectilinear.py` - JAX-native bilinear scalar/vector interpolation and extrapolation built on (1, 3, 12, 13)
 16. `vercor/interpolators/conservative_remap_rectilinear.py` - JAX-native conservative scalar remapping runtime with eager overlap preprocessing built on (1, 3, 12, 13)
 17. `vercor/regridders/base.py` - abstract regridder wrapper and scalar/vector interpolator protocol built on (12, 13)
@@ -38,7 +38,7 @@
 38. `vercor/setups/external/camulator_imports.py` - lazy CREDIT/postblock/CAMulator wind-filter optional-dependency loading
 39. `vercor/setups/external/camulator_forcing.py` - CAMulator config loading, forcing context, and runtime forcing cursors built on (26, 38)
 40. `vercor/setups/external/camulator_tensors.py` - typed CAMulator tensor-variable indexing, static forcing tensor staging, and JAX-to-Torch transfer helpers
-41. `vercor/setups/external/camulator_fields.py` - CAMulator runtime field initialization, forcing prep, and prediction-field mapping built on (1, 7, 10, 40)
+41. `vercor/setups/external/camulator_contracts.py` and `camulator_fields.py` - lightweight CAMulator runtime field contract ownership, runtime field initialization, forcing prep, and prediction-field mapping built on (1, 7, 10, 40)
 42. `vercor/setups/external/camulator_wind_filter.py` - CAMulator-only wind artifact post-processing with explicit configuration validation
 43. `vercor/setups/external/camulator_stepper.py` - CAMulator state shifting, forcing concatenation, stepping, and optional post-processing built on (38, 40, 42)
 44. `vercor/setups/external/camulator_init.py` - CAMulator model, transform, forcing, metadata, init-noise, and stepper initialization built on (38, 40, 43)
@@ -59,7 +59,7 @@
 59. `vercor/runtime/contexts.py` - immutable setup and runtime step context payloads built on calendar, run-sequence, settings helpers, and (25)
 60. `vercor/runtime/views.py` - explicit runtime component metadata and shared read-only field resolution for diagnostics/output views and compatible runtime states built on (12, 64)
 61. `vercor/diagnostics/fields.py`, `tables.py`, `plotting.py`, and `__init__.py` - derived diagnostic fields, console tables, optional plotting, and public reexports with runtime field lookup delegated to (60) built on (10, 60)
-62. `vercor/components/contracts.py`, `base.py`, `data.py`, `host.py`, `_field_names.py`, `_protocols.py`, `_field_authoring.py`, `_contracts.py`, `_lifecycle.py`, `_lifecycle_api.py`, `_callable_wrappers.py`, `_runtime_fields.py`, `_runtime_access.py`, `_runtime_validation.py`, `runtime_execution.py`, `setup_validation.py`, and `factories.py` - public component author contracts, abstract/component-kind owners, concrete callable-backed wrappers beside their runtime-kind bases, shared field-name de-duplication, private component helper protocols, field-authoring helpers, internal field normalization, lifecycle hook storage/dispatch, shared callable signature/runtime helpers, runtime-field adapters/accessors, component-facing runtime validation, component-owned runtime execution policy, setup validation, and public factory helpers built on (1, 12, 14, 59)
+62. `vercor/components/contracts.py`, `base.py`, `data.py`, `host.py`, `_field_names.py`, `_protocols.py`, `_field_authoring.py`, `_contracts.py`, `_lifecycle.py`, `_lifecycle_api.py`, `_callable_wrappers.py`, `_runtime_fields.py`, `_runtime_access.py`, `_runtime_validation.py`, `runtime_execution.py`, `setup_validation.py`, and `factories.py` - public component author contracts, abstract/component-kind owners, concrete callable-backed wrappers beside their runtime-kind bases, shared field-name de-duplication, narrowed private component helper protocols, field-authoring helpers, internal field normalization, lifecycle hook storage/dispatch, shared callable signature/runtime helpers, runtime-field adapters/accessors, component-facing runtime validation through shared field-layout checks, component-owned runtime execution policy, setup validation, and public factory helpers built on (1, 12, 14, 59)
 63. `vercor/runtime/contracts.py` - runtime import/export contracts, exchange-field flattening, stable exchange mask key names, and contract construction
 64. `vercor/runtime/stores.py`, `state.py`, and `__init__.py` - immutable runtime field stores, component/coupler runtime state containers, and an empty runtime package initializer with no compatibility reexports built on (1, 3, 63)
 65. `vercor/runtime/time.py` - `RuntimeStepInfo` plus host-precomputed daily/monthly runtime step metadata built on (3, 6, 23, 64)
@@ -71,6 +71,6 @@
 71. `vercor/runtime/resources.py` - mutable per-coupler runtime resource holder and grouped replacement boundary for topology maps, refreshed contracts, compiled runtime cache, and interrupts built on (63, 64, 68, 70)
 72. `vercor/runtime/runner.py` - host/scanned runtime loops, run-mode selection, donation checks, and interrupt translation built on (65, 67, 70)
 73. `vercor/output.py` - runtime-view and coupler-final-output NetCDF output boundary built on (10, 12, 60, 64, 68)
-74. `vercor/runtime/facade.py` - high-level runtime orchestration boundary for the public coupler facade and runtime resource holder built on (24, 25, 59, 60, 63, 64, 67, 68, 69, 70, 71, 72, 73)
+74. `vercor/runtime/facade.py` - high-level runtime orchestration boundary and internal repeated-input bundle for the public coupler facade and runtime resource holder built on (24, 25, 59, 60, 63, 64, 67, 68, 69, 70, 71, 72, 73)
 75. `vercor/coupler.py` - public setup/finalization facade for `run()` and `create_runtime_state()` built on (25, 59, 62, 64, 71, 74)
 76. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`

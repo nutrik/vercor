@@ -10,7 +10,7 @@ from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
     seed_grid_field_defaults,
 )
-import vercor.setups.external.camulator_fields as _camulator_fields
+import vercor.setups.external.camulator_contracts as _camulator_contracts
 from vercor.setups.external.camulator_forcing import CamulatorRuntimeCursor
 import vercor.setups.external.camulator_init as _camulator_init
 import vercor.setups.external.camulator_runtime as _camulator_runtime
@@ -192,7 +192,7 @@ class _CAMulatorGCMState:
         self.forecast_hour = 1
         seed_grid_field_defaults(
             component,
-            _camulator_fields._CAMULATOR_RUNTIME_FIELD_NAMES,
+            _camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES,
             context,
         )
 
@@ -243,11 +243,8 @@ def make_camulator_gcm(
         grid=state.grid,
         step=state.step,
         inputs=("sea_surface_temperature", "land_surface_temperature"),
-        outputs=_camulator_fields._CAMULATOR_RUNTIME_FIELD_NAMES,
-        default_fields={
-            field_name: 0.0
-            for field_name in _camulator_fields._CAMULATOR_RUNTIME_FIELD_NAMES
-        },
+        outputs=_camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES,
+        default_fields=_camulator_contracts.camulator_runtime_field_defaults(),
         initialize=state.initialize,
     )
 

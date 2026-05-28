@@ -13,6 +13,7 @@ import torch
 import xarray as xr
 
 import vercor.setups.external.camulator as camulator_module
+import vercor.setups.external.camulator_contracts as camulator_contracts_module
 import vercor.setups.external.camulator_fields as camulator_fields_module
 import vercor.setups.external.camulator_forcing as camulator_forcing_module
 import vercor.setups.external.camulator_imports as camulator_imports_module
@@ -525,7 +526,7 @@ def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
     )
     assert (
         component.field_spec.outputs
-        == camulator_fields_module._CAMULATOR_RUNTIME_FIELD_NAMES
+        == camulator_contracts_module.CAMULATOR_RUNTIME_FIELD_NAMES
     )
     assert_allclose_compact(component.grid.binary_mask, np.ones((3, 2)))
 

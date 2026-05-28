@@ -168,7 +168,9 @@ immutable runtime containers used during traced integration.
   share component-owned structural protocols from
   `vercor.components._protocols` instead of importing the public
   `Component` class for helper annotations, so helper boundaries stay decoupled
-  from the concrete base implementation. Component-facing
+  from the concrete base implementation. Runtime-oriented component protocols
+  expose only name, grid, settings, and declared field contracts; setup data
+  storage stays on concrete component classes. Component-facing
   runtime-field adapters live in private `vercor.components._runtime_fields`,
   component-facing runtime-field convenience methods live in private
   `vercor.components._runtime_access`, and component-facing required-field
@@ -265,8 +267,10 @@ immutable runtime containers used during traced integration.
   cache, and the interrupt controller. Runtime facade code replaces refreshed
   contracts and topology maps through holder methods, keeping grouped resource
   mutation behind the resource owner. `Coupler` accesses those resources
-  through the holder directly; there are no private compatibility aliases for
-  individual runtime maps or caches. Host/scanned runtime loops, run-mode
+  through the holder directly and passes repeated runtime inputs through the
+  internal `vercor.runtime.facade.RuntimeFacadeInputs` bundle; there are no
+  private compatibility aliases for individual runtime maps or caches.
+  Host/scanned runtime loops, run-mode
   selection, donation checks, and interrupt translation live in
   `vercor.runtime.runner`. High-level runtime orchestration for the
   public `Coupler` facade lives in `vercor.runtime.facade`: runtime-state
@@ -340,9 +344,10 @@ into `vercor.diagnostics.fields`, `vercor.diagnostics.tables`, and
 `vercor.runtime.views` and `vercor.diagnostics` preserving the public reexport
 surface.
 
-CAMulator optional-dependency loading, forcing cursors, tensor accessors,
-runtime stepping, output, wind filtering, land forcing, and initialization are
-split across
+CAMulator runtime field contracts, optional-dependency loading, forcing cursors,
+tensor accessors, runtime stepping, output, wind filtering, land forcing, and
+initialization are split across
+`vercor.setups.external.camulator_contracts`,
 `vercor.setups.external.camulator_imports`,
 `vercor.setups.external.camulator_forcing`,
 `vercor.setups.external.camulator_tensors`,

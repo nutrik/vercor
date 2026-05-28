@@ -33,6 +33,61 @@ def is_canonical_grid_field_shape(
     return 2 <= len(shape) <= 4 and shape[-2:] == grid_shape
 
 
+def canonical_grid_field_shape(value: object) -> tuple[int, ...]:
+    """Return ``value`` shape as an integer tuple for field-layout checks."""
+
+    return tuple(int(size) for size in jnp.asarray(value).shape)
+
+
+def canonical_grid_field_shape_error(
+    *,
+    field_name: str,
+    shape: tuple[int, ...],
+    grid_shape: tuple[int, int],
+    owner_description: str,
+    owner_name: str,
+) -> str:
+    """Return the shared canonical grid-field shape error message."""
+
+    if owner_description == "Component data field":
+        return (
+            f"Component '{owner_name}' data field '{field_name}' has "
+            f"shape {shape}; expected canonical grid-field layout "
+            f"{canonical_data_layout_description()} with trailing grid shape "
+            f"{grid_shape}"
+        )
+
+    return (
+        f"{owner_description} '{field_name}' for component '{owner_name}' has "
+        f"shape {shape}; expected canonical grid-field layout "
+        f"{canonical_data_layout_description()} with trailing grid shape "
+        f"{grid_shape}"
+    )
+
+
+def validate_canonical_grid_field_shape(
+    *,
+    field_name: str,
+    value: object,
+    grid_shape: tuple[int, int],
+    owner_description: str,
+    owner_name: str,
+) -> None:
+    """Validate one value against VerCOR's canonical grid-field layout."""
+
+    shape = canonical_grid_field_shape(value)
+    if not is_canonical_grid_field_shape(shape, grid_shape):
+        raise ValueError(
+            canonical_grid_field_shape_error(
+                field_name=field_name,
+                shape=shape,
+                grid_shape=grid_shape,
+                owner_description=owner_description,
+                owner_name=owner_name,
+            )
+        )
+
+
 def validate_component_data_layout(
     *,
     component_name: str,
@@ -42,15 +97,18 @@ def validate_component_data_layout(
     """Validate all component data arrays against canonical grid-field layouts."""
 
     for field_name, field_value in data.items():
-        shape = tuple(int(size) for size in jnp.asarray(field_value).shape)
-        if not is_canonical_grid_field_shape(shape, grid_shape):
-            raise ComponentError(
-                f"Component '{component_name}' data field '{field_name}' has "
-                f"shape {shape}; expected canonical grid-field layout "
-                f"{canonical_data_layout_description()} with trailing grid "
-                f"shape {grid_shape}. Non-grid metadata must be stored outside "
-                "Component.data."
+        try:
+            validate_canonical_grid_field_shape(
+                field_name=field_name,
+                value=field_value,
+                grid_shape=grid_shape,
+                owner_description="Component data field",
+                owner_name=component_name,
             )
+        except ValueError as exc:
+            raise ComponentError(
+                f"{exc}. Non-grid metadata must be stored outside Component.data."
+            ) from exc
 
 
 def canonicalize_time_last_surface_field(field: ArrayLike) -> jax.Array:

@@ -67,6 +67,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local component protocol/resource boundary validation: focused fast
   pytest, Black, flake8, mypy, full fast pytest, and full pytest passed as of
   2026-05-28.
+- Latest local whole-codebase boundary refactor validation: focused fast pytest,
+  full fast pytest, Black, flake8, mypy, and full pytest passed as of
+  2026-05-28.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -92,6 +95,36 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-28: Whole-Codebase Boundary Refactor
+
+- Added shared canonical grid-field shape helpers in `vercor.field_layout`, then
+  routed component-facing and runtime-facing required-field validation through
+  the shared message/shape policy while preserving existing exception types.
+- Narrowed private component helper protocols so runtime helpers no longer
+  require setup data storage, and added focused boundary tests for protocol
+  ownership.
+- Added `vercor.runtime.facade.RuntimeFacadeInputs` so `Coupler` passes one
+  grouped internal runtime input bundle into facade helpers instead of repeated
+  component/exchange/resource parameter clumps.
+- Added lightweight CAMulator runtime field contract ownership in
+  `vercor.setups.external.camulator_contracts`, leaving tensor/field mapping
+  code focused on runtime arrays.
+- Split reusable architecture-test helpers out of `tests/test_api_boundaries.py`
+  and added focused tests for field layout, component boundaries, runtime facade
+  boundaries, and CAMulator contracts.
+- Validation run for this change:
+  focused new boundary pytest,
+  focused API/runtime/component/CAMulator fast pytest,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: the initial shared field-layout error wording broke
+  an existing component data-field regex contract; the helper now preserves the
+  component-facing message shape while still centralizing shape validation.
 
 ### 2026-05-28: Component Protocol and Runtime Resource Boundary Refactor
 

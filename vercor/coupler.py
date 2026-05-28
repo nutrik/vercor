@@ -133,19 +133,26 @@ class Coupler:
             f" Set coupler components run sequence: {', '.join(self.run_sequence)}"
         )
 
+    def _runtime_inputs(self) -> _runtime_facade.RuntimeFacadeInputs:
+        """Return the repeated runtime facade input bundle for this coupler."""
+
+        return _runtime_facade.RuntimeFacadeInputs(
+            self.components,
+            self.exchanges,
+            self._runtime_resources,
+            self.run_sequence,
+            self.clock,
+            self.settings,
+        )
+
     def initialize(self, enable_x64_computations: Optional[bool] = None) -> None:
         """
         Initialize the coupler and all registered components.
         """
 
         initialized = _runtime_facade.initialize_coupler_runtime(
-            clock=self.clock,
-            components=self.components,
-            exchanges=self.exchanges,
-            run_sequence=self.run_sequence,
-            settings=self.settings,
+            inputs=self._runtime_inputs(),
             logger=self.logger,
-            runtime_resources=self._runtime_resources,
             enable_x64_computations=enable_x64_computations,
         )
 
@@ -160,12 +167,7 @@ class Coupler:
         """Create and validate the immutable state used by the unified runtime."""
 
         prepared = _runtime_facade.create_runtime_state(
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
-            run_sequence=self.run_sequence,
-            clock=self.clock,
-            settings=self.settings,
+            inputs=self._runtime_inputs(),
             prefill_missing=prefill_missing,
         )
         return prepared.runtime_state
@@ -212,9 +214,7 @@ class Coupler:
         self.logger.info(" ------------ Finalizing coupler and components ------------")
         _runtime_facade.finalize(
             final_state=final_state,
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
+            inputs=self._runtime_inputs(),
             output_file_mask=output_file_mask,
             logger=self.logger,
         )
@@ -253,22 +253,12 @@ class Coupler:
 
         prepared = _runtime_facade.prepare_runtime_state(
             initial_state,
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
-            run_sequence=self.run_sequence,
-            clock=self.clock,
-            settings=self.settings,
+            inputs=self._runtime_inputs(),
         )
         return _runtime_facade.run(
             prepared.runtime_state,
-            run_sequence=self.run_sequence,
-            clock=self.clock,
+            inputs=self._runtime_inputs(),
             logger=self.logger,
             log_level=self.log_level,
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
-            settings=self.settings,
             donate_state=donate_state,
         )

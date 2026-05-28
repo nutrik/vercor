@@ -2,15 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import jax.numpy as jnp
-
 from vercor.components._contracts import declared_runtime_field_names
 from vercor.components._protocols import ComponentRuntimeProtocol
 from vercor.exceptions import CouplerError
-from vercor.field_layout import (
-    canonical_data_layout_description,
-    is_canonical_grid_field_shape,
-)
+from vercor.field_layout import validate_canonical_grid_field_shape
 
 if TYPE_CHECKING:
     from vercor.runtime.state import RuntimeComponentState
@@ -29,18 +24,16 @@ def require_runtime_fields(
                 "Runtime missing required data field "
                 f"'{field_name}' for component '{component.name}'"
             )
-        field_shape = tuple(
-            int(size)
-            for size in jnp.asarray(component_state.data.get(field_name)).shape
-        )
-        if not is_canonical_grid_field_shape(field_shape, component.grid.shape):
-            raise CouplerError(
-                "Runtime required data field "
-                f"'{field_name}' for component '{component.name}' has shape "
-                f"{field_shape}; expected canonical grid-field layout "
-                f"{canonical_data_layout_description()} with trailing grid shape "
-                f"{component.grid.shape}"
+        try:
+            validate_canonical_grid_field_shape(
+                field_name=field_name,
+                value=component_state.data.get(field_name),
+                grid_shape=component.grid.shape,
+                owner_description="Runtime required data field",
+                owner_name=component.name,
             )
+        except ValueError as exc:
+            raise CouplerError(str(exc)) from exc
 
 
 def validate_declared_runtime_fields(
