@@ -5,19 +5,16 @@ import jax.numpy as jnp
 import numpy as np
 
 from tests.assertions import assert_allclose_compact
-from vercor.setups.external.jax_gcm import JAXGCMRuntimePayload
 from vercor.grid import RectilinearGrid
 from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 from vercor.interpolators.conservative_remap_rectilinear import (
     ConservativeRectilinearRemapper,
 )
 from vercor.pytree import PyTreeNodeMixin
-from vercor.runtime import (
-    RuntimeComponentState,
-    RuntimeCouplerState,
-    RuntimeFieldStore,
-    RuntimeStepInfo,
-)
+from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
+from vercor.runtime.stores import RuntimeFieldStore
+from vercor.runtime.time import RuntimeStepInfo
+from vercor.setups.external.jax_gcm_runtime import JAXGCMRuntimePayload
 
 
 def test_registered_pytree_classes_inherit_shared_flatten_methods() -> None:

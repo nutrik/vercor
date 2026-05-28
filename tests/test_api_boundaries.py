@@ -23,10 +23,12 @@ from vercor.components.base import Component
 from vercor.components.data import DataComponent
 from vercor.components.host import HostRuntimeComponent
 from vercor.clock import Clock
+from vercor.coupler import Coupler
 from vercor.exchange import Exchange
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.run_sequence import RunSequence
-from vercor.runtime import RuntimeComponentState, RuntimeFieldStore
+from vercor.runtime.state import RuntimeComponentState
+from vercor.runtime.stores import RuntimeFieldStore
 from vercor.regridders import bilinear
 
 
@@ -224,6 +226,65 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert not hasattr(components_module, "RuntimeComponentState")
     assert not hasattr(components_module, "ComponentInitContext")
     assert not hasattr(components_module, "RuntimeStepContext")
+
+
+@pytest.mark.fast_always
+def test_obsolete_compatibility_api_surfaces_are_removed() -> None:
+    import vercor.forcing_data as forcing_data_module
+    import vercor.runtime as runtime_module
+    import vercor.settings as settings_module
+    import vercor.setups.external as external_module
+    import vercor.setups.external.camulator_tensors as camulator_tensors_module
+    import vercor.setups.external.jax_gcm as jax_gcm_module
+
+    removed_runtime_reexports = {
+        "RuntimeComponentContract",
+        "RuntimeComponentState",
+        "RuntimeCouplerState",
+        "RuntimeFieldStore",
+        "RuntimeStepInfo",
+        "append_unique_runtime_fields",
+        "build_runtime_contracts",
+        "dispatch_component_exchanges",
+        "exchange_key_name",
+        "flatten_exchange_fields",
+    }
+    for name in removed_runtime_reexports:
+        assert not hasattr(runtime_module, name)
+    assert getattr(runtime_module, "__all__", []) == []
+
+    assert not hasattr(jax_gcm_module, "JAXGCMRuntimePayload")
+    assert "JAXGCMRuntimePayload" not in external_module.__all__
+    assert "JAXGCMRuntimePayload" not in external_module._LAZY_EXPORTS
+
+    assert not hasattr(settings_module, "ComponentSettings")
+    assert not hasattr(forcing_data_module, "ComponentForcingData")
+    assert not hasattr(camulator_tensors_module.TensorVariableIndex, "to_mapping")
+    assert not hasattr(camulator_tensors_module.StateVariableAccessor, "get_var_info")
+    assert not hasattr(
+        camulator_tensors_module.StateVariableAccessor,
+        "list_available_vars",
+    )
+
+
+@pytest.mark.fast_always
+def test_coupler_private_compatibility_aliases_are_removed() -> None:
+    removed_names = (
+        "_regridders",
+        "_binary_masks",
+        "_fractional_masks",
+        "_runtime_contracts",
+        "_compiled_runtime_cache",
+        "_runtime_interrupts",
+        "_runtime_state_from_components",
+        "_validate_runtime_state",
+        "_prepare_runtime_state",
+        "_runtime_dispatch_context",
+        "_runtime_run_context",
+        "_run_scanned_runtime",
+    )
+    for name in removed_names:
+        assert not hasattr(Coupler, name)
 
 
 @pytest.mark.fast_always
@@ -967,8 +1028,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     )
     import vercor.setups.external as external_module
 
-    payload_export = external_module._LAZY_EXPORTS["JAXGCMRuntimePayload"]
-    assert payload_export.module == "jax_gcm_runtime"
+    assert "JAXGCMRuntimePayload" not in external_module._LAZY_EXPORTS
 
 
 @pytest.mark.fast_always

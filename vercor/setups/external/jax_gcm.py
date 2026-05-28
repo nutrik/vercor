@@ -57,9 +57,6 @@ except ImportError:
         "`pip install jcm`."
     )
 
-JAXGCMRuntimePayload = _jax_gcm_runtime.JAXGCMRuntimePayload
-_jax_gcm_default_field_names = _jax_gcm_runtime.jax_gcm_default_field_names
-
 
 @tree_math.struct
 @dataclass
@@ -206,7 +203,7 @@ class _JAXGCMState:
 
         seed_grid_field_defaults(
             component,
-            _jax_gcm_default_field_names(
+            _jax_gcm_runtime.jax_gcm_default_field_names(
                 include_total_surface_temperature=False,
             ),
             context,
@@ -258,7 +255,7 @@ def _step_jax_gcm_runtime_callback(
 def _create_jax_gcm_runtime_payload_callback(
     state: _JAXGCMState,
     component: Component,
-) -> JAXGCMRuntimePayload:
+) -> _jax_gcm_runtime.JAXGCMRuntimePayload:
     """Delegate runtime-payload creation to the JAXGCM runtime owner."""
 
     _ = component

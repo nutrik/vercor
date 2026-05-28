@@ -9,13 +9,10 @@ import numpy as np
 
 from tests.assertions import assert_allclose_compact
 from vercor.exchange import Exchange
-from vercor.runtime import (
-    RuntimeComponentState,
-    RuntimeCouplerState,
-    RuntimeFieldStore,
-    dispatch_component_exchanges,
-)
 from vercor.runtime.dispatch_context import RuntimeDispatchContext
+from vercor.runtime.exchange_dispatch import dispatch_component_exchanges
+from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
+from vercor.runtime.stores import RuntimeFieldStore
 
 
 class _ScalingRegridder:

@@ -34,32 +34,3 @@ def read_forcing(
         raise RuntimeError(
             f"Error reading variable '{variable}' from forcing file '{data_files[where]}'"
         ) from exc
-
-
-class ComponentForcingData:
-    """Read named forcing variables from configured NetCDF files."""
-
-    def __init__(self) -> None:
-        self.DATA_FILES: dict[str, str] = {}
-
-    def _read_forcing(
-        self, variable: str, where: str, flip_y: bool = False
-    ) -> RuntimeArray:
-        """Read a variable from one configured forcing file as a JAX array."""
-
-        return read_forcing(
-            self.DATA_FILES,
-            variable,
-            where,
-            flip_y=flip_y,
-            mapping_name="DATA_FILES",
-        )
-
-    def __str__(self) -> str:
-        return (
-            f"{self.__class__.__name__}:\n"
-            f"└── Forcing files: {self.DATA_FILES if self.DATA_FILES else 'No files assigned'}"
-        )
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(DATA_FILES={self.DATA_FILES})"

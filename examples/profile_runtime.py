@@ -17,7 +17,7 @@ from vercor.setups.slab.seaice import make_slab_seaice
 from vercor.dtypes import jax_ones
 from vercor.grid_geometry import make_rectilinear_grid
 from vercor.regridders import bilinear, conservative
-from vercor.runtime import RuntimeCouplerState
+from vercor.runtime.state import RuntimeCouplerState
 from vercor.setups.exchange_recipes import (
     LAND_TO_ATMOSPHERE_SOIL_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
@@ -201,7 +201,7 @@ def profile_runtime(
         grid_ny=grid_ny,
         log_level=log_level,
     )
-    coupler._compiled_runtime_cache.clear()
+    coupler._runtime_resources.compiled_runtime_cache.clear()
 
     first_state = coupler.create_runtime_state()
     second_state = coupler.create_runtime_state()
@@ -225,7 +225,7 @@ def profile_runtime(
         first_non_donating_seconds=first_non_donating_seconds,
         cached_non_donating_seconds=cached_non_donating_seconds,
         first_donating_seconds=first_donating_seconds,
-        compiled_cache_entries=len(coupler._compiled_runtime_cache),
+        compiled_cache_entries=len(coupler._runtime_resources.compiled_runtime_cache),
         final_state_leaves=len(jax.tree_util.tree_leaves(first_final)),
     )
 

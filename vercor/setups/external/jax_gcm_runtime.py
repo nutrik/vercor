@@ -22,7 +22,8 @@ from vercor.setups.external.jax_gcm_output import (
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
-    from vercor.runtime import RuntimeComponentContract, RuntimeComponentState
+    from vercor.runtime.contracts import RuntimeComponentContract
+    from vercor.runtime.state import RuntimeComponentState
 
 JCM_REFERENCE_PRESSURE = 1.0e5
 

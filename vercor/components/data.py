@@ -14,7 +14,7 @@ from vercor.runtime.contexts import RuntimeStepContext
 from vercor.settings import VercorSettings
 
 if TYPE_CHECKING:
-    from vercor.runtime import RuntimeComponentState
+    from vercor.runtime.state import RuntimeComponentState
 
 
 class DataComponent(Component):

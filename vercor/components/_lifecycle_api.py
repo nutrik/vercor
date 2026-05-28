@@ -8,8 +8,9 @@ from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components.base import Component
-    from vercor.runtime import RuntimeComponentContract, RuntimeComponentState
+    from vercor.runtime.contracts import RuntimeComponentContract
     from vercor.runtime.contexts import ComponentInitContext
+    from vercor.runtime.state import RuntimeComponentState
 
 
 class ComponentLifecycleMixin:

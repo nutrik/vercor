@@ -27,11 +27,9 @@ from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.components.data import DataComponent
 from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
-from vercor.runtime import (
-    RuntimeComponentContract,
-    RuntimeComponentState,
-    RuntimeFieldStore,
-)
+from vercor.runtime.contracts import RuntimeComponentContract
+from vercor.runtime.state import RuntimeComponentState
+from vercor.runtime.stores import RuntimeFieldStore
 from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
 

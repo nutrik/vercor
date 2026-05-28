@@ -36,12 +36,10 @@ from vercor.setups.external.camulator_fields import (
 from vercor.setups.external.camulator_tensors import _torch_tensor_from_jax_array
 from vercor.fluxes.vertical_coordinates import get_altitudes_hybrid_sigma_levels
 from vercor.grid import RectilinearGrid
-from vercor.runtime import (
-    RuntimeComponentContract,
-    RuntimeComponentState,
-    RuntimeFieldStore,
-)
+from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.component_state import create_runtime_component_state
+from vercor.runtime.state import RuntimeComponentState
+from vercor.runtime.stores import RuntimeFieldStore
 from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
 from vercor.jax_logging import DEFAULT_LOGGER_NAME
@@ -310,53 +308,45 @@ def test_state_variable_accessor_builds_exact_index_maps() -> None:
         tensor_type="output",
     )
 
-    assert state_accessor.get_var_info("U") == {
-        "start_idx": 0,
-        "end_idx": 3,
-        "n_channels": 3,
-        "is_3d": True,
-        "available": True,
-    }
-    assert state_accessor.get_var_info("V")["start_idx"] == 3
-    assert state_accessor.get_var_info("TS")["start_idx"] == 6
-    assert state_accessor.get_var_info("PS")["end_idx"] == 8
-    assert state_accessor.get_var_info("FSNS") == {
-        "available": False,
-        "reason": "Diagnostics not in state tensor",
-    }
-    assert state_accessor.get_var_info("SOLIN") == {
-        "available": False,
-        "reason": "Forcing not in state tensor",
-    }
+    u_index = state_accessor.get_var_index("U")
+    assert u_index.start_idx == 0
+    assert u_index.end_idx == 3
+    assert u_index.n_channels == 3
+    assert u_index.is_3d
+    assert u_index.available
+    assert state_accessor.get_var_index("V").start_idx == 3
+    assert state_accessor.get_var_index("TS").start_idx == 6
+    assert state_accessor.get_var_index("PS").end_idx == 8
+    fsns_state_index = state_accessor.get_var_index("FSNS")
+    solin_state_index = state_accessor.get_var_index("SOLIN")
+    assert not fsns_state_index.available
+    assert fsns_state_index.reason == "Diagnostics not in state tensor"
+    assert not solin_state_index.available
+    assert solin_state_index.reason == "Forcing not in state tensor"
 
-    assert input_accessor.get_var_info("SOLIN")["start_idx"] == 8
-    assert input_accessor.get_var_info("ORO")["start_idx"] == 9
-    assert input_accessor.get_var_info("LAND")["start_idx"] == 10
-    assert static_first_input_accessor.get_var_info("LAND")["start_idx"] == 8
-    assert static_first_input_accessor.get_var_info("SOLIN")["start_idx"] == 9
-    assert static_first_input_accessor.get_var_info("ORO")["start_idx"] == 10
-    assert input_accessor.get_var_info("FSNS") == {
-        "available": False,
-        "reason": "Diagnostics not in input tensor",
-    }
+    assert input_accessor.get_var_index("SOLIN").start_idx == 8
+    assert input_accessor.get_var_index("ORO").start_idx == 9
+    assert input_accessor.get_var_index("LAND").start_idx == 10
+    assert static_first_input_accessor.get_var_index("LAND").start_idx == 8
+    assert static_first_input_accessor.get_var_index("SOLIN").start_idx == 9
+    assert static_first_input_accessor.get_var_index("ORO").start_idx == 10
+    fsns_input_index = input_accessor.get_var_index("FSNS")
+    assert not fsns_input_index.available
+    assert fsns_input_index.reason == "Diagnostics not in input tensor"
 
-    assert output_accessor.get_var_info("FSNS") == {
-        "start_idx": 8,
-        "end_idx": 9,
-        "n_channels": 1,
-        "is_3d": False,
-        "available": True,
-    }
-    assert output_accessor.get_var_info("LAND") == {
-        "available": False,
-        "reason": "Forcing not in output tensor",
-    }
+    fsns_output_index = output_accessor.get_var_index("FSNS")
+    assert fsns_output_index.start_idx == 8
+    assert fsns_output_index.end_idx == 9
+    assert fsns_output_index.n_channels == 1
+    assert not fsns_output_index.is_3d
+    assert fsns_output_index.available
+    land_output_index = output_accessor.get_var_index("LAND")
+    assert not land_output_index.available
+    assert land_output_index.reason == "Forcing not in output tensor"
 
 
 @pytest.mark.fast_always
-def test_state_variable_accessor_exposes_typed_indices_with_dict_compatibility() -> (
-    None
-):
+def test_state_variable_accessor_exposes_typed_indices() -> None:
     accessor = camulator_tensors_module.StateVariableAccessor(
         _state_variable_accessor_conf(),
         tensor_type="state",
@@ -366,24 +356,18 @@ def test_state_variable_accessor_exposes_typed_indices_with_dict_compatibility()
 
     assert isinstance(variable_index, camulator_tensors_module.TensorVariableIndex)
     assert variable_index.channel_slice == slice(0, 3)
-    assert variable_index.to_mapping() == {
-        "start_idx": 0,
-        "end_idx": 3,
-        "n_channels": 3,
-        "is_3d": True,
-        "available": True,
-    }
-    assert accessor.get_var_info("U") == variable_index.to_mapping()
-    assert accessor.get_var_index("FSNS").to_mapping() == {
-        "available": False,
-        "reason": "Diagnostics not in state tensor",
-    }
+    assert variable_index.start_idx == 0
+    assert variable_index.end_idx == 3
+    assert variable_index.n_channels == 3
+    assert variable_index.is_3d
+    assert variable_index.available
+    diagnostic_index = accessor.get_var_index("FSNS")
+    assert not diagnostic_index.available
+    assert diagnostic_index.reason == "Diagnostics not in state tensor"
 
 
 @pytest.mark.fast_always
-def test_state_variable_accessor_tensor_access_uses_typed_index_path(
-    monkeypatch: Any,
-) -> None:
+def test_state_variable_accessor_tensor_access_uses_typed_index_path() -> None:
     accessor = camulator_tensors_module.StateVariableAccessor(
         _state_variable_accessor_conf(),
         tensor_type="state",
@@ -395,11 +379,6 @@ def test_state_variable_accessor_tensor_access_uses_typed_index_path(
         2,
         2,
     )
-
-    def _fail_dict_info(var_name: str) -> None:
-        raise AssertionError(f"dict metadata path used for {var_name}")
-
-    monkeypatch.setattr(accessor, "get_var_info", _fail_dict_info)
 
     assert torch.equal(accessor.get_state_var(tensor, "V"), tensor[:, 3:6, ...])
 

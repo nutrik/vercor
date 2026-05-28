@@ -12,7 +12,8 @@ from vercor.grid import RectilinearGrid
 from vercor.host_arrays import transposed_host_array
 from tests.assertions import assert_allclose_compact
 from vercor.host_arrays import runtime_array_to_host
-from vercor.runtime import RuntimeComponentState, RuntimeFieldStore
+from vercor.runtime.state import RuntimeComponentState
+from vercor.runtime.stores import RuntimeFieldStore
 from vercor.runtime.views import RuntimeComponentView
 
 

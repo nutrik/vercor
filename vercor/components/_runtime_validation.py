@@ -13,7 +13,7 @@ from vercor.field_layout import (
 
 if TYPE_CHECKING:
     from vercor.components.base import Component
-    from vercor.runtime import RuntimeComponentState
+    from vercor.runtime.state import RuntimeComponentState
 
 
 def require_runtime_fields(

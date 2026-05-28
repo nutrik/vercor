@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Optional
 
 from vercor.clock import Clock
 from vercor.exceptions import CouplerError
@@ -16,19 +16,14 @@ from vercor.jax_logging import (
     setup_logger as _setup_logger,
 )
 from vercor.run_sequence import RunSequence
-from vercor.runtime import facade as _runtime_facade
-from vercor.runtime.interrupts import RuntimeInterruptController
+import vercor.runtime.facade as _runtime_facade
 from vercor.runtime.resources import CouplerRuntimeResources
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components.base import Component
-    import vercor.runtime.contracts as _runtime_contracts_module
-    import vercor.runtime.dispatch_context as _runtime_dispatch_context_module
-    import vercor.runtime.run_context as _runtime_run_context_module
     import vercor.runtime.state as _runtime_state_module
-    import vercor.runtime.topology as _runtime_topology_module
     import vercor.runtime.views as _runtime_views_module
 
 
@@ -86,95 +81,6 @@ class Coupler:
         set_level = getattr(self.logger, "setLevel", None)
         if callable(set_level):
             set_level(self.log_level)
-
-    @property
-    def _regridders(
-        self,
-    ) -> dict[tuple[str, str, str], _runtime_topology_module.RuntimeRegridder]:
-        """Compatibility alias for runtime-owned exchange regridders."""
-
-        return self._runtime_resources.regridders
-
-    @_regridders.setter
-    def _regridders(
-        self,
-        value: dict[tuple[str, str, str], _runtime_topology_module.RuntimeRegridder],
-    ) -> None:
-        self._runtime_resources.regridders = value
-
-    @property
-    def _binary_masks(self) -> dict[tuple[str, str, str], RuntimeArray]:
-        """Compatibility alias for runtime-owned binary exchange masks."""
-
-        return self._runtime_resources.binary_masks
-
-    @_binary_masks.setter
-    def _binary_masks(self, value: dict[tuple[str, str, str], RuntimeArray]) -> None:
-        self._runtime_resources.binary_masks = value
-
-    @property
-    def _fractional_masks(self) -> dict[tuple[str, str, str], RuntimeArray]:
-        """Compatibility alias for runtime-owned fractional exchange masks."""
-
-        return self._runtime_resources.fractional_masks
-
-    @_fractional_masks.setter
-    def _fractional_masks(
-        self, value: dict[tuple[str, str, str], RuntimeArray]
-    ) -> None:
-        self._runtime_resources.fractional_masks = value
-
-    @property
-    def _runtime_contracts(
-        self,
-    ) -> dict[str, _runtime_contracts_module.RuntimeComponentContract]:
-        """Compatibility alias for runtime-owned component contracts."""
-
-        return self._runtime_resources.contracts
-
-    @_runtime_contracts.setter
-    def _runtime_contracts(
-        self,
-        value: dict[str, _runtime_contracts_module.RuntimeComponentContract],
-    ) -> None:
-        self._runtime_resources.contracts = value
-
-    @property
-    def _compiled_runtime_cache(
-        self,
-    ) -> dict[
-        tuple[Any, ...],
-        Callable[
-            [_runtime_state_module.RuntimeCouplerState],
-            _runtime_state_module.RuntimeCouplerState,
-        ],
-    ]:
-        """Compatibility alias for runtime-owned compiled runtime cache."""
-
-        return self._runtime_resources.compiled_runtime_cache
-
-    @_compiled_runtime_cache.setter
-    def _compiled_runtime_cache(
-        self,
-        value: dict[
-            tuple[Any, ...],
-            Callable[
-                [_runtime_state_module.RuntimeCouplerState],
-                _runtime_state_module.RuntimeCouplerState,
-            ],
-        ],
-    ) -> None:
-        self._runtime_resources.compiled_runtime_cache = value
-
-    @property
-    def _runtime_interrupts(self) -> RuntimeInterruptController:
-        """Compatibility alias for the runtime-owned interrupt controller."""
-
-        return self._runtime_resources.interrupts
-
-    @_runtime_interrupts.setter
-    def _runtime_interrupts(self, value: RuntimeInterruptController) -> None:
-        self._runtime_resources.interrupts = value
 
     def register(
         self,
@@ -248,49 +154,6 @@ class Coupler:
         self.lnd_fmask_on_atm_grid = topology.lnd_fmask_on_atm_grid
         self.lnd_bmask_on_atm_grid = topology.lnd_bmask_on_atm_grid
 
-    def _runtime_state_from_components(
-        self, *, prefill_missing: bool = False
-    ) -> _runtime_state_module.RuntimeCouplerState:
-        prepared = _runtime_facade.runtime_state_from_components(
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
-            prefill_missing=prefill_missing,
-        )
-        return prepared.runtime_state
-
-    def _validate_runtime_state(
-        self,
-        runtime_state: _runtime_state_module.RuntimeCouplerState,
-    ) -> None:
-        _runtime_facade.validate_runtime_state(
-            runtime_state,
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
-            run_sequence=self.run_sequence,
-        )
-
-    def _prepare_runtime_state(
-        self,
-        initial_state: _runtime_state_module.RuntimeCouplerState | None,
-        *,
-        validate_state: bool = True,
-    ) -> _runtime_state_module.RuntimeCouplerState:
-        """Return a runtime state ready for execution."""
-
-        prepared = _runtime_facade.prepare_runtime_state(
-            initial_state,
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
-            run_sequence=self.run_sequence,
-            clock=self.clock,
-            settings=self.settings,
-            validate_state=validate_state,
-        )
-        return prepared.runtime_state
-
     def create_runtime_state(
         self, *, prefill_missing: bool = True
     ) -> _runtime_state_module.RuntimeCouplerState:
@@ -306,33 +169,6 @@ class Coupler:
             prefill_missing=prefill_missing,
         )
         return prepared.runtime_state
-
-    def _runtime_dispatch_context(
-        self,
-    ) -> _runtime_dispatch_context_module.RuntimeDispatchContext:
-        """Return static runtime dispatch plumbing for the current coupler state."""
-
-        return _runtime_facade.runtime_dispatch_context(
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
-            clock=self.clock,
-            settings=self.settings,
-        )
-
-    def _runtime_run_context(self) -> _runtime_run_context_module.RuntimeRunContext:
-        """Return static runtime inputs bundled for execution."""
-
-        return _runtime_facade.runtime_run_context(
-            run_sequence=self.run_sequence,
-            clock=self.clock,
-            logger=self.logger,
-            log_level=self.log_level,
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
-            settings=self.settings,
-        )
 
     def runtime_component_view(
         self,
@@ -415,9 +251,17 @@ class Coupler:
         runtime state as consumed after this method returns.
         """
 
-        runtime_state = self._prepare_runtime_state(initial_state)
+        prepared = _runtime_facade.prepare_runtime_state(
+            initial_state,
+            components=self.components,
+            exchanges=self.exchanges,
+            runtime_resources=self._runtime_resources,
+            run_sequence=self.run_sequence,
+            clock=self.clock,
+            settings=self.settings,
+        )
         return _runtime_facade.run(
-            runtime_state,
+            prepared.runtime_state,
             run_sequence=self.run_sequence,
             clock=self.clock,
             logger=self.logger,
@@ -427,27 +271,4 @@ class Coupler:
             runtime_resources=self._runtime_resources,
             settings=self.settings,
             donate_state=donate_state,
-        )
-
-    def _run_scanned_runtime(
-        self,
-        initial_state: _runtime_state_module.RuntimeCouplerState | None = None,
-        *,
-        validate_state: bool = True,
-    ) -> _runtime_state_module.RuntimeCouplerState:
-        """Run the unified scanned runtime path and return state."""
-
-        runtime_state = self._prepare_runtime_state(
-            initial_state,
-            validate_state=validate_state,
-        )
-        return _runtime_facade.run_scanned(
-            runtime_state,
-            run_sequence=self.run_sequence,
-            clock=self.clock,
-            logger=self.logger,
-            components=self.components,
-            exchanges=self.exchanges,
-            runtime_resources=self._runtime_resources,
-            settings=self.settings,
         )

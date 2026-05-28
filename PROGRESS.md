@@ -58,6 +58,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime-resource-holder validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-28.
+- Latest local obsolete compatibility API cleanup validation: Black, flake8,
+  mypy, focused compatibility pytest, full fast pytest, and full pytest passed
+  as of 2026-05-28.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -83,6 +86,30 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-28: Obsolete Compatibility API Cleanup
+
+- Removed compatibility-only runtime reexports from `vercor.runtime`; code,
+  examples, and tests now import runtime contracts, state containers, stores,
+  step metadata, and exchange dispatch from their focused owner modules.
+- Removed obsolete compatibility aliases and methods:
+  `vercor.setups.external.jax_gcm.JAXGCMRuntimePayload`,
+  the external setup lazy payload export, `ComponentSettings`,
+  `ComponentForcingData._read_forcing()`, CAMulator dictionary metadata
+  accessors, and private `Coupler` runtime resource/scanned-run shims.
+- Added test-only runtime helpers for focused scanned-runtime and
+  state-from-components coverage without restoring production compatibility
+  methods.
+- Updated boundary tests, runtime/coupler/cache/interrupt/forcing/CAMulator
+  tests, `DESIGN.md`, and `DEPENDENCIES.md` for the canonical API paths.
+- Validation run for this change:
+  focused obsolete-API/CAMulator/forcing pytest,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-28: Runtime Resource Holder Boundary Refactor
 

@@ -36,13 +36,15 @@ from vercor.exchange import Exchange
 from vercor.grid import RectilinearGrid
 from vercor.regridders import bilinear, conservative
 from vercor.run_sequence import RunSequence
-from vercor.runtime import RuntimeComponentState, RuntimeCouplerState, RuntimeFieldStore
+from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
+from vercor.runtime.stores import RuntimeFieldStore
 from vercor.settings import VercorSettings
 from vercor.time_selection import (
     datetime_to_seconds_in_year,
     get_field_time_slice,
     get_periodic_interval,
 )
+from tests._runtime_helpers import run_scanned_coupler
 
 
 class _IdentityRegridder:
@@ -346,7 +348,7 @@ def _make_coupler(steps: int) -> Coupler:
         ),
     ]
     key = ("OCN", "ATM", "_identity_factory")
-    coupler._regridders = cast(
+    coupler._runtime_resources.regridders = cast(
         Any,
         {
             key: _IdentityRegridder(),
@@ -355,8 +357,9 @@ def _make_coupler(steps: int) -> Coupler:
             ("OCN", "ICE", "_identity_factory"): _IdentityRegridder(),
         },
     )
-    coupler._fractional_masks = {
-        runtime_key: jnp.ones((2, 2)) for runtime_key in coupler._regridders
+    coupler._runtime_resources.fractional_masks = {
+        runtime_key: jnp.ones((2, 2))
+        for runtime_key in coupler._runtime_resources.regridders
     }
     return coupler
 
@@ -664,7 +667,7 @@ def test_run_supports_jit_grad_and_jvp() -> None:
     initial_sst = jnp.full((2, 2), 286.15, dtype=jnp.float64)
     initial_state = _make_initial_state(initial_sst)
 
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     ocean_sst = final_state.get_component_state("OCN").data.get(
@@ -676,7 +679,7 @@ def test_run_supports_jit_grad_and_jvp() -> None:
 
     def loss(sst: jax.Array) -> jax.Array:
         state = _make_initial_state(sst)
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(
             result.get_component_state("OCN").data.get("sea_surface_temperature")
         )
@@ -691,7 +694,7 @@ def test_run_supports_jit_grad_and_jvp() -> None:
 def test_run_matches_one_step_closed_form_for_slab_ocean() -> None:
     coupler = _make_coupler(steps=1)
     initial_sst = jnp.full((2, 2), 286.15, dtype=jnp.float64)
-    final_state = coupler._run_scanned_runtime(_make_initial_state(initial_sst))
+    final_state = run_scanned_coupler(coupler, _make_initial_state(initial_sst))
 
     ocean_sst = final_state.get_component_state("OCN").data.get(
         "sea_surface_temperature"
@@ -715,7 +718,7 @@ def test_initialized_slab_coupler_creates_jittable_runtime_state() -> None:
     assert runtime_state_copy.component_names == canonical_state.component_names
     initial_state = _with_ocean_sst(canonical_state, initial_sst)
 
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     ocean_sst = final_state.get_component_state("OCN").data.get(
@@ -729,7 +732,7 @@ def test_initialized_slab_coupler_creates_jittable_runtime_state() -> None:
 
     def loss(sea_surface_temperature: jax.Array) -> jax.Array:
         state = _with_ocean_sst(initial_state, sea_surface_temperature)
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(
             result.get_component_state("OCN").data.get("sea_surface_temperature")
         )
@@ -762,7 +765,7 @@ def test_scanned_runtime_state_uses_runtime_field_stores() -> None:
         for component_state in initial_state.components
     )
 
-    final_state = coupler._run_scanned_runtime(initial_state)
+    final_state = run_scanned_coupler(coupler, initial_state)
 
     assert all(
         isinstance(component_state.data, RuntimeFieldStore)
@@ -780,7 +783,7 @@ def test_mixed_grid_slab_coupler_runs_with_real_regridders_under_jit_grad_and_jv
     initial_sst = jnp.linspace(285.15, 287.15, 9, dtype=jnp.float64).reshape((3, 3))
     initial_state = _with_ocean_sst(initial_state, initial_sst)
 
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
 
@@ -803,7 +806,7 @@ def test_mixed_grid_slab_coupler_runs_with_real_regridders_under_jit_grad_and_jv
 
     def loss(sea_surface_temperature: jax.Array) -> jax.Array:
         state = _with_ocean_sst(initial_state, sea_surface_temperature)
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(
             result.get_component_state("OCN").data.get("sea_surface_temperature")
         )
@@ -873,19 +876,20 @@ def test_data_forcing_components_run_inside_runtime() -> None:
             regridder_factory=cast(Any, _identity_factory),
         ),
     ]
-    coupler._regridders = cast(
+    coupler._runtime_resources.regridders = cast(
         Any,
         {
             ("OCN", "ATM", "_identity_factory"): _IdentityRegridder(),
             ("LND", "ATM", "_identity_factory"): _IdentityRegridder(),
         },
     )
-    coupler._fractional_masks = {
-        key: jnp.ones(grid.shape, dtype=jnp.float64) for key in coupler._regridders
+    coupler._runtime_resources.fractional_masks = {
+        key: jnp.ones(grid.shape, dtype=jnp.float64)
+        for key in coupler._runtime_resources.regridders
     }
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere = final_state.get_component_state("ATM")
@@ -908,7 +912,7 @@ def test_data_forcing_components_run_inside_runtime() -> None:
             "OCN",
             ocean.with_data(ocean.data.set("sea_surface_temperature", ocean_forcing)),
         )
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(
             result.get_component_state("ATM").incoming.get("sea_surface_temperature")
         )
@@ -951,8 +955,10 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
         )
     ]
     key = ("OCN", "ATM", "_identity_factory")
-    coupler._regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._fractional_masks = {key: jnp.ones(grid.shape, dtype=jnp.float64)}
+    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
+    coupler._runtime_resources.fractional_masks = {
+        key: jnp.ones(grid.shape, dtype=jnp.float64)
+    }
 
     initial_state = coupler.create_runtime_state()
     ocean_state = initial_state.get_component_state("OCN")
@@ -963,7 +969,7 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
         np.asarray(first_month),
     )
 
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     received_sst = final_state.get_component_state("ATM").incoming.get(
@@ -1003,8 +1009,10 @@ def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridd
         )
     ]
     key = ("OCN", "ATM", "bilinear")
-    coupler._regridders = cast(Any, {key: bilinear(grid, grid)})
-    coupler._fractional_masks = {key: jnp.ones(grid.shape, dtype=jnp.float64)}
+    coupler._runtime_resources.regridders = cast(Any, {key: bilinear(grid, grid)})
+    coupler._runtime_resources.fractional_masks = {
+        key: jnp.ones(grid.shape, dtype=jnp.float64)
+    }
     atmosphere.data = {
         "temperature_2m": jnp.full(grid.shape, 288.15, dtype=jnp.float64),
         "sensible_heat_flux": jnp.zeros(grid.shape, dtype=jnp.float64),
@@ -1015,7 +1023,7 @@ def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridd
     }
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere_state = final_state.get_component_state("ATM")
@@ -1072,8 +1080,8 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
     ]
     key = ("OCN", "ATM", "bilinear")
     regridder = bilinear(ocean_grid, atmosphere_grid)
-    coupler._regridders = cast(Any, {key: regridder})
-    coupler._fractional_masks = {key: jnp.ones(atmosphere_grid.shape)}
+    coupler._runtime_resources.regridders = cast(Any, {key: regridder})
+    coupler._runtime_resources.fractional_masks = {key: jnp.ones(atmosphere_grid.shape)}
     atmosphere.data = {
         "temperature_2m": jnp.full(atmosphere_grid.shape, 288.15, dtype=jnp.float64),
         "sensible_heat_flux": jnp.zeros(atmosphere_grid.shape, dtype=jnp.float64),
@@ -1084,7 +1092,7 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
     }
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere_state = final_state.get_component_state("ATM")
@@ -1108,7 +1116,7 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
                 ocean_state.data.set("sea_surface_temperature", ocean_forcing)
             ),
         )
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(
             result.get_component_state("ATM").incoming.get("sea_surface_temperature")
         )
@@ -1155,11 +1163,13 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
         )
     ]
     key = ("LND", "ATM", "bilinear")
-    coupler._regridders = cast(Any, {key: bilinear(grid, grid)})
-    coupler._fractional_masks = {key: jnp.ones(grid.shape, dtype=jnp.float64)}
+    coupler._runtime_resources.regridders = cast(Any, {key: bilinear(grid, grid)})
+    coupler._runtime_resources.fractional_masks = {
+        key: jnp.ones(grid.shape, dtype=jnp.float64)
+    }
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere_state = final_state.get_component_state("ATM")
@@ -1178,7 +1188,7 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
                 land_state.data.set("land_surface_temperature", land_forcing)
             ),
         )
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(
             result.get_component_state("ATM").incoming.get("land_surface_temperature")
         )
@@ -1230,11 +1240,13 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
         )
     ]
     key = ("LND", "ATM", "_identity_factory")
-    coupler._regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._fractional_masks = {key: jnp.ones(grid.shape, dtype=jnp.float64)}
+    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
+    coupler._runtime_resources.fractional_masks = {
+        key: jnp.ones(grid.shape, dtype=jnp.float64)
+    }
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere_state = final_state.get_component_state("ATM")
@@ -1251,7 +1263,7 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
                 land_state.data.set("land_surface_temperature", land_forcing)
             ),
         )
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(
             result.get_component_state("ATM").incoming.get("land_surface_temperature")
         )
@@ -1304,8 +1316,10 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
         )
     ]
     key = ("LND", "ATM", "_identity_factory")
-    coupler._regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._fractional_masks = {key: jnp.ones(grid.shape, dtype=jnp.float64)}
+    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
+    coupler._runtime_resources.fractional_masks = {
+        key: jnp.ones(grid.shape, dtype=jnp.float64)
+    }
     _, runtime_time, _ = next(coupler.clock.iter())
     expected_slice = get_field_time_slice(
         "land_surface_temperature",
@@ -1314,7 +1328,7 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
     )
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere_state = final_state.get_component_state("ATM")
@@ -1332,7 +1346,7 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
                 land_state.data.set("land_surface_temperature", land_forcing)
             ),
         )
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(
             result.get_component_state("ATM").incoming.get("land_surface_temperature")
         )
@@ -1382,8 +1396,10 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
         )
     ]
     key = ("OCN", "ATM", "_identity_factory")
-    coupler._regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._fractional_masks = {key: jnp.ones(grid.shape, dtype=jnp.float64)}
+    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
+    coupler._runtime_resources.fractional_masks = {
+        key: jnp.ones(grid.shape, dtype=jnp.float64)
+    }
     (left_index, left_weight), (right_index, right_weight) = get_periodic_interval(
         current_time=datetime_to_seconds_in_year(coupler.clock.start),
         cycle_length=coupler.settings.year_in_seconds,
@@ -1392,7 +1408,7 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
     )
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere_state = final_state.get_component_state("ATM")
@@ -1415,7 +1431,7 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
                 ocean_state.data.set("sea_surface_temperature", ocean_forcing)
             ),
         )
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(
             result.get_component_state("ATM").incoming.get("sea_surface_temperature")
         )
@@ -1439,7 +1455,7 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
     coupler.run_sequence = RunSequence(order=["ATM"])
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere_state = final_state.get_component_state("ATM")
@@ -1467,7 +1483,7 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
                 )
             ),
         )
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(result.get_component_state("ATM").data.get("temperature"))
 
     gradient = jax.grad(loss)(jnp.full(grid.shape, 281.0, dtype=jnp.float64))
@@ -1492,7 +1508,7 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
     coupler.run_sequence = RunSequence(order=["ATM"])
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere_state = final_state.get_component_state("ATM")
@@ -1534,11 +1550,13 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
         )
     ]
     key = ("OCN", "ATM", "_identity_factory")
-    coupler._regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._fractional_masks = {key: jnp.ones(grid.shape, dtype=jnp.float64)}
+    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
+    coupler._runtime_resources.fractional_masks = {
+        key: jnp.ones(grid.shape, dtype=jnp.float64)
+    }
 
     initial_state = coupler.create_runtime_state()
-    final_state = jax.jit(lambda state: coupler._run_scanned_runtime(state))(
+    final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
     atmosphere_state = final_state.get_component_state("ATM")
@@ -1560,7 +1578,7 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
                 ocean_state.data.set("sea_surface_temperature", forcing)
             ),
         )
-        result = coupler._run_scanned_runtime(state)
+        result = run_scanned_coupler(coupler, state)
         return jnp.sum(result.get_component_state("ATM").data.get("temperature"))
 
     gradient = jax.grad(loss)(sea_surface_temperature)
@@ -1588,7 +1606,7 @@ def test_jax_gcm_runtime_requires_initialized_payload() -> None:
     coupler.run_sequence = RunSequence(order=["ATM"])
 
     with pytest.raises(ComponentError, match="component initialization"):
-        coupler._run_scanned_runtime()
+        run_scanned_coupler(coupler)
 
     component = _make_jax_gcm_component(grid)
     coupler.components = {"ATM": component}
@@ -1597,7 +1615,7 @@ def test_jax_gcm_runtime_requires_initialized_payload() -> None:
     state = state.set_component_state("ATM", atmosphere)
 
     with pytest.raises(ComponentError, match="runtime payload"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_run_validates_missing_run_sequence() -> None:
@@ -1606,7 +1624,7 @@ def test_run_validates_missing_run_sequence() -> None:
     )
 
     with pytest.raises(CouplerError, match="run sequence"):
-        coupler._run_scanned_runtime()
+        run_scanned_coupler(coupler)
 
 
 def test_run_accepts_default_runtime_component() -> None:
@@ -1617,7 +1635,7 @@ def test_run_accepts_default_runtime_component() -> None:
     coupler.components = {"ATM": cast(Any, DummyComponent("ATM", grid))}
     coupler.run_sequence = RunSequence(order=["ATM"])
 
-    final_state = coupler._run_scanned_runtime()
+    final_state = run_scanned_coupler(coupler)
 
     assert final_state.component_names == ("ATM",)
 
@@ -1644,7 +1662,7 @@ def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
     state = coupler.create_runtime_state()
 
     with pytest.raises(ComponentError, match="host-backed.*Coupler.run"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
@@ -1667,7 +1685,7 @@ def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
     state = coupler.create_runtime_state()
 
     with pytest.raises(ComponentError, match="host-backed.*Coupler.run"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_scanned_runtime_rejects_veros_runtime_boundary() -> None:
@@ -1692,16 +1710,16 @@ def test_scanned_runtime_rejects_veros_runtime_boundary() -> None:
     state = coupler.create_runtime_state()
 
     with pytest.raises(ComponentError, match="host-backed.*Coupler.run"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_run_validates_regridders_and_fractional_masks() -> None:
     coupler = _make_coupler(steps=1)
     state = _make_initial_state(jnp.full((2, 2), 286.15, dtype=jnp.float64))
-    coupler._regridders = {}
+    coupler._runtime_resources.regridders = {}
 
     with pytest.raises(CouplerError, match="initialized regridder"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
     coupler = _make_coupler(steps=1)
     state = RuntimeCouplerState(
@@ -1712,7 +1730,7 @@ def test_run_validates_regridders_and_fractional_masks() -> None:
     )
 
     with pytest.raises(CouplerError, match="fractional mask"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_run_validates_missing_source_fields_before_scan() -> None:
@@ -1722,7 +1740,7 @@ def test_run_validates_missing_source_fields_before_scan() -> None:
     state = state.set_component_state("OCN", ocean)
 
     with pytest.raises(CouplerError, match="source field"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_run_validates_missing_slab_required_data_before_scan() -> None:
@@ -1735,7 +1753,7 @@ def test_run_validates_missing_slab_required_data_before_scan() -> None:
     state = state.set_component_state("ATM", atmosphere)
 
     with pytest.raises(CouplerError, match="required data field 'temperature_2m'"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_run_validates_missing_import_data_before_scan() -> None:
@@ -1750,7 +1768,7 @@ def test_run_validates_missing_import_data_before_scan() -> None:
     with pytest.raises(
         CouplerError, match="required data field 'sea_surface_temperature'"
     ):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_run_validates_missing_export_data_before_scan() -> None:
@@ -1763,7 +1781,7 @@ def test_run_validates_missing_export_data_before_scan() -> None:
     with pytest.raises(
         CouplerError, match="required data field 'sea_surface_temperature'"
     ):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_run_validates_missing_jax_gcm_preseed_before_scan() -> None:
@@ -1780,7 +1798,7 @@ def test_run_validates_missing_jax_gcm_preseed_before_scan() -> None:
     state = state.set_component_state("ATM", atmosphere)
 
     with pytest.raises(CouplerError, match="required data field 'pressure'"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)
 
 
 def test_run_validates_fractional_mask_shape_before_scan() -> None:
@@ -1801,4 +1819,4 @@ def test_run_validates_fractional_mask_shape_before_scan() -> None:
     )
 
     with pytest.raises(CouplerError, match="fractional mask.*shape"):
-        coupler._run_scanned_runtime(state)
+        run_scanned_coupler(coupler, state)

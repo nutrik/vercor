@@ -31,7 +31,7 @@ from vercor.setups.data.jcm_land import (
     _jcm_coordinates_in_degrees,
     _prepare_jcm_land_runtime_fields,
 )
-from vercor.runtime import RuntimeFieldStore
+from vercor.runtime.stores import RuntimeFieldStore
 from vercor.runtime.views import RuntimeComponentView
 from vercor.settings import VercorSettings
 

@@ -202,6 +202,3 @@ class VercorSettings:
         """Return the canonical array dtype policy for these settings."""
 
         return DTypePolicy.from_settings(self)
-
-
-ComponentSettings = VercorSettings

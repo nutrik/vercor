@@ -11,7 +11,6 @@ from vercor.coupler import Coupler
 from vercor.dtypes import DTypePolicy, SupportsEnableX64
 from vercor.settings import (
     DEFAULT_SETTINGS,
-    ComponentSettings,
     Settings,
     VercorSettings,
 )
@@ -123,10 +122,6 @@ def test_settings_satisfy_precision_protocol_after_dynamic_refactor() -> None:
     settings = VercorSettings(enable_x64=True)
 
     assert _precision_protocol_value(settings) is True
-
-
-def test_component_settings_alias_points_to_single_settings_class() -> None:
-    assert ComponentSettings is VercorSettings
 
 
 def test_coupler_and_components_get_independent_settings_containers() -> None:

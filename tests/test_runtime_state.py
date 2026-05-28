@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from tests._coverage_support import make_test_grid
+from tests._runtime_helpers import runtime_state_from_coupler_components
 from tests.assertions import assert_allclose_compact
 from vercor.components.data import DataComponent
 from vercor.clock import Clock
@@ -18,17 +19,14 @@ from vercor.coupler import Coupler
 from vercor.exchange import Exchange
 from vercor.runtime.contexts import ComponentInitContext
 from vercor.settings import VercorSettings
-from vercor.setups.external.jax_gcm import JAXGCMRuntimePayload
-from vercor.runtime import (
-    RuntimeComponentContract,
-    RuntimeComponentState,
-    RuntimeCouplerState,
-    RuntimeFieldStore,
-    RuntimeStepInfo,
-)
+from vercor.setups.external.jax_gcm_runtime import JAXGCMRuntimePayload
+from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.component_state import create_runtime_component_state
 from vercor.runtime.field_transfer import send_runtime_fields
 from vercor.runtime.interrupts import RuntimeInterruptController
+from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
+from vercor.runtime.stores import RuntimeFieldStore
+from vercor.runtime.time import RuntimeStepInfo
 
 
 class _RuntimeSendComponent(DataComponent):
@@ -235,7 +233,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def runtime_state_from_components(" in runtime_coupler_state_source
     assert "def validate_runtime_state(" in runtime_coupler_state_source
     assert "def runtime_dispatch_context(" not in runtime_coupler_state_source
-    assert "from vercor.runtime import facade as _runtime_facade" in coupler_source
+    assert "import vercor.runtime.facade as _runtime_facade" in coupler_source
     assert "build_runtime_dispatch_context(" not in coupler_source
     assert "build_runtime_dispatch_context(" in runtime_facade_source
     assert "def output_masks_for_component(" in runtime_coupler_state_source
@@ -274,18 +272,16 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def _run_host_runtime" not in coupler_source
     assert "def _compiled_runtime_cache_key" not in coupler_source
     run_body = coupler_source.split("def run", 1)[1]
-    scanned_body = coupler_source.split("def _run_scanned_runtime", 1)[1]
     assert "host_component_names(self.components)" not in run_body
     assert "host_component_names(context.dispatch_context.components)" in (
         runtime_runner_source
     )
-    assert "def _prepare_runtime_state(" in coupler_source
-    assert "self._prepare_runtime_state(" in run_body
-    assert "self._prepare_runtime_state(" in scanned_body
+    assert "def _prepare_runtime_state(" not in coupler_source
+    assert "_runtime_facade.prepare_runtime_state(" in run_body
+    assert "def _run_scanned_runtime(" not in coupler_source
     assert "run_coupler_runtime(" not in run_body
-    assert "run_scanned_runtime(" not in scanned_body
     assert "_runtime_facade.run(" in run_body
-    assert "_runtime_facade.run_scanned(" in scanned_body
+    assert "_runtime_facade.run_scanned(" not in coupler_source
     assert "run_coupler_runtime(" in runtime_facade_source
     assert "run_scanned_runtime(" in runtime_facade_source
     assert "jax.lax.scan" not in coupler_source
@@ -319,7 +315,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "ComponentForcingData" not in base_source
     assert "h5netcdf" not in base_source
     assert "import numpy" not in base_source
-    assert "class ComponentForcingData" in forcing_data_source
+    assert "class ComponentForcingData" not in forcing_data_source
     assert "ComponentForcingData" not in components_source
     assert "def create_runtime_component_state" in runtime_component_state_source
     assert "def prefill_runtime_contract_fields" in runtime_component_state_source
@@ -486,8 +482,8 @@ def test_runtime_contracts_refresh_after_exchange_changes() -> None:
         )
     )
 
-    coupler._runtime_state_from_components(prefill_missing=True)
-    assert coupler._runtime_contracts["ATM"].exports == ("temperature",)
+    runtime_state_from_coupler_components(coupler, prefill_missing=True)
+    assert coupler._runtime_resources.contracts["ATM"].exports == ("temperature",)
 
     coupler.add_exchange(
         Exchange(
@@ -497,12 +493,15 @@ def test_runtime_contracts_refresh_after_exchange_changes() -> None:
             regridder_factory=cast(Any, lambda source, destination: object()),
         )
     )
-    coupler._runtime_state_from_components(prefill_missing=True)
+    runtime_state_from_coupler_components(coupler, prefill_missing=True)
 
-    assert coupler._runtime_contracts["ATM"].exports == ("temperature", "humidity")
+    assert coupler._runtime_resources.contracts["ATM"].exports == (
+        "temperature",
+        "humidity",
+    )
 
 
-def test_coupler_private_runtime_aliases_share_resource_holder() -> None:
+def test_coupler_runtime_resources_store_runtime_state() -> None:
     from vercor.runtime.resources import CouplerRuntimeResources
 
     coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
@@ -515,12 +514,12 @@ def test_coupler_private_runtime_aliases_share_resource_holder() -> None:
     compiled_cache: dict[Any, Any] = {}
     interrupts = RuntimeInterruptController()
 
-    coupler._regridders = regridders
-    coupler._binary_masks = binary_masks
-    coupler._fractional_masks = fractional_masks
-    coupler._runtime_contracts = contracts
-    coupler._compiled_runtime_cache = compiled_cache
-    coupler._runtime_interrupts = interrupts
+    coupler._runtime_resources.regridders = regridders
+    coupler._runtime_resources.binary_masks = binary_masks
+    coupler._runtime_resources.fractional_masks = fractional_masks
+    coupler._runtime_resources.contracts = contracts
+    coupler._runtime_resources.compiled_runtime_cache = compiled_cache
+    coupler._runtime_resources.interrupts = interrupts
 
     assert coupler._runtime_resources.regridders is regridders
     assert coupler._runtime_resources.binary_masks is binary_masks
@@ -528,34 +527,17 @@ def test_coupler_private_runtime_aliases_share_resource_holder() -> None:
     assert coupler._runtime_resources.contracts is contracts
     assert coupler._runtime_resources.compiled_runtime_cache is compiled_cache
     assert coupler._runtime_resources.interrupts is interrupts
-    assert coupler._regridders is coupler._runtime_resources.regridders
-    assert coupler._binary_masks is coupler._runtime_resources.binary_masks
-    assert coupler._fractional_masks is coupler._runtime_resources.fractional_masks
-    assert coupler._runtime_contracts is coupler._runtime_resources.contracts
-    assert coupler._compiled_runtime_cache is (
-        coupler._runtime_resources.compiled_runtime_cache
-    )
-    assert coupler._runtime_interrupts is coupler._runtime_resources.interrupts
 
 
-def test_runtime_focused_modules_keep_canonical_aggregator_exports() -> None:
+def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:
     runtime_module = importlib.import_module("vercor.runtime")
-    contracts_module = importlib.import_module("vercor.runtime.contracts")
-    stores_module = importlib.import_module("vercor.runtime.stores")
-    time_module = importlib.import_module("vercor.runtime.time")
-    exchange_dispatch_module = importlib.import_module(
-        "vercor.runtime.exchange_dispatch"
-    )
     component_state_module = importlib.import_module("vercor.runtime.component_state")
 
-    assert runtime_module.RuntimeComponentContract is (
-        contracts_module.RuntimeComponentContract
-    )
-    assert runtime_module.RuntimeFieldStore is stores_module.RuntimeFieldStore
-    assert runtime_module.RuntimeStepInfo is time_module.RuntimeStepInfo
-    assert runtime_module.dispatch_component_exchanges is (
-        exchange_dispatch_module.dispatch_component_exchanges
-    )
+    assert runtime_module.__all__ == []
+    assert not hasattr(runtime_module, "RuntimeComponentContract")
+    assert not hasattr(runtime_module, "RuntimeFieldStore")
+    assert not hasattr(runtime_module, "RuntimeStepInfo")
+    assert not hasattr(runtime_module, "dispatch_component_exchanges")
     assert not Path("vercor/runtime/components.py").exists()
     assert callable(component_state_module.create_runtime_component_state)
 

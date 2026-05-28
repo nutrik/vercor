@@ -27,9 +27,7 @@ from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
-    from vercor.runtime import (
-        RuntimeComponentState,
-    )
+    from vercor.runtime.state import RuntimeComponentState
 
 
 __all__ = [

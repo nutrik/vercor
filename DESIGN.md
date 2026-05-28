@@ -258,10 +258,11 @@ immutable runtime containers used during traced integration.
   controller lives in `vercor.runtime.interrupts`. Mutable per-coupler runtime
   resources live in `vercor.runtime.resources.CouplerRuntimeResources`, which
   owns exchange topology maps, refreshed runtime contracts, the compiled runtime
-  cache, and the interrupt controller. `Coupler` keeps private compatibility
-  aliases for these resources but stores them through the holder. Host/scanned
-  runtime loops, run-mode selection, donation checks, and interrupt translation
-  live in `vercor.runtime.runner`. High-level runtime orchestration for the
+  cache, and the interrupt controller. `Coupler` accesses those resources
+  through the holder directly; there are no private compatibility aliases for
+  individual runtime maps or caches. Host/scanned runtime loops, run-mode
+  selection, donation checks, and interrupt translation live in
+  `vercor.runtime.runner`. High-level runtime orchestration for the
   public `Coupler` facade lives in `vercor.runtime.facade`: runtime-state
   creation, validation, dispatch/run context construction, host/scanned
   execution, runtime views, and final output delegation enter through this
@@ -278,6 +279,9 @@ immutable runtime containers used during traced integration.
   the runtime facade and
   remains the public setup/finalization facade rather than the owner of runtime
   adapter mechanics.
+  The `vercor.runtime` package initializer does not reexport runtime containers
+  or helper functions; internal code should import from the focused owner
+  modules listed above.
   payload pytrees carried through `jax.lax.scan` must preserve every leaf's
   shape and dtype between input and output; per-step slices or adapted forcing
   objects should be local values unless they are shape-stable runtime state.
@@ -345,10 +349,11 @@ split across
 these focused modules; the old one-hop CAMulator state and wind-filter facades
 have been removed. CAMulator tensor channel metadata is stored internally as
 typed `TensorVariableIndex` values in `camulator_tensors`, while
-`StateVariableAccessor.get_var_info(...)` keeps the legacy dictionary shape for
-callers that inspect metadata. CAMulator wind-filter configuration validates
-with explicit exceptions and avoids mutable function defaults so tests and
-callers see stable failure modes independent of Python optimization settings.
+`StateVariableAccessor.get_var_index(...)` is the canonical metadata lookup for
+callers that inspect tensor channels. CAMulator wind-filter configuration
+validates with explicit exceptions and avoids mutable function defaults so tests
+and callers see stable failure modes independent of Python optimization
+settings.
 
 ### Settings container
 
@@ -368,8 +373,8 @@ settings must be introduced explicitly with `add_setting()` or passed as keyword
 arguments to `VercorSettings(...)`; existing settings should be updated with
 `set_value()` where production code is making an intentional configuration
 change. `dir(settings)` includes default and custom setting names for
-introspection. `ComponentSettings` is a compatibility alias for
-`VercorSettings`, not a separate settings class.
+introspection. The obsolete `ComponentSettings` alias has been removed; use
+`VercorSettings` directly.
 
 ### Precision and dtype policy
 

@@ -21,6 +21,10 @@ from tests._coverage_support import (
     capture_logger_output,
     make_test_grid,
 )
+from tests._runtime_helpers import (
+    run_scanned_coupler,
+    runtime_state_from_coupler_components,
+)
 from tests.assertions import assert_allclose_compact
 from vercor.clock import Clock
 from vercor.components.base import Component
@@ -40,7 +44,8 @@ from vercor.jax_logging import (
 from vercor.regridders.bilinear import bilinear
 from vercor.regridders.conservative import conservative
 from vercor.run_sequence import RunSequence
-from vercor.runtime import RuntimeComponentContract, dispatch_component_exchanges
+from vercor.runtime.contracts import RuntimeComponentContract
+from vercor.runtime.exchange_dispatch import dispatch_component_exchanges
 from vercor.runtime.coupler_state import output_masks_for_component
 from vercor.runtime.topology import (
     ExchangeTopologyState,
@@ -163,7 +168,7 @@ def _dispatch_runtime_fields(
         runtime_state,
         component_name,
         coupler.exchanges,
-        coupler._regridders,
+        coupler._runtime_resources.regridders,
     )
 
 
@@ -326,7 +331,7 @@ def test_coupler_wraps_injected_python_logger_for_scanned_runtime() -> None:
     coupler.run_sequence = RunSequence(order=["ATM"])
 
     with capture_logger_output(logger_name, set_logger_level=False) as stream:
-        final_state = jax.jit(lambda: coupler._run_scanned_runtime())()
+        final_state = jax.jit(lambda: run_scanned_coupler(coupler))()
         jax.effects_barrier()
 
     assert final_state.component_names == ("ATM",)
@@ -366,7 +371,7 @@ def test_scanned_runtime_passes_callback_logger_to_components() -> None:
     coupler.run_sequence = RunSequence(order=["ATM"])
 
     with capture_logger_output(logger_name) as stream:
-        final_state = jax.jit(lambda: coupler._run_scanned_runtime())()
+        final_state = jax.jit(lambda: run_scanned_coupler(coupler))()
         jax.effects_barrier()
 
     assert final_state.component_names == ("ATM",)
@@ -387,7 +392,7 @@ def test_scanned_runtime_logs_host_equivalent_progress_messages() -> None:
     coupler.run_sequence = RunSequence(order=["ATM", "OCN"])
 
     with capture_logger_output(logger_name) as stream:
-        final_state = jax.jit(lambda: coupler._run_scanned_runtime())()
+        final_state = jax.jit(lambda: run_scanned_coupler(coupler))()
         jax.effects_barrier()
 
     assert final_state.component_names == ("ATM", "OCN")
@@ -415,7 +420,7 @@ def test_scanned_runtime_suppresses_info_below_log_level() -> None:
     coupler.run_sequence = RunSequence(order=["ATM"])
 
     with capture_logger_output(logger_name, set_logger_level=False) as stream:
-        final_state = jax.jit(lambda: coupler._run_scanned_runtime())()
+        final_state = jax.jit(lambda: run_scanned_coupler(coupler))()
         jax.effects_barrier()
 
     assert final_state.component_names == ("ATM",)
@@ -597,13 +602,17 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
     assert coupler.settings.enable_x64 is True
     assert jax_calls == [("jax_enable_x64", True)]
     assert len(created_keys) == 6
-    assert len(coupler._regridders) == 6
+    assert len(coupler._runtime_resources.regridders) == 6
     assert any("already exists" in message for message in logger.warning_messages)
-    assert isinstance(coupler._binary_masks[("ATM", "OCN", "conservative")], jax.Array)
     assert isinstance(
-        coupler._fractional_masks[("ATM", "OCN", "conservative")], jax.Array
+        coupler._runtime_resources.binary_masks[("ATM", "OCN", "conservative")],
+        jax.Array,
     )
-    assert coupler._runtime_contracts["ATM"] == RuntimeComponentContract(
+    assert isinstance(
+        coupler._runtime_resources.fractional_masks[("ATM", "OCN", "conservative")],
+        jax.Array,
+    )
+    assert coupler._runtime_resources.contracts["ATM"] == RuntimeComponentContract(
         imports=(
             "temperature",
             "specific_humidity",
@@ -617,11 +626,11 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
         ),
     )
     assert_allclose_compact(
-        coupler._fractional_masks[("OCN", "ATM", "bilinear")],
+        coupler._runtime_resources.fractional_masks[("OCN", "ATM", "bilinear")],
         np.full((2, 2), 0.4),
     )
     assert_allclose_compact(
-        coupler._binary_masks[("LND", "ATM", "bilinear")],
+        coupler._runtime_resources.binary_masks[("LND", "ATM", "bilinear")],
         lnd_mask,
     )
 
@@ -757,12 +766,12 @@ def test_patch_exchange_masks_updates_only_expected_bilinear_pairs() -> None:
     lnd_key = ("LND", "ATM", "bilinear")
     other_key = ("OCN", "ATM", "conservative")
 
-    coupler._binary_masks = {
+    coupler._runtime_resources.binary_masks = {
         ocn_key: np.zeros((2, 2)),
         lnd_key: np.zeros((2, 2)),
         other_key: np.full((2, 2), 9.0),
     }
-    coupler._fractional_masks = {
+    coupler._runtime_resources.fractional_masks = {
         ocn_key: np.zeros((2, 2)),
         lnd_key: np.zeros((2, 2)),
         other_key: np.full((2, 2), 7.0),
@@ -772,20 +781,29 @@ def test_patch_exchange_masks_updates_only_expected_bilinear_pairs() -> None:
     coupler.lnd_fmask_on_atm_grid = np.full((2, 2), 0.75)
 
     patch_exchange_masks(
-        binary_masks=coupler._binary_masks,
-        fractional_masks=coupler._fractional_masks,
+        binary_masks=coupler._runtime_resources.binary_masks,
+        fractional_masks=coupler._runtime_resources.fractional_masks,
         ocn_fmask_on_atm_grid=coupler.ocn_fmask_on_atm_grid,
         lnd_bmask_on_atm_grid=coupler.lnd_bmask_on_atm_grid,
         lnd_fmask_on_atm_grid=coupler.lnd_fmask_on_atm_grid,
     )
 
-    assert_allclose_compact(coupler._fractional_masks[ocn_key], np.full((2, 2), 0.25))
     assert_allclose_compact(
-        coupler._binary_masks[lnd_key], np.asarray([[1.0, 0.0], [0.0, 1.0]])
+        coupler._runtime_resources.fractional_masks[ocn_key], np.full((2, 2), 0.25)
     )
-    assert_allclose_compact(coupler._fractional_masks[lnd_key], np.full((2, 2), 0.75))
-    assert_allclose_compact(coupler._binary_masks[other_key], np.full((2, 2), 9.0))
-    assert_allclose_compact(coupler._fractional_masks[other_key], np.full((2, 2), 7.0))
+    assert_allclose_compact(
+        coupler._runtime_resources.binary_masks[lnd_key],
+        np.asarray([[1.0, 0.0], [0.0, 1.0]]),
+    )
+    assert_allclose_compact(
+        coupler._runtime_resources.fractional_masks[lnd_key], np.full((2, 2), 0.75)
+    )
+    assert_allclose_compact(
+        coupler._runtime_resources.binary_masks[other_key], np.full((2, 2), 9.0)
+    )
+    assert_allclose_compact(
+        coupler._runtime_resources.fractional_masks[other_key], np.full((2, 2), 7.0)
+    )
 
 
 def test_validate_land_mask_consistency_rejects_shape_and_value_mismatches() -> None:
@@ -882,11 +900,11 @@ def test_output_masks_for_component_returns_destination_exchange_masks() -> None
         regridder_factory=bilinear,
     )
     coupler.exchanges = [ocn_exchange, lnd_exchange]
-    coupler._binary_masks = {
+    coupler._runtime_resources.binary_masks = {
         ("OCN", "ATM", "bilinear"): np.zeros((2, 2)),
         ("LND", "ATM", "bilinear"): np.ones((2, 2)),
     }
-    coupler._fractional_masks = {
+    coupler._runtime_resources.fractional_masks = {
         ("OCN", "ATM", "bilinear"): np.full((2, 2), 0.25),
         ("LND", "ATM", "bilinear"): np.full((2, 2), 0.75),
     }
@@ -896,8 +914,8 @@ def test_output_masks_for_component_returns_destination_exchange_masks() -> None
     masks = output_masks_for_component(
         "ATM",
         coupler.exchanges,
-        coupler._binary_masks,
-        coupler._fractional_masks,
+        coupler._runtime_resources.binary_masks,
+        coupler._runtime_resources.fractional_masks,
     )
 
     assert set(masks) == {
@@ -931,7 +949,7 @@ def test_runtime_field_dispatch_handles_scalar_and_vector_paths() -> None:
     )
     coupler.components = cast(Any, {"OCN": source, "ATM": destination})
     coupler.exchanges = [scalar_exchange, vector_exchange]
-    coupler._regridders = cast(
+    coupler._runtime_resources.regridders = cast(
         Any,
         {
             ("OCN", "ATM", "bilinear"): RecordingRegridder(
@@ -945,14 +963,14 @@ def test_runtime_field_dispatch_handles_scalar_and_vector_paths() -> None:
             ),
         },
     )
-    coupler._fractional_masks = {
+    coupler._runtime_resources.fractional_masks = {
         ("OCN", "ATM", "bilinear"): np.asarray([[1.0, 0.5], [0.0, 1.0]]),
         ("OCN", "ATM", "conservative"): np.ones((2, 2)),
     }
 
     runtime_state = _dispatch_runtime_fields(
         coupler,
-        coupler._runtime_state_from_components(prefill_missing=True),
+        runtime_state_from_coupler_components(coupler, prefill_missing=True),
         "ATM",
     )
     destination_state = runtime_state.get_component_state("ATM")
@@ -986,7 +1004,7 @@ def test_runtime_field_dispatch_accepts_mixed_numpy_and_jax_arrays() -> None:
     )
     coupler.components = cast(Any, {"OCN": source, "ATM": destination})
     coupler.exchanges = [exchange]
-    coupler._regridders = cast(
+    coupler._runtime_resources.regridders = cast(
         Any,
         {
             ("OCN", "ATM", "bilinear"): RecordingRegridder(
@@ -994,13 +1012,13 @@ def test_runtime_field_dispatch_accepts_mixed_numpy_and_jax_arrays() -> None:
             )
         },
     )
-    coupler._fractional_masks = {
+    coupler._runtime_resources.fractional_masks = {
         ("OCN", "ATM", "bilinear"): np.asarray([[1.0, 0.5], [0.0, 1.0]]),
     }
 
     runtime_state = _dispatch_runtime_fields(
         coupler,
-        coupler._runtime_state_from_components(prefill_missing=True),
+        runtime_state_from_coupler_components(coupler, prefill_missing=True),
         "ATM",
     )
     destination_state = runtime_state.get_component_state("ATM")
@@ -1025,16 +1043,18 @@ def test_runtime_field_dispatch_rejects_missing_scalar_and_vector_fields() -> No
     )
     coupler.components = cast(Any, {"OCN": scalar_source, "ATM": scalar_destination})
     coupler.exchanges = [scalar_exchange]
-    coupler._regridders = cast(
+    coupler._runtime_resources.regridders = cast(
         Any,
         {("OCN", "ATM", "bilinear"): RecordingRegridder(scalar_result=np.ones((2, 2)))},
     )
-    coupler._fractional_masks = {("OCN", "ATM", "bilinear"): np.ones((2, 2))}
+    coupler._runtime_resources.fractional_masks = {
+        ("OCN", "ATM", "bilinear"): np.ones((2, 2))
+    }
 
     with pytest.raises(ExchangerError, match="Field temperature not present"):
         _dispatch_runtime_fields(
             coupler,
-            coupler._runtime_state_from_components(prefill_missing=False),
+            runtime_state_from_coupler_components(coupler, prefill_missing=False),
             scalar_destination.name,
         )
 
@@ -1049,7 +1069,7 @@ def test_runtime_field_dispatch_rejects_missing_scalar_and_vector_fields() -> No
     )
     coupler.components = cast(Any, {"OCN": vector_source, "ATM": vector_destination})
     coupler.exchanges = [vector_exchange]
-    coupler._regridders = cast(
+    coupler._runtime_resources.regridders = cast(
         Any,
         {
             ("OCN", "ATM", "conservative"): RecordingRegridder(
@@ -1057,12 +1077,14 @@ def test_runtime_field_dispatch_rejects_missing_scalar_and_vector_fields() -> No
             )
         },
     )
-    coupler._fractional_masks = {("OCN", "ATM", "conservative"): np.ones((2, 2))}
+    coupler._runtime_resources.fractional_masks = {
+        ("OCN", "ATM", "conservative"): np.ones((2, 2))
+    }
 
     with pytest.raises(ExchangerError, match="Not all fields in vector"):
         _dispatch_runtime_fields(
             coupler,
-            coupler._runtime_state_from_components(prefill_missing=False),
+            runtime_state_from_coupler_components(coupler, prefill_missing=False),
             vector_destination.name,
         )
 
@@ -1076,7 +1098,7 @@ def test_coupler_finalize_writes_runtime_outputs_for_all_components(
         "OCN": DummyComponent(name="OCN", grid=make_test_grid(name="ocn")),
     }
     coupler.components = cast(Any, components)
-    state = coupler._runtime_state_from_components(prefill_missing=True)
+    state = runtime_state_from_coupler_components(coupler, prefill_missing=True)
     captured: dict[str, Any] = {}
 
     def fake_write_outputs(**kwargs: Any) -> None:
@@ -1091,8 +1113,8 @@ def test_coupler_finalize_writes_runtime_outputs_for_all_components(
     assert captured["final_state"] is state
     assert captured["components"] is coupler.components
     assert captured["exchanges"] is coupler.exchanges
-    assert captured["binary_masks"] is coupler._binary_masks
-    assert captured["fractional_masks"] is coupler._fractional_masks
+    assert captured["binary_masks"] is coupler._runtime_resources.binary_masks
+    assert captured["fractional_masks"] is coupler._runtime_resources.fractional_masks
     assert captured["output_file_mask"] == Path("snapshot")
     assert captured["logger"] is coupler.logger
 
@@ -1106,7 +1128,7 @@ def test_output_boundary_builds_runtime_views_filenames_and_masks(
         "OCN": DummyComponent(name="OCN", grid=make_test_grid(name="ocn")),
     }
     coupler.components = cast(Any, components)
-    state = coupler._runtime_state_from_components(prefill_missing=True)
+    state = runtime_state_from_coupler_components(coupler, prefill_missing=True)
     captured: list[tuple[str, Any, Path, dict[str, Any]]] = []
 
     def fake_write(
@@ -1125,8 +1147,8 @@ def test_output_boundary_builds_runtime_views_filenames_and_masks(
         final_state=state,
         components=coupler.components,
         exchanges=coupler.exchanges,
-        binary_masks=coupler._binary_masks,
-        fractional_masks=coupler._fractional_masks,
+        binary_masks=coupler._runtime_resources.binary_masks,
+        fractional_masks=coupler._runtime_resources.fractional_masks,
         output_file_mask=Path("snapshot"),
         logger=coupler.logger,
     )
@@ -1282,7 +1304,7 @@ def test_host_and_scanned_run_use_runtime_component_helper(
     ocean = _RunComponent("OCN", [], timestamp)
     coupler.components = cast(Any, {"ATM": atmosphere, "OCN": ocean})
     coupler.run_sequence = RunSequence(order=["ATM", "OCN"])
-    coupler._run_scanned_runtime()
+    run_scanned_coupler(coupler)
 
     assert run_events == ["run:ATM"]
     assert events == ["scan:ATM", "scan:OCN"]

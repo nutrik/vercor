@@ -13,12 +13,12 @@ from tests.assertions import assert_allclose_compact
 import vercor.diagnostics as diagnostics_module
 from vercor.exceptions import CouplerError
 from vercor.grid import RectilinearGrid
-from vercor.runtime import (
-    RuntimeComponentState,
-    RuntimeFieldStore,
+from vercor.runtime.contracts import (
     append_unique_runtime_fields,
     flatten_exchange_fields,
 )
+from vercor.runtime.state import RuntimeComponentState
+from vercor.runtime.stores import RuntimeFieldStore
 from vercor.runtime.views import RuntimeComponentView
 from vercor.diagnostics import (
     plot_component_scalar_vector_comparison,

@@ -64,22 +64,6 @@ class TensorVariableIndex:
             f"Reason: {self.reason or 'Unknown'}"
         )
 
-    def to_mapping(self) -> dict[str, Any]:
-        """Return the legacy dictionary representation used by callers."""
-
-        if not self.available:
-            return {
-                "available": False,
-                "reason": self.reason or "Unknown",
-            }
-        return {
-            "start_idx": self.start_idx,
-            "end_idx": self.end_idx,
-            "n_channels": self.n_channels,
-            "is_3d": self.is_3d,
-            "available": True,
-        }
-
 
 def _torch_tensor_from_jax_array(
     array: RuntimeArray,
@@ -297,11 +281,6 @@ class StateVariableAccessor:
             )
         return indices[var_name]
 
-    def get_var_info(self, var_name: str) -> dict[str, Any]:
-        """Return legacy dictionary metadata for a configured variable."""
-
-        return self.get_var_index(var_name).to_mapping()
-
     def get_state_var(
         self,
         state_tensor: torch.Tensor,
@@ -361,15 +340,6 @@ class StateVariableAccessor:
             state_tensor[:, index.channel_slice, time_idx, :, :] = (  # noqa: E203
                 var_data
             )
-
-    def list_available_vars(self) -> dict[str, dict[str, Any]]:
-        """Return variables available in this accessor's tensor type."""
-
-        return {
-            var: info.to_mapping()
-            for var, info in self.var_indices[self.tensor_type].items()
-            if info.available
-        }
 
 
 __all__ = [

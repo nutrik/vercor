@@ -22,7 +22,7 @@ from vercor.runtime.contexts import RuntimeStepContext
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
-    from vercor.runtime import RuntimeComponentState
+    from vercor.runtime.state import RuntimeComponentState
 
 
 def normalize_component_step_callable(
