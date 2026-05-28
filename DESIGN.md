@@ -248,13 +248,18 @@ immutable runtime containers used during traced integration.
   runtime-contract refresh, and final-output mask lookup live in
   `vercor.runtime.coupler_state`; exchange topology mask/regridder setup lives
   in `vercor.runtime.topology`, which returns an explicit
-  `ExchangeTopologyState` for the public facade to store. Setup-time component
+  `ExchangeTopologyState` for the runtime facade to store. Setup-time component
   precision synchronization, initialization context construction, component
   setup validation, runtime contract validation, and topology handoff live in
   `vercor.runtime.initialization`. Bundled `RuntimeRunContext` execution inputs
   live in `vercor.runtime.run_context`, compiled-runtime cache keys and JIT
-  wrapping live in `vercor.runtime.cache`, and shared host/scanned progress
-  messages plus traced callbacks live in `vercor.runtime.progress`. Host/scanned
+  wrapping live in `vercor.runtime.cache`, shared host/scanned progress messages
+  plus traced callbacks live in `vercor.runtime.progress`, and the interrupt
+  controller lives in `vercor.runtime.interrupts`. Mutable per-coupler runtime
+  resources live in `vercor.runtime.resources.CouplerRuntimeResources`, which
+  owns exchange topology maps, refreshed runtime contracts, the compiled runtime
+  cache, and the interrupt controller. `Coupler` keeps private compatibility
+  aliases for these resources but stores them through the holder. Host/scanned
   runtime loops, run-mode selection, donation checks, and interrupt translation
   live in `vercor.runtime.runner`. High-level runtime orchestration for the
   public `Coupler` facade lives in `vercor.runtime.facade`: runtime-state

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, MutableMapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import vercor.output as _output
 from vercor.clock import Clock
@@ -26,7 +26,7 @@ from vercor.runtime.initialization import (
     initialize_coupler_runtime as _initialize_coupler_runtime,
     validate_registered_component_setup as _validate_registered_component_setup,
 )
-from vercor.runtime.interrupts import RuntimeInterruptController
+from vercor.runtime.resources import CouplerRuntimeResources
 from vercor.runtime.run_context import RuntimeRunContext
 from vercor.runtime.runner import (
     run_coupler_runtime,
@@ -34,19 +34,11 @@ from vercor.runtime.runner import (
 )
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.time import initial_runtime_step_info
-from vercor.runtime.topology import RuntimeRegridder
 from vercor.runtime.views import RuntimeComponentView
 from vercor.settings import VercorSettings
-from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components.base import Component
-
-
-CompiledRuntimeCache = MutableMapping[
-    tuple[Any, ...],
-    Callable[[RuntimeCouplerState], RuntimeCouplerState],
-]
 
 
 @dataclass(frozen=True)
@@ -68,41 +60,43 @@ def initialize_coupler_runtime(
     clock: Clock,
     components: dict[str, "Component"],
     exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder],
-    binary_masks: Mapping[tuple[str, str, str], RuntimeArray],
-    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray],
     run_sequence: RunSequence,
     settings: VercorSettings,
     logger: LoggerLike,
+    runtime_resources: CouplerRuntimeResources,
     enable_x64_computations: bool | None = None,
 ) -> RuntimeInitializationState:
     """Initialize components, runtime contracts, and exchange topology."""
 
-    return _initialize_coupler_runtime(
+    initialized = _initialize_coupler_runtime(
         clock=clock,
         components=components,
         exchanges=exchanges,
-        regridders=regridders,
-        binary_masks=binary_masks,
-        fractional_masks=fractional_masks,
+        regridders=runtime_resources.regridders,
+        binary_masks=runtime_resources.binary_masks,
+        fractional_masks=runtime_resources.fractional_masks,
         run_sequence=run_sequence,
         settings=settings,
         logger=logger,
         enable_x64_computations=enable_x64_computations,
     )
+    runtime_resources.contracts = initialized.runtime_contracts
+    runtime_resources.regridders = initialized.topology.regridders
+    runtime_resources.binary_masks = initialized.topology.binary_masks
+    runtime_resources.fractional_masks = initialized.topology.fractional_masks
+    return initialized
 
 
 def runtime_state_from_components(
     *,
     components: Mapping[str, "Component"],
     exchanges: Sequence[Exchange],
-    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray],
-    binary_masks: Mapping[tuple[str, str, str], RuntimeArray],
+    runtime_resources: CouplerRuntimeResources,
     prefill_missing: bool,
 ) -> PreparedRuntimeState:
     """Build immutable runtime state from setup components and exchanges."""
 
-    runtime_contracts = refresh_runtime_contracts(
+    runtime_resources.contracts = refresh_runtime_contracts(
         components,
         exchanges,
         validate_endpoints=False,
@@ -110,12 +104,12 @@ def runtime_state_from_components(
     runtime_state = _runtime_state_from_components(
         components,
         exchanges,
-        fractional_masks,
-        binary_masks,
-        contracts=runtime_contracts,
+        runtime_resources.fractional_masks,
+        runtime_resources.binary_masks,
+        contracts=runtime_resources.contracts,
         prefill_missing=prefill_missing,
     )
-    return PreparedRuntimeState(runtime_state, runtime_contracts)
+    return PreparedRuntimeState(runtime_state, runtime_resources.contracts)
 
 
 def validate_runtime_state(
@@ -123,12 +117,12 @@ def validate_runtime_state(
     *,
     components: Mapping[str, "Component"],
     exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder],
+    runtime_resources: CouplerRuntimeResources,
     run_sequence: RunSequence,
 ) -> dict[str, RuntimeComponentContract]:
     """Validate runtime state and return the contracts used for validation."""
 
-    runtime_contracts = refresh_runtime_contracts(
+    runtime_resources.contracts = refresh_runtime_contracts(
         components,
         exchanges,
         validate_endpoints=False,
@@ -137,19 +131,18 @@ def validate_runtime_state(
         runtime_state,
         components=components,
         exchanges=exchanges,
-        regridders=regridders,
-        contracts=runtime_contracts,
+        regridders=runtime_resources.regridders,
+        contracts=runtime_resources.contracts,
         run_sequence=tuple(run_sequence),
     )
-    return runtime_contracts
+    return runtime_resources.contracts
 
 
 def runtime_dispatch_context(
     *,
     components: Mapping[str, "Component"],
     exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder],
-    runtime_contracts: Mapping[str, RuntimeComponentContract],
+    runtime_resources: CouplerRuntimeResources,
     clock: Clock,
     settings: VercorSettings,
 ) -> RuntimeDispatchContext:
@@ -158,8 +151,8 @@ def runtime_dispatch_context(
     return build_runtime_dispatch_context(
         components,
         exchanges,
-        regridders,
-        runtime_contracts,
+        runtime_resources.regridders,
+        runtime_resources.contracts,
         dt_seconds=clock.dt_seconds,
         settings=settings,
     )
@@ -169,9 +162,7 @@ def create_runtime_state(
     *,
     components: Mapping[str, "Component"],
     exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder],
-    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray],
-    binary_masks: Mapping[tuple[str, str, str], RuntimeArray],
+    runtime_resources: CouplerRuntimeResources,
     run_sequence: RunSequence,
     clock: Clock,
     settings: VercorSettings,
@@ -182,8 +173,7 @@ def create_runtime_state(
     prepared = runtime_state_from_components(
         components=components,
         exchanges=exchanges,
-        fractional_masks=fractional_masks,
-        binary_masks=binary_masks,
+        runtime_resources=runtime_resources,
         prefill_missing=prefill_missing,
     )
     runtime_state = prepared.runtime_state
@@ -194,8 +184,7 @@ def create_runtime_state(
             dispatch_context=runtime_dispatch_context(
                 components=components,
                 exchanges=exchanges,
-                regridders=regridders,
-                runtime_contracts=prepared.runtime_contracts,
+                runtime_resources=runtime_resources,
                 clock=clock,
                 settings=settings,
             ),
@@ -205,7 +194,7 @@ def create_runtime_state(
         runtime_state,
         components=components,
         exchanges=exchanges,
-        regridders=regridders,
+        runtime_resources=runtime_resources,
         run_sequence=run_sequence,
     )
     return PreparedRuntimeState(runtime_state, runtime_contracts)
@@ -216,10 +205,7 @@ def prepare_runtime_state(
     *,
     components: Mapping[str, "Component"],
     exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder],
-    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray],
-    binary_masks: Mapping[tuple[str, str, str], RuntimeArray],
-    runtime_contracts: Mapping[str, RuntimeComponentContract],
+    runtime_resources: CouplerRuntimeResources,
     run_sequence: RunSequence,
     clock: Clock,
     settings: VercorSettings,
@@ -231,9 +217,7 @@ def prepare_runtime_state(
         return create_runtime_state(
             components=components,
             exchanges=exchanges,
-            regridders=regridders,
-            fractional_masks=fractional_masks,
-            binary_masks=binary_masks,
+            runtime_resources=runtime_resources,
             run_sequence=run_sequence,
             clock=clock,
             settings=settings,
@@ -244,11 +228,11 @@ def prepare_runtime_state(
             initial_state,
             components=components,
             exchanges=exchanges,
-            regridders=regridders,
+            runtime_resources=runtime_resources,
             run_sequence=run_sequence,
         )
         return PreparedRuntimeState(initial_state, refreshed_contracts)
-    return PreparedRuntimeState(initial_state, dict(runtime_contracts))
+    return PreparedRuntimeState(initial_state, dict(runtime_resources.contracts))
 
 
 def runtime_run_context(
@@ -259,11 +243,8 @@ def runtime_run_context(
     log_level: int | str,
     components: Mapping[str, "Component"],
     exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder],
-    runtime_contracts: Mapping[str, RuntimeComponentContract],
+    runtime_resources: CouplerRuntimeResources,
     settings: VercorSettings,
-    compiled_runtime_cache: CompiledRuntimeCache,
-    interrupts: RuntimeInterruptController,
 ) -> RuntimeRunContext:
     """Return static runtime inputs bundled for execution."""
 
@@ -275,13 +256,12 @@ def runtime_run_context(
         dispatch_context=runtime_dispatch_context(
             components=components,
             exchanges=exchanges,
-            regridders=regridders,
-            runtime_contracts=runtime_contracts,
+            runtime_resources=runtime_resources,
             clock=clock,
             settings=settings,
         ),
-        compiled_runtime_cache=compiled_runtime_cache,
-        interrupts=interrupts,
+        compiled_runtime_cache=runtime_resources.compiled_runtime_cache,
+        interrupts=runtime_resources.interrupts,
     )
 
 
@@ -294,11 +274,8 @@ def run(
     log_level: int | str,
     components: Mapping[str, "Component"],
     exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder],
-    runtime_contracts: Mapping[str, RuntimeComponentContract],
+    runtime_resources: CouplerRuntimeResources,
     settings: VercorSettings,
-    compiled_runtime_cache: CompiledRuntimeCache,
-    interrupts: RuntimeInterruptController,
     donate_state: bool,
 ) -> RuntimeCouplerState:
     """Run a validated runtime state through the selected runtime path."""
@@ -312,11 +289,8 @@ def run(
             log_level=log_level,
             components=components,
             exchanges=exchanges,
-            regridders=regridders,
-            runtime_contracts=runtime_contracts,
+            runtime_resources=runtime_resources,
             settings=settings,
-            compiled_runtime_cache=compiled_runtime_cache,
-            interrupts=interrupts,
         ),
         donate_state=donate_state,
     )
@@ -330,10 +304,8 @@ def run_scanned(
     logger: LoggerLike,
     components: Mapping[str, "Component"],
     exchanges: Sequence[Exchange],
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder],
-    runtime_contracts: Mapping[str, RuntimeComponentContract],
+    runtime_resources: CouplerRuntimeResources,
     settings: VercorSettings,
-    interrupts: RuntimeInterruptController,
 ) -> RuntimeCouplerState:
     """Run the unified scanned runtime path and return final state."""
 
@@ -346,12 +318,11 @@ def run_scanned(
         dispatch_context=runtime_dispatch_context(
             components=components,
             exchanges=exchanges,
-            regridders=regridders,
-            runtime_contracts=runtime_contracts,
+            runtime_resources=runtime_resources,
             clock=clock,
             settings=settings,
         ),
-        interrupts=interrupts,
+        interrupts=runtime_resources.interrupts,
     )
 
 
@@ -394,8 +365,7 @@ def finalize(
     final_state: RuntimeCouplerState,
     components: Mapping[str, "Component"],
     exchanges: Sequence[Exchange],
-    binary_masks: Mapping[tuple[str, str, str], RuntimeArray],
-    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray],
+    runtime_resources: CouplerRuntimeResources,
     output_file_mask: Path | None,
     logger: LoggerLike,
 ) -> None:
@@ -407,8 +377,8 @@ def finalize(
         final_state=final_state,
         components=components,
         exchanges=exchanges,
-        binary_masks=binary_masks,
-        fractional_masks=fractional_masks,
+        binary_masks=runtime_resources.binary_masks,
+        fractional_masks=runtime_resources.fractional_masks,
         output_file_mask=output_file_mask,
         logger=logger,
     )

@@ -28,6 +28,7 @@ from vercor.runtime import (
 )
 from vercor.runtime.component_state import create_runtime_component_state
 from vercor.runtime.field_transfer import send_runtime_fields
+from vercor.runtime.interrupts import RuntimeInterruptController
 
 
 class _RuntimeSendComponent(DataComponent):
@@ -79,6 +80,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_exchange_dispatch_path = Path("vercor/runtime/exchange_dispatch.py")
     runtime_dispatch_context_path = Path("vercor/runtime/dispatch_context.py")
     runtime_run_context_path = Path("vercor/runtime/run_context.py")
+    runtime_resources_path = Path("vercor/runtime/resources.py")
     runtime_cache_path = Path("vercor/runtime/cache.py")
     runtime_progress_path = Path("vercor/runtime/progress.py")
     runtime_component_state_path = Path("vercor/runtime/component_state.py")
@@ -92,6 +94,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_exchange_dispatch_path.exists()
     assert runtime_dispatch_context_path.exists()
     assert runtime_run_context_path.exists()
+    assert runtime_resources_path.exists()
     assert runtime_cache_path.exists()
     assert runtime_progress_path.exists()
     assert runtime_component_state_path.exists()
@@ -109,6 +112,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         encoding="utf-8"
     )
     runtime_run_context_source = runtime_run_context_path.read_text(encoding="utf-8")
+    runtime_resources_source = runtime_resources_path.read_text(encoding="utf-8")
     runtime_cache_source = runtime_cache_path.read_text(encoding="utf-8")
     runtime_progress_source = runtime_progress_path.read_text(encoding="utf-8")
     runtime_component_state_source = runtime_component_state_path.read_text(
@@ -248,6 +252,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def run_coupler_runtime(" in runtime_runner_source
     assert "class RuntimeRunContext" not in runtime_runner_source
     assert "class RuntimeRunContext" in runtime_run_context_source
+    assert "class CouplerRuntimeResources" in runtime_resources_source
     assert "components:" not in runtime_run_context_source
     assert "exchanges:" not in runtime_run_context_source
     assert "regridders:" not in runtime_run_context_source
@@ -257,6 +262,10 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "from vercor.runtime.run_context import" not in coupler_source
     assert "from vercor.runtime.run_context import" in runtime_facade_source
     assert "from vercor.runtime.run_context import" in runtime_runner_source
+    assert "from vercor.runtime.resources import CouplerRuntimeResources" in (
+        coupler_source
+    )
+    assert "runtime_resources: CouplerRuntimeResources" in runtime_facade_source
     assert "def compiled_scanned_runtime(" not in runtime_runner_source
     assert "def compiled_runtime_cache_key(" not in runtime_runner_source
     assert "def compiled_scanned_runtime(" in runtime_cache_source
@@ -360,7 +369,16 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "component_state.data.to_mapping()" not in base_source
     assert "component_state.data.to_mapping()" in runtime_fields_source
     assert "def merge(" not in runtime_source
-    assert "_runtime_contracts" in coupler_source
+    assert "_runtime_resources" in coupler_source
+    for field_marker in (
+        "    _regridders:",
+        "    _binary_masks:",
+        "    _fractional_masks:",
+        "    _runtime_contracts:",
+        "    _compiled_runtime_cache:",
+        "    _runtime_interrupts:",
+    ):
+        assert field_marker not in coupler_source
     assert "def initialize_regridders_and_masks(" in runtime_topology_source
     assert "class ExchangeTopologyState" in runtime_topology_source
     assert "def build_exchange_topology(" in runtime_topology_source
@@ -368,7 +386,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def validate_land_mask_consistency(" in runtime_topology_source
     assert "def patch_exchange_masks(" in runtime_topology_source
     assert "from vercor.runtime.topology import" not in coupler_source
-    assert "from vercor.runtime.topology import" in runtime_facade_source
+    assert "from vercor.runtime.topology import RuntimeRegridder" in (
+        runtime_resources_source
+    )
     assert "def _create_exchange_masks(" not in coupler_source
     assert "def _validate_land_mask_consistency(" not in coupler_source
     assert "def _patch_exchange_masks(" not in coupler_source
@@ -480,6 +500,42 @@ def test_runtime_contracts_refresh_after_exchange_changes() -> None:
     coupler._runtime_state_from_components(prefill_missing=True)
 
     assert coupler._runtime_contracts["ATM"].exports == ("temperature", "humidity")
+
+
+def test_coupler_private_runtime_aliases_share_resource_holder() -> None:
+    from vercor.runtime.resources import CouplerRuntimeResources
+
+    coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
+
+    assert isinstance(coupler._runtime_resources, CouplerRuntimeResources)
+    regridders = cast(Any, {("ATM", "OCN", "bilinear"): object()})
+    binary_masks = cast(Any, {("ATM", "OCN", "bilinear"): jnp.ones((2, 2))})
+    fractional_masks = cast(Any, {("ATM", "OCN", "bilinear"): jnp.full((2, 2), 0.5)})
+    contracts = {"ATM": RuntimeComponentContract(imports=("x",), exports=("y",))}
+    compiled_cache: dict[Any, Any] = {}
+    interrupts = RuntimeInterruptController()
+
+    coupler._regridders = regridders
+    coupler._binary_masks = binary_masks
+    coupler._fractional_masks = fractional_masks
+    coupler._runtime_contracts = contracts
+    coupler._compiled_runtime_cache = compiled_cache
+    coupler._runtime_interrupts = interrupts
+
+    assert coupler._runtime_resources.regridders is regridders
+    assert coupler._runtime_resources.binary_masks is binary_masks
+    assert coupler._runtime_resources.fractional_masks is fractional_masks
+    assert coupler._runtime_resources.contracts is contracts
+    assert coupler._runtime_resources.compiled_runtime_cache is compiled_cache
+    assert coupler._runtime_resources.interrupts is interrupts
+    assert coupler._regridders is coupler._runtime_resources.regridders
+    assert coupler._binary_masks is coupler._runtime_resources.binary_masks
+    assert coupler._fractional_masks is coupler._runtime_resources.fractional_masks
+    assert coupler._runtime_contracts is coupler._runtime_resources.contracts
+    assert coupler._compiled_runtime_cache is (
+        coupler._runtime_resources.compiled_runtime_cache
+    )
+    assert coupler._runtime_interrupts is coupler._runtime_resources.interrupts
 
 
 def test_runtime_focused_modules_keep_canonical_aggregator_exports() -> None:

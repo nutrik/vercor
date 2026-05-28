@@ -55,6 +55,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime-facade/CAMulator-index validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
+- Latest local runtime-resource-holder validation: Black, flake8, mypy,
+  focused fast pytest, full fast pytest, and full pytest passed as of
+  2026-05-28.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -80,6 +83,27 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-28: Runtime Resource Holder Boundary Refactor
+
+- Added `vercor.runtime.resources.CouplerRuntimeResources` as the owner for
+  per-coupler runtime topology maps, refreshed runtime contracts, compiled
+  runtime cache, and interrupt controller.
+- Updated `Coupler` to store one runtime resource holder while preserving the
+  existing private compatibility aliases for tests and profiling helpers.
+- Routed runtime facade initialization, state creation, validation, dispatch/run
+  context construction, execution, and finalization through the resource holder
+  instead of repeated map/cache/interrupt arguments.
+- Updated boundary tests, `DESIGN.md`, and `DEPENDENCIES.md` for the new runtime
+  resource ownership map.
+- Validation run for this change:
+  focused runtime/Coupler/cache/interrupt fast pytest,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-05-27: Runtime Facade and CAMulator Tensor Index Refactor
 

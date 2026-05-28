@@ -18,6 +18,7 @@ from vercor.jax_logging import (
 from vercor.run_sequence import RunSequence
 from vercor.runtime import facade as _runtime_facade
 from vercor.runtime.interrupts import RuntimeInterruptController
+from vercor.runtime.resources import CouplerRuntimeResources
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
@@ -52,22 +53,8 @@ class Coupler:
         lnd_bmask_on_atm_grid: binary land mask regridded onto atmosphere grid
         ocn_fmask_on_atm_grid: fractional ocean mask regridded onto atmosphere grid
         lnd_fmask_on_atm_grid: fractional land mask regridded onto atmosphere grid
-        _regridders: mapping of (source component name, destination component name)
-                to Regridder instance (a pool of all available regridders)
-        _binary_masks: mapping of (source component name, destination component name)
-                to a binary mask array. This mask is used during regridding of fields
-                to ensure that only valid (e.g., ocean or land) points are considered
-                during the regridding process.
-        _fractional_masks: mapping of (source component name, destination component name)
-                to a fractional mask array. This mask is applied during field exchanges
-                after regridding to ensure that only the appropriate portion from source
-                grid cells of the forcing or boundary conditions is transferred to
-                destination grid cells, reflecting the partial coverage of source grid cells
-                within destination grid cells.
-        _runtime_contracts: mapping of component name to RuntimeComponentContract instance
-        _compiled_runtime_cache: mapping of static runtime topology keys to cached compiled runtime functions
-        _runtime_interrupts: controller for signaling and handling runtime
-            interrupts across host and JAX-traced runtime paths
+        _runtime_resources: runtime-owned holder for topology maps, runtime
+            contracts, compiled runtime cache, and interrupt controller.
     """
 
     clock: Clock
@@ -80,29 +67,8 @@ class Coupler:
     lnd_bmask_on_atm_grid: RuntimeArray = field(init=False)
     ocn_fmask_on_atm_grid: RuntimeArray = field(init=False)
     lnd_fmask_on_atm_grid: RuntimeArray = field(init=False)
-    _regridders: dict[
-        tuple[str, str, str],
-        _runtime_topology_module.RuntimeRegridder,
-    ] = field(default_factory=dict)
-    _binary_masks: dict[tuple[str, str, str], RuntimeArray] = field(
-        default_factory=dict
-    )
-    _fractional_masks: dict[tuple[str, str, str], RuntimeArray] = field(
-        default_factory=dict
-    )
-    _runtime_contracts: dict[
-        str,
-        _runtime_contracts_module.RuntimeComponentContract,
-    ] = field(default_factory=dict)
-    _compiled_runtime_cache: dict[
-        tuple[Any, ...],
-        Callable[
-            [_runtime_state_module.RuntimeCouplerState],
-            _runtime_state_module.RuntimeCouplerState,
-        ],
-    ] = field(default_factory=dict, init=False, repr=False)
-    _runtime_interrupts: RuntimeInterruptController = field(
-        default_factory=RuntimeInterruptController,
+    _runtime_resources: CouplerRuntimeResources = field(
+        default_factory=CouplerRuntimeResources,
         init=False,
         repr=False,
     )
@@ -120,6 +86,95 @@ class Coupler:
         set_level = getattr(self.logger, "setLevel", None)
         if callable(set_level):
             set_level(self.log_level)
+
+    @property
+    def _regridders(
+        self,
+    ) -> dict[tuple[str, str, str], _runtime_topology_module.RuntimeRegridder]:
+        """Compatibility alias for runtime-owned exchange regridders."""
+
+        return self._runtime_resources.regridders
+
+    @_regridders.setter
+    def _regridders(
+        self,
+        value: dict[tuple[str, str, str], _runtime_topology_module.RuntimeRegridder],
+    ) -> None:
+        self._runtime_resources.regridders = value
+
+    @property
+    def _binary_masks(self) -> dict[tuple[str, str, str], RuntimeArray]:
+        """Compatibility alias for runtime-owned binary exchange masks."""
+
+        return self._runtime_resources.binary_masks
+
+    @_binary_masks.setter
+    def _binary_masks(self, value: dict[tuple[str, str, str], RuntimeArray]) -> None:
+        self._runtime_resources.binary_masks = value
+
+    @property
+    def _fractional_masks(self) -> dict[tuple[str, str, str], RuntimeArray]:
+        """Compatibility alias for runtime-owned fractional exchange masks."""
+
+        return self._runtime_resources.fractional_masks
+
+    @_fractional_masks.setter
+    def _fractional_masks(
+        self, value: dict[tuple[str, str, str], RuntimeArray]
+    ) -> None:
+        self._runtime_resources.fractional_masks = value
+
+    @property
+    def _runtime_contracts(
+        self,
+    ) -> dict[str, _runtime_contracts_module.RuntimeComponentContract]:
+        """Compatibility alias for runtime-owned component contracts."""
+
+        return self._runtime_resources.contracts
+
+    @_runtime_contracts.setter
+    def _runtime_contracts(
+        self,
+        value: dict[str, _runtime_contracts_module.RuntimeComponentContract],
+    ) -> None:
+        self._runtime_resources.contracts = value
+
+    @property
+    def _compiled_runtime_cache(
+        self,
+    ) -> dict[
+        tuple[Any, ...],
+        Callable[
+            [_runtime_state_module.RuntimeCouplerState],
+            _runtime_state_module.RuntimeCouplerState,
+        ],
+    ]:
+        """Compatibility alias for runtime-owned compiled runtime cache."""
+
+        return self._runtime_resources.compiled_runtime_cache
+
+    @_compiled_runtime_cache.setter
+    def _compiled_runtime_cache(
+        self,
+        value: dict[
+            tuple[Any, ...],
+            Callable[
+                [_runtime_state_module.RuntimeCouplerState],
+                _runtime_state_module.RuntimeCouplerState,
+            ],
+        ],
+    ) -> None:
+        self._runtime_resources.compiled_runtime_cache = value
+
+    @property
+    def _runtime_interrupts(self) -> RuntimeInterruptController:
+        """Compatibility alias for the runtime-owned interrupt controller."""
+
+        return self._runtime_resources.interrupts
+
+    @_runtime_interrupts.setter
+    def _runtime_interrupts(self, value: RuntimeInterruptController) -> None:
+        self._runtime_resources.interrupts = value
 
     def register(
         self,
@@ -181,20 +236,14 @@ class Coupler:
             clock=self.clock,
             components=self.components,
             exchanges=self.exchanges,
-            regridders=self._regridders,
-            binary_masks=self._binary_masks,
-            fractional_masks=self._fractional_masks,
             run_sequence=self.run_sequence,
             settings=self.settings,
             logger=self.logger,
+            runtime_resources=self._runtime_resources,
             enable_x64_computations=enable_x64_computations,
         )
 
-        self._runtime_contracts = initialized.runtime_contracts
         topology = initialized.topology
-        self._regridders = topology.regridders
-        self._binary_masks = topology.binary_masks
-        self._fractional_masks = topology.fractional_masks
         self.ocn_fmask_on_atm_grid = topology.ocn_fmask_on_atm_grid
         self.lnd_fmask_on_atm_grid = topology.lnd_fmask_on_atm_grid
         self.lnd_bmask_on_atm_grid = topology.lnd_bmask_on_atm_grid
@@ -205,22 +254,20 @@ class Coupler:
         prepared = _runtime_facade.runtime_state_from_components(
             components=self.components,
             exchanges=self.exchanges,
-            fractional_masks=self._fractional_masks,
-            binary_masks=self._binary_masks,
+            runtime_resources=self._runtime_resources,
             prefill_missing=prefill_missing,
         )
-        self._runtime_contracts = prepared.runtime_contracts
         return prepared.runtime_state
 
     def _validate_runtime_state(
         self,
         runtime_state: _runtime_state_module.RuntimeCouplerState,
     ) -> None:
-        self._runtime_contracts = _runtime_facade.validate_runtime_state(
+        _runtime_facade.validate_runtime_state(
             runtime_state,
             components=self.components,
             exchanges=self.exchanges,
-            regridders=self._regridders,
+            runtime_resources=self._runtime_resources,
             run_sequence=self.run_sequence,
         )
 
@@ -236,16 +283,12 @@ class Coupler:
             initial_state,
             components=self.components,
             exchanges=self.exchanges,
-            regridders=self._regridders,
-            fractional_masks=self._fractional_masks,
-            binary_masks=self._binary_masks,
-            runtime_contracts=self._runtime_contracts,
+            runtime_resources=self._runtime_resources,
             run_sequence=self.run_sequence,
             clock=self.clock,
             settings=self.settings,
             validate_state=validate_state,
         )
-        self._runtime_contracts = prepared.runtime_contracts
         return prepared.runtime_state
 
     def create_runtime_state(
@@ -256,15 +299,12 @@ class Coupler:
         prepared = _runtime_facade.create_runtime_state(
             components=self.components,
             exchanges=self.exchanges,
-            regridders=self._regridders,
-            fractional_masks=self._fractional_masks,
-            binary_masks=self._binary_masks,
+            runtime_resources=self._runtime_resources,
             run_sequence=self.run_sequence,
             clock=self.clock,
             settings=self.settings,
             prefill_missing=prefill_missing,
         )
-        self._runtime_contracts = prepared.runtime_contracts
         return prepared.runtime_state
 
     def _runtime_dispatch_context(
@@ -275,8 +315,7 @@ class Coupler:
         return _runtime_facade.runtime_dispatch_context(
             components=self.components,
             exchanges=self.exchanges,
-            regridders=self._regridders,
-            runtime_contracts=self._runtime_contracts,
+            runtime_resources=self._runtime_resources,
             clock=self.clock,
             settings=self.settings,
         )
@@ -291,11 +330,8 @@ class Coupler:
             log_level=self.log_level,
             components=self.components,
             exchanges=self.exchanges,
-            regridders=self._regridders,
-            runtime_contracts=self._runtime_contracts,
+            runtime_resources=self._runtime_resources,
             settings=self.settings,
-            compiled_runtime_cache=self._compiled_runtime_cache,
-            interrupts=self._runtime_interrupts,
         )
 
     def runtime_component_view(
@@ -342,8 +378,7 @@ class Coupler:
             final_state=final_state,
             components=self.components,
             exchanges=self.exchanges,
-            binary_masks=self._binary_masks,
-            fractional_masks=self._fractional_masks,
+            runtime_resources=self._runtime_resources,
             output_file_mask=output_file_mask,
             logger=self.logger,
         )
@@ -389,11 +424,8 @@ class Coupler:
             log_level=self.log_level,
             components=self.components,
             exchanges=self.exchanges,
-            regridders=self._regridders,
-            runtime_contracts=self._runtime_contracts,
+            runtime_resources=self._runtime_resources,
             settings=self.settings,
-            compiled_runtime_cache=self._compiled_runtime_cache,
-            interrupts=self._runtime_interrupts,
             donate_state=donate_state,
         )
 
@@ -416,8 +448,6 @@ class Coupler:
             logger=self.logger,
             components=self.components,
             exchanges=self.exchanges,
-            regridders=self._regridders,
-            runtime_contracts=self._runtime_contracts,
+            runtime_resources=self._runtime_resources,
             settings=self.settings,
-            interrupts=self._runtime_interrupts,
         )
