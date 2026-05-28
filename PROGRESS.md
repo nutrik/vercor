@@ -76,6 +76,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime-preparation boundary validation: focused boundary
   pytest, Black, flake8, mypy, full fast pytest, and full pytest passed as of
   2026-05-28.
+- Latest local component/runtime boundary alias validation: focused fast
+  pytest, Black, flake8, mypy, full fast pytest, and full pytest passed as of
+  2026-05-28.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -101,6 +104,36 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-28: Component and Runtime Boundary Alias Refactor
+
+- Moved public lifecycle hook type aliases to `vercor.components.contracts` and
+  reexported them from `vercor.components` and `vercor`, leaving
+  `vercor.components._lifecycle` focused on private hook storage and
+  installation.
+- Added shared callable component construction metadata in
+  `vercor.components._callable_wrappers` so differentiable and host
+  `from_model()` paths share field-spec, payload, settings, and lifecycle-hook
+  normalization.
+- Split `vercor.runtime.runner.run_coupler_runtime()` into smaller helpers for
+  compiled scanned execution and host-runtime donation rejection while
+  preserving public runtime behavior.
+- Strengthened boundary and lifecycle coverage for public hook ownership,
+  callable construction ownership, direct `from_model()` lifecycle hooks, and
+  runner path-selection helpers.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the new component and runtime
+  boundary ownership.
+- Validation run for this change:
+  focused component/runtime-cache fast pytest,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: the first runner boundary test split source through
+  the next public function and accidentally included the new private helper
+  body; it now extracts only `run_coupler_runtime()`.
 
 ### 2026-05-28: Runtime Preparation Boundary Refactor
 

@@ -40,44 +40,16 @@ def run_coupler_runtime(
     with context.interrupts.signal_scope():
         host_names = host_component_names(context.dispatch_context.components)
         if not host_names:
-            try:
-                cache_key = compiled_runtime_cache_key(
-                    donate_state=donate_state,
-                    context=context,
-                )
-
-                def scanned_runtime(
-                    state: RuntimeCouplerState,
-                ) -> RuntimeCouplerState:
-                    return run_scanned_runtime(
-                        state,
-                        run_sequence=context.run_sequence,
-                        clock=context.clock,
-                        settings=context.dispatch_context.settings,
-                        logger=context.logger,
-                        dispatch_context=context.dispatch_context,
-                        interrupts=context.interrupts,
-                    )
-
-                return compiled_scanned_runtime(
-                    scanned_runtime,
-                    cache=context.compiled_runtime_cache,
-                    cache_key=cache_key,
-                    donate_state=donate_state,
-                )(runtime_state)
-            except JaxRuntimeError as error:
-                context.interrupts.raise_if_jax_callback_interrupted(
-                    error,
-                    "compiled scanned runtime",
-                )
-
-        if donate_state:
-            names = ", ".join(host_names)
-            raise CouplerError(
-                "Runtime state donation is only supported for differentiable "
-                f"components; host-backed component(s) require non-donating run(): {names}"
+            return _run_compiled_scanned_runtime(
+                runtime_state,
+                context=context,
+                donate_state=donate_state,
             )
 
+        _raise_if_donating_host_runtime(
+            donate_state=donate_state,
+            host_names=host_names,
+        )
         return run_host_runtime(
             runtime_state,
             run_sequence=context.run_sequence,
@@ -87,6 +59,63 @@ def run_coupler_runtime(
             dispatch_context=context.dispatch_context,
             interrupts=context.interrupts,
         )
+
+
+def _run_compiled_scanned_runtime(
+    runtime_state: RuntimeCouplerState,
+    *,
+    context: RuntimeRunContext,
+    donate_state: bool,
+) -> RuntimeCouplerState:
+    """Run a pure runtime state through the cached compiled scanned path."""
+
+    try:
+        cache_key = compiled_runtime_cache_key(
+            donate_state=donate_state,
+            context=context,
+        )
+
+        def scanned_runtime(
+            state: RuntimeCouplerState,
+        ) -> RuntimeCouplerState:
+            return run_scanned_runtime(
+                state,
+                run_sequence=context.run_sequence,
+                clock=context.clock,
+                settings=context.dispatch_context.settings,
+                logger=context.logger,
+                dispatch_context=context.dispatch_context,
+                interrupts=context.interrupts,
+            )
+
+        return compiled_scanned_runtime(
+            scanned_runtime,
+            cache=context.compiled_runtime_cache,
+            cache_key=cache_key,
+            donate_state=donate_state,
+        )(runtime_state)
+    except JaxRuntimeError as error:
+        context.interrupts.raise_if_jax_callback_interrupted(
+            error,
+            "compiled scanned runtime",
+        )
+
+
+def _raise_if_donating_host_runtime(
+    *,
+    donate_state: bool,
+    host_names: Sequence[str],
+) -> None:
+    """Reject buffer donation when host-backed components are present."""
+
+    if not donate_state:
+        return
+
+    names = ", ".join(host_names)
+    raise CouplerError(
+        "Runtime state donation is only supported for differentiable "
+        f"components; host-backed component(s) require non-donating run(): {names}"
+    )
 
 
 def run_host_runtime(

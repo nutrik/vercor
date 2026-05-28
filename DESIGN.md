@@ -131,6 +131,10 @@ immutable runtime containers used during traced integration.
   the model reads or updates. Scalar default and seeded values expand
   to grid-shaped constants. `ComponentSetupContext` and `ComponentStepContext`
   are public aliases for the setup and step contexts passed to author callbacks.
+  Lifecycle hook type aliases (`ComponentInitializeHook`,
+  `ComponentCreatePayloadHook`, `ComponentPrefillHook`, and
+  `ComponentValidateHook`) are public component-author contracts and are
+  reexported from `vercor.components` and `vercor`.
   `ComponentFieldSpec`, `field_spec`, and `declare_fields()` provide the same
   vocabulary and read-only introspection for subclasses. `field_names` exposes
   setup-time seeded field names in insertion order. Subclass constructors can
@@ -153,15 +157,15 @@ immutable runtime containers used during traced integration.
   Field-name de-duplication lives in private
   `vercor.components._field_names`, and component authoring methods for field
   declarations, setup seeding, and settings updates live in private
-  `vercor.components._field_authoring`. Lifecycle hook type aliases, hook
-  storage, and hook installation live in private
-  `vercor.components._lifecycle`; default lifecycle dispatch lives in private
+  `vercor.components._field_authoring`. Lifecycle hook storage and hook
+  installation live in private `vercor.components._lifecycle`; default
+  lifecycle dispatch lives in private
   `vercor.components._lifecycle_api`, and factory-installed hooks are stored in
   one private `ComponentLifecycleHooks` container rather than as ad-hoc
   component attributes. Author-value normalization lives in private
-  `vercor.components._contracts`; callable signature adaptation and shared
-  callable runtime mechanics live in private
-  `vercor.components._callable_wrappers`. The concrete callable-backed
+  `vercor.components._contracts`; callable signature adaptation, shared
+  callable construction metadata, and shared callable runtime mechanics live in
+  private `vercor.components._callable_wrappers`. The concrete callable-backed
   differentiable wrapper is owned by `vercor.components.base`, and the concrete
   callable-backed host wrapper is owned by `vercor.components.host`, keeping
   each runtime kind beside its public abstract base. Private helper modules
@@ -280,9 +284,9 @@ immutable runtime containers used during traced integration.
   profiling facade; there are no private compatibility aliases for individual
   runtime maps or caches.
   Host/scanned runtime loops, run-mode
-  selection, donation checks, and interrupt translation live in
-  `vercor.runtime.runner`. High-level runtime orchestration for the
-  public `Coupler` facade lives in `vercor.runtime.facade`: runtime-state
+  selection, compiled scanned dispatch, donation checks, and interrupt
+  translation live in `vercor.runtime.runner`. High-level runtime orchestration
+  for the public `Coupler` facade lives in `vercor.runtime.facade`: runtime-state
   preparation, dispatch/run context construction, host/scanned execution,
   runtime views, and final output delegation enter through this module instead
   of direct `Coupler` imports of runtime implementation helpers.

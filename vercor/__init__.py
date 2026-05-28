@@ -5,10 +5,14 @@ from vercor.components.base import (
     Component,
 )
 from vercor.components.contracts import (
+    ComponentCreatePayloadHook,
     ComponentFieldSpec,
+    ComponentInitializeHook,
+    ComponentPrefillHook,
     ComponentSetupContext,
     ComponentStepContext,
     ComponentStepResult,
+    ComponentValidateHook,
 )
 from vercor.components.data import (
     DataComponent,
@@ -29,10 +33,14 @@ from vercor.run_sequence import RunSequence
 __all__ = [
     "Coupler",
     "Component",
+    "ComponentCreatePayloadHook",
     "ComponentFieldSpec",
+    "ComponentInitializeHook",
+    "ComponentPrefillHook",
     "ComponentSetupContext",
     "ComponentStepContext",
     "ComponentStepResult",
+    "ComponentValidateHook",
     "DataComponent",
     "HostRuntimeComponent",
     "data_component",

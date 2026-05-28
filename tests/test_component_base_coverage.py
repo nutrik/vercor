@@ -732,6 +732,24 @@ def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> Non
             prefill_runtime_state_fields=prefill,
             validate_runtime_state=validate,
         ),
+        base_module.Component.from_model(
+            name="DIRECT",
+            grid=grid,
+            step=step,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill,
+            validate_runtime_state=validate,
+        ),
+        host_module.HostRuntimeComponent.from_model(
+            name="DIRECT_HOST",
+            grid=grid,
+            step=step,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill,
+            validate_runtime_state=validate,
+        ),
     )
 
     for component in factories:
@@ -767,6 +785,14 @@ def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> Non
         "prefill:HOST",
         "payload:HOST",
         "validate:HOST",
+        "initialize:DIRECT",
+        "prefill:DIRECT",
+        "payload:DIRECT",
+        "validate:DIRECT",
+        "initialize:DIRECT_HOST",
+        "prefill:DIRECT_HOST",
+        "payload:DIRECT_HOST",
+        "validate:DIRECT_HOST",
     ]
 
 

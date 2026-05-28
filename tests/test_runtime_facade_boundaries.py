@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 
+import pytest
+
 from tests._architecture_support import package_import_cycles, source_for
 from vercor.runtime.facade import PreparedRuntimeState, RuntimeFacadeInputs
 
@@ -55,6 +57,20 @@ def test_runtime_facade_reexports_preparation_without_owning_it() -> None:
     assert "def validate_runtime_state(" not in facade_source
     assert "def create_runtime_state(" not in facade_source
     assert "def prepare_runtime_state(" not in facade_source
+
+
+@pytest.mark.fast_always
+def test_runtime_runner_splits_path_selection_helpers() -> None:
+    runner_source = source_for("vercor/runtime/runner.py")
+    run_coupler_body = runner_source.split("def run_coupler_runtime(", 1)[1].split(
+        "\ndef _run_compiled_scanned_runtime(",
+        1,
+    )[0]
+
+    assert "def _run_compiled_scanned_runtime(" in runner_source
+    assert "def _raise_if_donating_host_runtime(" in runner_source
+    assert "compiled_runtime_cache_key(" not in run_coupler_body
+    assert "raise CouplerError(" not in run_coupler_body
 
 
 def test_runtime_package_has_no_top_level_import_cycles() -> None:

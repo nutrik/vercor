@@ -1,25 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from vercor.runtime.contexts import ComponentInitContext
-from vercor.types import RuntimeArray
-
-ComponentInitializeHook = Callable[[Any, ComponentInitContext], None]
-ComponentCreatePayloadHook = Callable[[Any], Any | None]
-ComponentPrefillHook = Callable[
-    [
-        Any,
-        dict[str, RuntimeArray],
-        dict[str, RuntimeArray],
-        dict[str, RuntimeArray],
-        Any,
-    ],
-    None,
-]
-ComponentValidateHook = Callable[[Any, Any, Any], None]
+from vercor.components.contracts import (
+    ComponentCreatePayloadHook,
+    ComponentInitializeHook,
+    ComponentPrefillHook,
+    ComponentValidateHook,
+)
 
 
 @dataclass(frozen=True)

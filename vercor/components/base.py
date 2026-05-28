@@ -7,18 +7,20 @@ from typing import TYPE_CHECKING, Any
 from vercor.components.contracts import (
     AuthorFieldValues as _AuthorFieldValues,
     AuthorStepCallable as _AuthorStepCallable,
-    ComponentFieldSpec as _ComponentFieldSpec,
-    FieldNames as _FieldNames,
-)
-from vercor.components._callable_wrappers import _CallableRuntimeMixin
-from vercor.components._field_authoring import ComponentFieldAuthoringMixin
-from vercor.components._lifecycle import (
     ComponentCreatePayloadHook,
+    ComponentFieldSpec as _ComponentFieldSpec,
     ComponentInitializeHook,
-    ComponentLifecycleHooks,
     ComponentPrefillHook,
     ComponentValidateHook,
+    FieldNames as _FieldNames,
 )
+from vercor.components._callable_wrappers import (
+    _CallableComponentDefinition,
+    _CallableRuntimeMixin,
+    _callable_component_definition,
+)
+from vercor.components._field_authoring import ComponentFieldAuthoringMixin
+from vercor.components._lifecycle import ComponentLifecycleHooks
 from vercor.components._lifecycle_api import ComponentLifecycleMixin
 from vercor.components._runtime_access import ComponentRuntimeAccessMixin
 from vercor.grid import RectilinearGrid
@@ -115,18 +117,18 @@ class Component(
         return _CallableComponent(
             name=name,
             grid=grid,
-            step=step,
-            payload=payload,
-            settings=settings,
-            field_spec=_ComponentFieldSpec(
+            definition=_callable_component_definition(
+                step=step,
+                payload=payload,
+                settings=settings,
                 inputs=inputs,
                 outputs=outputs,
-                default_fields=default_fields or {},
+                default_fields=default_fields,
+                initialize=initialize,
+                create_runtime_payload=create_runtime_payload,
+                prefill_runtime_state_fields=prefill_runtime_state_fields,
+                validate_runtime_state=validate_runtime_state,
             ),
-            initialize=initialize,
-            create_runtime_payload=create_runtime_payload,
-            prefill_runtime_state_fields=prefill_runtime_state_fields,
-            validate_runtime_state=validate_runtime_state,
         )
 
     @abstractmethod
@@ -158,28 +160,18 @@ class _CallableComponent(_CallableRuntimeMixin, Component):
         name: str,
         grid: RectilinearGrid,
         *,
-        step: _AuthorStepCallable,
-        payload: Any | None = None,
-        settings: VercorSettings | None = None,
-        field_spec: _ComponentFieldSpec | None = None,
-        initialize: ComponentInitializeHook | None = None,
-        create_runtime_payload: ComponentCreatePayloadHook | None = None,
-        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
-        validate_runtime_state: ComponentValidateHook | None = None,
+        definition: _CallableComponentDefinition,
     ) -> None:
-        if settings is None:
+        if definition.settings is None:
             Component.__init__(self, name=name, grid=grid)
         else:
-            Component.__init__(self, name=name, grid=grid, settings=settings)
-        self._initialize_callable_runtime(
-            step=step,
-            payload=payload,
-            field_spec=field_spec or _ComponentFieldSpec(),
-            initialize=initialize,
-            create_runtime_payload=create_runtime_payload,
-            prefill_runtime_state_fields=prefill_runtime_state_fields,
-            validate_runtime_state=validate_runtime_state,
-        )
+            Component.__init__(
+                self,
+                name=name,
+                grid=grid,
+                settings=definition.settings,
+            )
+        self._initialize_callable_runtime_from_definition(definition)
 
     def step_runtime_state(
         self,

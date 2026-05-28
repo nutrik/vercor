@@ -2,10 +2,14 @@ from vercor.components.base import (
     Component,
 )
 from vercor.components.contracts import (
+    ComponentCreatePayloadHook,
     ComponentFieldSpec,
+    ComponentInitializeHook,
+    ComponentPrefillHook,
     ComponentSetupContext,
     ComponentStepContext,
     ComponentStepResult,
+    ComponentValidateHook,
 )
 from vercor.components.data import (
     DataComponent,
@@ -21,10 +25,14 @@ from vercor.components.factories import (
 
 __all__ = [
     "Component",
+    "ComponentCreatePayloadHook",
     "ComponentFieldSpec",
+    "ComponentInitializeHook",
+    "ComponentPrefillHook",
     "ComponentSetupContext",
     "ComponentStepContext",
     "ComponentStepResult",
+    "ComponentValidateHook",
     "DataComponent",
     "HostRuntimeComponent",
     "data_component",

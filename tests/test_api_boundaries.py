@@ -37,10 +37,14 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
     expected_public_names = {
         "Clock",
         "Component",
+        "ComponentCreatePayloadHook",
         "ComponentFieldSpec",
+        "ComponentInitializeHook",
+        "ComponentPrefillHook",
         "ComponentSetupContext",
         "ComponentStepContext",
         "ComponentStepResult",
+        "ComponentValidateHook",
         "Coupler",
         "DataComponent",
         "Exchange",
@@ -73,10 +77,24 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
     assert legacy_component_names.isdisjoint(set(vercor.__all__))
 
     assert vercor.Component is Component
+    assert (
+        vercor.ComponentCreatePayloadHook
+        is component_contracts_module.ComponentCreatePayloadHook
+    )
     assert vercor.ComponentFieldSpec is component_contracts_module.ComponentFieldSpec
+    assert (
+        vercor.ComponentInitializeHook
+        is component_contracts_module.ComponentInitializeHook
+    )
+    assert (
+        vercor.ComponentPrefillHook is component_contracts_module.ComponentPrefillHook
+    )
     assert vercor.ComponentSetupContext is ComponentInitContext
     assert vercor.ComponentStepContext is RuntimeStepContext
     assert vercor.ComponentStepResult is component_contracts_module.ComponentStepResult
+    assert (
+        vercor.ComponentValidateHook is component_contracts_module.ComponentValidateHook
+    )
     data_component_type = getattr(components_module, "DataComponent", None)
     assert data_component_type is not None
     assert getattr(vercor, "DataComponent", None) is data_component_type
@@ -105,10 +123,14 @@ def test_components_package_exports_only_component_author_contracts() -> None:
 
     assert components_module.__all__ == [
         "Component",
+        "ComponentCreatePayloadHook",
         "ComponentFieldSpec",
+        "ComponentInitializeHook",
+        "ComponentPrefillHook",
         "ComponentSetupContext",
         "ComponentStepContext",
         "ComponentStepResult",
+        "ComponentValidateHook",
         "DataComponent",
         "HostRuntimeComponent",
         "data_component",
@@ -116,10 +138,25 @@ def test_components_package_exports_only_component_author_contracts() -> None:
         "host_component",
     ]
     assert components_module.Component is Component
+    assert (
+        components_module.ComponentCreatePayloadHook
+        is contracts_module.ComponentCreatePayloadHook
+    )
     assert components_module.ComponentFieldSpec is contracts_module.ComponentFieldSpec
+    assert (
+        components_module.ComponentInitializeHook
+        is contracts_module.ComponentInitializeHook
+    )
+    assert (
+        components_module.ComponentPrefillHook is contracts_module.ComponentPrefillHook
+    )
     assert components_module.ComponentSetupContext is ComponentInitContext
     assert components_module.ComponentStepContext is RuntimeStepContext
     assert components_module.ComponentStepResult is contracts_module.ComponentStepResult
+    assert (
+        components_module.ComponentValidateHook
+        is contracts_module.ComponentValidateHook
+    )
     assert data_module is imported_data_module
     assert host_module is imported_host_module
     assert components_module.DataComponent is data_module.DataComponent
@@ -280,6 +317,10 @@ def test_component_base_internals_are_private_modules() -> None:
 
     assert "class ComponentFieldSpec" in public_contracts_source
     assert "class ComponentStepResult" in public_contracts_source
+    assert "ComponentInitializeHook =" in public_contracts_source
+    assert "ComponentCreatePayloadHook =" in public_contracts_source
+    assert "ComponentPrefillHook =" in public_contracts_source
+    assert "ComponentValidateHook =" in public_contracts_source
     assert "class ComponentFieldSpec" not in contracts_source
     assert "class ComponentStepResult" not in contracts_source
     assert "class DataComponent" in data_source
@@ -317,10 +358,10 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def _install_lifecycle_hooks(" not in factories_source
     assert "def install_lifecycle_hooks(" in lifecycle_source
     assert "class ComponentLifecycleHooks" in lifecycle_source
-    assert "ComponentInitializeHook" in lifecycle_source
-    assert "ComponentCreatePayloadHook" in lifecycle_source
-    assert "ComponentPrefillHook" in lifecycle_source
-    assert "ComponentValidateHook" in lifecycle_source
+    assert "ComponentInitializeHook =" not in lifecycle_source
+    assert "ComponentCreatePayloadHook =" not in lifecycle_source
+    assert "ComponentPrefillHook =" not in lifecycle_source
+    assert "ComponentValidateHook =" not in lifecycle_source
     assert "from vercor.components import _runtime_fields" not in base_source
     assert "from vercor.components.factories import _install_lifecycle_hooks" not in (
         callable_source

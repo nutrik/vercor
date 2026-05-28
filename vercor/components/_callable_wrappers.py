@@ -1,29 +1,76 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from inspect import Parameter, signature
 from typing import TYPE_CHECKING, Any, Mapping, cast
 
 from vercor.components.contracts import (
+    AuthorFieldValues,
     AuthorStepCallable,
-    ComponentFieldSpec,
-    ComponentStepCallable,
-    ComponentStepReturn,
-)
-from vercor.components._lifecycle import (
     ComponentCreatePayloadHook,
+    ComponentFieldSpec,
     ComponentInitializeHook,
     ComponentPrefillHook,
+    ComponentStepCallable,
+    ComponentStepReturn,
     ComponentValidateHook,
-    install_lifecycle_hooks,
+    FieldNames,
 )
+from vercor.components._lifecycle import install_lifecycle_hooks
 from vercor.components._protocols import ComponentAuthoringProtocol
 from vercor.components._runtime_fields import apply_step_result
 from vercor.exceptions import ComponentError
 from vercor.runtime.contexts import RuntimeStepContext
+from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.runtime.state import RuntimeComponentState
+
+
+@dataclass(frozen=True)
+class _CallableComponentDefinition:
+    """Normalized construction inputs for callable-backed component wrappers."""
+
+    step: AuthorStepCallable
+    payload: Any | None
+    settings: VercorSettings | None
+    field_spec: ComponentFieldSpec
+    initialize: ComponentInitializeHook | None
+    create_runtime_payload: ComponentCreatePayloadHook | None
+    prefill_runtime_state_fields: ComponentPrefillHook | None
+    validate_runtime_state: ComponentValidateHook | None
+
+
+def _callable_component_definition(
+    *,
+    step: AuthorStepCallable,
+    payload: Any | None,
+    settings: VercorSettings | None,
+    inputs: FieldNames,
+    outputs: FieldNames,
+    default_fields: AuthorFieldValues,
+    initialize: ComponentInitializeHook | None,
+    create_runtime_payload: ComponentCreatePayloadHook | None,
+    prefill_runtime_state_fields: ComponentPrefillHook | None,
+    validate_runtime_state: ComponentValidateHook | None,
+) -> _CallableComponentDefinition:
+    """Return shared construction metadata for callable-backed wrappers."""
+
+    return _CallableComponentDefinition(
+        step=step,
+        payload=payload,
+        settings=settings,
+        field_spec=ComponentFieldSpec(
+            inputs=inputs,
+            outputs=outputs,
+            default_fields=default_fields or {},
+        ),
+        initialize=initialize,
+        create_runtime_payload=create_runtime_payload,
+        prefill_runtime_state_fields=prefill_runtime_state_fields,
+        validate_runtime_state=validate_runtime_state,
+    )
 
 
 def normalize_component_step_callable(
@@ -132,6 +179,22 @@ class _CallableRuntimeMixin:
 
     _step: ComponentStepCallable
     _payload: Any | None
+
+    def _initialize_callable_runtime_from_definition(
+        self,
+        definition: _CallableComponentDefinition,
+    ) -> None:
+        """Initialize callable runtime mechanics from shared construction data."""
+
+        self._initialize_callable_runtime(
+            step=definition.step,
+            payload=definition.payload,
+            field_spec=definition.field_spec,
+            initialize=definition.initialize,
+            create_runtime_payload=definition.create_runtime_payload,
+            prefill_runtime_state_fields=definition.prefill_runtime_state_fields,
+            validate_runtime_state=definition.validate_runtime_state,
+        )
 
     def _initialize_callable_runtime(
         self,

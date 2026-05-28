@@ -5,15 +5,13 @@ from typing import Any
 from vercor.components.contracts import (
     AuthorFieldValues,
     AuthorStepCallable,
-    FieldNames,
-)
-from vercor.components._lifecycle import (
     ComponentCreatePayloadHook,
     ComponentInitializeHook,
     ComponentPrefillHook,
     ComponentValidateHook,
-    install_lifecycle_hooks,
+    FieldNames,
 )
+from vercor.components._lifecycle import install_lifecycle_hooks
 from vercor.components.base import (
     Component,
 )

@@ -35,6 +35,19 @@ AuthorStepCallable: TypeAlias = Callable[..., ComponentStepReturn]
 FieldNames: TypeAlias = Iterable[str]
 FieldDefaults: TypeAlias = Mapping[str, RuntimeArray] | None
 AuthorFieldValues: TypeAlias = Mapping[str, object] | None
+ComponentInitializeHook = Callable[[Any, ComponentInitContext], None]
+ComponentCreatePayloadHook = Callable[[Any], Any | None]
+ComponentPrefillHook = Callable[
+    [
+        Any,
+        dict[str, RuntimeArray],
+        dict[str, RuntimeArray],
+        dict[str, RuntimeArray],
+        Any,
+    ],
+    None,
+]
+ComponentValidateHook = Callable[[Any, Any, Any], None]
 
 
 @dataclass(frozen=True)
@@ -63,12 +76,16 @@ class ComponentFieldSpec:
 __all__ = [
     "AuthorFieldValues",
     "AuthorStepCallable",
+    "ComponentCreatePayloadHook",
     "ComponentFieldSpec",
+    "ComponentInitializeHook",
+    "ComponentPrefillHook",
     "ComponentSetupContext",
     "ComponentStepCallable",
     "ComponentStepContext",
     "ComponentStepResult",
     "ComponentStepReturn",
+    "ComponentValidateHook",
     "FieldDefaults",
     "FieldNames",
 ]
