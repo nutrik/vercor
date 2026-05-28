@@ -201,7 +201,7 @@ def profile_runtime(
         grid_ny=grid_ny,
         log_level=log_level,
     )
-    coupler._runtime_resources.compiled_runtime_cache.clear()
+    coupler.clear_runtime_cache()
 
     first_state = coupler.create_runtime_state()
     second_state = coupler.create_runtime_state()
@@ -225,7 +225,7 @@ def profile_runtime(
         first_non_donating_seconds=first_non_donating_seconds,
         cached_non_donating_seconds=cached_non_donating_seconds,
         first_donating_seconds=first_donating_seconds,
-        compiled_cache_entries=len(coupler._runtime_resources.compiled_runtime_cache),
+        compiled_cache_entries=coupler.runtime_cache_entry_count(),
         final_state_leaves=len(jax.tree_util.tree_leaves(first_final)),
     )
 

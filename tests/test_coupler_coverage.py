@@ -22,6 +22,7 @@ from tests._coverage_support import (
     make_test_grid,
 )
 from tests._runtime_helpers import (
+    replace_runtime_topology_maps,
     run_scanned_coupler,
     runtime_state_from_coupler_components,
 )
@@ -766,16 +767,22 @@ def test_patch_exchange_masks_updates_only_expected_bilinear_pairs() -> None:
     lnd_key = ("LND", "ATM", "bilinear")
     other_key = ("OCN", "ATM", "conservative")
 
-    coupler._runtime_resources.binary_masks = {
+    binary_masks = {
         ocn_key: np.zeros((2, 2)),
         lnd_key: np.zeros((2, 2)),
         other_key: np.full((2, 2), 9.0),
     }
-    coupler._runtime_resources.fractional_masks = {
+    fractional_masks = {
         ocn_key: np.zeros((2, 2)),
         lnd_key: np.zeros((2, 2)),
         other_key: np.full((2, 2), 7.0),
     }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders={},
+        binary_masks=binary_masks,
+        fractional_masks=fractional_masks,
+    )
     coupler.ocn_fmask_on_atm_grid = np.full((2, 2), 0.25)
     coupler.lnd_bmask_on_atm_grid = np.asarray([[1.0, 0.0], [0.0, 1.0]])
     coupler.lnd_fmask_on_atm_grid = np.full((2, 2), 0.75)
@@ -900,14 +907,20 @@ def test_output_masks_for_component_returns_destination_exchange_masks() -> None
         regridder_factory=bilinear,
     )
     coupler.exchanges = [ocn_exchange, lnd_exchange]
-    coupler._runtime_resources.binary_masks = {
+    binary_masks = {
         ("OCN", "ATM", "bilinear"): np.zeros((2, 2)),
         ("LND", "ATM", "bilinear"): np.ones((2, 2)),
     }
-    coupler._runtime_resources.fractional_masks = {
+    fractional_masks = {
         ("OCN", "ATM", "bilinear"): np.full((2, 2), 0.25),
         ("LND", "ATM", "bilinear"): np.full((2, 2), 0.75),
     }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders={},
+        binary_masks=binary_masks,
+        fractional_masks=fractional_masks,
+    )
 
     assert not hasattr(coupler, "_output_masks_for_component")
 
@@ -949,7 +962,7 @@ def test_runtime_field_dispatch_handles_scalar_and_vector_paths() -> None:
     )
     coupler.components = cast(Any, {"OCN": source, "ATM": destination})
     coupler.exchanges = [scalar_exchange, vector_exchange]
-    coupler._runtime_resources.regridders = cast(
+    regridders = cast(
         Any,
         {
             ("OCN", "ATM", "bilinear"): RecordingRegridder(
@@ -963,10 +976,14 @@ def test_runtime_field_dispatch_handles_scalar_and_vector_paths() -> None:
             ),
         },
     )
-    coupler._runtime_resources.fractional_masks = {
-        ("OCN", "ATM", "bilinear"): np.asarray([[1.0, 0.5], [0.0, 1.0]]),
-        ("OCN", "ATM", "conservative"): np.ones((2, 2)),
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=regridders,
+        fractional_masks={
+            ("OCN", "ATM", "bilinear"): np.asarray([[1.0, 0.5], [0.0, 1.0]]),
+            ("OCN", "ATM", "conservative"): np.ones((2, 2)),
+        },
+    )
 
     runtime_state = _dispatch_runtime_fields(
         coupler,
@@ -1004,7 +1021,7 @@ def test_runtime_field_dispatch_accepts_mixed_numpy_and_jax_arrays() -> None:
     )
     coupler.components = cast(Any, {"OCN": source, "ATM": destination})
     coupler.exchanges = [exchange]
-    coupler._runtime_resources.regridders = cast(
+    regridders = cast(
         Any,
         {
             ("OCN", "ATM", "bilinear"): RecordingRegridder(
@@ -1012,9 +1029,13 @@ def test_runtime_field_dispatch_accepts_mixed_numpy_and_jax_arrays() -> None:
             )
         },
     )
-    coupler._runtime_resources.fractional_masks = {
-        ("OCN", "ATM", "bilinear"): np.asarray([[1.0, 0.5], [0.0, 1.0]]),
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=regridders,
+        fractional_masks={
+            ("OCN", "ATM", "bilinear"): np.asarray([[1.0, 0.5], [0.0, 1.0]]),
+        },
+    )
 
     runtime_state = _dispatch_runtime_fields(
         coupler,
@@ -1043,13 +1064,15 @@ def test_runtime_field_dispatch_rejects_missing_scalar_and_vector_fields() -> No
     )
     coupler.components = cast(Any, {"OCN": scalar_source, "ATM": scalar_destination})
     coupler.exchanges = [scalar_exchange]
-    coupler._runtime_resources.regridders = cast(
+    regridders = cast(
         Any,
         {("OCN", "ATM", "bilinear"): RecordingRegridder(scalar_result=np.ones((2, 2)))},
     )
-    coupler._runtime_resources.fractional_masks = {
-        ("OCN", "ATM", "bilinear"): np.ones((2, 2))
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=regridders,
+        fractional_masks={("OCN", "ATM", "bilinear"): np.ones((2, 2))},
+    )
 
     with pytest.raises(ExchangerError, match="Field temperature not present"):
         _dispatch_runtime_fields(
@@ -1069,7 +1092,7 @@ def test_runtime_field_dispatch_rejects_missing_scalar_and_vector_fields() -> No
     )
     coupler.components = cast(Any, {"OCN": vector_source, "ATM": vector_destination})
     coupler.exchanges = [vector_exchange]
-    coupler._runtime_resources.regridders = cast(
+    regridders = cast(
         Any,
         {
             ("OCN", "ATM", "conservative"): RecordingRegridder(
@@ -1077,9 +1100,11 @@ def test_runtime_field_dispatch_rejects_missing_scalar_and_vector_fields() -> No
             )
         },
     )
-    coupler._runtime_resources.fractional_masks = {
-        ("OCN", "ATM", "conservative"): np.ones((2, 2))
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=regridders,
+        fractional_masks={("OCN", "ATM", "conservative"): np.ones((2, 2))},
+    )
 
     with pytest.raises(ExchangerError, match="Not all fields in vector"):
         _dispatch_runtime_fields(

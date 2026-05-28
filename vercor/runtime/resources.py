@@ -46,9 +46,39 @@ class CouplerRuntimeResources:
     ) -> None:
         """Replace exchange topology maps from an initialized topology state."""
 
-        self.regridders = topology.regridders
-        self.binary_masks = topology.binary_masks
-        self.fractional_masks = topology.fractional_masks
+        self.replace_topology_maps(
+            regridders=topology.regridders,
+            binary_masks=topology.binary_masks,
+            fractional_masks=topology.fractional_masks,
+        )
+
+    def replace_topology_maps(
+        self,
+        *,
+        regridders: dict[tuple[str, str, str], RuntimeRegridder],
+        binary_masks: dict[tuple[str, str, str], RuntimeArray],
+        fractional_masks: dict[tuple[str, str, str], RuntimeArray],
+    ) -> None:
+        """Replace exchange topology maps as one grouped resource update."""
+
+        self.regridders = regridders
+        self.binary_masks = binary_masks
+        self.fractional_masks = fractional_masks
+
+    def clear_compiled_runtime_cache(self) -> None:
+        """Clear compiled runtime entries owned by this resource holder."""
+
+        self.compiled_runtime_cache.clear()
+
+    def compiled_runtime_cache_entry_count(self) -> int:
+        """Return the number of compiled runtime entries in the cache."""
+
+        return len(self.compiled_runtime_cache)
+
+    def compiled_runtime_cache_values(self) -> tuple[CompiledRuntime, ...]:
+        """Return compiled runtime values without exposing the cache mapping."""
+
+        return tuple(self.compiled_runtime_cache.values())
 
 
 __all__ = ["CompiledRuntime", "CouplerRuntimeResources"]

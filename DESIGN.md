@@ -265,11 +265,15 @@ immutable runtime containers used during traced integration.
   resources live in `vercor.runtime.resources.CouplerRuntimeResources`, which
   owns exchange topology maps, refreshed runtime contracts, the compiled runtime
   cache, and the interrupt controller. Runtime facade code replaces refreshed
-  contracts and topology maps through holder methods, keeping grouped resource
-  mutation behind the resource owner. `Coupler` accesses those resources
-  through the holder directly and passes repeated runtime inputs through the
-  internal `vercor.runtime.facade.RuntimeFacadeInputs` bundle; there are no
-  private compatibility aliases for individual runtime maps or caches.
+  contracts and topology maps through holder methods, and focused tests install
+  synthetic topology through the same grouped topology-map replacement helper.
+  Compiled runtime cache clearing, counting, and test inspection also live on
+  the holder rather than exposing its dictionary. `Coupler` passes repeated
+  runtime inputs through the internal
+  `vercor.runtime.facade.RuntimeFacadeInputs` bundle and exposes only
+  `clear_runtime_cache()` plus `runtime_cache_entry_count()` as a small public
+  profiling facade; there are no private compatibility aliases for individual
+  runtime maps or caches.
   Host/scanned runtime loops, run-mode
   selection, donation checks, and interrupt translation live in
   `vercor.runtime.runner`. High-level runtime orchestration for the

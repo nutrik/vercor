@@ -70,6 +70,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local whole-codebase boundary refactor validation: focused fast pytest,
   full fast pytest, Black, flake8, mypy, and full pytest passed as of
   2026-05-28.
+- Latest local runtime-resource boundary refinement validation: focused fast
+  pytest, Black, flake8, mypy, full fast pytest, and full pytest passed as of
+  2026-05-28.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -95,6 +98,28 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-28: Runtime Resource Boundary Refinement
+
+- Added public `Coupler.clear_runtime_cache()` and
+  `Coupler.runtime_cache_entry_count()` as the small profiling-facing runtime
+  cache API.
+- Added grouped runtime-resource helpers for topology-map replacement and
+  compiled-cache clear/count/value inspection, keeping cache dictionaries and
+  synthetic topology setup behind the runtime resource holder.
+- Updated the runtime profiling example and focused runtime tests to use the
+  public cache facade or named test helpers instead of raw runtime cache and
+  topology assignments.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the refined resource boundary.
+- Validation run for this change:
+  focused runtime-resource/API fast pytest,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- No failed implementation approaches.
 
 ### 2026-05-28: Whole-Codebase Boundary Refactor
 

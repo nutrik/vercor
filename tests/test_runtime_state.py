@@ -530,6 +530,20 @@ def test_coupler_runtime_resources_store_runtime_state() -> None:
     assert coupler._runtime_resources.interrupts is interrupts
 
 
+def test_coupler_exposes_minimal_runtime_cache_facade() -> None:
+    coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
+    coupler._runtime_resources.compiled_runtime_cache[("unit-test",)] = cast(
+        Any,
+        lambda state: state,
+    )
+
+    assert coupler.runtime_cache_entry_count() == 1
+
+    coupler.clear_runtime_cache()
+
+    assert coupler.runtime_cache_entry_count() == 0
+
+
 @pytest.mark.fast_always
 def test_runtime_resources_replace_contracts_and_topology_through_methods() -> None:
     from vercor.runtime.resources import CouplerRuntimeResources
@@ -561,6 +575,31 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
     assert resources.binary_masks is topology.binary_masks
     assert resources.fractional_masks is topology.fractional_masks
 
+    resources.compiled_runtime_cache[("unit-test",)] = cast(Any, lambda state: state)
+    assert resources.compiled_runtime_cache_entry_count() == 1
+    assert len(resources.compiled_runtime_cache_values()) == 1
+
+    resources.clear_compiled_runtime_cache()
+
+    assert resources.compiled_runtime_cache_entry_count() == 0
+
+    replacement_regridders = cast(Any, {("OCN", "ATM", "bilinear"): object()})
+    replacement_binary_masks: dict[tuple[str, str, str], RuntimeArray] = {
+        ("OCN", "ATM", "bilinear"): jnp.ones((2, 2))
+    }
+    replacement_fractional_masks: dict[tuple[str, str, str], RuntimeArray] = {
+        ("OCN", "ATM", "bilinear"): jnp.full((2, 2), 0.25)
+    }
+    resources.replace_topology_maps(
+        regridders=replacement_regridders,
+        binary_masks=replacement_binary_masks,
+        fractional_masks=replacement_fractional_masks,
+    )
+
+    assert resources.regridders is replacement_regridders
+    assert resources.binary_masks is replacement_binary_masks
+    assert resources.fractional_masks is replacement_fractional_masks
+
     runtime_facade_source = Path("vercor/runtime/facade.py").read_text(encoding="utf-8")
     for direct_assignment in (
         "runtime_resources.contracts =",
@@ -569,6 +608,9 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
         "runtime_resources.fractional_masks =",
     ):
         assert direct_assignment not in runtime_facade_source
+
+    profile_source = Path("examples/profile_runtime.py").read_text(encoding="utf-8")
+    assert "coupler._runtime_resources" not in profile_source
 
 
 def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:

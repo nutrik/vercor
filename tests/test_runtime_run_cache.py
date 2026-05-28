@@ -9,6 +9,12 @@ import jax.numpy as jnp
 import numpy as np
 
 from tests._coverage_support import make_test_grid
+from tests._runtime_helpers import (
+    clear_runtime_cache,
+    compiled_runtime_cache_values,
+    replace_runtime_topology_maps,
+    runtime_cache_entry_count,
+)
 from vercor.clock import Clock
 from vercor.setups.slab.atmosphere import make_slab_atmosphere
 from vercor.setups.slab.land import make_slab_land
@@ -95,7 +101,7 @@ def _make_coupler(steps: int) -> Coupler:
             regridder_factory=cast(Any, _identity_factory),
         ),
     ]
-    coupler._runtime_resources.regridders = cast(
+    regridders = cast(
         Any,
         {
             ("OCN", "ATM", "_identity_factory"): _IdentityRegridder(),
@@ -104,10 +110,13 @@ def _make_coupler(steps: int) -> Coupler:
             ("OCN", "ICE", "_identity_factory"): _IdentityRegridder(),
         },
     )
-    coupler._runtime_resources.fractional_masks = {
-        key: jnp.ones((2, 2), dtype=jnp.float64)
-        for key in coupler._runtime_resources.regridders
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=regridders,
+        fractional_masks={
+            key: jnp.ones((2, 2), dtype=jnp.float64) for key in regridders
+        },
+    )
     return coupler
 
 
@@ -196,14 +205,12 @@ def _runtime_treedef_repr(value: RuntimeCouplerState) -> str:
 
 def test_run_reuses_compiled_cache_for_same_shapes_and_metadata() -> None:
     coupler = _make_coupler(steps=2)
-    coupler._runtime_resources.compiled_runtime_cache.clear()
+    clear_runtime_cache(coupler)
 
     first = _block_until_ready(
         coupler.run(_runtime_state_with_sst(288.15), donate_state=False)
     )
-    compiled = cast(
-        Any, next(iter(coupler._runtime_resources.compiled_runtime_cache.values()))
-    )
+    compiled = cast(Any, next(iter(compiled_runtime_cache_values(coupler))))
     first_cache_size = compiled._cache_size()
 
     second = _block_until_ready(
@@ -211,7 +218,7 @@ def test_run_reuses_compiled_cache_for_same_shapes_and_metadata() -> None:
     )
     second_cache_size = compiled._cache_size()
 
-    assert len(coupler._runtime_resources.compiled_runtime_cache) == 1
+    assert runtime_cache_entry_count(coupler) == 1
     assert first_cache_size == 1
     assert second_cache_size == first_cache_size
     assert first.get_component_state("OCN").data.get(
@@ -224,14 +231,12 @@ def test_run_reuses_compiled_cache_for_same_shapes_and_metadata() -> None:
 
 def test_run_donation_uses_donating_compiled_runtime() -> None:
     coupler = _make_coupler(steps=2)
-    coupler._runtime_resources.compiled_runtime_cache.clear()
+    clear_runtime_cache(coupler)
 
     final_state = _block_until_ready(
         coupler.run(_runtime_state_with_sst(289.15), donate_state=True)
     )
-    compiled = cast(
-        Any, next(iter(coupler._runtime_resources.compiled_runtime_cache.values()))
-    )
+    compiled = cast(Any, next(iter(compiled_runtime_cache_values(coupler))))
 
     assert compiled._cache_size() == 1
     assert final_state.component_names == ("ATM", "OCN", "LND", "ICE")

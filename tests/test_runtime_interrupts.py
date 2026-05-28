@@ -11,6 +11,11 @@ import numpy as np
 import pytest
 
 from tests._coverage_support import make_test_grid
+from tests._runtime_helpers import (
+    clear_runtime_cache,
+    compiled_runtime_cache_values,
+    runtime_cache_entry_count,
+)
 from vercor.clock import Clock
 from vercor.components.base import Component
 from vercor.components.host import HostRuntimeComponent
@@ -231,16 +236,14 @@ def test_compiled_scanned_runtime_observes_wakeup_fd_interrupt(
 
 def test_interrupt_checkpoints_do_not_split_compiled_runtime_cache() -> None:
     coupler = _make_pure_coupler()
-    coupler._runtime_resources.compiled_runtime_cache.clear()
+    clear_runtime_cache(coupler)
 
     first = _block_until_ready(coupler.run(donate_state=False))
-    compiled = cast(
-        Any, next(iter(coupler._runtime_resources.compiled_runtime_cache.values()))
-    )
+    compiled = cast(Any, next(iter(compiled_runtime_cache_values(coupler))))
     first_cache_size = compiled._cache_size()
     second = _block_until_ready(coupler.run(donate_state=False))
 
-    assert len(coupler._runtime_resources.compiled_runtime_cache) == 1
+    assert runtime_cache_entry_count(coupler) == 1
     assert compiled._cache_size() == first_cache_size
     assert first.component_names == ("ATM",)
     assert second.component_names == ("ATM",)

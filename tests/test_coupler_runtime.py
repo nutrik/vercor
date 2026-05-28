@@ -44,7 +44,7 @@ from vercor.time_selection import (
     get_field_time_slice,
     get_periodic_interval,
 )
-from tests._runtime_helpers import run_scanned_coupler
+from tests._runtime_helpers import replace_runtime_topology_maps, run_scanned_coupler
 
 
 class _IdentityRegridder:
@@ -348,7 +348,7 @@ def _make_coupler(steps: int) -> Coupler:
         ),
     ]
     key = ("OCN", "ATM", "_identity_factory")
-    coupler._runtime_resources.regridders = cast(
+    regridders = cast(
         Any,
         {
             key: _IdentityRegridder(),
@@ -357,10 +357,11 @@ def _make_coupler(steps: int) -> Coupler:
             ("OCN", "ICE", "_identity_factory"): _IdentityRegridder(),
         },
     )
-    coupler._runtime_resources.fractional_masks = {
-        runtime_key: jnp.ones((2, 2))
-        for runtime_key in coupler._runtime_resources.regridders
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=regridders,
+        fractional_masks={runtime_key: jnp.ones((2, 2)) for runtime_key in regridders},
+    )
     return coupler
 
 
@@ -876,17 +877,20 @@ def test_data_forcing_components_run_inside_runtime() -> None:
             regridder_factory=cast(Any, _identity_factory),
         ),
     ]
-    coupler._runtime_resources.regridders = cast(
+    regridders = cast(
         Any,
         {
             ("OCN", "ATM", "_identity_factory"): _IdentityRegridder(),
             ("LND", "ATM", "_identity_factory"): _IdentityRegridder(),
         },
     )
-    coupler._runtime_resources.fractional_masks = {
-        key: jnp.ones(grid.shape, dtype=jnp.float64)
-        for key in coupler._runtime_resources.regridders
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=regridders,
+        fractional_masks={
+            key: jnp.ones(grid.shape, dtype=jnp.float64) for key in regridders
+        },
+    )
 
     initial_state = coupler.create_runtime_state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -955,10 +959,11 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
         )
     ]
     key = ("OCN", "ATM", "_identity_factory")
-    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._runtime_resources.fractional_masks = {
-        key: jnp.ones(grid.shape, dtype=jnp.float64)
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=cast(Any, {key: _IdentityRegridder()}),
+        fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
+    )
 
     initial_state = coupler.create_runtime_state()
     ocean_state = initial_state.get_component_state("OCN")
@@ -1009,10 +1014,11 @@ def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridd
         )
     ]
     key = ("OCN", "ATM", "bilinear")
-    coupler._runtime_resources.regridders = cast(Any, {key: bilinear(grid, grid)})
-    coupler._runtime_resources.fractional_masks = {
-        key: jnp.ones(grid.shape, dtype=jnp.float64)
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=cast(Any, {key: bilinear(grid, grid)}),
+        fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
+    )
     atmosphere.data = {
         "temperature_2m": jnp.full(grid.shape, 288.15, dtype=jnp.float64),
         "sensible_heat_flux": jnp.zeros(grid.shape, dtype=jnp.float64),
@@ -1080,8 +1086,11 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
     ]
     key = ("OCN", "ATM", "bilinear")
     regridder = bilinear(ocean_grid, atmosphere_grid)
-    coupler._runtime_resources.regridders = cast(Any, {key: regridder})
-    coupler._runtime_resources.fractional_masks = {key: jnp.ones(atmosphere_grid.shape)}
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=cast(Any, {key: regridder}),
+        fractional_masks={key: jnp.ones(atmosphere_grid.shape)},
+    )
     atmosphere.data = {
         "temperature_2m": jnp.full(atmosphere_grid.shape, 288.15, dtype=jnp.float64),
         "sensible_heat_flux": jnp.zeros(atmosphere_grid.shape, dtype=jnp.float64),
@@ -1163,10 +1172,11 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
         )
     ]
     key = ("LND", "ATM", "bilinear")
-    coupler._runtime_resources.regridders = cast(Any, {key: bilinear(grid, grid)})
-    coupler._runtime_resources.fractional_masks = {
-        key: jnp.ones(grid.shape, dtype=jnp.float64)
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=cast(Any, {key: bilinear(grid, grid)}),
+        fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
+    )
 
     initial_state = coupler.create_runtime_state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1240,10 +1250,11 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
         )
     ]
     key = ("LND", "ATM", "_identity_factory")
-    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._runtime_resources.fractional_masks = {
-        key: jnp.ones(grid.shape, dtype=jnp.float64)
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=cast(Any, {key: _IdentityRegridder()}),
+        fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
+    )
 
     initial_state = coupler.create_runtime_state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1316,10 +1327,11 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
         )
     ]
     key = ("LND", "ATM", "_identity_factory")
-    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._runtime_resources.fractional_masks = {
-        key: jnp.ones(grid.shape, dtype=jnp.float64)
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=cast(Any, {key: _IdentityRegridder()}),
+        fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
+    )
     _, runtime_time, _ = next(coupler.clock.iter())
     expected_slice = get_field_time_slice(
         "land_surface_temperature",
@@ -1396,10 +1408,11 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
         )
     ]
     key = ("OCN", "ATM", "_identity_factory")
-    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._runtime_resources.fractional_masks = {
-        key: jnp.ones(grid.shape, dtype=jnp.float64)
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=cast(Any, {key: _IdentityRegridder()}),
+        fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
+    )
     (left_index, left_weight), (right_index, right_weight) = get_periodic_interval(
         current_time=datetime_to_seconds_in_year(coupler.clock.start),
         cycle_length=coupler.settings.year_in_seconds,
@@ -1550,10 +1563,11 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
         )
     ]
     key = ("OCN", "ATM", "_identity_factory")
-    coupler._runtime_resources.regridders = cast(Any, {key: _IdentityRegridder()})
-    coupler._runtime_resources.fractional_masks = {
-        key: jnp.ones(grid.shape, dtype=jnp.float64)
-    }
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=cast(Any, {key: _IdentityRegridder()}),
+        fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
+    )
 
     initial_state = coupler.create_runtime_state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1716,7 +1730,7 @@ def test_scanned_runtime_rejects_veros_runtime_boundary() -> None:
 def test_run_validates_regridders_and_fractional_masks() -> None:
     coupler = _make_coupler(steps=1)
     state = _make_initial_state(jnp.full((2, 2), 286.15, dtype=jnp.float64))
-    coupler._runtime_resources.regridders = {}
+    replace_runtime_topology_maps(coupler, regridders={})
 
     with pytest.raises(CouplerError, match="initialized regridder"):
         run_scanned_coupler(coupler, state)

@@ -172,6 +172,16 @@ class Coupler:
         )
         return prepared.runtime_state
 
+    def clear_runtime_cache(self) -> None:
+        """Clear compiled runtime entries cached for this coupler instance."""
+
+        self._runtime_resources.clear_compiled_runtime_cache()
+
+    def runtime_cache_entry_count(self) -> int:
+        """Return the number of compiled runtime entries cached by this coupler."""
+
+        return self._runtime_resources.compiled_runtime_cache_entry_count()
+
     def runtime_component_view(
         self,
         runtime_state: _runtime_state_module.RuntimeCouplerState,
