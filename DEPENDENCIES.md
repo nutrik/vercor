@@ -25,7 +25,7 @@
 25. `vercor/jax_logging.py` - callback-backed logger protocol and setup helper for Python and traced JAX runtime diagnostics
 26. `vercor/setups/_time_helpers.py` - shared setup-time timestep validation, lifecycle assignment, spinup logging, forcing-index, and default-field seeding helpers built on (23)
 27. `vercor/setups/_lazy_imports.py` - shared lazy package export helper for setup modules with optional dependencies
-28. `vercor/setups/exchange_recipes.py` and `vercor/setups/coupler_helpers.py` - shared exchange field recipes, compact `ExchangeSpec` construction, and orchestration helpers
+28. `vercor/exchange.py`, `vercor/setups/exchange_recipes.py`, and `vercor/setups/coupler_helpers.py` - public exchange declarations and exchange-owned field/factory aliases, shared exchange field recipes, compact `ExchangeSpec` construction, and orchestration helpers built on (12, 17, 18, 19)
 29. `vercor/setups/external/jax_gcm_tools.py` - JCM-specific parameter and input-data helpers built on (1, 7, 8, 11)
 30. `vercor/setups/external/jax_gcm_fields.py` - JCM output-field mapping and surface-temperature forcing helpers built on (1, 7)
 31. `vercor/setups/external/jax_gcm_output.py` - JAXGCM output cadence and NetCDF writing helpers built on (6, 25)
@@ -67,10 +67,11 @@
 67. `vercor/runtime/dispatch_context.py`, `exchange_dispatch.py`, and `driver.py` - static dispatch context construction, exchange dispatch, component runtime stepping orchestration, and outgoing priming built on (6, 59, 62, 63, 64, 65, 66)
 68. `vercor/runtime/coupler_state.py` and `topology.py` - runtime coupler-state assembly, runtime-contract refresh, topology/name validation, output-mask lookup, component lookup, explicit exchange topology state, and exchange topology setup built on (12, 13, 19, 20, 59, 62, 63, 64, 66, 67)
 69. `vercor/runtime/initialization.py` - setup-time precision synchronization, component initialization, setup validation, runtime contract validation, and exchange-topology handoff built on (24, 59, 62, 63, 66, 68)
-70. `vercor/runtime/run_context.py`, `cache.py`, `progress.py`, and `interrupts.py` - bundled runtime execution context, compile-cache/JIT policy, progress callbacks, and cancellation controller built on (24, 25, 64, 67)
+70. `vercor/runtime/run_context.py`, `cache.py`, `progress.py`, and `interrupts.py` - bundled runtime execution context, shared compiled-runtime callable alias, compile-cache/JIT policy, progress callbacks, and cancellation controller built on (24, 25, 64, 67)
 71. `vercor/runtime/resources.py` - mutable per-coupler runtime resource holder, grouped replacement boundary for topology maps and refreshed contracts, compiled runtime cache query/clear helpers, and interrupts built on (63, 64, 68, 70)
-72. `vercor/runtime/runner.py` - host/scanned runtime loops, run-mode selection, donation checks, and interrupt translation built on (65, 67, 70)
-73. `vercor/output.py` - runtime-view and coupler-final-output NetCDF output boundary built on (10, 12, 60, 64, 68)
-74. `vercor/runtime/facade.py` - high-level runtime orchestration boundary and internal repeated-input bundle for the public coupler facade and runtime resource holder built on (24, 25, 59, 60, 63, 64, 67, 68, 69, 70, 71, 72, 73)
-75. `vercor/coupler.py` - public setup/finalization facade for `run()`, `create_runtime_state()`, runtime views, and minimal runtime-cache profiling helpers built on (25, 59, 62, 64, 71, 74)
-76. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`
+72. `vercor/runtime/preparation.py` - runtime state preparation, prepared-state bundle ownership, refreshed contract validation, and initial outgoing-store priming built on (24, 63, 64, 65, 67, 68, 71)
+73. `vercor/runtime/runner.py` - host/scanned runtime loops, run-mode selection, donation checks, and interrupt translation built on (65, 67, 70)
+74. `vercor/output.py` - runtime-view and coupler-final-output NetCDF output boundary built on (10, 12, 60, 64, 68)
+75. `vercor/runtime/facade.py` - high-level runtime orchestration boundary and internal repeated-input bundle for the public coupler facade and runtime resource holder built on (24, 25, 59, 60, 63, 64, 67, 68, 69, 70, 71, 72, 73, 74)
+76. `vercor/coupler.py` - public setup/finalization facade for `run()`, `create_runtime_state()`, runtime views, and minimal runtime-cache profiling helpers built on (25, 59, 62, 64, 71, 75)
+77. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`

@@ -87,6 +87,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_validation_path = Path("vercor/runtime/validation.py")
     runtime_topology_path = Path("vercor/runtime/topology.py")
     runtime_initialization_path = Path("vercor/runtime/initialization.py")
+    runtime_preparation_path = Path("vercor/runtime/preparation.py")
     runtime_facade_path = Path("vercor/runtime/facade.py")
     assert runtime_contracts_path.exists()
     assert runtime_stores_path.exists()
@@ -101,6 +102,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_validation_path.exists()
     assert runtime_topology_path.exists()
     assert runtime_initialization_path.exists()
+    assert runtime_preparation_path.exists()
     assert runtime_facade_path.exists()
     runtime_contracts_source = runtime_contracts_path.read_text(encoding="utf-8")
     runtime_stores_source = runtime_stores_path.read_text(encoding="utf-8")
@@ -125,6 +127,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_initialization_source = runtime_initialization_path.read_text(
         encoding="utf-8"
     )
+    runtime_preparation_source = runtime_preparation_path.read_text(encoding="utf-8")
     runtime_facade_source = runtime_facade_path.read_text(encoding="utf-8")
     regridder_source = Path("vercor/regridders/base.py").read_text(encoding="utf-8")
     coupler_source = Path("vercor/coupler.py").read_text(encoding="utf-8")
@@ -240,12 +243,14 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def output_masks_for_component(" in runtime_coupler_state_source
     assert "def refresh_runtime_contracts(" in runtime_coupler_state_source
     assert "refresh_runtime_contracts(" not in coupler_source
-    assert "refresh_runtime_contracts(" in runtime_facade_source
+    assert "refresh_runtime_contracts(" in runtime_preparation_source
+    assert "refresh_runtime_contracts(" not in runtime_facade_source
     assert "build_runtime_contracts(" not in coupler_source
     assert "def prime_runtime_state(" not in runtime_coupler_state_source
     assert "prime_runtime_state(" not in coupler_source
     assert "prime_runtime_outgoing(" not in coupler_source
-    assert "prime_runtime_outgoing(" in runtime_facade_source
+    assert "prime_runtime_outgoing(" in runtime_preparation_source
+    assert "prime_runtime_outgoing(" not in runtime_facade_source
     assert "def run_host_runtime(" in runtime_runner_source
     assert "def run_scanned_runtime(" in runtime_runner_source
     assert "def run_coupler_runtime(" in runtime_runner_source

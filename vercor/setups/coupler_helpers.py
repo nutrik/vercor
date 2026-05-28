@@ -1,23 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from vercor.clock import Clock
 from vercor.components import Component
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
-from vercor.regridders import (
-    BilinearRectilinearRegridder,
-    ConservativeRectilinearRegridder,
-)
+from vercor.exchange import ExchangeField, RegridderFactory
 from vercor.run_sequence import RunSequence
-
-ExchangeField = str | tuple[str, str]
-RegridderFactory = Callable[
-    ...,
-    BilinearRectilinearRegridder | ConservativeRectilinearRegridder,
-]
 
 
 @dataclass(frozen=True)

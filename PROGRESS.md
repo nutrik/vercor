@@ -73,6 +73,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime-resource boundary refinement validation: focused fast
   pytest, Black, flake8, mypy, full fast pytest, and full pytest passed as of
   2026-05-28.
+- Latest local runtime-preparation boundary validation: focused boundary
+  pytest, Black, flake8, mypy, full fast pytest, and full pytest passed as of
+  2026-05-28.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -98,6 +101,37 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-28: Runtime Preparation Boundary Refactor
+
+- Added `vercor.runtime.preparation` as the focused owner for prepared runtime
+  state construction, contract refresh for prepared states, runtime-state
+  validation, and initial outgoing-store priming.
+- Kept `vercor.runtime.facade` as the coupler-facing orchestration boundary by
+  reexporting preparation helpers while leaving dispatch/run context
+  construction, execution delegation, runtime views, and final output delegation
+  in the facade.
+- Centralized `CompiledRuntime` in `vercor.runtime.run_context` and exchange
+  field/factory aliases in `vercor.exchange`, removing duplicate alias
+  ownership from runtime resources and setup helper modules.
+- Strengthened boundary tests for runtime preparation ownership, facade
+  reexports, runtime import-cycle absence, shared compiled-runtime typing, and
+  exchange alias ownership.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the new preparation and alias
+  ownership boundaries.
+- Validation run for this change:
+  focused runtime/API/state boundary fast pytest,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: the first `RuntimePreparationInputs` protocol used
+  mutable attributes, which mypy rejected for frozen `RuntimeFacadeInputs`; the
+  protocol now uses read-only properties. The first full pytest run exposed a
+  stale architecture assertion that still expected preparation logic in
+  `runtime.facade`; the assertion now checks `runtime.preparation` as the owner.
 
 ### 2026-05-28: Runtime Resource Boundary Refinement
 

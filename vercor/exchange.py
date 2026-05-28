@@ -1,11 +1,16 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Callable, Union
+from typing import Callable, TypeAlias
 
 from vercor.grid import Grid
 from vercor.regridders.bilinear import BilinearRectilinearRegridder
 from vercor.regridders.conservative import ConservativeRectilinearRegridder
+
+ExchangeField: TypeAlias = str | tuple[str, str]
+RegridderFactory: TypeAlias = Callable[
+    ..., BilinearRectilinearRegridder | ConservativeRectilinearRegridder
+]
 
 
 def _regridder_factory_name(regridder_factory: Callable[..., object]) -> str:
@@ -43,10 +48,8 @@ class Exchange:
     source: str
     destination: str
     name: str = field(init=False)
-    field_names: Sequence[Union[str, tuple[str, str]]]
-    regridder_factory: Callable[
-        ..., BilinearRectilinearRegridder | ConservativeRectilinearRegridder
-    ]
+    field_names: Sequence[ExchangeField]
+    regridder_factory: RegridderFactory
     interpolation_type: str = field(init=False)
 
     def __post_init__(self) -> None:

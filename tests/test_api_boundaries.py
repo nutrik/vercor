@@ -773,12 +773,24 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert not hasattr(exchange_module, "VALID_EXCHANGE_FIELD_NAMES")
     assert "sea_surface_temperature" in field_names_module.VALID_EXCHANGE_FIELD_NAMES
 
+    assert exchange_module.ExchangeField == str | tuple[str, str]
+    assert hasattr(exchange_module, "RegridderFactory")
+
     clock_source = Path("vercor/clock.py").read_text(encoding="utf-8")
     runtime_time_source = Path("vercor/runtime/time.py").read_text(encoding="utf-8")
     runtime_validation_source = Path("vercor/runtime/validation.py").read_text(
         encoding="utf-8"
     )
     exchange_source = Path("vercor/exchange.py").read_text(encoding="utf-8")
+    coupler_helpers_source = Path("vercor/setups/coupler_helpers.py").read_text(
+        encoding="utf-8"
+    )
+    exchange_recipes_source = Path("vercor/setups/exchange_recipes.py").read_text(
+        encoding="utf-8"
+    )
+    runtime_resources_source = Path("vercor/runtime/resources.py").read_text(
+        encoding="utf-8"
+    )
     regridder_base_source = Path("vercor/regridders/base.py").read_text(
         encoding="utf-8"
     )
@@ -807,6 +819,17 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
         not in exchange_source
     )
     assert "VALID_EXCHANGE_FIELD_NAMES: list[str]" not in exchange_source
+    assert "ExchangeField: TypeAlias" in exchange_source
+    assert "RegridderFactory: TypeAlias" in exchange_source
+    assert "ExchangeField = str | tuple[str, str]" not in coupler_helpers_source
+    assert "RegridderFactory = Callable[" not in coupler_helpers_source
+    assert "ExchangeField: TypeAlias" not in exchange_recipes_source
+    assert "from vercor.exchange import ExchangeField" in coupler_helpers_source
+    assert "from vercor.exchange import ExchangeField" in exchange_recipes_source
+    assert "from vercor.runtime.run_context import CompiledRuntime" in (
+        runtime_resources_source
+    )
+    assert "CompiledRuntime = Callable[" not in runtime_resources_source
     assert "def _compute_has_identical_grids(" not in regridder_base_source
     assert "grids_identical(" in regridder_base_source
     assert "BilinearRectilinearInterpolator" not in regridder_base_source

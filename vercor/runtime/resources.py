@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.interrupts import RuntimeInterruptController
-from vercor.runtime.state import RuntimeCouplerState
+from vercor.runtime.run_context import CompiledRuntime
 from vercor.runtime.topology import ExchangeTopologyState, RuntimeRegridder
 from vercor.types import RuntimeArray
-
-CompiledRuntime = Callable[[RuntimeCouplerState], RuntimeCouplerState]
 
 
 @dataclass

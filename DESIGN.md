@@ -257,9 +257,14 @@ immutable runtime containers used during traced integration.
   `ExchangeTopologyState` for the runtime facade to store. Setup-time component
   precision synchronization, initialization context construction, component
   setup validation, runtime contract validation, and topology handoff live in
-  `vercor.runtime.initialization`. Bundled `RuntimeRunContext` execution inputs
-  live in `vercor.runtime.run_context`, compiled-runtime cache keys and JIT
-  wrapping live in `vercor.runtime.cache`, shared host/scanned progress messages
+  `vercor.runtime.initialization`. Runtime state preparation, the
+  `PreparedRuntimeState` bundle, contract refresh for prepared states,
+  validation, and initial outgoing-store priming live in
+  `vercor.runtime.preparation`; `vercor.runtime.facade` reexports these helpers
+  for the coupler-facing runtime boundary but does not own their implementation.
+  Bundled `RuntimeRunContext` execution inputs and the shared compiled-runtime
+  callable alias live in `vercor.runtime.run_context`, compiled-runtime cache
+  keys and JIT wrapping live in `vercor.runtime.cache`, shared host/scanned progress messages
   plus traced callbacks live in `vercor.runtime.progress`, and the interrupt
   controller lives in `vercor.runtime.interrupts`. Mutable per-coupler runtime
   resources live in `vercor.runtime.resources.CouplerRuntimeResources`, which
@@ -278,9 +283,9 @@ immutable runtime containers used during traced integration.
   selection, donation checks, and interrupt translation live in
   `vercor.runtime.runner`. High-level runtime orchestration for the
   public `Coupler` facade lives in `vercor.runtime.facade`: runtime-state
-  creation, validation, dispatch/run context construction, host/scanned
-  execution, runtime views, and final output delegation enter through this
-  module instead of direct `Coupler` imports of runtime implementation helpers.
+  preparation, dispatch/run context construction, host/scanned execution,
+  runtime views, and final output delegation enter through this module instead
+  of direct `Coupler` imports of runtime implementation helpers.
   Runtime component metadata and read-only field
   resolution for diagnostics/output live in `vercor.runtime.views`;
   `RuntimeComponentView`, `runtime_field_candidates(...)`, and
@@ -311,7 +316,10 @@ mappings at their author boundary instead of importing runtime context/store
 internals directly. Shared setup orchestration helpers in
 `vercor.setups.coupler_helpers` own component registration and compact
 `ExchangeSpec` recipes, so examples share source/destination/regridder wiring
-instead of repeating raw `Exchange(...)` construction.
+instead of repeating raw `Exchange(...)` construction. Public exchange
+configuration types, including `ExchangeField` and `RegridderFactory`, are
+owned by `vercor.exchange` and imported by setup helper modules rather than
+duplicated beside recipes.
 
 Core helper ownership follows the same boundary. Calendar constants,
 model-calendar datetime values, leap-year logic, 360/noleap daily mapping, and

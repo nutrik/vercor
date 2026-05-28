@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeAlias
-
-ExchangeField: TypeAlias = str | tuple[str, str]
-
+from vercor.exchange import ExchangeField
 
 ATMOSPHERE_TO_VEROS_FORCING_FIELDS: tuple[ExchangeField, ...] = (
     ("u_velocity", "v_velocity"),
