@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 import vercor.components._runtime_fields as _runtime_field_adapters
 import vercor.components._runtime_validation as _runtime_field_validation
+from vercor.components._protocols import ComponentAuthoringProtocol
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
-    from vercor.components.base import Component
     from vercor.runtime.contracts import RuntimeComponentContract
     from vercor.runtime.contexts import ComponentInitContext
     from vercor.runtime.state import RuntimeComponentState
@@ -16,10 +16,10 @@ if TYPE_CHECKING:
 class ComponentLifecycleMixin:
     """Default component lifecycle hook dispatch used by factory and subclasses."""
 
-    def _lifecycle_component(self) -> "Component":
+    def _lifecycle_component(self) -> ComponentAuthoringProtocol:
         """Return this mixin instance as the concrete component type."""
 
-        return cast("Component", self)
+        return cast(ComponentAuthoringProtocol, self)
 
     def initialize(
         self,

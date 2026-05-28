@@ -7,7 +7,7 @@ from typing import Any
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.interrupts import RuntimeInterruptController
 from vercor.runtime.state import RuntimeCouplerState
-from vercor.runtime.topology import RuntimeRegridder
+from vercor.runtime.topology import ExchangeTopologyState, RuntimeRegridder
 from vercor.types import RuntimeArray
 
 CompiledRuntime = Callable[[RuntimeCouplerState], RuntimeCouplerState]
@@ -31,6 +31,24 @@ class CouplerRuntimeResources:
     interrupts: RuntimeInterruptController = field(
         default_factory=RuntimeInterruptController
     )
+
+    def replace_contracts(
+        self,
+        contracts: dict[str, RuntimeComponentContract],
+    ) -> None:
+        """Replace refreshed runtime contracts as one resource update."""
+
+        self.contracts = contracts
+
+    def replace_topology(
+        self,
+        topology: ExchangeTopologyState,
+    ) -> None:
+        """Replace exchange topology maps from an initialized topology state."""
+
+        self.regridders = topology.regridders
+        self.binary_masks = topology.binary_masks
+        self.fractional_masks = topology.fractional_masks
 
 
 __all__ = ["CompiledRuntime", "CouplerRuntimeResources"]

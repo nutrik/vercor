@@ -164,7 +164,11 @@ immutable runtime containers used during traced integration.
   `vercor.components._callable_wrappers`. The concrete callable-backed
   differentiable wrapper is owned by `vercor.components.base`, and the concrete
   callable-backed host wrapper is owned by `vercor.components.host`, keeping
-  each runtime kind beside its public abstract base. Component-facing
+  each runtime kind beside its public abstract base. Private helper modules
+  share component-owned structural protocols from
+  `vercor.components._protocols` instead of importing the public
+  `Component` class for helper annotations, so helper boundaries stay decoupled
+  from the concrete base implementation. Component-facing
   runtime-field adapters live in private `vercor.components._runtime_fields`,
   component-facing runtime-field convenience methods live in private
   `vercor.components._runtime_access`, and component-facing required-field
@@ -258,7 +262,9 @@ immutable runtime containers used during traced integration.
   controller lives in `vercor.runtime.interrupts`. Mutable per-coupler runtime
   resources live in `vercor.runtime.resources.CouplerRuntimeResources`, which
   owns exchange topology maps, refreshed runtime contracts, the compiled runtime
-  cache, and the interrupt controller. `Coupler` accesses those resources
+  cache, and the interrupt controller. Runtime facade code replaces refreshed
+  contracts and topology maps through holder methods, keeping grouped resource
+  mutation behind the resource owner. `Coupler` accesses those resources
   through the holder directly; there are no private compatibility aliases for
   individual runtime maps or caches. Host/scanned runtime loops, run-mode
   selection, donation checks, and interrupt translation live in

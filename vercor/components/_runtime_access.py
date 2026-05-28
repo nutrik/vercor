@@ -11,21 +11,21 @@ from vercor.components.contracts import (
 )
 import vercor.components._runtime_fields as _runtime_field_adapters
 import vercor.components._runtime_validation as _runtime_field_validation
+from vercor.components._protocols import ComponentRuntimeProtocol
 from vercor.dtypes import PrecisionPolicy
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
-    from vercor.components.base import Component
     from vercor.runtime.state import RuntimeComponentState
 
 
 class ComponentRuntimeAccessMixin:
     """Component-facing runtime field read, update, prefill, and validation API."""
 
-    def _runtime_access_component(self) -> "Component":
+    def _runtime_access_component(self) -> ComponentRuntimeProtocol:
         """Return this mixin instance as the concrete component type."""
 
-        return cast("Component", self)
+        return cast(ComponentRuntimeProtocol, self)
 
     def runtime_fields(
         self,

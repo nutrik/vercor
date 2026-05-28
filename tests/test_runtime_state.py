@@ -27,6 +27,7 @@ from vercor.runtime.interrupts import RuntimeInterruptController
 from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.runtime.time import RuntimeStepInfo
+from vercor.types import RuntimeArray
 
 
 class _RuntimeSendComponent(DataComponent):
@@ -382,9 +383,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def validate_land_mask_consistency(" in runtime_topology_source
     assert "def patch_exchange_masks(" in runtime_topology_source
     assert "from vercor.runtime.topology import" not in coupler_source
-    assert "from vercor.runtime.topology import RuntimeRegridder" in (
-        runtime_resources_source
-    )
+    assert "from vercor.runtime.topology import" in runtime_resources_source
+    assert "ExchangeTopologyState" in runtime_resources_source
+    assert "RuntimeRegridder" in runtime_resources_source
     assert "def _create_exchange_masks(" not in coupler_source
     assert "def _validate_land_mask_consistency(" not in coupler_source
     assert "def _patch_exchange_masks(" not in coupler_source
@@ -527,6 +528,47 @@ def test_coupler_runtime_resources_store_runtime_state() -> None:
     assert coupler._runtime_resources.contracts is contracts
     assert coupler._runtime_resources.compiled_runtime_cache is compiled_cache
     assert coupler._runtime_resources.interrupts is interrupts
+
+
+@pytest.mark.fast_always
+def test_runtime_resources_replace_contracts_and_topology_through_methods() -> None:
+    from vercor.runtime.resources import CouplerRuntimeResources
+    from vercor.runtime.topology import ExchangeTopologyState
+
+    resources = CouplerRuntimeResources()
+    contracts = {"ATM": RuntimeComponentContract(imports=("x",), exports=("y",))}
+    regridders = cast(Any, {("ATM", "OCN", "bilinear"): object()})
+    binary_masks: dict[tuple[str, str, str], RuntimeArray] = {
+        ("ATM", "OCN", "bilinear"): jnp.ones((2, 2))
+    }
+    fractional_masks: dict[tuple[str, str, str], RuntimeArray] = {
+        ("ATM", "OCN", "bilinear"): jnp.full((2, 2), 0.5)
+    }
+    topology = ExchangeTopologyState(
+        regridders=regridders,
+        binary_masks=binary_masks,
+        fractional_masks=fractional_masks,
+        ocn_fmask_on_atm_grid=jnp.full((2, 2), 0.25),
+        lnd_fmask_on_atm_grid=jnp.full((2, 2), 0.75),
+        lnd_bmask_on_atm_grid=jnp.ones((2, 2)),
+    )
+
+    resources.replace_contracts(contracts)
+    resources.replace_topology(topology)
+
+    assert resources.contracts is contracts
+    assert resources.regridders is topology.regridders
+    assert resources.binary_masks is topology.binary_masks
+    assert resources.fractional_masks is topology.fractional_masks
+
+    runtime_facade_source = Path("vercor/runtime/facade.py").read_text(encoding="utf-8")
+    for direct_assignment in (
+        "runtime_resources.contracts =",
+        "runtime_resources.regridders =",
+        "runtime_resources.binary_masks =",
+        "runtime_resources.fractional_masks =",
+    ):
+        assert direct_assignment not in runtime_facade_source
 
 
 def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:

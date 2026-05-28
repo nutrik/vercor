@@ -64,6 +64,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local obsolete compatibility API active-doc audit validation:
   API-boundary fast pytest, full fast pytest, Black, flake8, mypy, and full
   pytest passed as of 2026-05-28.
+- Latest local component protocol/resource boundary validation: focused fast
+  pytest, Black, flake8, mypy, full fast pytest, and full pytest passed as of
+  2026-05-28.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -89,6 +92,32 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-05-28: Component Protocol and Runtime Resource Boundary Refactor
+
+- Added private component helper protocols in `vercor.components._protocols` so
+  runtime-field, validation, lifecycle, and callable-wrapper helpers depend on
+  structural component contracts instead of type-only imports from the public
+  `Component` base class.
+- Added grouped `CouplerRuntimeResources.replace_contracts(...)` and
+  `replace_topology(...)` methods, then routed runtime-facade contract/topology
+  refreshes through the resource holder instead of assigning individual maps in
+  facade code.
+- Strengthened boundary tests for component helper protocol ownership, runtime
+  resource replacement, and runtime-facade assignment cleanup; updated
+  `DESIGN.md` and `DEPENDENCIES.md` for the new ownership map.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_runtime_state.py tests/test_component_base_coverage.py -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: the first full pytest run exposed an overly exact
+  existing source-boundary assertion for the `RuntimeRegridder` topology import;
+  the assertion now checks topology-owner imports without depending on one-line
+  import formatting.
 
 ### 2026-05-28: Obsolete Compatibility Active-Doc Audit
 

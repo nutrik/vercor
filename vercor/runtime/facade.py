@@ -80,10 +80,8 @@ def initialize_coupler_runtime(
         logger=logger,
         enable_x64_computations=enable_x64_computations,
     )
-    runtime_resources.contracts = initialized.runtime_contracts
-    runtime_resources.regridders = initialized.topology.regridders
-    runtime_resources.binary_masks = initialized.topology.binary_masks
-    runtime_resources.fractional_masks = initialized.topology.fractional_masks
+    runtime_resources.replace_contracts(initialized.runtime_contracts)
+    runtime_resources.replace_topology(initialized.topology)
     return initialized
 
 
@@ -96,11 +94,12 @@ def runtime_state_from_components(
 ) -> PreparedRuntimeState:
     """Build immutable runtime state from setup components and exchanges."""
 
-    runtime_resources.contracts = refresh_runtime_contracts(
+    runtime_contracts = refresh_runtime_contracts(
         components,
         exchanges,
         validate_endpoints=False,
     )
+    runtime_resources.replace_contracts(runtime_contracts)
     runtime_state = _runtime_state_from_components(
         components,
         exchanges,
@@ -122,11 +121,12 @@ def validate_runtime_state(
 ) -> dict[str, RuntimeComponentContract]:
     """Validate runtime state and return the contracts used for validation."""
 
-    runtime_resources.contracts = refresh_runtime_contracts(
+    runtime_contracts = refresh_runtime_contracts(
         components,
         exchanges,
         validate_endpoints=False,
     )
+    runtime_resources.replace_contracts(runtime_contracts)
     _validate_runtime_state(
         runtime_state,
         components=components,

@@ -559,6 +559,29 @@ def test_components_package_has_no_top_level_import_cycles() -> None:
 
 
 @pytest.mark.fast_always
+def test_component_helpers_depend_on_private_protocol_boundary() -> None:
+    protocols_path = Path("vercor/components/_protocols.py")
+    assert protocols_path.exists()
+
+    helper_paths = (
+        Path("vercor/components/_runtime_fields.py"),
+        Path("vercor/components/_runtime_validation.py"),
+        Path("vercor/components/_runtime_access.py"),
+        Path("vercor/components/_lifecycle_api.py"),
+        Path("vercor/components/_callable_wrappers.py"),
+    )
+    for path in helper_paths:
+        source = path.read_text(encoding="utf-8")
+        assert "from vercor.components.base import Component" not in source, path
+        assert "vercor.components._protocols" in source, path
+
+    components_source = Path("vercor/components/__init__.py").read_text(
+        encoding="utf-8"
+    )
+    assert "_protocols" not in components_source
+
+
+@pytest.mark.fast_always
 def test_runtime_component_type_imports_are_annotation_only() -> None:
     """Runtime facade modules should not import Component for annotations only."""
 

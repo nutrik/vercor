@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import jax.numpy as jnp
 
 from vercor.components._contracts import declared_runtime_field_names
+from vercor.components._protocols import ComponentRuntimeProtocol
 from vercor.exceptions import CouplerError
 from vercor.field_layout import (
     canonical_data_layout_description,
@@ -12,12 +13,11 @@ from vercor.field_layout import (
 )
 
 if TYPE_CHECKING:
-    from vercor.components.base import Component
     from vercor.runtime.state import RuntimeComponentState
 
 
 def require_runtime_fields(
-    component: "Component",
+    component: ComponentRuntimeProtocol,
     component_state: "RuntimeComponentState",
     *names: str,
 ) -> None:
@@ -44,7 +44,7 @@ def require_runtime_fields(
 
 
 def validate_declared_runtime_fields(
-    component: "Component",
+    component: ComponentRuntimeProtocol,
     component_state: "RuntimeComponentState",
 ) -> None:
     """Validate fields required by the component's declared field contract."""
