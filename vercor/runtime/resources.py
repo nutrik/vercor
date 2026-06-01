@@ -6,7 +6,7 @@ from vercor.runtime.cache import CompiledRuntimeCache
 from vercor.runtime.compilation import CompiledRuntime
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.interrupts import RuntimeInterruptController
-from vercor.runtime.topology import ExchangeTopologyState, RuntimeTopologyMaps
+from vercor.runtime.topology_state import ExchangeTopologyState, RuntimeTopologyMaps
 
 
 @dataclass(slots=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from vercor.exceptions import ComponentError, CouplerError
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
 VALID_TOPOLOGY_COMPONENT_NAMES = ("ATM", "OCN", "LND", "ICE")
 
 
-def validate_component_topology_names(components: dict[str, Component]) -> None:
+def validate_component_topology_names(components: Mapping[str, Component]) -> None:
     """Validate registered component names supported by the default topology."""
 
     for name in components:
@@ -20,7 +21,7 @@ def validate_component_topology_names(components: dict[str, Component]) -> None:
             raise ComponentError(f"Incorrect component name: {name}, must be {allowed}")
 
 
-def get_component(allcomponents: dict[str, Component], types: str) -> Component:
+def get_component(allcomponents: Mapping[str, Component], types: str) -> Component:
     """Return the registered component with the requested VerCOR component name."""
 
     components: list[Component] = [

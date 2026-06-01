@@ -157,9 +157,10 @@ class Coupler:
         )
 
         topology = initialized.topology
-        self.ocn_fmask_on_atm_grid = topology.ocn_fmask_on_atm_grid
-        self.lnd_fmask_on_atm_grid = topology.lnd_fmask_on_atm_grid
-        self.lnd_bmask_on_atm_grid = topology.lnd_bmask_on_atm_grid
+        surface_masks = topology.surface_masks
+        self.ocn_fmask_on_atm_grid = surface_masks.ocn_fmask_on_atm_grid
+        self.lnd_fmask_on_atm_grid = surface_masks.lnd_fmask_on_atm_grid
+        self.lnd_bmask_on_atm_grid = surface_masks.lnd_bmask_on_atm_grid
 
     def create_runtime_state(
         self, *, prefill_missing: bool = True

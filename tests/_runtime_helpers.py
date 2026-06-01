@@ -7,7 +7,7 @@ from vercor.types import RuntimeArray
 import vercor.runtime.facade as runtime_facade
 from vercor.coupler import Coupler
 from vercor.runtime.state import RuntimeCouplerState
-from vercor.runtime.topology import RuntimeTopologyMaps
+from vercor.runtime.topology_state import RuntimeTopologyMaps
 
 
 def runtime_facade_inputs(coupler: Coupler) -> runtime_facade.RuntimeFacadeInputs:

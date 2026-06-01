@@ -94,6 +94,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime compilation cache boundary validation: focused
   red/green pytest, Black, focused fast pytest, flake8, mypy, full fast pytest,
   and full pytest passed as of 2026-06-01.
+- Latest local runtime topology policy boundary validation: focused red/green
+  pytest, Black, focused boundary pytest, flake8, mypy, full fast pytest, and
+  full pytest passed as of 2026-06-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -119,6 +122,42 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-01: Runtime Topology Policy Boundary Refactor
+
+- Added `vercor.runtime.topology_state` as the neutral owner for
+  `RuntimeRegridder`, grouped `RuntimeTopologyMaps`, `SurfaceExchangeMasks`,
+  and `ExchangeTopologyState`.
+- Split generic exchange regridder/identity-mask map construction into
+  `vercor.runtime.exchange_topology`, and moved ATM/OCN/LND surface-mask
+  creation, validation, and bilinear mask patching into
+  `vercor.runtime.surface_masks`.
+- Reduced `vercor.runtime.topology` to orchestration: it composes generic
+  exchange topology maps with surface masks and returns one explicit topology
+  state. Runtime resources and initialization now import topology state
+  contracts from the neutral state module, and `Coupler.initialize()` reads
+  public mask attributes through `topology.surface_masks`.
+- Strengthened boundary coverage so topology state, generic exchange maps, and
+  surface-mask policy cannot drift back into one mixed-responsibility topology
+  module.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the topology-state,
+  exchange-topology, surface-mask, and topology-orchestration split.
+- Validation run for this change:
+  baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`, focused
+  red pytest for the missing `topology_state`/`surface_masks` split, focused
+  green topology/boundary pytest after implementation,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy pytest tests/test_runtime_facade_boundaries.py tests/test_runtime_state.py tests/test_api_boundaries.py tests/test_coupler_coverage.py -q --fast --tb=short`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: the first focused green run exposed a stale
+  boundary assertion that still expected `vercor.runtime.topology` to import
+  component-topology lookup helpers; it now checks the new surface-mask owner.
+  The first flake8 pass reported one stale unused test local left by the import
+  move; it was removed before rerunning flake8.
 
 ### 2026-06-01: Runtime Compilation Cache Boundary Refactor
 

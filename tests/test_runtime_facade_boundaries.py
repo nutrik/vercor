@@ -54,6 +54,7 @@ def test_runtime_preparation_module_owns_runtime_state_preparation() -> None:
 def test_component_topology_module_owns_component_lookup_helpers() -> None:
     component_topology_source = source_for("vercor/runtime/component_topology.py")
     topology_source = source_for("vercor/runtime/topology.py")
+    surface_masks_source = source_for("vercor/runtime/surface_masks.py")
     initialization_source = source_for("vercor/runtime/initialization.py")
 
     assert "VALID_TOPOLOGY_COMPONENT_NAMES" in component_topology_source
@@ -61,28 +62,80 @@ def test_component_topology_module_owns_component_lookup_helpers() -> None:
     assert "def get_component(" in component_topology_source
     assert "def validate_component_topology_names(" not in topology_source
     assert "def get_component(" not in topology_source
-    assert "from vercor.runtime.component_topology import" in topology_source
+    assert "from vercor.runtime.component_topology import" not in topology_source
+    assert "from vercor.runtime.component_topology import" in surface_masks_source
     assert "from vercor.runtime.component_topology import" in initialization_source
 
 
 @pytest.mark.fast_always
 def test_runtime_topology_state_groups_mutable_maps() -> None:
-    topology_module = importlib.import_module("vercor.runtime.topology")
+    topology_state_module = importlib.import_module("vercor.runtime.topology_state")
+    topology_state_source = source_for("vercor/runtime/topology_state.py")
     topology_source = source_for("vercor/runtime/topology.py")
     resources_source = source_for("vercor/runtime/resources.py")
 
-    assert hasattr(topology_module, "RuntimeTopologyMaps")
-    RuntimeTopologyMaps = topology_module.RuntimeTopologyMaps
+    assert hasattr(topology_state_module, "RuntimeTopologyMaps")
+    RuntimeTopologyMaps = topology_state_module.RuntimeTopologyMaps
     assert is_dataclass(RuntimeTopologyMaps)
     assert [field.name for field in fields(RuntimeTopologyMaps)] == [
         "regridders",
         "binary_masks",
         "fractional_masks",
     ]
-    assert "class RuntimeTopologyMaps" in topology_source
-    assert "topology_maps: RuntimeTopologyMaps" in topology_source
+    assert "class RuntimeTopologyMaps" in topology_state_source
+    assert "topology_maps: RuntimeTopologyMaps" in topology_state_source
+    assert "class RuntimeTopologyMaps" not in topology_source
     assert "topology.regridders" not in resources_source
     assert "topology.topology_maps" in resources_source
+
+
+@pytest.mark.fast_always
+def test_runtime_topology_policy_boundaries_are_focused() -> None:
+    topology_state_module = importlib.import_module("vercor.runtime.topology_state")
+    topology_state_source = source_for("vercor/runtime/topology_state.py")
+    exchange_topology_source = source_for("vercor/runtime/exchange_topology.py")
+    surface_masks_source = source_for("vercor/runtime/surface_masks.py")
+    topology_source = source_for("vercor/runtime/topology.py")
+    resources_source = source_for("vercor/runtime/resources.py")
+
+    assert hasattr(topology_state_module, "SurfaceExchangeMasks")
+    SurfaceExchangeMasks = topology_state_module.SurfaceExchangeMasks
+    ExchangeTopologyState = topology_state_module.ExchangeTopologyState
+    assert is_dataclass(SurfaceExchangeMasks)
+    assert is_dataclass(ExchangeTopologyState)
+    assert [field.name for field in fields(SurfaceExchangeMasks)] == [
+        "ocn_fmask_on_atm_grid",
+        "lnd_fmask_on_atm_grid",
+        "lnd_bmask_on_atm_grid",
+    ]
+    assert [field.name for field in fields(ExchangeTopologyState)] == [
+        "topology_maps",
+        "surface_masks",
+    ]
+
+    assert "RuntimeRegridder =" in topology_state_source
+    assert "def build_exchange_topology_maps(" in exchange_topology_source
+    assert "def create_surface_exchange_masks(" in surface_masks_source
+    assert "def validate_land_mask_consistency(" in surface_masks_source
+    assert "def apply_surface_exchange_masks(" in surface_masks_source
+
+    for marker in (
+        "compute_ocn_lnd_masks_on_atm_grid",
+        "check_remap_conservation",
+        "check_total_lnd_ocn_mask_sum",
+        "ConservativeRectilinearRegridder",
+        "jax_ones",
+        "def create_exchange_masks(",
+        "def validate_land_mask_consistency(",
+        "def initialize_regridders_and_masks(",
+        "def patch_exchange_masks(",
+    ):
+        assert marker not in topology_source
+
+    assert "import vercor.runtime.exchange_topology as" in topology_source
+    assert "import vercor.runtime.surface_masks as" in topology_source
+    assert "from vercor.runtime.topology_state import" in topology_source
+    assert "from vercor.runtime.topology_state import" in resources_source
 
 
 @pytest.mark.fast_always

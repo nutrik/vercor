@@ -13,10 +13,10 @@ from vercor.run_sequence import RunSequence
 from vercor.runtime.component_topology import validate_component_topology_names
 from vercor.runtime.contexts import ComponentInitContext
 from vercor.runtime.contracts import RuntimeComponentContract, build_runtime_contracts
-from vercor.runtime.topology import (
+from vercor.runtime.topology import build_exchange_topology
+from vercor.runtime.topology_state import (
     ExchangeTopologyState,
     RuntimeTopologyMaps,
-    build_exchange_topology,
 )
 from vercor.runtime.validation import (
     check_not_empty_import_export_lists,

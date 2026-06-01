@@ -258,10 +258,15 @@ immutable runtime containers used during traced integration.
   lives in `vercor.runtime.state_validation`. Runtime coupler-state assembly
   and runtime-contract refresh live in `vercor.runtime.coupler_state`; exchange
   component-name validation and component lookup live in
-  `vercor.runtime.component_topology`; exchange topology mask/regridder setup
-  lives in `vercor.runtime.topology`, which returns an explicit
-  `ExchangeTopologyState` carrying grouped `RuntimeTopologyMaps` for the runtime
-  facade to store. Setup-time component
+  `vercor.runtime.component_topology`; runtime topology data contracts live in
+  `vercor.runtime.topology_state`, including grouped `RuntimeTopologyMaps`,
+  `SurfaceExchangeMasks`, and `ExchangeTopologyState`. Generic exchange
+  regridder/identity-mask map construction lives in
+  `vercor.runtime.exchange_topology`, while ATM/OCN/LND surface-mask creation,
+  validation, and bilinear exchange patching live in
+  `vercor.runtime.surface_masks`. `vercor.runtime.topology` remains the
+  orchestration boundary that composes those owners and returns the explicit
+  topology state for the runtime facade to store. Setup-time component
   precision synchronization, initialization context construction, component
   setup validation, runtime contract validation, and topology handoff live in
   `vercor.runtime.initialization`. Runtime state preparation, the

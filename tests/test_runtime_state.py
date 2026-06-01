@@ -26,7 +26,7 @@ from vercor.runtime.field_transfer import send_runtime_fields
 from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.runtime.time import RuntimeStepInfo
-from vercor.runtime.topology import RuntimeTopologyMaps
+from vercor.runtime.topology_state import RuntimeTopologyMaps, SurfaceExchangeMasks
 from vercor.types import RuntimeArray
 
 
@@ -415,19 +415,34 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         "    _runtime_interrupts:",
     ):
         assert field_marker not in coupler_source
-    assert "def initialize_regridders_and_masks(" in runtime_topology_source
-    assert "class ExchangeTopologyState" in runtime_topology_source
-    assert "class RuntimeTopologyMaps" in runtime_topology_source
+    runtime_topology_state_source = Path("vercor/runtime/topology_state.py").read_text(
+        encoding="utf-8"
+    )
+    runtime_exchange_topology_source = Path(
+        "vercor/runtime/exchange_topology.py"
+    ).read_text(encoding="utf-8")
+    runtime_surface_masks_source = Path("vercor/runtime/surface_masks.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def build_exchange_topology_maps(" in runtime_exchange_topology_source
+    assert "class ExchangeTopologyState" in runtime_topology_state_source
+    assert "class RuntimeTopologyMaps" in runtime_topology_state_source
+    assert "class SurfaceExchangeMasks" in runtime_topology_state_source
     assert "def build_exchange_topology(" in runtime_topology_source
-    assert "def create_exchange_masks(" in runtime_topology_source
-    assert "def validate_land_mask_consistency(" in runtime_topology_source
-    assert "def patch_exchange_masks(" in runtime_topology_source
+    assert "def create_surface_exchange_masks(" in runtime_surface_masks_source
+    assert "def validate_land_mask_consistency(" in runtime_surface_masks_source
+    assert "def apply_surface_exchange_masks(" in runtime_surface_masks_source
+    assert "def create_exchange_masks(" not in runtime_topology_source
+    assert "def validate_land_mask_consistency(" not in runtime_topology_source
+    assert "def initialize_regridders_and_masks(" not in runtime_topology_source
+    assert "def patch_exchange_masks(" not in runtime_topology_source
     assert "def validate_component_topology_names(" not in runtime_topology_source
     assert "def get_component(" not in runtime_topology_source
     assert "def validate_component_topology_names(" in runtime_component_topology_source
     assert "def get_component(" in runtime_component_topology_source
     assert "from vercor.runtime.topology import" not in coupler_source
-    assert "from vercor.runtime.topology import" in runtime_resources_source
+    assert "from vercor.runtime.topology_state import" in runtime_resources_source
     assert "ExchangeTopologyState" in runtime_resources_source
     assert "RuntimeTopologyMaps" in runtime_resources_source
     assert "def _create_exchange_masks(" not in coupler_source
@@ -635,7 +650,7 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
     cache_module = importlib.import_module("vercor.runtime.cache")
     compiled_runtime_cache_type = getattr(cache_module, "CompiledRuntimeCache")
     from vercor.runtime.resources import CouplerRuntimeResources
-    from vercor.runtime.topology import ExchangeTopologyState
+    from vercor.runtime.topology_state import ExchangeTopologyState
 
     resources = CouplerRuntimeResources()
     contracts = {"ATM": RuntimeComponentContract(imports=("x",), exports=("y",))}
@@ -653,9 +668,11 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
     )
     topology = ExchangeTopologyState(
         topology_maps=topology_maps,
-        ocn_fmask_on_atm_grid=jnp.full((2, 2), 0.25),
-        lnd_fmask_on_atm_grid=jnp.full((2, 2), 0.75),
-        lnd_bmask_on_atm_grid=jnp.ones((2, 2)),
+        surface_masks=SurfaceExchangeMasks(
+            ocn_fmask_on_atm_grid=jnp.full((2, 2), 0.25),
+            lnd_fmask_on_atm_grid=jnp.full((2, 2), 0.75),
+            lnd_bmask_on_atm_grid=jnp.ones((2, 2)),
+        ),
     )
 
     resources.replace_contracts(contracts)

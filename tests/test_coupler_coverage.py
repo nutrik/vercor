@@ -12,7 +12,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import vercor.runtime.topology as topology_module
+import vercor.runtime.surface_masks as surface_masks_module
 import vercor.coupler as coupler_module
 import vercor.output as output_module
 from tests._coverage_support import (
@@ -48,13 +48,16 @@ from vercor.run_sequence import RunSequence
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.exchange_dispatch import dispatch_component_exchanges
 from vercor.output import output_masks_for_component
-from vercor.runtime.topology import (
+from vercor.runtime.surface_masks import (
+    apply_surface_exchange_masks,
+    create_surface_exchange_masks,
+    validate_land_mask_consistency,
+)
+from vercor.runtime.topology import build_exchange_topology
+from vercor.runtime.topology_state import (
     ExchangeTopologyState,
     RuntimeTopologyMaps,
-    build_exchange_topology,
-    create_exchange_masks,
-    patch_exchange_masks,
-    validate_land_mask_consistency,
+    SurfaceExchangeMasks,
 )
 from vercor.settings import VercorSettings
 
@@ -579,14 +582,20 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
         monkeypatch.setattr(exchange, "create", fake_create)
         coupler.add_exchange(exchange)
 
-    def fake_create_exchange_masks(*args: Any, **kwargs: Any) -> tuple[Any, Any, Any]:
+    def fake_create_surface_exchange_masks(
+        *args: Any, **kwargs: Any
+    ) -> SurfaceExchangeMasks:
         _ = args, kwargs
-        return np.full((2, 2), 0.4), np.full((2, 2), 0.6), lnd_mask
+        return SurfaceExchangeMasks(
+            ocn_fmask_on_atm_grid=np.full((2, 2), 0.4),
+            lnd_fmask_on_atm_grid=np.full((2, 2), 0.6),
+            lnd_bmask_on_atm_grid=lnd_mask,
+        )
 
     monkeypatch.setattr(
-        topology_module,
-        "create_exchange_masks",
-        fake_create_exchange_masks,
+        surface_masks_module,
+        "create_surface_exchange_masks",
+        fake_create_surface_exchange_masks,
     )
     jax_calls: list[tuple[str, bool]] = []
     monkeypatch.setitem(
@@ -652,12 +661,12 @@ def test_build_exchange_topology_returns_explicit_patched_state(
         regridder_factory=bilinear,
     )
     monkeypatch.setattr(
-        topology_module,
-        "create_exchange_masks",
-        lambda *args, **kwargs: (
-            np.full((2, 2), 0.4),
-            np.full((2, 2), 0.6),
-            np.asarray([[1.0, 0.0], [0.0, 1.0]]),
+        surface_masks_module,
+        "create_surface_exchange_masks",
+        lambda *args, **kwargs: SurfaceExchangeMasks(
+            ocn_fmask_on_atm_grid=np.full((2, 2), 0.4),
+            lnd_fmask_on_atm_grid=np.full((2, 2), 0.6),
+            lnd_bmask_on_atm_grid=np.asarray([[1.0, 0.0], [0.0, 1.0]]),
         ),
     )
 
@@ -675,7 +684,7 @@ def test_build_exchange_topology_returns_explicit_patched_state(
         np.full((2, 2), 0.4),
     )
     assert_allclose_compact(
-        state.lnd_bmask_on_atm_grid,
+        state.surface_masks.lnd_bmask_on_atm_grid,
         np.asarray([[1.0, 0.0], [0.0, 1.0]]),
     )
 
@@ -701,12 +710,12 @@ def test_build_exchange_topology_preserves_duplicate_regridder_warning(
         ),
     )
     monkeypatch.setattr(
-        topology_module,
-        "create_exchange_masks",
-        lambda *args, **kwargs: (
-            np.ones((2, 2)),
-            np.zeros((2, 2)),
-            np.asarray([[1.0, 0.0], [0.0, 1.0]]),
+        surface_masks_module,
+        "create_surface_exchange_masks",
+        lambda *args, **kwargs: SurfaceExchangeMasks(
+            ocn_fmask_on_atm_grid=np.ones((2, 2)),
+            lnd_fmask_on_atm_grid=np.zeros((2, 2)),
+            lnd_bmask_on_atm_grid=np.asarray([[1.0, 0.0], [0.0, 1.0]]),
         ),
     )
 
@@ -736,12 +745,12 @@ def test_build_exchange_topology_does_not_mutate_existing_mappings(
     existing_binary_masks: dict[tuple[str, str, str], Any] = {}
     existing_fractional_masks: dict[tuple[str, str, str], Any] = {}
     monkeypatch.setattr(
-        topology_module,
-        "create_exchange_masks",
-        lambda *args, **kwargs: (
-            np.zeros((2, 2)),
-            np.full((2, 2), 0.75),
-            np.asarray([[1.0, 0.0], [0.0, 1.0]]),
+        surface_masks_module,
+        "create_surface_exchange_masks",
+        lambda *args, **kwargs: SurfaceExchangeMasks(
+            ocn_fmask_on_atm_grid=np.zeros((2, 2)),
+            lnd_fmask_on_atm_grid=np.full((2, 2), 0.75),
+            lnd_bmask_on_atm_grid=np.asarray([[1.0, 0.0], [0.0, 1.0]]),
         ),
     )
 
@@ -767,7 +776,7 @@ def test_build_exchange_topology_does_not_mutate_existing_mappings(
     )
 
 
-def test_patch_exchange_masks_updates_only_expected_bilinear_pairs() -> None:
+def test_apply_surface_exchange_masks_updates_only_expected_bilinear_pairs() -> None:
     coupler = make_coupler()
     ocn_key = ("OCN", "ATM", "bilinear")
     lnd_key = ("LND", "ATM", "bilinear")
@@ -794,12 +803,13 @@ def test_patch_exchange_masks_updates_only_expected_bilinear_pairs() -> None:
     coupler.lnd_fmask_on_atm_grid = np.full((2, 2), 0.75)
 
     topology_maps = coupler._runtime_resources.topology_maps
-    patch_exchange_masks(
-        binary_masks=topology_maps.binary_masks,
-        fractional_masks=topology_maps.fractional_masks,
-        ocn_fmask_on_atm_grid=coupler.ocn_fmask_on_atm_grid,
-        lnd_bmask_on_atm_grid=coupler.lnd_bmask_on_atm_grid,
-        lnd_fmask_on_atm_grid=coupler.lnd_fmask_on_atm_grid,
+    apply_surface_exchange_masks(
+        topology_maps,
+        surface_masks=SurfaceExchangeMasks(
+            ocn_fmask_on_atm_grid=coupler.ocn_fmask_on_atm_grid,
+            lnd_fmask_on_atm_grid=coupler.lnd_fmask_on_atm_grid,
+            lnd_bmask_on_atm_grid=coupler.lnd_bmask_on_atm_grid,
+        ),
     )
 
     assert_allclose_compact(
@@ -833,7 +843,12 @@ def test_validate_land_mask_consistency_rejects_shape_and_value_mismatches() -> 
 
     with pytest.raises(CouplerError, match="does not match atmospheric grid shape"):
         validate_land_mask_consistency(
-            coupler.components, coupler.lnd_bmask_on_atm_grid
+            coupler.components,
+            SurfaceExchangeMasks(
+                ocn_fmask_on_atm_grid=np.zeros((2, 2)),
+                lnd_fmask_on_atm_grid=np.ones((2, 2)),
+                lnd_bmask_on_atm_grid=coupler.lnd_bmask_on_atm_grid,
+            ),
         )
 
     coupler.components["LND"] = cast(
@@ -850,11 +865,16 @@ def test_validate_land_mask_consistency_rejects_shape_and_value_mismatches() -> 
 
     with pytest.raises(CouplerError, match="mismatched points: 2"):
         validate_land_mask_consistency(
-            coupler.components, coupler.lnd_bmask_on_atm_grid
+            coupler.components,
+            SurfaceExchangeMasks(
+                ocn_fmask_on_atm_grid=np.zeros((2, 2)),
+                lnd_fmask_on_atm_grid=np.ones((2, 2)),
+                lnd_bmask_on_atm_grid=coupler.lnd_bmask_on_atm_grid,
+            ),
         )
 
 
-def test_create_exchange_masks_rejects_non_identical_land_and_atmosphere_grids() -> (
+def test_create_surface_exchange_masks_rejects_non_identical_land_and_atmosphere_grids() -> (
     None
 ):
     coupler = make_coupler()
@@ -879,10 +899,10 @@ def test_create_exchange_masks_rejects_non_identical_land_and_atmosphere_grids()
     )
 
     with pytest.raises(CouplerError, match="must use identical horizontal grids"):
-        create_exchange_masks(coupler.components, logger=setup_logger())
+        create_surface_exchange_masks(coupler.components, logger=setup_logger())
 
 
-def test_create_exchange_masks_rejects_missing_ocean_binary_mask() -> None:
+def test_create_surface_exchange_masks_rejects_missing_ocean_binary_mask() -> None:
     coupler = make_coupler()
     coupler.components = cast(
         Any,
@@ -894,7 +914,7 @@ def test_create_exchange_masks_rejects_missing_ocean_binary_mask() -> None:
     )
 
     with pytest.raises(ComponentError, match="has no binary mask defined"):
-        create_exchange_masks(coupler.components, logger=setup_logger())
+        create_surface_exchange_masks(coupler.components, logger=setup_logger())
 
 
 def test_output_masks_for_component_returns_destination_exchange_masks() -> None:
