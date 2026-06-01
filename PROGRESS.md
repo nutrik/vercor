@@ -79,6 +79,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local component/runtime boundary alias validation: focused fast
   pytest, Black, flake8, mypy, full fast pytest, and full pytest passed as of
   2026-05-28.
+- Latest local runtime-output boundary validation: focused red/green pytest,
+  Black, flake8, mypy, full fast pytest, and full pytest passed as of
+  2026-06-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -104,6 +107,28 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-01: Runtime Output Boundary Refactor
+
+- Moved output mask selection and naming from `vercor.runtime.coupler_state`
+  into `vercor.output`, leaving runtime coupler-state ownership focused on
+  immutable state assembly, contract refresh, and validation.
+- Removed `vercor.output`'s dependency on `vercor.runtime.coupler_state`; final
+  output iteration now owns its view construction, file naming, and mask lookup
+  in one output boundary.
+- Strengthened boundary coverage so `output_masks_for_component(...)` stays in
+  `vercor.output` and cannot drift back into runtime-state assembly.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the new output-mask ownership.
+- Validation run for this change:
+  focused red pytest for the ownership move,
+  focused green pytest after the move,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- No failed implementation approaches.
 
 ### 2026-05-28: Component and Runtime Boundary Alias Refactor
 

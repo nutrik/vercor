@@ -47,7 +47,7 @@ from vercor.regridders.conservative import conservative
 from vercor.run_sequence import RunSequence
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.exchange_dispatch import dispatch_component_exchanges
-from vercor.runtime.coupler_state import output_masks_for_component
+from vercor.output import output_masks_for_component
 from vercor.runtime.topology import (
     ExchangeTopologyState,
     build_exchange_topology,

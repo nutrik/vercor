@@ -152,23 +152,3 @@ def validate_runtime_state(
                 "Runtime fractional mask for exchange "
                 f"{exchange.name} has shape {mask_shape}, expected {destination_shape}"
             )
-
-
-def output_masks_for_component(
-    name: str,
-    exchanges: Sequence[Exchange],
-    binary_masks: Mapping[tuple[str, str, str], RuntimeArray],
-    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray],
-) -> dict[str, RuntimeArray]:
-    """Return runtime output mask fields for one destination component."""
-
-    masks = {}
-    for exchange in exchanges:
-        if name != exchange.destination:
-            continue
-
-        key = (exchange.source, name, exchange.interpolation_type)
-        source_destination_name = "_".join(key)
-        masks["bmask_" + source_destination_name] = binary_masks[key]
-        masks["fmask_" + source_destination_name] = fractional_masks[key]
-    return masks

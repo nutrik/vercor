@@ -5,7 +5,6 @@ import xarray as xr
 
 from vercor.exchange import Exchange
 from vercor.host_arrays import runtime_array_to_host
-from vercor.runtime.coupler_state import output_masks_for_component
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.views import RuntimeComponentView
 from vercor.types import RuntimeArray
@@ -13,6 +12,26 @@ from vercor.types import RuntimeArray
 if TYPE_CHECKING:
     from vercor.components.base import Component
     from vercor.jax_logging import LoggerLike
+
+
+def output_masks_for_component(
+    name: str,
+    exchanges: Sequence[Exchange],
+    binary_masks: Mapping[tuple[str, str, str], RuntimeArray],
+    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray],
+) -> dict[str, RuntimeArray]:
+    """Return output mask fields for one destination component."""
+
+    masks = {}
+    for exchange in exchanges:
+        if name != exchange.destination:
+            continue
+
+        key = (exchange.source, name, exchange.interpolation_type)
+        source_destination_name = "_".join(key)
+        masks["bmask_" + source_destination_name] = binary_masks[key]
+        masks["fmask_" + source_destination_name] = fractional_masks[key]
+    return masks
 
 
 def write_runtime_component_view_to_netcdf(

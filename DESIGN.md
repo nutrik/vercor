@@ -254,9 +254,9 @@ immutable runtime containers used during traced integration.
   `vercor.runtime.time`, component state creation lives in
   `vercor.runtime.component_state`, field receive/send mechanics live in
   `vercor.runtime.field_transfer`, and runtime validation lives in
-  `vercor.runtime.validation`. Runtime coupler-state assembly,
-  runtime-contract refresh, and final-output mask lookup live in
-  `vercor.runtime.coupler_state`; exchange topology mask/regridder setup lives
+  `vercor.runtime.validation`. Runtime coupler-state assembly and
+  runtime-contract refresh live in `vercor.runtime.coupler_state`; exchange
+  topology mask/regridder setup lives
   in `vercor.runtime.topology`, which returns an explicit
   `ExchangeTopologyState` for the runtime facade to store. Setup-time component
   precision synchronization, initialization context construction, component
@@ -296,7 +296,7 @@ immutable runtime containers used during traced integration.
   `runtime_field(...)` own data/incoming/outgoing lookup for explicit views and
   compatible runtime states. `Coupler` exposes `runtime_component_view()` and
   `runtime_component_views()` as the public facade for creating those views.
-  Final runtime output iteration and
+  Final runtime output iteration, output-mask naming/selection, and
   view writing live in `vercor.output`, with `vercor.runtime.facade` validating
   and delegating output writes for `Coupler.finalize()`. `Coupler` delegates to
   the runtime facade and

@@ -240,7 +240,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "import vercor.runtime.facade as _runtime_facade" in coupler_source
     assert "build_runtime_dispatch_context(" not in coupler_source
     assert "build_runtime_dispatch_context(" in runtime_facade_source
-    assert "def output_masks_for_component(" in runtime_coupler_state_source
+    assert "def output_masks_for_component(" not in runtime_coupler_state_source
+    assert "def output_masks_for_component(" in output_source
+    assert "from vercor.runtime.coupler_state import" not in output_source
     assert "def refresh_runtime_contracts(" in runtime_coupler_state_source
     assert "refresh_runtime_contracts(" not in coupler_source
     assert "refresh_runtime_contracts(" in runtime_preparation_source
