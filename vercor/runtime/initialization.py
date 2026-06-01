@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 
 from vercor.clock import Clock
 from vercor.components.setup_validation import validate_component_setup
+from vercor.components.contexts import ComponentSetupContext
 from vercor.dtypes import as_jax_real_array
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike
 from vercor.run_sequence import RunSequence
 from vercor.runtime.component_topology import validate_component_topology_names
-from vercor.runtime.contexts import ComponentInitContext
 from vercor.runtime.contracts import RuntimeComponentContract, build_runtime_contracts
 from vercor.runtime.topology import build_exchange_topology
 from vercor.runtime.topology_state import (
@@ -93,7 +93,7 @@ def initialize_coupler_runtime(
     for component in components.values():
         apply_run_precision_to_component(component, settings)
 
-    init_context = ComponentInitContext(
+    init_context = ComponentSetupContext(
         start=clock.start,
         dt_seconds=clock.dt_seconds,
         run_sequence=run_sequence,

@@ -97,6 +97,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime topology policy boundary validation: focused red/green
   pytest, Black, focused boundary pytest, flake8, mypy, full fast pytest, and
   full pytest passed as of 2026-06-01.
+- Latest local component-context boundary validation: focused red/green pytest,
+  Black, focused fast pytest, flake8, mypy, full fast pytest, and full pytest
+  passed as of 2026-06-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -122,6 +125,36 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-01: Component Context Boundary Refactor
+
+- Added `vercor.components.contexts` as the canonical owner for
+  `ComponentSetupContext` and `ComponentStepContext`.
+- Removed the internal `vercor.runtime.contexts` module and replaced production
+  and test imports of `ComponentInitContext` / `RuntimeStepContext` with the
+  public component-author context names.
+- Updated component contracts and package facades so context dataclasses are
+  reexported from `vercor.components` and `vercor` through the component-owned
+  boundary, while hook type aliases remain in `vercor.components.contracts`.
+- Strengthened architecture coverage so context dataclasses cannot drift back
+  into runtime ownership and setup adapters remain free of runtime context/store
+  imports.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for component-context ownership.
+- Validation run for this change:
+  baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`, focused red
+  pytest for the missing `vercor.components.contexts` owner, focused green
+  boundary pytest after implementation,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_runtime_state.py tests/test_component_base_coverage.py -q --fast --tb=short`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: the first focused green run exposed a runtime
+  import of `ComponentStepContext` in `vercor.components.base`, which widened
+  the base module surface. The import is now `TYPE_CHECKING`-only so the base
+  module stays narrow while annotations remain type-checkable.
 
 ### 2026-06-01: Runtime Topology Policy Boundary Refactor
 

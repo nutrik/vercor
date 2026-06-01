@@ -13,6 +13,7 @@ import pytest
 import vercor
 import vercor.components as components_module
 import vercor.components.base as base_module
+import vercor.components.contexts as component_contexts_module
 import vercor.components.contracts as component_contracts_module
 import vercor.components.data as data_module
 import vercor.components.factories as factories_module
@@ -25,7 +26,6 @@ from vercor.components.host import HostRuntimeComponent
 from vercor.clock import Clock
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.run_sequence import RunSequence
 from vercor.runtime.state import RuntimeComponentState
 from vercor.runtime.stores import RuntimeFieldStore
@@ -89,8 +89,10 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
     assert (
         vercor.ComponentPrefillHook is component_contracts_module.ComponentPrefillHook
     )
-    assert vercor.ComponentSetupContext is ComponentInitContext
-    assert vercor.ComponentStepContext is RuntimeStepContext
+    assert (
+        vercor.ComponentSetupContext is component_contexts_module.ComponentSetupContext
+    )
+    assert vercor.ComponentStepContext is component_contexts_module.ComponentStepContext
     assert vercor.ComponentStepResult is component_contracts_module.ComponentStepResult
     assert (
         vercor.ComponentValidateHook is component_contracts_module.ComponentValidateHook
@@ -150,8 +152,14 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert (
         components_module.ComponentPrefillHook is contracts_module.ComponentPrefillHook
     )
-    assert components_module.ComponentSetupContext is ComponentInitContext
-    assert components_module.ComponentStepContext is RuntimeStepContext
+    assert (
+        components_module.ComponentSetupContext
+        is component_contexts_module.ComponentSetupContext
+    )
+    assert (
+        components_module.ComponentStepContext
+        is component_contexts_module.ComponentStepContext
+    )
     assert components_module.ComponentStepResult is contracts_module.ComponentStepResult
     assert (
         components_module.ComponentValidateHook
@@ -205,6 +213,7 @@ def test_obsolete_compatibility_api_surfaces_are_removed() -> None:
     for name in removed_runtime_reexports:
         assert not hasattr(runtime_module, name)
     assert getattr(runtime_module, "__all__", []) == []
+    assert not Path("vercor/runtime/contexts.py").exists()
 
     assert not hasattr(jax_gcm_module, "JAXGCMRuntimePayload")
     assert "JAXGCMRuntimePayload" not in external_module.__all__
@@ -770,6 +779,7 @@ def test_private_setup_state_objects_do_not_borrow_component_methods() -> None:
 @pytest.mark.fast_always
 def test_setup_adapters_do_not_import_runtime_context_or_store_internals() -> None:
     forbidden_markers = (
+        "vercor.runtime.contexts",
         "from vercor.runtime.contexts import ComponentInitContext",
         "from vercor.runtime.contexts import RuntimeStepContext",
         "from vercor.runtime import RuntimeFieldStore",

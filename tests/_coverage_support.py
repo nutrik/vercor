@@ -14,7 +14,7 @@ from vercor.clock import Clock
 from vercor.components import DataComponent
 from vercor.grid import RectilinearGrid
 from vercor.run_sequence import RunSequence
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
+from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
@@ -80,8 +80,8 @@ class CoverageCouplerStub:
     )
     run_sequence: RunSequence = field(default_factory=lambda: RunSequence(order=[]))
 
-    def init_context(self) -> ComponentInitContext:
-        return ComponentInitContext(
+    def init_context(self) -> ComponentSetupContext:
+        return ComponentSetupContext(
             start=self.clock.start,
             dt_seconds=self.clock.dt_seconds,
             run_sequence=self.run_sequence,
@@ -91,8 +91,8 @@ class CoverageCouplerStub:
 
     def step_context(
         self, *, time: datetime | None = None, with_logger: bool = True
-    ) -> RuntimeStepContext:
-        return RuntimeStepContext(
+    ) -> ComponentStepContext:
+        return ComponentStepContext(
             dt_seconds=self.clock.dt_seconds,
             settings=self.settings,
             time=time,
@@ -101,7 +101,7 @@ class CoverageCouplerStub:
 
 
 class DummyComponent(DataComponent):
-    def initialize(self, context: ComponentInitContext) -> None:
+    def initialize(self, context: ComponentSetupContext) -> None:
         _ = context
         self.data.setdefault("temperature", np.zeros(self.grid.shape, dtype=float))
 

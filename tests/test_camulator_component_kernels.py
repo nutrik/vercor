@@ -25,7 +25,7 @@ import vercor.setups.external.camulator_tensors as camulator_tensors_module
 import vercor.setups.external.camulator_wind_filter as camulator_wind_filter_module
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
+from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
 from vercor.setups.external.camulator import make_camulator_gcm
 from vercor.setups.external.camulator_fields import (
     _initialize_camulator_runtime_fields,
@@ -87,8 +87,8 @@ def _runtime_component_state(
     )
 
 
-def _make_coupler(start: datetime) -> ComponentInitContext:
-    return ComponentInitContext(
+def _make_coupler(start: datetime) -> ComponentSetupContext:
+    return ComponentSetupContext(
         start=start,
         dt_seconds=21600,
         run_sequence=RunSequence(order=[]),
@@ -759,7 +759,7 @@ def test_camulator_land_stores_jax_runtime_arrays(
             prefill_missing=True,
             contract=RuntimeComponentContract(),
         ),
-        RuntimeStepContext(
+        ComponentStepContext(
             dt_seconds=(datetime(2000, 1, 1, 6, 0, 0) - start).total_seconds(),
             settings=coupler.settings,
             time=start,
@@ -908,7 +908,7 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     )
 
     component_state = _runtime_component_state("ATM", component.data)
-    step_context = RuntimeStepContext(
+    step_context = ComponentStepContext(
         dt_seconds=float((datetime(2000, 1, 1, 6, 0, 0) - start).total_seconds()),
         settings=VercorSettings(),
         time=start,

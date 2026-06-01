@@ -9,10 +9,12 @@ from vercor.components.contracts import (
     ComponentFieldSpec,
     ComponentInitializeHook,
     ComponentPrefillHook,
-    ComponentSetupContext,
-    ComponentStepContext,
     ComponentStepResult,
     ComponentValidateHook,
+)
+from vercor.components.contexts import (
+    ComponentSetupContext,
+    ComponentStepContext,
 )
 from vercor.components.data import (
     DataComponent,

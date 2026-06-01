@@ -30,7 +30,7 @@ from tests.assertions import assert_allclose_compact
 from vercor.clock import Clock
 from vercor.components.base import Component
 from vercor.components.host import HostRuntimeComponent
-from vercor.runtime.contexts import RuntimeStepContext
+from vercor.components.contexts import ComponentStepContext
 from vercor.coupler import Coupler
 from vercor.exceptions import ComponentError, CouplerError, ExchangerError
 from vercor.exchange import Exchange
@@ -88,7 +88,7 @@ class _RunComponent(Component):
     def step_runtime_state(
         self,
         component_state: Any,
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> Any:
         time = context.time
         time_label = "none" if time is None else time.isoformat()
@@ -106,7 +106,7 @@ class _LoggingRunComponent(Component):
     def step_runtime_state(
         self,
         component_state: Any,
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> Any:
         assert context.logger is not None
         context.logger.info(
@@ -126,7 +126,7 @@ class _HostRunComponent(HostRuntimeComponent):
     def step_host_runtime_state(
         self,
         component_state: Any,
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> Any:
         if self.events is not None:
             time = context.time

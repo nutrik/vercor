@@ -17,7 +17,7 @@ import vercor.setups.data.erainterim_ocean as erainterim_ocean_module
 import vercor.setups.data.jcm_land as jcm_land_module
 from tests._coverage_support import CoverageCouplerStub, make_test_grid
 from tests.assertions import assert_allclose_compact
-from vercor.runtime.contexts import RuntimeStepContext
+from vercor.components.contexts import ComponentStepContext
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.setups.data.era5_land import make_era5_land
 from vercor.setups.data.era5_ocean import make_era5_ocean
@@ -46,7 +46,7 @@ def _step_component(
             prefill_missing=True,
             contract=RuntimeComponentContract(),
         ),
-        RuntimeStepContext(
+        ComponentStepContext(
             dt_seconds=dt.total_seconds(),
             settings=coupler.settings,
             time=time,

@@ -26,7 +26,7 @@ from tests.assertions import assert_allclose_compact
 from vercor.forcing_data import read_forcing
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.clock import Clock
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
+from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
 from vercor.coupler import Coupler
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.output import write_runtime_component_view_to_netcdf
@@ -54,7 +54,7 @@ class _RuntimeOnlyComponent(base_module.Component):
     def step_runtime_state(
         self,
         component_state: RuntimeComponentState,
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> RuntimeComponentState:
         data = component_state.data.set(
             "temperature",
@@ -70,7 +70,7 @@ class _MissingSetupComponent(base_module.Component):
     def step_runtime_state(
         self,
         component_state: RuntimeComponentState,
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> RuntimeComponentState:
         _ = context
         return component_state
@@ -80,7 +80,7 @@ class _HostStepOnlyComponent(host_module.HostRuntimeComponent):
     def step_host_runtime_state(
         self,
         component_state: RuntimeComponentState,
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> RuntimeComponentState:
         _ = context
         return component_state
@@ -113,7 +113,7 @@ def test_component_runtime_execution_policy_steps_selected_runtime_path() -> Non
         def step_runtime_state(
             self,
             component_state: RuntimeComponentState,
-            context: RuntimeStepContext,
+            context: ComponentStepContext,
         ) -> RuntimeComponentState:
             _ = context
             return component_state.with_data(
@@ -127,7 +127,7 @@ def test_component_runtime_execution_policy_steps_selected_runtime_path() -> Non
         def step_host_runtime_state(
             self,
             component_state: RuntimeComponentState,
-            context: RuntimeStepContext,
+            context: ComponentStepContext,
         ) -> RuntimeComponentState:
             _ = context
             return component_state.with_data(
@@ -138,7 +138,7 @@ def test_component_runtime_execution_policy_steps_selected_runtime_path() -> Non
             )
 
     grid = make_test_grid()
-    context = RuntimeStepContext(dt_seconds=1.0, settings=VercorSettings())
+    context = ComponentStepContext(dt_seconds=1.0, settings=VercorSettings())
     state = RuntimeComponentState(
         data=RuntimeFieldStore.from_mapping({"marker": jnp.asarray(0.0)}),
         incoming=RuntimeFieldStore.empty(),
@@ -204,7 +204,7 @@ def test_data_component_uses_explicit_noop_runtime_step() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        RuntimeStepContext(dt_seconds=60.0, settings=VercorSettings()),
+        ComponentStepContext(dt_seconds=60.0, settings=VercorSettings()),
     )
 
     assert stepped is state
@@ -276,7 +276,7 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
     )
     stepped = differentiable.step_runtime_state(
         state,
-        RuntimeStepContext(dt_seconds=3.0, settings=VercorSettings()),
+        ComponentStepContext(dt_seconds=3.0, settings=VercorSettings()),
     )
     assert_allclose_compact(
         stepped.data.get("temperature"),
@@ -302,7 +302,7 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
     )
     host_stepped = host.step_host_runtime_state(
         host_state,
-        RuntimeStepContext(dt_seconds=5.0, settings=VercorSettings()),
+        ComponentStepContext(dt_seconds=5.0, settings=VercorSettings()),
     )
     assert_allclose_compact(
         host_stepped.data.get("temperature"),
@@ -337,7 +337,7 @@ def test_from_fields_and_from_model_facade_expand_scalar_defaults() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = payload
@@ -366,7 +366,7 @@ def test_from_fields_and_from_model_facade_expand_scalar_defaults() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        RuntimeStepContext(dt_seconds=3.0, settings=VercorSettings()),
+        ComponentStepContext(dt_seconds=3.0, settings=VercorSettings()),
     )
     assert_allclose_compact(
         stepped.data.get("temperature"),
@@ -423,13 +423,13 @@ def test_callable_facade_accepts_one_two_and_three_argument_steps() -> None:
 
     def fields_and_context(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> Mapping[str, RuntimeArray]:
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
     def fields_context_payload(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         assert isinstance(payload, Mapping)
@@ -476,7 +476,7 @@ def test_callable_facade_accepts_one_two_and_three_argument_steps() -> None:
         )
         stepped = component.step_runtime_state(
             state,
-            RuntimeStepContext(dt_seconds=2.0, settings=VercorSettings()),
+            ComponentStepContext(dt_seconds=2.0, settings=VercorSettings()),
         )
         assert_allclose_compact(
             stepped.data.get("temperature"),
@@ -490,7 +490,7 @@ def test_callable_facade_rejects_unsupported_step_signature() -> None:
 
     def too_many_arguments(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
         extra: object,
     ) -> Mapping[str, RuntimeArray]:
@@ -553,7 +553,7 @@ def test_base_initialize_seeds_declared_defaults() -> None:
     )
 
     component.initialize(
-        ComponentInitContext(
+        ComponentSetupContext(
             start=datetime(2000, 1, 1),
             dt_seconds=60.0,
             logger=cast(Any, None),
@@ -677,7 +677,7 @@ def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> Non
     def step(fields: Mapping[str, RuntimeArray]) -> Mapping[str, RuntimeArray]:
         return {"temperature": fields["temperature"] + 1.0}
 
-    def initialize(component: Any, context: ComponentInitContext) -> None:
+    def initialize(component: Any, context: ComponentSetupContext) -> None:
         _ = context
         events.append(f"initialize:{component.name}")
 
@@ -757,7 +757,7 @@ def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> Non
         assert not hasattr(component, "_initialize_hook")
         assert not hasattr(component, "_create_runtime_payload_hook")
         component.initialize(
-            ComponentInitContext(
+            ComponentSetupContext(
                 start=datetime(2000, 1, 1),
                 dt_seconds=60.0,
                 logger=cast(Any, None),
@@ -886,7 +886,7 @@ def test_from_model_inputs_validate_missing_fields_without_zero_prefill() -> Non
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = context, payload
@@ -919,7 +919,7 @@ def test_host_runtime_component_from_model_uses_author_friendly_names() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = payload
@@ -940,7 +940,7 @@ def test_host_runtime_component_from_model_uses_author_friendly_names() -> None:
 
     stepped = component.step_host_runtime_state(
         state,
-        RuntimeStepContext(dt_seconds=5.0, settings=VercorSettings()),
+        ComponentStepContext(dt_seconds=5.0, settings=VercorSettings()),
     )
     assert_allclose_compact(
         stepped.data.get("temperature"),
@@ -966,7 +966,7 @@ def test_subclasses_can_declare_fields_with_author_spec() -> None:
         def step_runtime_state(
             self,
             component_state: RuntimeComponentState,
-            context: RuntimeStepContext,
+            context: ComponentStepContext,
         ) -> RuntimeComponentState:
             _ = context
             return self.with_runtime_fields(
@@ -1036,7 +1036,7 @@ def test_callable_component_prefills_and_validates_declared_fields() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = payload
@@ -1067,7 +1067,7 @@ def test_callable_component_prefills_and_validates_declared_fields() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        RuntimeStepContext(dt_seconds=2.0, settings=VercorSettings()),
+        ComponentStepContext(dt_seconds=2.0, settings=VercorSettings()),
     )
     assert_allclose_compact(
         stepped.data.get("temperature"),
@@ -1081,7 +1081,7 @@ def test_callable_component_reports_missing_declared_inputs() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = context, payload
@@ -1230,7 +1230,7 @@ def test_differentiable_component_applies_callable_field_updates() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         assert payload is None
@@ -1251,7 +1251,7 @@ def test_differentiable_component_applies_callable_field_updates() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        RuntimeStepContext(dt_seconds=3.0, settings=VercorSettings()),
+        ComponentStepContext(dt_seconds=3.0, settings=VercorSettings()),
     )
 
     assert_allclose_compact(
@@ -1266,7 +1266,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
 
     def preserve_payload(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = context
@@ -1288,7 +1288,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
     )
     preserved = preserve_component.step_runtime_state(
         preserve_state,
-        RuntimeStepContext(dt_seconds=1.0, settings=VercorSettings()),
+        ComponentStepContext(dt_seconds=1.0, settings=VercorSettings()),
     )
 
     assert preserved.runtime_payload is preserve_state.runtime_payload
@@ -1299,7 +1299,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
 
     def replace_payload(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> contracts_module.ComponentStepResult:
         _ = context
@@ -1324,7 +1324,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
     )
     replaced = replace_component.step_runtime_state(
         replace_state,
-        RuntimeStepContext(dt_seconds=1.0, settings=VercorSettings()),
+        ComponentStepContext(dt_seconds=1.0, settings=VercorSettings()),
     )
 
     assert replaced.runtime_payload is not replace_state.runtime_payload
@@ -1342,7 +1342,7 @@ def test_host_component_runs_through_coupler_host_runtime() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = payload
@@ -1373,7 +1373,7 @@ def test_callable_component_rejects_unseeded_field_updates() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = fields, context, payload
@@ -1397,7 +1397,7 @@ def test_callable_component_rejects_unseeded_field_updates() -> None:
     ):
         component.step_runtime_state(
             state,
-            RuntimeStepContext(dt_seconds=1.0, settings=VercorSettings()),
+            ComponentStepContext(dt_seconds=1.0, settings=VercorSettings()),
         )
 
 
@@ -1557,7 +1557,7 @@ def test_runtime_state_creation_receive_and_send() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        RuntimeStepContext(
+        ComponentStepContext(
             dt_seconds=3.0,
             settings=VercorSettings(),
         ),

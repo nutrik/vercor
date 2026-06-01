@@ -24,11 +24,11 @@ from vercor.components._lifecycle import ComponentLifecycleHooks
 from vercor.components._lifecycle_api import ComponentLifecycleMixin
 from vercor.components._runtime_access import ComponentRuntimeAccessMixin
 from vercor.grid import RectilinearGrid
-from vercor.runtime.contexts import RuntimeStepContext
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
+    from vercor.components.contexts import ComponentStepContext
     from vercor.runtime.state import RuntimeComponentState
 
 
@@ -135,7 +135,7 @@ class Component(
     def step_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> "RuntimeComponentState":
         """Return this differentiable component advanced by one runtime step."""
 
@@ -176,7 +176,7 @@ class _CallableComponent(_CallableRuntimeMixin, Component):
     def step_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> "RuntimeComponentState":
         """Advance this callable-backed differentiable component one step."""
 

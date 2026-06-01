@@ -21,7 +21,7 @@ from vercor.components.base import Component
 from vercor.components.host import HostRuntimeComponent
 from vercor.coupler import Coupler
 from vercor.run_sequence import RunSequence
-from vercor.runtime.contexts import RuntimeStepContext
+from vercor.components.contexts import ComponentStepContext
 from vercor.runtime.interrupts import (
     RuntimeInterruptController,
     RuntimeInterrupted,
@@ -37,7 +37,7 @@ class _NoopRuntimeComponent(Component):
     def step_runtime_state(
         self,
         component_state: Any,
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> Any:
         _ = context
         return component_state
@@ -51,7 +51,7 @@ class _InterruptingHostComponent(HostRuntimeComponent):
     def step_host_runtime_state(
         self,
         component_state: Any,
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> Any:
         _ = context
         signal.raise_signal(signal.SIGINT)

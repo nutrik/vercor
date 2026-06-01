@@ -18,9 +18,9 @@ from vercor.components._callable_wrappers import (
     _callable_component_definition,
 )
 from vercor.components.base import Component
+from vercor.components.contexts import ComponentStepContext
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
-from vercor.runtime.contexts import RuntimeStepContext
 from vercor.settings import VercorSettings
 
 if TYPE_CHECKING:
@@ -70,7 +70,7 @@ class HostRuntimeComponent(Component):
     def step_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> "RuntimeComponentState":
         """Reject accidental execution on the differentiable scanned runtime."""
 
@@ -86,7 +86,7 @@ class HostRuntimeComponent(Component):
     def step_host_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> "RuntimeComponentState":
         """Advance this non-differentiable host adapter by one runtime step."""
 
@@ -115,7 +115,7 @@ class _CallableHostRuntimeComponent(_CallableRuntimeMixin, HostRuntimeComponent)
     def step_host_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> "RuntimeComponentState":
         """Advance this callable-backed host component one step."""
 

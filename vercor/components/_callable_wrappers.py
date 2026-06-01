@@ -16,11 +16,11 @@ from vercor.components.contracts import (
     ComponentValidateHook,
     FieldNames,
 )
+from vercor.components.contexts import ComponentStepContext
 from vercor.components._lifecycle import install_lifecycle_hooks
 from vercor.components._protocols import ComponentAuthoringProtocol
 from vercor.components._runtime_fields import apply_step_result
 from vercor.exceptions import ComponentError
-from vercor.runtime.contexts import RuntimeStepContext
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
@@ -135,7 +135,7 @@ def normalize_component_step_callable(
 
         def step_fields_only(
             fields: Mapping[str, RuntimeArray],
-            context: RuntimeStepContext,
+            context: ComponentStepContext,
             payload: Any | None,
         ) -> ComponentStepReturn:
             _ = context, payload
@@ -147,7 +147,7 @@ def normalize_component_step_callable(
 
         def step_fields_and_context(
             fields: Mapping[str, RuntimeArray],
-            context: RuntimeStepContext,
+            context: ComponentStepContext,
             payload: Any | None,
         ) -> ComponentStepReturn:
             _ = payload
@@ -157,7 +157,7 @@ def normalize_component_step_callable(
 
     def step_fields_context_payload(
         fields: Mapping[str, RuntimeArray],
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
         payload: Any | None,
     ) -> ComponentStepReturn:
         return step(fields, context, payload)
@@ -232,7 +232,7 @@ class _CallableRuntimeMixin:
     def _step_callable_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: RuntimeStepContext,
+        context: ComponentStepContext,
     ) -> "RuntimeComponentState":
         """Advance callable-backed runtime state using the normalized step."""
 

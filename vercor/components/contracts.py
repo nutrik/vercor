@@ -4,12 +4,9 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, TypeAlias
 
+from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
 from vercor.components._field_names import unique_field_names as _unique_field_names
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
 from vercor.types import RuntimeArray
-
-ComponentSetupContext = ComponentInitContext
-ComponentStepContext = RuntimeStepContext
 
 
 @dataclass(frozen=True)
@@ -28,14 +25,14 @@ class ComponentStepResult:
 
 ComponentStepReturn: TypeAlias = Mapping[str, RuntimeArray] | ComponentStepResult
 ComponentStepCallable: TypeAlias = Callable[
-    [Mapping[str, RuntimeArray], RuntimeStepContext, Any | None],
+    [Mapping[str, RuntimeArray], ComponentStepContext, Any | None],
     ComponentStepReturn,
 ]
 AuthorStepCallable: TypeAlias = Callable[..., ComponentStepReturn]
 FieldNames: TypeAlias = Iterable[str]
 FieldDefaults: TypeAlias = Mapping[str, RuntimeArray] | None
 AuthorFieldValues: TypeAlias = Mapping[str, object] | None
-ComponentInitializeHook = Callable[[Any, ComponentInitContext], None]
+ComponentInitializeHook = Callable[[Any, ComponentSetupContext], None]
 ComponentCreatePayloadHook = Callable[[Any], Any | None]
 ComponentPrefillHook = Callable[
     [

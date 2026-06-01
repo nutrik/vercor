@@ -10,8 +10,8 @@ from vercor.settings import VercorSettings
 
 
 @dataclass(frozen=True)
-class ComponentInitContext:
-    """Minimal component initialization context owned by the coupler."""
+class ComponentSetupContext:
+    """Minimal setup context passed to component initialization hooks."""
 
     start: datetime | ModelDateTime
     dt_seconds: float
@@ -21,10 +21,13 @@ class ComponentInitContext:
 
 
 @dataclass(frozen=True)
-class RuntimeStepContext:
+class ComponentStepContext:
     """Minimal runtime step context passed to component step boundaries."""
 
     dt_seconds: float
     settings: VercorSettings
     time: datetime | ModelDateTime | None = None
     logger: LoggerLike | None = None
+
+
+__all__ = ["ComponentSetupContext", "ComponentStepContext"]

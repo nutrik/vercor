@@ -26,7 +26,7 @@ import vercor.setups.external.veros_state as veros_state_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.components.data import DataComponent
-from vercor.runtime.contexts import ComponentInitContext, RuntimeStepContext
+from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.state import RuntimeComponentState
 from vercor.runtime.stores import RuntimeFieldStore
@@ -133,8 +133,8 @@ def _make_coupler(
     dt_seconds: float,
     run_order: list[str],
     settings: VercorSettings | None = None,
-) -> ComponentInitContext:
-    return ComponentInitContext(
+) -> ComponentSetupContext:
+    return ComponentSetupContext(
         start=datetime(2000, 1, 1),
         dt_seconds=dt_seconds,
         logger=cast(Any, _RecordingLogger()),
@@ -720,7 +720,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
             component
         ),
     )
-    step_context = RuntimeStepContext(
+    step_context = ComponentStepContext(
         dt_seconds=timedelta(days=1).total_seconds(),
         settings=coupler.settings,
         time=datetime(2000, 1, 2),
@@ -1274,7 +1274,7 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
     component_state = _runtime_component_state("OCN", component.data)
-    step_context = RuntimeStepContext(
+    step_context = ComponentStepContext(
         dt_seconds=20.0,
         settings=coupler.settings,
         time=datetime(2000, 1, 1),
@@ -1343,7 +1343,7 @@ def test_veros_step_nan_cleans_forcing_fields_before_set_variable(
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
     component_state = _runtime_component_state("OCN", component.data)
-    step_context = RuntimeStepContext(
+    step_context = ComponentStepContext(
         dt_seconds=20.0,
         settings=coupler.settings,
         time=datetime(2000, 1, 1),

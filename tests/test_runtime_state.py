@@ -17,7 +17,7 @@ from vercor.components.data import DataComponent
 from vercor.clock import Clock
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
-from vercor.runtime.contexts import ComponentInitContext
+from vercor.components.contexts import ComponentSetupContext
 from vercor.settings import VercorSettings
 from vercor.setups.external.jax_gcm_runtime import JAXGCMRuntimePayload
 from vercor.runtime.contracts import RuntimeComponentContract
@@ -35,7 +35,7 @@ class _RuntimeSendComponent(DataComponent):
         super().__init__("DATA", make_test_grid(name="runtime-send"))
         self.settings = settings
 
-    def initialize(self, context: ComponentInitContext) -> None:
+    def initialize(self, context: ComponentSetupContext) -> None:
         _ = context
 
 
@@ -71,9 +71,11 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         encoding="utf-8"
     )
     runtime_runner_source = runtime_runner_path.read_text(encoding="utf-8")
+    component_contexts_path = Path("vercor/components/contexts.py")
     runtime_contexts_path = Path("vercor/runtime/contexts.py")
-    assert runtime_contexts_path.exists()
-    runtime_contexts_source = runtime_contexts_path.read_text(encoding="utf-8")
+    assert component_contexts_path.exists()
+    assert not runtime_contexts_path.exists()
+    component_contexts_source = component_contexts_path.read_text(encoding="utf-8")
     runtime_contracts_path = Path("vercor/runtime/contracts.py")
     runtime_stores_path = Path("vercor/runtime/stores.py")
     runtime_exchange_dispatch_path = Path("vercor/runtime/exchange_dispatch.py")
@@ -451,13 +453,14 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "compute_ocn_lnd_masks_on_atm_grid" not in coupler_source
     assert "check_total_lnd_ocn_mask_sum" not in coupler_source
     assert "jax_ones(" not in coupler_source
-    assert "class ComponentInitContext" not in base_source
-    assert "class RuntimeStepContext" not in base_source
-    assert "from vercor.runtime.contexts import" in base_source
-    assert "class ComponentInitContext" in runtime_contexts_source
-    assert "class RuntimeStepContext" in runtime_contexts_source
-    assert "ComponentInitContext" not in components_source
-    assert "RuntimeStepContext" not in components_source
+    assert "class ComponentSetupContext" not in base_source
+    assert "class ComponentStepContext" not in base_source
+    assert "from vercor.components.contexts import ComponentStepContext" in base_source
+    assert "from vercor.runtime.contexts import" not in base_source
+    assert "class ComponentSetupContext" in component_contexts_source
+    assert "class ComponentStepContext" in component_contexts_source
+    assert "ComponentSetupContext" in components_source
+    assert "ComponentStepContext" in components_source
     assert "component.initialize(self)" not in coupler_source
     assert "dt_seconds: float,\n        runtime_settings" not in base_source
     assert "def write_runtime_component_to_netcdf" not in base_source

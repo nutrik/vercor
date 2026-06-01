@@ -130,7 +130,8 @@ immutable runtime containers used during traced integration.
   writes, and `default_fields` declare concrete runtime defaults for fields
   the model reads or updates. Scalar default and seeded values expand
   to grid-shaped constants. `ComponentSetupContext` and `ComponentStepContext`
-  are public aliases for the setup and step contexts passed to author callbacks.
+  are public setup and step context payloads passed to author callbacks, with
+  canonical ownership in `vercor.components.contexts`.
   Lifecycle hook type aliases (`ComponentInitializeHook`,
   `ComponentCreatePayloadHook`, `ComponentPrefillHook`, and
   `ComponentValidateHook`) are public component-author contracts and are
