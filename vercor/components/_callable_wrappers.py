@@ -16,7 +16,6 @@ from vercor.components.contracts import (
     ComponentValidateHook,
     FieldNames,
 )
-from vercor.components.contexts import ComponentStepContext
 from vercor.components._lifecycle import install_lifecycle_hooks
 from vercor.components._protocols import ComponentAuthoringProtocol
 from vercor.components._runtime_fields import apply_step_result
@@ -25,6 +24,7 @@ from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
+    from vercor.components.contexts import ComponentStepContext
     from vercor.runtime.state import RuntimeComponentState
 
 

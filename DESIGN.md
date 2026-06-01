@@ -175,7 +175,10 @@ immutable runtime containers used during traced integration.
   `Component` class for helper annotations, so helper boundaries stay decoupled
   from the concrete base implementation. Runtime-oriented component protocols
   expose only name, grid, settings, and declared field contracts; setup data
-  storage stays on concrete component classes. Component-facing
+  storage stays on concrete component classes. Execution protocols in the same
+  private module expose only runtime step methods, and host-runtime detection is
+  a runtime-checkable structural protocol rather than a concrete component class
+  check. Component-facing
   runtime-field adapters live in private `vercor.components._runtime_fields`,
   component-facing runtime-field convenience methods live in private
   `vercor.components._runtime_access`, and component-facing required-field

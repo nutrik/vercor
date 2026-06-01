@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from vercor.components.contracts import (
     AuthorFieldValues,
@@ -13,6 +13,7 @@ from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
+    from vercor.components.contexts import ComponentStepContext
     from vercor.runtime.state import RuntimeComponentState
 
 
@@ -60,4 +61,34 @@ class ComponentAuthoringProtocol(ComponentRuntimeProtocol, Protocol):
         ...
 
 
-__all__ = ["ComponentAuthoringProtocol", "ComponentRuntimeProtocol"]
+class ComponentExecutionProtocol(ComponentRuntimeProtocol, Protocol):
+    """Private structural contract for components that step runtime state."""
+
+    def step_runtime_state(
+        self,
+        component_state: "RuntimeComponentState",
+        context: "ComponentStepContext",
+    ) -> "RuntimeComponentState":
+        """Return this component advanced by one differentiable runtime step."""
+        ...
+
+
+@runtime_checkable
+class HostRuntimeExecutionProtocol(ComponentExecutionProtocol, Protocol):
+    """Private structural contract for components that require host stepping."""
+
+    def step_host_runtime_state(
+        self,
+        component_state: "RuntimeComponentState",
+        context: "ComponentStepContext",
+    ) -> "RuntimeComponentState":
+        """Return this component advanced by one Python host runtime step."""
+        ...
+
+
+__all__ = [
+    "ComponentAuthoringProtocol",
+    "ComponentExecutionProtocol",
+    "ComponentRuntimeProtocol",
+    "HostRuntimeExecutionProtocol",
+]

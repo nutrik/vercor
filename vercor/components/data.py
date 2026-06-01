@@ -8,12 +8,12 @@ from vercor.components._contracts import (
     merge_component_outputs,
 )
 from vercor.components.base import Component
-from vercor.components.contexts import ComponentStepContext
 from vercor.dtypes import PrecisionPolicy
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
 
 if TYPE_CHECKING:
+    from vercor.components.contexts import ComponentStepContext
     from vercor.runtime.state import RuntimeComponentState
 
 

@@ -100,6 +100,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local component-context boundary validation: focused red/green pytest,
   Black, focused fast pytest, flake8, mypy, full fast pytest, and full pytest
   passed as of 2026-06-01.
+- Latest local component execution protocol boundary validation: focused
+  red/green pytest, Black, focused fast pytest, flake8, mypy, full fast pytest,
+  and full pytest passed as of 2026-06-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -125,6 +128,35 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-01: Component Execution Protocol Boundary Refactor
+
+- Added private structural execution protocols in `vercor.components._protocols`
+  so component host/scanned execution policy no longer imports concrete
+  `Component` or `HostRuntimeComponent` classes.
+- Updated `vercor.components.runtime_execution` to detect host-backed runtime
+  components through `HostRuntimeExecutionProtocol` while preserving the
+  existing public helpers and host-runtime error behavior.
+- Narrowed runtime-only context imports in component modules to type-checking
+  imports where they are only annotation support.
+- Strengthened architecture coverage so runtime execution must use private
+  protocols and cannot drift back to concrete component-class imports.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for protocol-backed execution
+  policy ownership.
+- Validation run for this change:
+  baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`, focused red
+  pytest for the missing execution protocols and concrete-class runtime
+  execution import, focused green boundary pytest after implementation,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy pytest tests/test_component_boundary_contracts.py tests/test_component_base_coverage.py tests/test_api_boundaries.py tests/test_runtime_state.py -q --fast --tb=short`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: no failed implementation approach was encountered;
+  the only failure was the intentional focused red test run before adding the
+  private execution protocols.
 
 ### 2026-06-01: Component Context Boundary Refactor
 

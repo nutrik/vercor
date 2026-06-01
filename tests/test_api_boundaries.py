@@ -353,6 +353,21 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def component_requires_host_runtime(" in runtime_execution_source
     assert "def host_component_names(" in runtime_execution_source
     assert "def step_component_runtime_state(" in runtime_execution_source
+    assert "from vercor.components._protocols import" in runtime_execution_source
+    assert "ComponentExecutionProtocol" in runtime_execution_source
+    assert "HostRuntimeExecutionProtocol" in runtime_execution_source
+    assert (
+        "from vercor.components.base import Component" not in runtime_execution_source
+    )
+    assert "from vercor.components.host import HostRuntimeComponent" not in (
+        runtime_execution_source
+    )
+    assert "isinstance(component, HostRuntimeExecutionProtocol)" in (
+        runtime_execution_source
+    )
+    assert "isinstance(component, HostRuntimeComponent)" not in (
+        runtime_execution_source
+    )
     assert "def validate_component_setup" in validation_source
     assert "def _author_field_spec(" not in base_source
     assert "def component_field_spec(" not in contracts_source

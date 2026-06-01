@@ -18,12 +18,12 @@ from vercor.components._callable_wrappers import (
     _callable_component_definition,
 )
 from vercor.components.base import Component
-from vercor.components.contexts import ComponentStepContext
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
 
 if TYPE_CHECKING:
+    from vercor.components.contexts import ComponentStepContext
     from vercor.runtime.state import RuntimeComponentState
 
 

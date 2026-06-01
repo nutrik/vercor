@@ -207,9 +207,23 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def component_requires_host_runtime(" in component_runtime_execution_source
     assert "def host_component_names(" in component_runtime_execution_source
     assert "def step_component_runtime_state(" in component_runtime_execution_source
+    assert "from vercor.components._protocols import" in (
+        component_runtime_execution_source
+    )
+    assert "from vercor.components.base import Component" not in (
+        component_runtime_execution_source
+    )
+    assert "from vercor.components.host import HostRuntimeComponent" not in (
+        component_runtime_execution_source
+    )
+    assert "HostRuntimeExecutionProtocol" in component_runtime_execution_source
+    assert (
+        "isinstance(component, HostRuntimeExecutionProtocol)"
+        in component_runtime_execution_source
+    )
     assert (
         "isinstance(component, HostRuntimeComponent)"
-        in component_runtime_execution_source
+        not in component_runtime_execution_source
     )
     assert "time is not None and isinstance" not in runtime_driver_source
     assert "def _step_runtime_component" not in coupler_source

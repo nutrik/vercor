@@ -3,21 +3,25 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
-from vercor.components.base import Component
-from vercor.components.host import HostRuntimeComponent
+from vercor.components._protocols import (
+    ComponentExecutionProtocol,
+    HostRuntimeExecutionProtocol,
+)
 
 if TYPE_CHECKING:
     from vercor.components.contexts import ComponentStepContext
     from vercor.runtime.state import RuntimeComponentState
 
 
-def component_requires_host_runtime(component: Component) -> bool:
+def component_requires_host_runtime(component: ComponentExecutionProtocol) -> bool:
     """Return whether ``component`` must run through the Python host runtime."""
 
-    return isinstance(component, HostRuntimeComponent)
+    return isinstance(component, HostRuntimeExecutionProtocol)
 
 
-def host_component_names(components: Mapping[str, Component]) -> list[str]:
+def host_component_names(
+    components: Mapping[str, ComponentExecutionProtocol],
+) -> list[str]:
     """Return names of components that require the Python host runtime."""
 
     return [
@@ -28,7 +32,7 @@ def host_component_names(components: Mapping[str, Component]) -> list[str]:
 
 
 def step_component_runtime_state(
-    component: Component,
+    component: ComponentExecutionProtocol,
     component_state: RuntimeComponentState,
     context: ComponentStepContext,
     *,
@@ -36,7 +40,7 @@ def step_component_runtime_state(
 ) -> RuntimeComponentState:
     """Advance ``component_state`` through the component's selected runtime path."""
 
-    if allow_host_runtime and isinstance(component, HostRuntimeComponent):
+    if allow_host_runtime and isinstance(component, HostRuntimeExecutionProtocol):
         return component.step_host_runtime_state(
             component_state,
             context,

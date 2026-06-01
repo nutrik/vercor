@@ -39,6 +39,7 @@ def test_component_runtime_helpers_keep_private_protocol_boundary() -> None:
         "vercor/components/_runtime_access.py",
         "vercor/components/_lifecycle_api.py",
         "vercor/components/_callable_wrappers.py",
+        "vercor/components/runtime_execution.py",
     )
 
     for path in helper_paths:
@@ -48,6 +49,28 @@ def test_component_runtime_helpers_keep_private_protocol_boundary() -> None:
 
     components_source = source_for("vercor/components/__init__.py")
     assert "_protocols" not in components_source
+
+
+@pytest.mark.fast_always
+def test_component_execution_protocols_are_private_structural_contracts() -> None:
+    protocol_source = source_for("vercor/components/_protocols.py")
+    execution_protocol_source = class_body_source(
+        "vercor/components/_protocols.py",
+        "ComponentExecutionProtocol",
+    )
+    host_execution_protocol_source = class_body_source(
+        "vercor/components/_protocols.py",
+        "HostRuntimeExecutionProtocol",
+    )
+
+    assert "class ComponentExecutionProtocol" in protocol_source
+    assert "@runtime_checkable\nclass HostRuntimeExecutionProtocol" in protocol_source
+    assert "def step_runtime_state(" in execution_protocol_source
+    assert "def step_host_runtime_state(" in host_execution_protocol_source
+    assert "from vercor.components.base import Component" not in protocol_source
+    assert "from vercor.components.host import HostRuntimeComponent" not in (
+        protocol_source
+    )
 
 
 @pytest.mark.fast_always
