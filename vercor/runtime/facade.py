@@ -113,7 +113,7 @@ def runtime_run_context(
         dispatch_context=runtime_dispatch_context(
             inputs=inputs,
         ),
-        compiled_runtime_cache=inputs.runtime_resources.runtime_cache_mapping(),
+        runtime_cache=inputs.runtime_resources.runtime_cache,
         interrupts=inputs.runtime_resources.interrupt_controller,
     )
 

@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable, MutableMapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
 
 from vercor.clock import Clock
 from vercor.jax_logging import LoggerLike
+from vercor.runtime.cache import CompiledRuntime, CompiledRuntimeCache
 from vercor.runtime.dispatch_context import RuntimeDispatchContext
 from vercor.runtime.interrupts import RuntimeInterruptController
-from vercor.runtime.state import RuntimeCouplerState
-
-CompiledRuntime = Callable[[RuntimeCouplerState], RuntimeCouplerState]
 
 
 @dataclass(frozen=True)
@@ -22,5 +19,8 @@ class RuntimeRunContext:
     logger: LoggerLike
     log_level: int | str
     dispatch_context: RuntimeDispatchContext
-    compiled_runtime_cache: MutableMapping[tuple[Any, ...], CompiledRuntime]
+    runtime_cache: CompiledRuntimeCache
     interrupts: RuntimeInterruptController
+
+
+__all__ = ["CompiledRuntime", "RuntimeRunContext"]

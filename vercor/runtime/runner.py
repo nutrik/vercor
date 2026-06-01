@@ -11,7 +11,6 @@ from vercor.components.runtime_execution import host_component_names
 from vercor.exceptions import CouplerError
 from vercor.jax_logging import LoggerLike
 from vercor.dtypes import as_jax_index_array
-from vercor.runtime.cache import compiled_runtime_cache_key, compiled_scanned_runtime
 from vercor.runtime.dispatch_context import RuntimeDispatchContext
 from vercor.runtime.driver import step_runtime_component
 from vercor.runtime.interrupts import RuntimeInterruptController
@@ -70,10 +69,6 @@ def _run_compiled_scanned_runtime(
     """Run a pure runtime state through the cached compiled scanned path."""
 
     try:
-        cache_key = compiled_runtime_cache_key(
-            donate_state=donate_state,
-            context=context,
-        )
 
         def scanned_runtime(
             state: RuntimeCouplerState,
@@ -88,10 +83,9 @@ def _run_compiled_scanned_runtime(
                 interrupts=context.interrupts,
             )
 
-        return compiled_scanned_runtime(
+        return context.runtime_cache.get_or_compile_for_context(
             scanned_runtime,
-            cache=context.compiled_runtime_cache,
-            cache_key=cache_key,
+            context=context,
             donate_state=donate_state,
         )(runtime_state)
     except JaxRuntimeError as error:

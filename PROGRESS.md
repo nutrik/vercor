@@ -88,6 +88,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime resource/topology boundary validation: focused
   red/green pytest, Black, flake8, mypy, full fast pytest, and full pytest
   passed as of 2026-06-01.
+- Latest local compiled-runtime cache boundary validation: focused red/green
+  pytest, Black, flake8, mypy, full fast pytest, and full pytest passed as of
+  2026-06-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -113,6 +116,39 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-01: Compiled Runtime Cache Boundary Refactor
+
+- Added `vercor.runtime.cache.CompiledRuntimeCache` as the owner for compiled
+  scanned-runtime cache storage, JIT wrapping, context-derived cache-key lookup,
+  clearing, count, and value inspection.
+- Changed `RuntimeRunContext` to carry the cache owner instead of a mutable
+  mapping, and changed `CouplerRuntimeResources` to store a private
+  `_runtime_cache` while delegating its public cache facade methods to that
+  owner.
+- Removed the raw `runtime_cache_mapping()` accessor and updated the scanned
+  runner to ask the cache owner for compiled runtime reuse rather than importing
+  cache-key and cache-mutation helpers directly.
+- Strengthened boundary coverage so resources no longer expose the raw cache
+  mapping, run-context annotations cannot drift back to `MutableMapping`, and
+  cache compile/reuse/inspection behavior remains owned by
+  `CompiledRuntimeCache`.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the cache-owner boundary.
+- Validation run for this change:
+  baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  focused red pytest for the missing cache owner and raw mapping leak, focused
+  green pytest after implementation,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy pytest tests/test_runtime_state.py tests/test_runtime_facade_boundaries.py tests/test_runtime_run_cache.py tests/test_runtime_interrupts.py -q --fast --tb=short`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: the first runner boundary assertion searched for
+  `compiled_scanned_runtime(` across the entire runner module and also matched
+  the intended private `_run_compiled_scanned_runtime(...)` helper; it now checks
+  only the removed cache-helper import/call shape.
 
 ### 2026-06-01: Runtime Resource and Topology Boundary Refactor
 

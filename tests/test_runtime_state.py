@@ -273,11 +273,15 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "class RuntimeRunContext" not in runtime_runner_source
     assert "class RuntimeRunContext" in runtime_run_context_source
     assert "class CouplerRuntimeResources" in runtime_resources_source
+    assert "class CompiledRuntimeCache" in runtime_cache_source
     assert "components:" not in runtime_run_context_source
     assert "exchanges:" not in runtime_run_context_source
     assert "regridders:" not in runtime_run_context_source
     assert "contracts:" not in runtime_run_context_source
     assert "settings:" not in runtime_run_context_source
+    assert "MutableMapping" not in runtime_run_context_source
+    assert "compiled_runtime_cache:" not in runtime_run_context_source
+    assert "runtime_cache: CompiledRuntimeCache" in runtime_run_context_source
     assert "context: RuntimeRunContext" in runtime_runner_source
     assert "from vercor.runtime.run_context import" not in coupler_source
     assert "from vercor.runtime.run_context import" in runtime_facade_source
@@ -288,9 +292,13 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "runtime_resources: CouplerRuntimeResources" in runtime_facade_source
     assert "def compiled_scanned_runtime(" not in runtime_runner_source
     assert "def compiled_runtime_cache_key(" not in runtime_runner_source
-    assert "def compiled_scanned_runtime(" in runtime_cache_source
+    assert "compiled_runtime_cache_key(" not in runtime_runner_source
+    assert "def compiled_scanned_runtime(" not in runtime_cache_source
+    assert "def get_or_compile(" in runtime_cache_source
+    assert "def get_or_compile_for_context(" in runtime_cache_source
     assert "def compiled_runtime_cache_key(" in runtime_cache_source
-    assert "from vercor.runtime.cache import" in runtime_runner_source
+    assert "from vercor.runtime.cache import" not in runtime_runner_source
+    assert "get_or_compile_for_context(" in runtime_runner_source
     assert "def _run_host_runtime" not in coupler_source
     assert "def _compiled_runtime_cache_key" not in coupler_source
     run_body = coupler_source.split("def run", 1)[1]
@@ -555,10 +563,18 @@ def test_coupler_runtime_resources_store_runtime_state() -> None:
 
 
 def test_coupler_exposes_minimal_runtime_cache_facade() -> None:
+    cache_module = importlib.import_module("vercor.runtime.cache")
+    compiled_runtime_cache_type = getattr(cache_module, "CompiledRuntimeCache")
     coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
-    coupler._runtime_resources.runtime_cache_mapping()[("unit-test",)] = cast(
-        Any,
-        lambda state: state,
+    assert isinstance(
+        coupler._runtime_resources.runtime_cache,
+        compiled_runtime_cache_type,
+    )
+    cache = coupler._runtime_resources.runtime_cache
+    cache.get_or_compile(
+        cast(Any, lambda state: state),
+        cache_key=("unit-test",),
+        donate_state=False,
     )
 
     assert coupler.runtime_cache_entry_count() == 1
@@ -569,7 +585,45 @@ def test_coupler_exposes_minimal_runtime_cache_facade() -> None:
 
 
 @pytest.mark.fast_always
+def test_compiled_runtime_cache_owns_compilation_and_inspection() -> None:
+    cache_module = importlib.import_module("vercor.runtime.cache")
+
+    assert hasattr(cache_module, "CompiledRuntimeCache")
+    cache = getattr(cache_module, "CompiledRuntimeCache")()
+
+    runtime = cast(Any, lambda state: state)
+    compiled = cache.get_or_compile(
+        runtime,
+        cache_key=("unit-test",),
+        donate_state=False,
+    )
+    reused = cache.get_or_compile(
+        cast(
+            Any,
+            lambda state: RuntimeCouplerState(
+                (),
+                (),
+                RuntimeFieldStore.empty(),
+                RuntimeFieldStore.empty(),
+            ),
+        ),
+        cache_key=("unit-test",),
+        donate_state=False,
+    )
+
+    assert reused is compiled
+    assert cache.entry_count() == 1
+    assert cache.values() == (compiled,)
+
+    cache.clear()
+
+    assert cache.entry_count() == 0
+
+
+@pytest.mark.fast_always
 def test_runtime_resources_replace_contracts_and_topology_through_methods() -> None:
+    cache_module = importlib.import_module("vercor.runtime.cache")
+    compiled_runtime_cache_type = getattr(cache_module, "CompiledRuntimeCache")
     from vercor.runtime.resources import CouplerRuntimeResources
     from vercor.runtime.topology import ExchangeTopologyState
 
@@ -600,9 +654,12 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
     assert resources.runtime_contracts is contracts
     assert resources.topology_maps is topology_maps
 
-    resources.runtime_cache_mapping()[("unit-test",)] = cast(
-        Any,
-        lambda state: state,
+    assert isinstance(resources.runtime_cache, compiled_runtime_cache_type)
+    cache = resources.runtime_cache
+    cache.get_or_compile(
+        cast(Any, lambda state: state),
+        cache_key=("unit-test",),
+        donate_state=False,
     )
     assert resources.compiled_runtime_cache_entry_count() == 1
     assert len(resources.compiled_runtime_cache_values()) == 1
@@ -634,6 +691,7 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
         "runtime_resources.binary_masks =",
         "runtime_resources.fractional_masks =",
         "runtime_resources.compiled_runtime_cache =",
+        "runtime_resources.runtime_cache_mapping",
         "runtime_resources.interrupts =",
     ):
         assert direct_assignment not in runtime_facade_source

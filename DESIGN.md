@@ -270,17 +270,19 @@ immutable runtime containers used during traced integration.
   `vercor.runtime.preparation`; `vercor.runtime.facade` reexports these helpers
   for the coupler-facing runtime boundary but does not own their implementation.
   Frozen `RuntimeRunContext` execution inputs and the shared compiled-runtime
-  callable alias live in `vercor.runtime.run_context`, compiled-runtime cache
-  keys and JIT wrapping live in `vercor.runtime.cache`, shared host/scanned progress messages
-  plus traced callbacks live in `vercor.runtime.progress`, and the interrupt
-  controller lives in `vercor.runtime.interrupts`. Mutable per-coupler runtime
-  resources live in `vercor.runtime.resources.CouplerRuntimeResources`, which
-  owns private exchange topology maps, refreshed runtime contracts, the compiled
-  runtime cache, and the interrupt controller. Runtime facade and preparation
-  code use explicit holder accessors and replacement methods rather than raw
-  resource dictionaries, and focused tests install synthetic topology through
-  the same grouped topology-map replacement helper. Compiled runtime cache
-  clearing, counting, and test inspection also live on the holder rather than
+  callable alias live in `vercor.runtime.run_context`; `CompiledRuntimeCache`,
+  compiled-runtime cache keys, and JIT wrapping live in `vercor.runtime.cache`.
+  The run context carries the cache owner rather than a mutable cache mapping.
+  Shared host/scanned progress messages plus traced callbacks live in
+  `vercor.runtime.progress`, and the interrupt controller lives in
+  `vercor.runtime.interrupts`. Mutable per-coupler runtime resources live in
+  `vercor.runtime.resources.CouplerRuntimeResources`, which owns private
+  exchange topology maps, refreshed runtime contracts, a compiled-runtime cache
+  owner, and the interrupt controller. Runtime facade and preparation code use
+  explicit holder accessors and replacement methods rather than raw resource
+  dictionaries, and focused tests install synthetic topology through the same
+  grouped topology-map replacement helper. Compiled-runtime cache clearing,
+  counting, and test inspection delegate through the cache owner rather than
   exposing its dictionary. `Coupler` passes repeated
   runtime inputs through the internal
   `vercor.runtime.facade.RuntimeFacadeInputs` bundle and exposes only

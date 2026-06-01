@@ -91,6 +91,7 @@ def test_runtime_resources_hide_raw_resource_dictionaries() -> None:
     resources_source = source_for("vercor/runtime/resources.py")
     facade_source = source_for("vercor/runtime/facade.py")
     preparation_source = source_for("vercor/runtime/preparation.py")
+    run_context_source = source_for("vercor/runtime/run_context.py")
 
     for raw_name in (
         "regridders",
@@ -98,6 +99,7 @@ def test_runtime_resources_hide_raw_resource_dictionaries() -> None:
         "fractional_masks",
         "contracts",
         "compiled_runtime_cache",
+        "runtime_cache_mapping",
         "interrupts",
     ):
         assert not hasattr(resources, raw_name), raw_name
@@ -105,8 +107,12 @@ def test_runtime_resources_hide_raw_resource_dictionaries() -> None:
     assert "slots=True" in resources_source
     assert "_topology_maps:" in resources_source
     assert "_runtime_contracts:" in resources_source
-    assert "_compiled_runtime_cache:" in resources_source
+    assert "_runtime_cache:" in resources_source
+    assert "_compiled_runtime_cache:" not in resources_source
     assert "_interrupt_controller:" in resources_source
+    assert "runtime_cache_mapping(" not in resources_source
+    assert "MutableMapping" not in run_context_source
+    assert "runtime_cache: CompiledRuntimeCache" in run_context_source
     for source in (facade_source, preparation_source):
         for raw_access in (
             "runtime_resources.regridders",
@@ -114,6 +120,7 @@ def test_runtime_resources_hide_raw_resource_dictionaries() -> None:
             "runtime_resources.fractional_masks",
             "runtime_resources.contracts",
             "runtime_resources.compiled_runtime_cache",
+            "runtime_resources.runtime_cache_mapping",
             "runtime_resources.interrupts",
         ):
             assert raw_access not in source
@@ -158,6 +165,10 @@ def test_runtime_runner_splits_path_selection_helpers() -> None:
     assert "def _run_compiled_scanned_runtime(" in runner_source
     assert "def _raise_if_donating_host_runtime(" in runner_source
     assert "compiled_runtime_cache_key(" not in run_coupler_body
+    assert "compiled_runtime_cache_key(" not in runner_source
+    assert "compiled_scanned_runtime," not in runner_source
+    assert "return compiled_scanned_runtime(" not in runner_source
+    assert "get_or_compile_for_context(" in runner_source
     assert "raise CouplerError(" not in run_coupler_body
 
 

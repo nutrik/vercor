@@ -1,38 +1,85 @@
 from __future__ import annotations
 
-from collections.abc import MutableMapping
-from typing import Any, cast
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, cast
 
 import jax
 
 from vercor.jax_logging import effective_log_level
-from vercor.runtime.run_context import CompiledRuntime, RuntimeRunContext
+from vercor.runtime.state import RuntimeCouplerState
+
+if TYPE_CHECKING:
+    from vercor.runtime.run_context import RuntimeRunContext
+
+CompiledRuntime = Callable[[RuntimeCouplerState], RuntimeCouplerState]
 
 
-def compiled_scanned_runtime(
-    scanned_runtime: CompiledRuntime,
-    *,
-    cache: MutableMapping[tuple[Any, ...], CompiledRuntime],
-    cache_key: tuple[Any, ...],
-    donate_state: bool,
-) -> CompiledRuntime:
-    """Return a cached JIT-scanned runtime for one static topology key."""
+@dataclass(slots=True)
+class CompiledRuntimeCache:
+    """Owner for compiled scanned-runtime callables keyed by static run metadata."""
 
-    if cache_key in cache:
-        return cache[cache_key]
+    _compiled_runtime_cache: dict[tuple[Any, ...], CompiledRuntime] = field(
+        default_factory=dict
+    )
 
-    if donate_state:
-        compiled_runtime = cast(
-            CompiledRuntime,
-            jax.jit(scanned_runtime, donate_argnums=(0,)),
+    def get_or_compile(
+        self,
+        scanned_runtime: CompiledRuntime,
+        *,
+        cache_key: tuple[Any, ...],
+        donate_state: bool,
+    ) -> CompiledRuntime:
+        """Return a cached JIT runtime, compiling and storing it when missing."""
+
+        if cache_key in self._compiled_runtime_cache:
+            return self._compiled_runtime_cache[cache_key]
+
+        if donate_state:
+            compiled_runtime = cast(
+                CompiledRuntime,
+                jax.jit(scanned_runtime, donate_argnums=(0,)),
+            )
+        else:
+            compiled_runtime = cast(
+                CompiledRuntime,
+                jax.jit(scanned_runtime),
+            )
+        self._compiled_runtime_cache[cache_key] = compiled_runtime
+        return compiled_runtime
+
+    def get_or_compile_for_context(
+        self,
+        scanned_runtime: CompiledRuntime,
+        *,
+        context: RuntimeRunContext,
+        donate_state: bool,
+    ) -> CompiledRuntime:
+        """Return a compiled runtime keyed from one static runtime context."""
+
+        return self.get_or_compile(
+            scanned_runtime,
+            cache_key=compiled_runtime_cache_key(
+                donate_state=donate_state,
+                context=context,
+            ),
+            donate_state=donate_state,
         )
-    else:
-        compiled_runtime = cast(
-            CompiledRuntime,
-            jax.jit(scanned_runtime),
-        )
-    cache[cache_key] = compiled_runtime
-    return compiled_runtime
+
+    def clear(self) -> None:
+        """Clear compiled runtime entries."""
+
+        self._compiled_runtime_cache.clear()
+
+    def entry_count(self) -> int:
+        """Return the number of compiled runtime entries."""
+
+        return len(self._compiled_runtime_cache)
+
+    def values(self) -> tuple[CompiledRuntime, ...]:
+        """Return compiled runtime values without exposing the mutable mapping."""
+
+        return tuple(self._compiled_runtime_cache.values())
 
 
 def compiled_runtime_cache_key(
@@ -78,3 +125,6 @@ def compiled_runtime_cache_key(
         context.clock.year_type,
         dispatch_context.settings.year_in_seconds,
     )
+
+
+__all__ = ["CompiledRuntime", "CompiledRuntimeCache", "compiled_runtime_cache_key"]

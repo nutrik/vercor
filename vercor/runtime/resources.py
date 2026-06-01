@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
+from vercor.runtime.cache import CompiledRuntimeCache
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.interrupts import RuntimeInterruptController
 from vercor.runtime.run_context import CompiledRuntime
@@ -19,9 +19,7 @@ class CouplerRuntimeResources:
     _runtime_contracts: dict[str, RuntimeComponentContract] = field(
         default_factory=dict
     )
-    _compiled_runtime_cache: dict[tuple[Any, ...], CompiledRuntime] = field(
-        default_factory=dict
-    )
+    _runtime_cache: CompiledRuntimeCache = field(default_factory=CompiledRuntimeCache)
     _interrupt_controller: RuntimeInterruptController = field(
         default_factory=RuntimeInterruptController
     )
@@ -43,6 +41,12 @@ class CouplerRuntimeResources:
         """Return the runtime interrupt controller owned by this holder."""
 
         return self._interrupt_controller
+
+    @property
+    def runtime_cache(self) -> CompiledRuntimeCache:
+        """Return the compiled runtime cache owner for this holder."""
+
+        return self._runtime_cache
 
     def replace_contracts(
         self,
@@ -68,27 +72,20 @@ class CouplerRuntimeResources:
 
         self._topology_maps = topology_maps
 
-    def runtime_cache_mapping(
-        self,
-    ) -> dict[tuple[Any, ...], CompiledRuntime]:
-        """Return the mutable compiled runtime cache for cache-owner helpers."""
-
-        return self._compiled_runtime_cache
-
     def clear_compiled_runtime_cache(self) -> None:
         """Clear compiled runtime entries owned by this resource holder."""
 
-        self._compiled_runtime_cache.clear()
+        self._runtime_cache.clear()
 
     def compiled_runtime_cache_entry_count(self) -> int:
         """Return the number of compiled runtime entries in the cache."""
 
-        return len(self._compiled_runtime_cache)
+        return self._runtime_cache.entry_count()
 
     def compiled_runtime_cache_values(self) -> tuple[CompiledRuntime, ...]:
         """Return compiled runtime values without exposing the cache mapping."""
 
-        return tuple(self._compiled_runtime_cache.values())
+        return self._runtime_cache.values()
 
 
 __all__ = ["CompiledRuntime", "CouplerRuntimeResources"]
