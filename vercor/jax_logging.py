@@ -9,7 +9,7 @@ import jax
 
 DEFAULT_LOGGER_NAME = "VerCOR"
 CANONICAL_LOG_FORMAT = (
-    f"{DEFAULT_LOGGER_NAME}: %(asctime)s [%(levelname)s]: %(message)s"
+    f"{DEFAULT_LOGGER_NAME} ─ %(asctime)s [%(levelname)s]: %(message)s"
 )
 CANONICAL_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
