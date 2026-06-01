@@ -43,7 +43,7 @@ class _CAMulatorRuntimeState(Protocol):
     model_substeps: int
 
 
-def _coerce_camulator_datetime(time_obj: Any) -> datetime:
+def coerce_camulator_datetime(time_obj: Any) -> datetime:
     """Return a Python datetime from CAMulator/xarray time coordinates."""
 
     if hasattr(time_obj, "item"):
@@ -62,7 +62,7 @@ def _coerce_camulator_datetime(time_obj: Any) -> datetime:
     )
 
 
-def _run_camulator_prediction_block(
+def run_camulator_prediction_block(
     state: _CAMulatorRuntimeState,
     fields: Mapping[str, Any],
     *,
@@ -78,17 +78,17 @@ def _run_camulator_prediction_block(
     ds_slice = state.dynamic_ds.isel(time=slice(block_start, block_end)).load()
     ds_slice_times = ds_slice["time"].values
 
-    dynamic_forcing_chunk = _camulator_fields._prepare_camulator_dynamic_forcing_chunk(
+    dynamic_forcing_chunk = _camulator_fields.prepare_camulator_dynamic_forcing_chunk(
         ds_slice.to_array(dim="dynamic_variable").values
     )
-    gpu_forcing_chunk = _camulator_tensors._torch_tensor_from_jax_array(
+    gpu_forcing_chunk = _camulator_tensors.torch_tensor_from_jax_array(
         dynamic_forcing_chunk[:, :, jnp.newaxis, :, :],
         state.device,
         pin_memory=True,
     )
 
     for t in range(gpu_forcing_chunk.shape[0]):
-        utc_datetime = _coerce_camulator_datetime(ds_slice_times[t])
+        utc_datetime = coerce_camulator_datetime(ds_slice_times[t])
 
         if logger is not None:
             logger.info(
@@ -107,7 +107,7 @@ def _run_camulator_prediction_block(
             model_input = state.state
 
         total_ts, rescaled_total_ts = (
-            _camulator_fields._prepare_camulator_surface_forcing(
+            _camulator_fields.prepare_camulator_surface_forcing(
                 fields["sea_surface_temperature"],
                 fields["land_surface_temperature"],
                 state.LANDM_COSLAT,
@@ -125,8 +125,8 @@ def _run_camulator_prediction_block(
         state.accessor_input.set_state_var(
             model_input,
             "SST",
-            _camulator_tensors._torch_tensor_from_jax_array(
-                _camulator_fields._prepare_camulator_sst_input(rescaled_total_ts),
+            _camulator_tensors.torch_tensor_from_jax_array(
+                _camulator_fields.prepare_camulator_sst_input(rescaled_total_ts),
                 state.device,
             ),
         )
@@ -180,7 +180,7 @@ def step_camulator_runtime(
     block_start = state.runtime_cursor.current_index()
     block_end = block_start + state.model_substeps
 
-    prediction, last_total_surface_temperature = _run_camulator_prediction_block(
+    prediction, last_total_surface_temperature = run_camulator_prediction_block(
         state,
         fields,
         block_start=block_start,
@@ -189,7 +189,7 @@ def step_camulator_runtime(
     )
     state.runtime_cursor.advance()
 
-    mapped_fields = _camulator_fields._map_camulator_prediction_to_runtime_fields(
+    mapped_fields = _camulator_fields.map_camulator_prediction_to_runtime_fields(
         context.settings,
         camulator_reference_pressure=state.P0,
         hyai=state.hyai,
@@ -208,7 +208,7 @@ def step_camulator_runtime(
 
 
 __all__ = [
-    "_coerce_camulator_datetime",
-    "_run_camulator_prediction_block",
+    "coerce_camulator_datetime",
+    "run_camulator_prediction_block",
     "step_camulator_runtime",
 ]

@@ -17,7 +17,7 @@ from veros.state import VerosState  # noqa: E402
 
 
 @jax.jit
-def _update_veros_interior(
+def update_veros_interior(
     array: object,
     interior_value: object,
 ) -> jax.Array:
@@ -27,7 +27,7 @@ def _update_veros_interior(
 
 
 @jax.jit
-def _prepare_surface_forcing_fields(
+def prepare_surface_forcing_fields(
     taux: object,
     tauy: object,
     qnet: object,
@@ -52,7 +52,7 @@ def _prepare_surface_forcing_fields(
 
 
 @jax.jit
-def _extract_surface_temperature(
+def extract_surface_temperature(
     temperature: object,
     tau: object,
 ) -> jax.Array:
@@ -95,12 +95,12 @@ def pure(state: VerosState, jitted: bool, step: Callable) -> VerosState:
     return n_state
 
 
-def _extract_veros_runtime_sst(state: VerosState) -> jax.Array:
+def extract_veros_runtime_sst(state: VerosState) -> jax.Array:
     """Return the Veros surface temperature field in VerCOR runtime layout."""
 
     return cast(
         jax.Array,
-        _extract_surface_temperature(
+        extract_surface_temperature(
             state.variables.temp,
             state.variables.tau,
         ),
@@ -120,13 +120,13 @@ def set_variable(
 
     with n_state.variables.unlock():
         var = getattr(vs, variable_name)
-        updated_var = _update_veros_interior(var, variable_value)
+        updated_var = update_veros_interior(var, variable_value)
         setattr(vs, variable_name, runtime_array_to_host(updated_var))
 
     return n_state
 
 
-def _apply_veros_forcing_fields(
+def apply_veros_forcing_fields(
     state: VerosState,
     forcing_fields: tuple[jax.Array, jax.Array, jax.Array, jax.Array],
     *,
@@ -148,7 +148,7 @@ def _apply_veros_forcing_fields(
     return updated_state
 
 
-def _advance_veros_substeps(
+def advance_veros_substeps(
     state: VerosState,
     *,
     step_function: Callable[[VerosState], VerosState],
@@ -166,12 +166,12 @@ def _advance_veros_substeps(
 
 
 __all__ = [
-    "_advance_veros_substeps",
-    "_apply_veros_forcing_fields",
-    "_extract_surface_temperature",
-    "_extract_veros_runtime_sst",
-    "_prepare_surface_forcing_fields",
-    "_update_veros_interior",
+    "advance_veros_substeps",
+    "apply_veros_forcing_fields",
+    "extract_surface_temperature",
+    "extract_veros_runtime_sst",
+    "prepare_surface_forcing_fields",
+    "update_veros_interior",
     "copy_state",
     "pure",
     "set_variable",

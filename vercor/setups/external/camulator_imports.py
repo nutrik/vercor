@@ -23,7 +23,7 @@ GlobalEnergyFixer: Any = None
 post_process_wind_artifacts: Any = None
 
 
-def _load_credit_modules() -> None:
+def load_credit_modules() -> None:
     """Load CREDIT core modules at the CAMulator execution boundary."""
 
     global CREDIT_AVAILABLE
@@ -76,7 +76,7 @@ def _load_credit_modules() -> None:
     CREDIT_AVAILABLE = True
 
 
-def _load_postblock_modules() -> bool:
+def load_postblock_modules() -> bool:
     """Load optional CREDIT postblock fixers without import-time warnings."""
 
     global POSTBLOCK_AVAILABLE
@@ -105,7 +105,7 @@ def _load_postblock_modules() -> bool:
     return True
 
 
-def _load_windpp_module() -> bool:
+def load_windpp_module() -> bool:
     """Load optional wind post-processing only when CAMulator stepping needs it."""
 
     global WINDPP_AVAILABLE, post_process_wind_artifacts
@@ -133,9 +133,9 @@ __all__ = [
     "GlobalMassFixer",
     "GlobalWaterFixer",
     "Normalize_ERA5_and_Forcing",
-    "_load_credit_modules",
-    "_load_postblock_modules",
-    "_load_windpp_module",
+    "load_credit_modules",
+    "load_postblock_modules",
+    "load_windpp_module",
     "credit_main_parser",
     "distributed_model_wrapper",
     "load_metadata",

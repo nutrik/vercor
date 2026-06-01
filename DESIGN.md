@@ -356,21 +356,28 @@ component-topology name validation and lookup are private to
 and altitude helpers live in `vercor.fluxes.vertical_coordinates`, and generic
 PyTree transforms live in `vercor.pytree_utils`.
 Adapter-specific runtime and file-output policy lives beside adapters in focused
-helpers instead of in factory/bootstrap modules. JAXGCM runtime payload,
-prefill, validation, stepping, and host recording live in
+helpers instead of in factory/bootstrap modules. Exported adapter helpers use
+plain public package-internal names in their owner modules; underscored helpers
+remain local implementation details and are not listed in external adapter
+`__all__` exports. JAXGCM runtime payload, prefill, validation, stepping, and
+host recording live in
 `vercor.setups.external.jax_gcm_runtime`, which consumes the setup object through
 a private protocol rather than an unbounded state object. JAXGCM factory hooks
 are named callbacks bound to that setup state, keeping lifecycle wiring
 inspectable without changing the public factory API. JAXGCM output cadence and
-NetCDF writing live in `vercor.setups.external.jax_gcm_output`. Veros
-host-runtime flux application and substep orchestration live in
+NetCDF writing live in `vercor.setups.external.jax_gcm_output`, while
+surface-temperature cleanup and output-field mapping live in
+`vercor.setups.external.jax_gcm_fields`. Veros host-runtime flux application and
+substep orchestration live in
 `vercor.setups.external.veros_runtime` behind a private runtime-state protocol;
+Veros host-state mutation helpers live in `vercor.setups.external.veros_state`.
 Veros backend settings are imported only inside the explicit configuration
 function so setup modules preserve lazy optional-dependency boundaries. CAMulator
 prediction-block and runtime step orchestration live in
 `vercor.setups.external.camulator_runtime` behind a private runtime-state
-protocol, while CAMulator CREDIT output writing lives in
-`vercor.setups.external.camulator_output`.
+protocol, with tensor staging in `vercor.setups.external.camulator_tensors` and
+field mapping in `vercor.setups.external.camulator_fields`. CAMulator CREDIT
+output writing lives in `vercor.setups.external.camulator_output`.
 
 `vercor.assets` owns generic cache, download, and checksum validation only.
 Concrete forcing product registries and `get_forcing_data(...)` defaults live

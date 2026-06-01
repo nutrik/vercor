@@ -106,6 +106,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local component lifecycle boundary validation: focused red/green
   pytest, Black, focused fast pytest, flake8, mypy, full fast pytest, and full
   pytest passed as of 2026-06-01.
+- Latest local external-adapter helper boundary validation: focused red/green
+  pytest, Black, focused fast pytest, flake8, mypy, full fast pytest, and full
+  pytest passed as of 2026-06-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -131,6 +134,38 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-01: External Adapter Helper Boundary Refactor
+
+- Renamed exported external-adapter helper functions to public
+  package-internal names in JAXGCM, CAMulator, and Veros setup modules, while
+  leaving underscored helpers as local implementation details.
+- Removed private underscored helpers and setup-state classes from literal
+  external adapter `__all__` exports.
+- Updated external runtime call sites so adapter modules no longer reach through
+  another module's private helper namespace for JAXGCM field mapping,
+  CAMulator tensor/field staging, CAMulator optional-dependency loading, or
+  Veros host-state mutation helpers.
+- Strengthened architecture coverage so external adapter `__all__` exports
+  cannot drift back to private names and runtime helpers use the named
+  helper boundary.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the explicit external-adapter
+  helper boundary.
+- Validation run for this change:
+  baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`, focused red
+  pytest for the missing public helper names/private `__all__` exports, focused
+  green after implementation,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q --fast --tb=short`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: the first focused red run imported renamed
+  CAMulator helpers directly from the module and failed at collection time.
+  The test was adjusted to access helpers through the module object so the red
+  phase exercised the intended missing boundary attributes.
 
 ### 2026-06-01: Component Lifecycle Boundary Refactor
 

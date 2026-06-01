@@ -12,7 +12,7 @@ import yaml
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.setups.external import camulator_imports
 from vercor.setups.external.camulator_stepper import CAMulatorStepper
-from vercor.setups.external.camulator_tensors import _prepare_static_forcing_tensor
+from vercor.setups.external.camulator_tensors import prepare_static_forcing_tensor
 
 
 def add_init_noise(
@@ -36,7 +36,7 @@ def initialize_camulator(
 ) -> dict:
     """Initialize CAMulator model state and supporting runtime objects."""
 
-    camulator_imports._load_credit_modules()
+    camulator_imports.load_credit_modules()
 
     log = logger if logger is not None else get_default_logger()
     log.info(f"Initializing CAMulator from config: {config_path}")
@@ -113,7 +113,7 @@ def initialize_camulator(
 
     log.info("Loading static forcing...")
     sf_vars = conf["data"]["static_variables"]
-    static_forcing = _prepare_static_forcing_tensor(forcing_ds, sf_vars, current_device)
+    static_forcing = prepare_static_forcing_tensor(forcing_ds, sf_vars, current_device)
     log.info(f"Static forcing shape: {static_forcing.shape}")
 
     log.info("Loading metadata and coordinates...")

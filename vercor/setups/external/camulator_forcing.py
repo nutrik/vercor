@@ -17,7 +17,7 @@ from vercor.setups.external import camulator_imports
 def load_camulator_forcing_context(config_path: str) -> dict[str, Any]:
     """Load CAMulator config and raw forcing without constructing the model."""
 
-    camulator_imports._load_credit_modules()
+    camulator_imports.load_credit_modules()
 
     with open(config_path) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)

@@ -14,7 +14,7 @@ from vercor.setups.external.camulator_contracts import CAMULATOR_RUNTIME_FIELD_N
 from vercor.setups.external.camulator_tensors import StateVariableAccessor
 
 
-def _initialize_camulator_runtime_fields(
+def initialize_camulator_runtime_fields(
     grid_shape: tuple[int, int],
     policy: PrecisionPolicy = None,
 ) -> dict[str, jax.Array]:
@@ -25,7 +25,7 @@ def _initialize_camulator_runtime_fields(
 
 
 @jax.jit
-def _prepare_camulator_surface_forcing(
+def prepare_camulator_surface_forcing(
     sea_surface_temperature: object,
     land_surface_temperature: object,
     land_mask_coslat: object,
@@ -45,7 +45,7 @@ def _prepare_camulator_surface_forcing(
 
 
 @jax.jit
-def _prepare_camulator_dynamic_forcing_chunk(
+def prepare_camulator_dynamic_forcing_chunk(
     dynamic_forcing_values: object,
 ) -> jax.Array:
     """Convert xarray forcing values to CAMulator's time-major layout."""
@@ -54,7 +54,7 @@ def _prepare_camulator_dynamic_forcing_chunk(
 
 
 @jax.jit
-def _prepare_camulator_sst_input(
+def prepare_camulator_sst_input(
     rescaled_total_surface_temperature: object,
 ) -> jax.Array:
     """Expand a rescaled SST field to CAMulator's input tensor layout."""
@@ -65,7 +65,7 @@ def _prepare_camulator_sst_input(
 
 
 @jax.jit
-def _map_camulator_prediction_arrays(
+def map_camulator_prediction_arrays(
     earth_radius: float,
     gravity: float,
     rdair: float,
@@ -173,7 +173,7 @@ def _camulator_output_array(
     )
 
 
-def _map_camulator_prediction_to_runtime_fields(
+def map_camulator_prediction_to_runtime_fields(
     settings: VercorSettings,
     *,
     camulator_reference_pressure: float,
@@ -190,7 +190,7 @@ def _map_camulator_prediction_to_runtime_fields(
     prediction_out = state_transformer.inverse_transform(prediction)
     return cast(
         dict[str, jax.Array],
-        _map_camulator_prediction_arrays(
+        map_camulator_prediction_arrays(
             settings.earth_radius,
             settings.gravity,
             settings.rdair,
@@ -218,10 +218,10 @@ def _map_camulator_prediction_to_runtime_fields(
 
 
 __all__ = [
-    "_initialize_camulator_runtime_fields",
-    "_map_camulator_prediction_arrays",
-    "_map_camulator_prediction_to_runtime_fields",
-    "_prepare_camulator_dynamic_forcing_chunk",
-    "_prepare_camulator_sst_input",
-    "_prepare_camulator_surface_forcing",
+    "initialize_camulator_runtime_fields",
+    "map_camulator_prediction_arrays",
+    "map_camulator_prediction_to_runtime_fields",
+    "prepare_camulator_dynamic_forcing_chunk",
+    "prepare_camulator_sst_input",
+    "prepare_camulator_surface_forcing",
 ]

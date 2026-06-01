@@ -65,7 +65,7 @@ class TensorVariableIndex:
         )
 
 
-def _torch_tensor_from_jax_array(
+def torch_tensor_from_jax_array(
     array: RuntimeArray,
     device: str,
     *,
@@ -112,7 +112,7 @@ def _mark_unavailable_variables(
         indices[var] = TensorVariableIndex.unavailable(reason=reason)
 
 
-def _prepare_static_forcing_tensor(
+def prepare_static_forcing_tensor(
     forcing_ds: xr.Dataset,
     static_variables: list[str],
     device: Any,
@@ -345,8 +345,6 @@ class StateVariableAccessor:
 __all__ = [
     "StateVariableAccessor",
     "TensorVariableIndex",
-    "_append_indexed_variables",
-    "_mark_unavailable_variables",
-    "_prepare_static_forcing_tensor",
-    "_torch_tensor_from_jax_array",
+    "prepare_static_forcing_tensor",
+    "torch_tensor_from_jax_array",
 ]

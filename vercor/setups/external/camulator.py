@@ -250,6 +250,5 @@ def make_camulator_gcm(
 
 
 __all__ = [
-    "_CAMulatorGCMState",
     "make_camulator_gcm",
 ]

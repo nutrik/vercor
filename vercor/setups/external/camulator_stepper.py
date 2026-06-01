@@ -90,8 +90,8 @@ class CAMulatorStepper:
         """Initialize conservation fixers and wind filtering if available."""
 
         post_conf = self.conf["model"]["post_conf"]
-        postblock_available = camulator_imports._load_postblock_modules()
-        windpp_available = camulator_imports._load_windpp_module()
+        postblock_available = camulator_imports.load_postblock_modules()
+        windpp_available = camulator_imports.load_windpp_module()
 
         self.flag_mass = (
             postblock_available

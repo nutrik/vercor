@@ -950,7 +950,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert callable(diagnostics_module.component_vector_speed)
     assert callable(camulator_land_module.make_camulator_land)
     assert camulator_contracts_module.CAMULATOR_RUNTIME_FIELD_NAMES
-    assert callable(camulator_fields_module._prepare_camulator_surface_forcing)
+    assert callable(camulator_fields_module.prepare_camulator_surface_forcing)
     assert callable(camulator_runtime_settings_module.configure_camulator_runtime)
     assert callable(veros_fluxes_module.compute_fluxes)
     assert callable(veros_state_module.copy_state)
@@ -1030,24 +1030,24 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def _step_jax_gcm_component_state(" not in jax_gcm_source
     assert "def _record_jax_gcm_host_step(" not in jax_gcm_source
     assert "def asfloat(" not in jax_gcm_source
-    assert "def _cleanup_surface_temperature_fields(" not in jax_gcm_source
-    assert "def _prepare_surface_temperature_forcing(" not in jax_gcm_source
-    assert "def _map_jcm_output_fields(" not in jax_gcm_source
-    assert "def _cleanup_surface_temperature_fields(" in jax_gcm_fields_source
+    assert "def cleanup_surface_temperature_fields(" not in jax_gcm_source
+    assert "def prepare_surface_temperature_forcing(" not in jax_gcm_source
+    assert "def map_jcm_output_fields(" not in jax_gcm_source
+    assert "def cleanup_surface_temperature_fields(" in jax_gcm_fields_source
     assert "def _should_write_output(" not in jax_gcm_source
     assert "def _write_output(" not in jax_gcm_source
     assert "os.environ[" not in camulator_source
     assert "def configure_camulator_runtime(" in camulator_runtime_settings_source
-    assert "def _coerce_camulator_datetime(" in camulator_runtime_source
-    assert "def _run_camulator_prediction_block(" in camulator_runtime_source
+    assert "def coerce_camulator_datetime(" in camulator_runtime_source
+    assert "def run_camulator_prediction_block(" in camulator_runtime_source
     assert "def step_camulator_runtime(" in camulator_runtime_source
-    assert "def _run_camulator_prediction_block(" not in camulator_source
-    assert "def _prepare_camulator_surface_forcing(" not in camulator_source
-    assert "def _map_camulator_prediction_arrays(" not in camulator_source
-    assert "def _prepare_camulator_surface_forcing(" in camulator_fields_source
-    assert "def _map_camulator_prediction_arrays(" in camulator_fields_source
-    assert "def _torch_tensor_from_jax_array(" not in camulator_source
-    assert "def _torch_tensor_from_jax_array(" in camulator_tensors_source
+    assert "def run_camulator_prediction_block(" not in camulator_source
+    assert "def prepare_camulator_surface_forcing(" not in camulator_source
+    assert "def map_camulator_prediction_arrays(" not in camulator_source
+    assert "def prepare_camulator_surface_forcing(" in camulator_fields_source
+    assert "def map_camulator_prediction_arrays(" in camulator_fields_source
+    assert "def torch_tensor_from_jax_array(" not in camulator_source
+    assert "def torch_tensor_from_jax_array(" in camulator_tensors_source
     assert "def add_init_noise(" not in camulator_source
     assert "def add_init_noise(" in camulator_init_source
     assert "def _credit_output_functions(" not in camulator_source
@@ -1058,17 +1058,52 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def set_variable(" not in veros_gcm_source
     assert "def step_veros_runtime(" in veros_runtime_source
     assert "compute_fluxes(" in veros_runtime_source
-    assert "_apply_veros_forcing_fields(" in veros_runtime_source
-    assert "_advance_veros_substeps(" in veros_runtime_source
+    assert "apply_veros_forcing_fields(" in veros_runtime_source
+    assert "advance_veros_substeps(" in veros_runtime_source
     assert "compute_fluxes(" not in veros_gcm_source
-    assert "_apply_veros_forcing_fields(" not in veros_gcm_source
-    assert "_advance_veros_substeps(" not in veros_gcm_source
+    assert "apply_veros_forcing_fields(" not in veros_gcm_source
+    assert "advance_veros_substeps(" not in veros_gcm_source
     assert "from vercor.setups.external.camulator_wind_filter import" in (
         camulator_imports_source
     )
+    assert "_jax_gcm_fields._map_jcm_output_fields(" not in jax_gcm_runtime_source
+    assert "_camulator_fields._prepare_camulator_surface_forcing(" not in (
+        camulator_runtime_source
+    )
+    assert "_camulator_tensors._torch_tensor_from_jax_array(" not in (
+        camulator_runtime_source
+    )
+    assert "_veros_state._prepare_surface_forcing_fields(" not in veros_runtime_source
+    assert "_veros_state._advance_veros_substeps(" not in veros_runtime_source
     import vercor.setups.external as external_module
 
     assert "JAXGCMRuntimePayload" not in external_module._LAZY_EXPORTS
+
+
+@pytest.mark.fast_always
+def test_external_adapter_all_exports_are_public() -> None:
+    for path in Path("vercor/setups/external").glob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            if not any(
+                isinstance(target, ast.Name) and target.id == "__all__"
+                for target in node.targets
+            ):
+                continue
+            if not isinstance(node.value, (ast.List, ast.Tuple)):
+                continue
+            exports = [
+                element.value
+                for element in node.value.elts
+                if isinstance(element, ast.Constant) and isinstance(element.value, str)
+            ]
+            private_exports = [name for name in exports if name.startswith("_")]
+            assert (
+                private_exports == []
+            ), f"{path} exports private names: {private_exports}"
 
 
 @pytest.mark.fast_always

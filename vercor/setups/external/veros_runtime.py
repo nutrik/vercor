@@ -39,16 +39,16 @@ def step_veros_runtime(
         fields,
         context.settings,
     )
-    forcing_fields = _veros_state._prepare_surface_forcing_fields(
+    forcing_fields = _veros_state.prepare_surface_forcing_fields(
         taux, tauy, qnet, qnec, state.restore_to_climatology
     )
 
-    state._veros_state = _veros_state._apply_veros_forcing_fields(
+    state._veros_state = _veros_state.apply_veros_forcing_fields(
         state._veros_state,
         forcing_fields,
         jitted=state.jitted,
     )
-    state._veros_state = _veros_state._advance_veros_substeps(
+    state._veros_state = _veros_state.advance_veros_substeps(
         state._veros_state,
         step_function=state._step_function,
         model_substeps=state.model_substeps,
@@ -56,7 +56,7 @@ def step_veros_runtime(
     )
 
     return {
-        "sea_surface_temperature": _veros_state._extract_veros_runtime_sst(
+        "sea_surface_temperature": _veros_state.extract_veros_runtime_sst(
             state._veros_state
         )
     }

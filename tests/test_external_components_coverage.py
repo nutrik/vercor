@@ -184,7 +184,7 @@ def test_cleanup_surface_temperature_fields_supports_jit_and_gradients() -> None
         clean_sea_surface_temperature,
         total_surface_temperature,
         cold_surface_cells,
-    ) = jax.jit(jax_gcm_fields_module._cleanup_surface_temperature_fields)(
+    ) = jax.jit(jax_gcm_fields_module.cleanup_surface_temperature_fields)(
         land_surface_temperature,
         sea_surface_temperature,
     )
@@ -208,7 +208,7 @@ def test_cleanup_surface_temperature_fields_supports_jit_and_gradients() -> None
 
     gradient = jax.grad(
         lambda land: jnp.sum(
-            jax_gcm_fields_module._cleanup_surface_temperature_fields(
+            jax_gcm_fields_module.cleanup_surface_temperature_fields(
                 land,
                 jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
             )[2]
@@ -222,7 +222,7 @@ def test_prepare_surface_temperature_forcing_supports_jit_and_fill_value() -> No
     land_fraction_mask = jnp.asarray([[1.0, 0.0], [0.0, 1.0]])
 
     land_surface_temperature, sea_surface_temperature = jax.jit(
-        jax_gcm_fields_module._prepare_surface_temperature_forcing
+        jax_gcm_fields_module.prepare_surface_temperature_forcing
     )(total_surface_temperature, land_fraction_mask)
 
     assert_allclose_compact(
@@ -259,7 +259,7 @@ def test_map_jcm_output_fields_supports_jit(
         ),
     )
 
-    mapped_fields = jax.jit(jax_gcm_fields_module._map_jcm_output_fields)(
+    mapped_fields = jax.jit(jax_gcm_fields_module.map_jcm_output_fields)(
         2.5e6,
         1.0e5,
         jnp.asarray([0.2, 1.0]),
@@ -670,7 +670,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
             ]
         ),
     )
-    cast(Any, jax_gcm_fields_module._map_jcm_output_fields).clear_cache()
+    cast(Any, jax_gcm_fields_module.map_jcm_output_fields).clear_cache()
 
     def fake_write_jax_gcm_averages_output(
         predictions: list[Any],
@@ -1020,7 +1020,7 @@ def test_veros_update_veros_interior_supports_jit_and_gradients() -> None:
     array = jnp.zeros((8, 8, 1), dtype=jnp.float64)
     interior = jnp.arange(16.0, dtype=jnp.float64).reshape(4, 4, 1)
 
-    updated = jax.jit(veros_state_module._update_veros_interior)(array, interior)
+    updated = jax.jit(veros_state_module.update_veros_interior)(array, interior)
 
     assert_allclose_compact(updated[2:-2, 2:-2, :], interior)
     assert np.count_nonzero(np.asarray(updated[:2, :, :])) == 0
@@ -1030,7 +1030,7 @@ def test_veros_update_veros_interior_supports_jit_and_gradients() -> None:
 
     gradient = jax.grad(
         lambda payload: jnp.sum(
-            veros_state_module._update_veros_interior(array, payload)
+            veros_state_module.update_veros_interior(array, payload)
         )
     )(interior)
     assert_allclose_compact(gradient, np.ones((4, 4, 1)))
@@ -1039,7 +1039,7 @@ def test_veros_update_veros_interior_supports_jit_and_gradients() -> None:
 def test_veros_extract_surface_temperature_supports_jit_and_gradients() -> None:
     temperature = jnp.arange(8 * 8 * 2 * 2.0, dtype=jnp.float64).reshape(8, 8, 2, 2)
 
-    surface_temperature = jax.jit(veros_state_module._extract_surface_temperature)(
+    surface_temperature = jax.jit(veros_state_module.extract_surface_temperature)(
         temperature, 1
     )
 
@@ -1050,7 +1050,7 @@ def test_veros_extract_surface_temperature_supports_jit_and_gradients() -> None:
 
     gradient = jax.grad(
         lambda payload: jnp.sum(
-            veros_state_module._extract_surface_temperature(payload, 0)
+            veros_state_module.extract_surface_temperature(payload, 0)
         )
     )(temperature)
     expected_gradient = np.zeros((8, 8, 2, 2), dtype=float)
@@ -1066,7 +1066,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     qnet = jnp.asarray([[9.0, 10.0], [11.0, jnp.nan]])
     qnec = jnp.asarray([[12.0, 13.0], [14.0, 15.0]])
 
-    prepared = jax.jit(veros_state_module._prepare_surface_forcing_fields)(
+    prepared = jax.jit(veros_state_module.prepare_surface_forcing_fields)(
         taux, tauy, qnet, qnec, False
     )
     taux_out, tauy_out, qnet_out, qnec_out = prepared
@@ -1079,7 +1079,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     assert_allclose_compact(qnet_out, np.asarray([[[9.0], [11.0]], [[10.0], [0.0]]]))
     assert_allclose_compact(qnec_out, np.zeros((2, 2, 1)))
 
-    restored = veros_state_module._prepare_surface_forcing_fields(
+    restored = veros_state_module.prepare_surface_forcing_fields(
         taux, tauy, qnet, qnec, True
     )[3]
     assert_allclose_compact(

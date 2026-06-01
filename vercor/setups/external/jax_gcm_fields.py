@@ -33,7 +33,7 @@ JAXGCM_REQUIRED_GRID_FIELD_NAMES = (
 
 
 @jax.jit
-def _cleanup_surface_temperature_fields(
+def cleanup_surface_temperature_fields(
     land_surface_temperature: object,
     sea_surface_temperature: object,
 ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
@@ -56,7 +56,7 @@ def _cleanup_surface_temperature_fields(
 
 
 @jax.jit
-def _prepare_surface_temperature_forcing(
+def prepare_surface_temperature_forcing(
     total_surface_temperature: object,
     land_fraction_mask: object,
 ) -> tuple[jax.Array, jax.Array]:
@@ -85,7 +85,7 @@ def _prepare_surface_temperature_forcing(
 
 
 @jax.jit
-def _map_jcm_output_fields(
+def map_jcm_output_fields(
     latvap: float,
     reference_pressure: float,
     sigma_levels: object,
@@ -164,7 +164,7 @@ __all__ = [
     "JAXGCM_OUTPUT_GRID_FIELD_NAMES",
     "JAXGCM_REQUIRED_GRID_FIELD_NAMES",
     "REFERENCE_SURFACE_TEMPERATURE",
-    "_cleanup_surface_temperature_fields",
-    "_map_jcm_output_fields",
-    "_prepare_surface_temperature_forcing",
+    "cleanup_surface_temperature_fields",
+    "map_jcm_output_fields",
+    "prepare_surface_temperature_forcing",
 ]

@@ -189,13 +189,13 @@ def step_jax_gcm_runtime(
         sea_surface_temperature,
         total_surface_temperature,
         _,
-    ) = _jax_gcm_fields._cleanup_surface_temperature_fields(
+    ) = _jax_gcm_fields.cleanup_surface_temperature_fields(
         fields.get("land_surface_temperature"),
         fields.get("sea_surface_temperature"),
     )
 
     land_surface_temperature_forcing, sea_surface_temperature_forcing = (
-        _jax_gcm_fields._prepare_surface_temperature_forcing(
+        _jax_gcm_fields.prepare_surface_temperature_forcing(
             total_surface_temperature,
             as_jax_real_array(state.model.terrain.fmask, settings).T,
         )
@@ -212,7 +212,7 @@ def step_jax_gcm_runtime(
         unwrap_leading_dims(stack_objects([prediction])), axis=0
     )
 
-    mapped_fields = _jax_gcm_fields._map_jcm_output_fields(
+    mapped_fields = _jax_gcm_fields.map_jcm_output_fields(
         settings.latvap,
         JCM_REFERENCE_PRESSURE,
         state.sigma_levels,
@@ -267,7 +267,7 @@ def record_jax_gcm_host_step(
         state.forcing = applied_forcing
     state._predictions_list.append(prediction)
 
-    _, _, _, cold_surface_cells = _jax_gcm_fields._cleanup_surface_temperature_fields(
+    _, _, _, cold_surface_cells = _jax_gcm_fields.cleanup_surface_temperature_fields(
         step_result.fields.get("land_surface_temperature"),
         step_result.fields.get("sea_surface_temperature"),
     )

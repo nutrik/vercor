@@ -27,14 +27,6 @@ from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
 from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
 from vercor.setups.external.camulator import make_camulator_gcm
-from vercor.setups.external.camulator_fields import (
-    _initialize_camulator_runtime_fields,
-    _map_camulator_prediction_arrays,
-    _prepare_camulator_dynamic_forcing_chunk,
-    _prepare_camulator_sst_input,
-    _prepare_camulator_surface_forcing,
-)
-from vercor.setups.external.camulator_tensors import _torch_tensor_from_jax_array
 from vercor.fluxes.vertical_coordinates import get_altitudes_hybrid_sigma_levels
 from vercor.grid import RectilinearGrid
 from vercor.runtime.contracts import RuntimeComponentContract
@@ -98,7 +90,7 @@ def _make_coupler(start: datetime) -> ComponentSetupContext:
 
 
 def test_camulator_runtime_field_initializer_returns_jax_arrays() -> None:
-    fields = _initialize_camulator_runtime_fields((2, 3))
+    fields = camulator_fields_module.initialize_camulator_runtime_fields((2, 3))
 
     assert fields
     assert all(isinstance(value, jax.Array) for value in fields.values())
@@ -129,7 +121,7 @@ def test_prepare_camulator_surface_forcing_supports_jit_and_gradients() -> None:
     land_mask_coslat = jnp.asarray([[0.5, 1.0], [1.2, 0.0]])
 
     total_surface_temperature, rescaled_total_surface_temperature = jax.jit(
-        _prepare_camulator_surface_forcing
+        camulator_fields_module.prepare_camulator_surface_forcing
     )(
         sea_surface_temperature,
         land_surface_temperature,
@@ -151,7 +143,7 @@ def test_prepare_camulator_surface_forcing_supports_jit_and_gradients() -> None:
     weights = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
     gradient = jax.grad(
         lambda sst: jnp.sum(
-            _prepare_camulator_surface_forcing(
+            camulator_fields_module.prepare_camulator_surface_forcing(
                 sst,
                 jnp.asarray([[10.0, 11.0], [12.0, 13.0]]),
                 jnp.asarray([[0.0, 0.0], [1.0, 0.0]]),
@@ -166,7 +158,9 @@ def test_prepare_camulator_surface_forcing_supports_jit_and_gradients() -> None:
 def test_prepare_camulator_dynamic_forcing_chunk_supports_jit_and_ordering() -> None:
     values = jnp.arange(2 * 3 * 2 * 2, dtype=jnp.float32).reshape(2, 3, 2, 2)
 
-    prepared = jax.jit(_prepare_camulator_dynamic_forcing_chunk)(values)
+    prepared = jax.jit(camulator_fields_module.prepare_camulator_dynamic_forcing_chunk)(
+        values
+    )
 
     assert prepared.shape == (3, 2, 2, 2)
     assert_allclose_compact(prepared, np.asarray(values).transpose((1, 0, 2, 3)))
@@ -175,7 +169,9 @@ def test_prepare_camulator_dynamic_forcing_chunk_supports_jit_and_ordering() -> 
 def test_prepare_camulator_sst_input_supports_jit_and_shape() -> None:
     surface_temperature = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
 
-    prepared = jax.jit(_prepare_camulator_sst_input)(surface_temperature)
+    prepared = jax.jit(camulator_fields_module.prepare_camulator_sst_input)(
+        surface_temperature
+    )
 
     assert prepared.shape == (1, 1, 1, 2, 2)
     assert_allclose_compact(prepared[0, 0, 0], np.asarray(surface_temperature))
@@ -184,7 +180,7 @@ def test_prepare_camulator_sst_input_supports_jit_and_shape() -> None:
 def test_torch_tensor_from_jax_array_uses_copied_host_boundary() -> None:
     source = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
 
-    tensor = _torch_tensor_from_jax_array(source, "cpu")
+    tensor = camulator_tensors_module.torch_tensor_from_jax_array(source, "cpu")
     tensor[0, 0] = 99.0
 
     assert isinstance(tensor, torch.Tensor)
@@ -259,7 +255,7 @@ def test_prepare_static_forcing_tensor_preserves_order_and_shape() -> None:
         }
     )
 
-    static_forcing = camulator_tensors_module._prepare_static_forcing_tensor(
+    static_forcing = camulator_tensors_module.prepare_static_forcing_tensor(
         forcing_ds, ["LAND", "TOPO"], "cpu"
     )
 
@@ -428,7 +424,7 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
     net_longwave_accumulated = jnp.full((2, 2), -21600.0 * 3.0)
     surface_pressure = jnp.full((2, 2), 100000.0)
 
-    mapped_fields = jax.jit(_map_camulator_prediction_arrays)(
+    mapped_fields = jax.jit(camulator_fields_module.map_camulator_prediction_arrays)(
         settings.earth_radius,
         settings.gravity,
         settings.rdair,
@@ -666,7 +662,7 @@ def test_initialize_camulator_logs_lifecycle_through_injected_logger(
     )
     monkeypatch.setattr(
         camulator_init_module,
-        "_prepare_static_forcing_tensor",
+        "prepare_static_forcing_tensor",
         lambda forcing_ds, static_variables, device: torch.zeros((1, 1)),
     )
     monkeypatch.setattr(
@@ -869,7 +865,7 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
         latitude=jnp.asarray([0.0, 1.0]),
     )
     component.settings = VercorSettings()
-    component.data = _initialize_camulator_runtime_fields(
+    component.data = camulator_fields_module.initialize_camulator_runtime_fields(
         component.grid.shape,
         component.settings,
     )
@@ -903,7 +899,7 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     )
     monkeypatch.setattr(
         camulator_fields_module,
-        "_map_camulator_prediction_arrays",
+        "map_camulator_prediction_arrays",
         lambda *args: {"temperature": jnp.full((2, 2), 9.0)},
     )
 

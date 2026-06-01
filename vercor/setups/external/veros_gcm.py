@@ -157,7 +157,7 @@ class _VerosGCMState:
 
         component.seed_field(
             "sea_surface_temperature",
-            _veros_state._extract_veros_runtime_sst(self._veros_state),
+            _veros_state.extract_veros_runtime_sst(self._veros_state),
         )
 
     def step(
@@ -205,6 +205,5 @@ def make_veros_gcm(
 
 
 __all__ = [
-    "_VerosGCMState",
     "make_veros_gcm",
 ]
