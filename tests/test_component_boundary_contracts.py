@@ -100,6 +100,18 @@ def test_public_lifecycle_hook_types_are_owned_by_component_contracts() -> None:
 
 
 @pytest.mark.fast_always
+def test_lifecycle_storage_uses_private_typed_owner_boundary() -> None:
+    lifecycle_source = source_for("vercor/components/_lifecycle.py")
+    protocol_source = source_for("vercor/components/_protocols.py")
+
+    assert "class ComponentLifecycleOwner(Protocol)" in lifecycle_source
+    assert "component: ComponentLifecycleOwner" in lifecycle_source
+    assert "component: Any" not in lifecycle_source
+    assert "_lifecycle_hooks: ComponentLifecycleHooks" in protocol_source
+    assert "_lifecycle_hooks: Any" not in protocol_source
+
+
+@pytest.mark.fast_always
 def test_callable_wrapper_module_owns_callable_component_definition() -> None:
     callable_source = source_for("vercor/components/_callable_wrappers.py")
     base_source = source_for("vercor/components/base.py")
@@ -107,6 +119,13 @@ def test_callable_wrapper_module_owns_callable_component_definition() -> None:
 
     assert "class _CallableComponentDefinition" in callable_source
     assert "def _callable_component_definition(" in callable_source
+    assert "lifecycle_hooks: ComponentLifecycleHooks" in callable_source
+    assert "initialize: ComponentInitializeHook | None" not in class_body_source(
+        "vercor/components/_callable_wrappers.py",
+        "_CallableComponentDefinition",
+    )
+    assert "def create_runtime_payload(" not in callable_source
+    assert "component._lifecycle_hooks.create_runtime_payload" not in callable_source
     assert "field_spec=_ComponentFieldSpec(" not in base_source
     assert "field_spec=ComponentFieldSpec(" not in host_source
 

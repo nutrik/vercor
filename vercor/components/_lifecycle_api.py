@@ -41,6 +41,11 @@ class ComponentLifecycleMixin:
         hook = component._lifecycle_hooks.create_runtime_payload
         if hook is not None:
             return hook(component)
+        return self._default_runtime_payload()
+
+    def _default_runtime_payload(self) -> Any | None:
+        """Return the payload used when no lifecycle hook is installed."""
+
         return None
 
     def prefill_runtime_state_fields(

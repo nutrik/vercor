@@ -159,14 +159,16 @@ immutable runtime containers used during traced integration.
   `vercor.components._field_names`, and component authoring methods for field
   declarations, setup seeding, and settings updates live in private
   `vercor.components._field_authoring`. Lifecycle hook storage and hook
-  installation live in private `vercor.components._lifecycle`; default
-  lifecycle dispatch lives in private
-  `vercor.components._lifecycle_api`, and factory-installed hooks are stored in
-  one private `ComponentLifecycleHooks` container rather than as ad-hoc
-  component attributes. Author-value normalization lives in private
+  installation live behind the typed private `ComponentLifecycleOwner`
+  boundary in `vercor.components._lifecycle`; default lifecycle dispatch lives
+  in private `vercor.components._lifecycle_api`, and factory-installed hooks are
+  stored in one private `ComponentLifecycleHooks` container rather than as
+  ad-hoc component attributes. Author-value normalization lives in private
   `vercor.components._contracts`; callable signature adaptation, shared
   callable construction metadata, and shared callable runtime mechanics live in
-  private `vercor.components._callable_wrappers`. The concrete callable-backed
+  private `vercor.components._callable_wrappers`, which carries lifecycle hooks
+  as that container and delegates hook precedence/default payload fallback to
+  the lifecycle mixin. The concrete callable-backed
   differentiable wrapper is owned by `vercor.components.base`, and the concrete
   callable-backed host wrapper is owned by `vercor.components.host`, keeping
   each runtime kind beside its public abstract base. Private helper modules

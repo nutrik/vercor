@@ -16,7 +16,10 @@ from vercor.components.contracts import (
     ComponentValidateHook,
     FieldNames,
 )
-from vercor.components._lifecycle import install_lifecycle_hooks
+from vercor.components._lifecycle import (
+    ComponentLifecycleHooks,
+    install_lifecycle_hooks,
+)
 from vercor.components._protocols import ComponentAuthoringProtocol
 from vercor.components._runtime_fields import apply_step_result
 from vercor.exceptions import ComponentError
@@ -36,10 +39,7 @@ class _CallableComponentDefinition:
     payload: Any | None
     settings: VercorSettings | None
     field_spec: ComponentFieldSpec
-    initialize: ComponentInitializeHook | None
-    create_runtime_payload: ComponentCreatePayloadHook | None
-    prefill_runtime_state_fields: ComponentPrefillHook | None
-    validate_runtime_state: ComponentValidateHook | None
+    lifecycle_hooks: ComponentLifecycleHooks
 
 
 def _callable_component_definition(
@@ -66,10 +66,12 @@ def _callable_component_definition(
             outputs=outputs,
             default_fields=default_fields or {},
         ),
-        initialize=initialize,
-        create_runtime_payload=create_runtime_payload,
-        prefill_runtime_state_fields=prefill_runtime_state_fields,
-        validate_runtime_state=validate_runtime_state,
+        lifecycle_hooks=ComponentLifecycleHooks(
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
+        ),
     )
 
 
@@ -190,10 +192,7 @@ class _CallableRuntimeMixin:
             step=definition.step,
             payload=definition.payload,
             field_spec=definition.field_spec,
-            initialize=definition.initialize,
-            create_runtime_payload=definition.create_runtime_payload,
-            prefill_runtime_state_fields=definition.prefill_runtime_state_fields,
-            validate_runtime_state=definition.validate_runtime_state,
+            lifecycle_hooks=definition.lifecycle_hooks,
         )
 
     def _initialize_callable_runtime(
@@ -202,10 +201,7 @@ class _CallableRuntimeMixin:
         step: AuthorStepCallable,
         payload: Any | None,
         field_spec: ComponentFieldSpec,
-        initialize: ComponentInitializeHook | None,
-        create_runtime_payload: ComponentCreatePayloadHook | None,
-        prefill_runtime_state_fields: ComponentPrefillHook | None,
-        validate_runtime_state: ComponentValidateHook | None,
+        lifecycle_hooks: ComponentLifecycleHooks,
     ) -> None:
         component = cast(ComponentAuthoringProtocol, self)
         self._step = normalize_component_step_callable(step)
@@ -214,19 +210,12 @@ class _CallableRuntimeMixin:
 
         install_lifecycle_hooks(
             component,
-            initialize=initialize,
-            create_runtime_payload=create_runtime_payload,
-            prefill_runtime_state_fields=prefill_runtime_state_fields,
-            validate_runtime_state=validate_runtime_state,
+            hooks=lifecycle_hooks,
         )
 
-    def create_runtime_payload(self) -> Any | None:
+    def _default_runtime_payload(self) -> Any | None:
         """Return the payload supplied to the callable component factory."""
 
-        component = cast(ComponentAuthoringProtocol, self)
-        hook = component._lifecycle_hooks.create_runtime_payload
-        if hook is not None:
-            return hook(component)
         return self._payload
 
     def _step_callable_runtime_state(

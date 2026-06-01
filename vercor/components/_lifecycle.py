@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Protocol
 
 from vercor.components.contracts import (
     ComponentCreatePayloadHook,
@@ -50,9 +50,16 @@ class ComponentLifecycleHooks:
         )
 
 
+class ComponentLifecycleOwner(Protocol):
+    """Private structural contract for components that own lifecycle hooks."""
+
+    _lifecycle_hooks: ComponentLifecycleHooks
+
+
 def install_lifecycle_hooks(
-    component: Any,
+    component: ComponentLifecycleOwner,
     *,
+    hooks: ComponentLifecycleHooks | None = None,
     initialize: ComponentInitializeHook | None = None,
     create_runtime_payload: ComponentCreatePayloadHook | None = None,
     prefill_runtime_state_fields: ComponentPrefillHook | None = None,
@@ -60,10 +67,24 @@ def install_lifecycle_hooks(
 ) -> None:
     """Attach optional lifecycle hooks to a factory-created component."""
 
-    hooks = getattr(component, "_lifecycle_hooks", ComponentLifecycleHooks())
-    component._lifecycle_hooks = hooks.with_updates(
+    base_hooks = component._lifecycle_hooks
+    if hooks is not None:
+        base_hooks = base_hooks.with_updates(
+            initialize=hooks.initialize,
+            create_runtime_payload=hooks.create_runtime_payload,
+            prefill_runtime_state_fields=hooks.prefill_runtime_state_fields,
+            validate_runtime_state=hooks.validate_runtime_state,
+        )
+    component._lifecycle_hooks = base_hooks.with_updates(
         initialize=initialize,
         create_runtime_payload=create_runtime_payload,
         prefill_runtime_state_fields=prefill_runtime_state_fields,
         validate_runtime_state=validate_runtime_state,
     )
+
+
+__all__ = [
+    "ComponentLifecycleHooks",
+    "ComponentLifecycleOwner",
+    "install_lifecycle_hooks",
+]

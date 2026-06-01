@@ -1337,6 +1337,41 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
 
 
 @pytest.mark.fast_always
+def test_callable_payload_default_can_be_overridden_by_lifecycle_hook() -> None:
+    grid = make_test_grid(name="factory-payload-hook")
+
+    def step(fields: Mapping[str, RuntimeArray]) -> Mapping[str, RuntimeArray]:
+        return {"temperature": fields["temperature"] + 1.0}
+
+    payload = {"offset": 2}
+    component = components_module.differentiable_component(
+        name="ATM",
+        grid=grid,
+        payload=payload,
+        step=step,
+        outputs=("temperature",),
+        default_fields={"temperature": jnp.ones(grid.shape)},
+    )
+
+    assert component.create_runtime_payload() is payload
+
+    def create_runtime_payload(owner: Any) -> dict[str, str]:
+        return {"owner": owner.name}
+
+    hooked_component = components_module.differentiable_component(
+        name="HOOKED",
+        grid=grid,
+        payload=payload,
+        step=step,
+        outputs=("temperature",),
+        default_fields={"temperature": jnp.ones(grid.shape)},
+        create_runtime_payload=create_runtime_payload,
+    )
+
+    assert hooked_component.create_runtime_payload() == {"owner": "HOOKED"}
+
+
+@pytest.mark.fast_always
 def test_host_component_runs_through_coupler_host_runtime() -> None:
     grid = make_test_grid(name="factory-host")
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from vercor.components.contracts import (
     AuthorFieldValues,
     ComponentFieldSpec,
     FieldNames,
 )
+from vercor.components._lifecycle import ComponentLifecycleHooks
 from vercor.dtypes import PrecisionPolicy
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
@@ -33,7 +34,7 @@ class ComponentRuntimeProtocol(Protocol):
 class ComponentAuthoringProtocol(ComponentRuntimeProtocol, Protocol):
     """Private structural contract for helpers that call authoring methods."""
 
-    _lifecycle_hooks: Any
+    _lifecycle_hooks: ComponentLifecycleHooks
 
     def declare_fields(
         self,
