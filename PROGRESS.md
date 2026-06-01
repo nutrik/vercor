@@ -109,6 +109,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local external-adapter helper boundary validation: focused red/green
   pytest, Black, focused fast pytest, flake8, mypy, full fast pytest, and full
   pytest passed as of 2026-06-01.
+- Latest local external-adapter setup-state boundary validation: focused
+  red/green pytest, Black, focused fast pytest, flake8, mypy, full fast pytest,
+  and full pytest passed as of 2026-06-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -134,6 +137,36 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-01: External Adapter Setup-State Boundary Refactor
+
+- Added `vercor.setups.external.jax_gcm_state` as the owner for JAXGCM setup
+  state, model construction, spinup, and lifecycle callback wiring; the public
+  `jax_gcm.py` module now stays focused on the `make_jax_gcm(...)` factory and
+  `JCMState` reexport.
+- Added `vercor.setups.external.veros_gcm_state` as the owner for Veros setup
+  state, grid derivation, spinup, and host step delegation; the public
+  `veros_gcm.py` module now stays focused on `make_veros_gcm(...)`.
+- Added the named tuple-compatible `VerosForcingFields` container so Veros
+  forcing fields have explicit names while preserving existing tuple unpacking.
+- Strengthened architecture coverage for external setup-state owners, factory
+  thinness, external package import cycles, and named Veros forcing fields.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the new external adapter
+  setup-state boundary.
+- Validation run for this change:
+  focused red
+  `conda run -n scipy pytest tests/test_api_boundaries.py::test_setup_helper_and_external_output_ownership_boundaries tests/test_api_boundaries.py::test_jax_gcm_factory_uses_named_runtime_callbacks tests/test_api_boundaries.py::test_external_package_has_no_top_level_import_cycles tests/test_external_components_coverage.py::test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate -q --fast --tb=short`,
+  focused green after implementation,
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_external_components_coverage.py tests/test_coupler_runtime.py -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: no failed implementation approach was encountered;
+  the only failures were the intentional focused red tests before adding the
+  setup-state owner modules and named Veros forcing container.
 
 ### 2026-06-01: External Adapter Helper Boundary Refactor
 

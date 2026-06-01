@@ -29,12 +29,12 @@
 29. `vercor/setups/external/jax_gcm_tools.py` - JCM-specific parameter and input-data helpers built on (1, 7, 8, 11)
 30. `vercor/setups/external/jax_gcm_fields.py` - public package-internal JCM output-field mapping and surface-temperature forcing helpers built on (1, 7)
 31. `vercor/setups/external/jax_gcm_output.py` - JAXGCM output cadence and NetCDF writing helpers built on (6, 25)
-32. `vercor/setups/external/jax_gcm_runtime.py` and `jax_gcm.py` - JAXGCM private runtime-state protocol, payload/hooks/stepping, named factory callback wiring, and JCM adapter setup boundary built on (1, 3, 11, 26, 29, 30, 31, 62)
+32. `vercor/setups/external/jax_gcm_runtime.py`, `jax_gcm_state.py`, and `jax_gcm.py` - JAXGCM private runtime-state protocol, payload/hooks/stepping, setup-state/lifecycle ownership, named factory callback wiring, and thin JCM adapter factory boundary built on (1, 3, 11, 26, 29, 30, 31, 62)
 33. `vercor/setups/external/veros_runtime_settings.py` - explicit lazy Veros backend/runtime configuration side-effect boundary
 34. `vercor/setups/external/veros_setup.py` - concrete Veros setup subclass and setup policy built on (33)
 35. `vercor/setups/external/veros_fluxes.py` - Veros-to-VerCOR flux conversion built on (1, 4, 9, 33)
-36. `vercor/setups/external/veros_state.py` - public package-internal Veros host-state copy, mutation, forcing, and stepping helpers built on (1, 10, 33)
-37. `vercor/setups/external/veros_runtime.py` and `veros_gcm.py` - Veros private runtime-state protocol, host-runtime stepping helper, named host step adapter, and adapter factory/setup boundary built on (26, 34, 35, 36)
+36. `vercor/setups/external/veros_state.py` - public package-internal Veros host-state copy, mutation, named forcing-field container, forcing, and stepping helpers built on (1, 10, 33)
+37. `vercor/setups/external/veros_runtime.py`, `veros_gcm_state.py`, and `veros_gcm.py` - Veros private runtime-state protocol, host-runtime stepping helper, setup-state/lifecycle ownership, named host step adapter, and thin adapter factory boundary built on (26, 34, 35, 36)
 38. `vercor/setups/external/camulator_imports.py` - public package-internal lazy CREDIT/postblock/CAMulator wind-filter optional-dependency loading
 39. `vercor/setups/external/camulator_forcing.py` - CAMulator config loading, forcing context, and runtime forcing cursors built on (26, 38)
 40. `vercor/setups/external/camulator_tensors.py` - typed CAMulator tensor-variable indexing, public package-internal static forcing tensor staging, and JAX-to-Torch transfer helpers

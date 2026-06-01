@@ -362,15 +362,22 @@ remain local implementation details and are not listed in external adapter
 `__all__` exports. JAXGCM runtime payload, prefill, validation, stepping, and
 host recording live in
 `vercor.setups.external.jax_gcm_runtime`, which consumes the setup object through
-a private protocol rather than an unbounded state object. JAXGCM factory hooks
-are named callbacks bound to that setup state, keeping lifecycle wiring
-inspectable without changing the public factory API. JAXGCM output cadence and
+a private protocol rather than an unbounded state object.
+`vercor.setups.external.jax_gcm_state` owns JAXGCM setup-time model resources,
+spinup policy, lifecycle callbacks, and the public `JCMState` bundle reexported
+by the factory module. `vercor.setups.external.jax_gcm` remains a thin public
+factory that constructs setup state and binds named lifecycle callbacks without
+owning runtime payload or setup-state internals. JAXGCM output cadence and
 NetCDF writing live in `vercor.setups.external.jax_gcm_output`, while
 surface-temperature cleanup and output-field mapping live in
 `vercor.setups.external.jax_gcm_fields`. Veros host-runtime flux application and
 substep orchestration live in
-`vercor.setups.external.veros_runtime` behind a private runtime-state protocol;
-Veros host-state mutation helpers live in `vercor.setups.external.veros_state`.
+`vercor.setups.external.veros_runtime` behind a private runtime-state protocol.
+`vercor.setups.external.veros_gcm_state` owns Veros setup-time model resources,
+spinup policy, grid derivation, and lifecycle callbacks, while
+`vercor.setups.external.veros_gcm` remains the thin public factory.
+Veros host-state mutation helpers and the named tuple-compatible
+`VerosForcingFields` container live in `vercor.setups.external.veros_state`.
 Veros backend settings are imported only inside the explicit configuration
 function so setup modules preserve lazy optional-dependency boundaries. CAMulator
 prediction-block and runtime step orchestration live in

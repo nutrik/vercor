@@ -19,6 +19,7 @@ import vercor.components.data as data_module
 import vercor.components.factories as factories_module
 import vercor.components.host as host_module
 import vercor.components.setup_validation as setup_validation_module
+from tests._architecture_support import package_import_cycles
 from tests._coverage_support import make_test_grid
 from vercor.components.base import Component
 from vercor.components.data import DataComponent
@@ -965,6 +966,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     jax_gcm_source = Path("vercor/setups/external/jax_gcm.py").read_text(
         encoding="utf-8"
     )
+    jax_gcm_state_source = Path("vercor/setups/external/jax_gcm_state.py").read_text(
+        encoding="utf-8"
+    )
     jax_gcm_runtime_source = Path(
         "vercor/setups/external/jax_gcm_runtime.py"
     ).read_text(encoding="utf-8")
@@ -992,6 +996,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     veros_gcm_source = Path("vercor/setups/external/veros_gcm.py").read_text(
         encoding="utf-8"
     )
+    veros_gcm_state_source = Path(
+        "vercor/setups/external/veros_gcm_state.py"
+    ).read_text(encoding="utf-8")
     veros_runtime_source = Path("vercor/setups/external/veros_runtime.py").read_text(
         encoding="utf-8"
     )
@@ -1013,12 +1020,16 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert Path("vercor/setups/external/veros_setup.py").exists()
     assert Path("vercor/setups/external/veros_state.py").exists()
     assert Path("vercor/setups/external/veros_runtime.py").exists()
+    assert Path("vercor/setups/external/jax_gcm_state.py").exists()
+    assert Path("vercor/setups/external/veros_gcm_state.py").exists()
     assert not Path("vercor/setups/jax_array_helpers.py").exists()
     assert not Path("vercor/setups/data/camulator_land.py").exists()
     assert not Path("vercor/setups/external/windpp.py").exists()
     assert "from vercor.runtime.validation import" not in jax_gcm_source
     assert "class JAXGCMRuntimePayload" not in jax_gcm_source
     assert "class JAXGCMRuntimePayload" in jax_gcm_runtime_source
+    assert "class JAXGCMSetupState" not in jax_gcm_source
+    assert "class JAXGCMSetupState" in jax_gcm_state_source
     assert "def create_jax_gcm_runtime_payload(" in jax_gcm_runtime_source
     assert "def prefill_jax_gcm_runtime_fields(" in jax_gcm_runtime_source
     assert "def validate_jax_gcm_runtime_state(" in jax_gcm_runtime_source
@@ -1027,6 +1038,14 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def create_runtime_payload(" not in jax_gcm_source
     assert "def prefill_runtime_state_fields(" not in jax_gcm_source
     assert "def validate_runtime_state(" not in jax_gcm_source
+    assert "def step_jax_gcm_runtime_callback(" not in jax_gcm_source
+    assert "def create_jax_gcm_runtime_payload_callback(" not in jax_gcm_source
+    assert "def prefill_jax_gcm_runtime_fields_callback(" not in jax_gcm_source
+    assert "def validate_jax_gcm_runtime_state_callback(" not in jax_gcm_source
+    assert "def step_jax_gcm_runtime_callback(" in jax_gcm_state_source
+    assert "def create_jax_gcm_runtime_payload_callback(" in jax_gcm_state_source
+    assert "def prefill_jax_gcm_runtime_fields_callback(" in jax_gcm_state_source
+    assert "def validate_jax_gcm_runtime_state_callback(" in jax_gcm_state_source
     assert "def _step_jax_gcm_component_state(" not in jax_gcm_source
     assert "def _record_jax_gcm_host_step(" not in jax_gcm_source
     assert "def asfloat(" not in jax_gcm_source
@@ -1053,6 +1072,8 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def _credit_output_functions(" not in camulator_source
     assert "def _write_camulator_prediction_output(" not in camulator_source
     assert "class CustomGlobalFourDegree" not in veros_gcm_source
+    assert "class VerosGCMSetupState" not in veros_gcm_source
+    assert "class VerosGCMSetupState" in veros_gcm_state_source
     assert "def compute_fluxes(" not in veros_gcm_source
     assert "def copy_state(" not in veros_gcm_source
     assert "def set_variable(" not in veros_gcm_source
@@ -1137,15 +1158,29 @@ def test_external_runtime_helpers_use_private_state_protocols() -> None:
 @pytest.mark.fast_always
 def test_jax_gcm_factory_uses_named_runtime_callbacks() -> None:
     source = Path("vercor/setups/external/jax_gcm.py").read_text(encoding="utf-8")
+    state_source = Path("vercor/setups/external/jax_gcm_state.py").read_text(
+        encoding="utf-8"
+    )
     factory_source = source.split("def make_jax_gcm(", 1)[1]
 
     assert "from functools import partial" in source
-    assert "def _step_jax_gcm_runtime_callback(" in source
-    assert "def _create_jax_gcm_runtime_payload_callback(" in source
-    assert "def _prefill_jax_gcm_runtime_fields_callback(" in source
-    assert "def _validate_jax_gcm_runtime_state_callback(" in source
+    assert "def step_jax_gcm_runtime_callback(" in state_source
+    assert "def create_jax_gcm_runtime_payload_callback(" in state_source
+    assert "def prefill_jax_gcm_runtime_fields_callback(" in state_source
+    assert "def validate_jax_gcm_runtime_state_callback(" in state_source
+    assert "_jax_gcm_state.step_jax_gcm_runtime_callback" in factory_source
+    assert "_jax_gcm_state.create_jax_gcm_runtime_payload_callback" in factory_source
+    assert "_jax_gcm_state.prefill_jax_gcm_runtime_fields_callback" in factory_source
+    assert "_jax_gcm_state.validate_jax_gcm_runtime_state_callback" in factory_source
     assert "lambda fields" not in factory_source
     assert "lambda component" not in factory_source
+
+
+@pytest.mark.fast_always
+def test_external_package_has_no_top_level_import_cycles() -> None:
+    assert (
+        package_import_cycles("vercor/setups/external", "vercor.setups.external") == []
+    )
 
 
 @pytest.mark.fast_always

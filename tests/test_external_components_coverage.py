@@ -18,11 +18,14 @@ import vercor.setups.external.jax_gcm as jax_gcm_module
 import vercor.setups.external.jax_gcm_fields as jax_gcm_fields_module
 import vercor.setups.external.jax_gcm_output as jax_gcm_output_module
 import vercor.setups.external.jax_gcm_runtime as jax_gcm_runtime_module
+import vercor.setups.external.jax_gcm_state as jax_gcm_state_module
 import vercor.setups.external.veros_fluxes as veros_fluxes_module
 import vercor.setups.external.veros_gcm as veros_gcm_module
+import vercor.setups.external.veros_gcm_state as veros_gcm_state_module
 import vercor.setups.external.veros_runtime as veros_runtime_module
 import vercor.setups.external.veros_setup as veros_setup_module
 import vercor.setups.external.veros_state as veros_state_module
+import vercor.pytree_utils as pytree_utils_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.components.data import DataComponent
@@ -168,7 +171,7 @@ def test_asfloat_converts_tree_leaves_to_float_dtype() -> None:
         "b": jnp.asarray([[3, 4]], dtype=jnp.int32),
     }
 
-    converted = jax_gcm_module.asfloat(tree)
+    converted = pytree_utils_module.asfloat(tree)
 
     assert jnp.issubdtype(converted["a"].dtype, jnp.floating)
     assert jnp.issubdtype(converted["b"].dtype, jnp.floating)
@@ -340,7 +343,9 @@ def test_map_jcm_output_fields_supports_jit(
 
 
 def test_generate_step_function_non_jitted_averages_predictions() -> None:
-    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
+    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
+        jax_gcm_state_module.JAXGCMSetupState
+    )
     component.save_interval = timedelta(days=2)
     component.coupling_timestep = timedelta(hours=12)
 
@@ -368,7 +373,7 @@ def test_generate_step_function_non_jitted_averages_predictions() -> None:
             return "next-modal-state", predictions
 
     component.model = _FakeModel()
-    state = jax_gcm_module.JCMState(prog={}, phydata={}, metadata="initial-state")
+    state = jax_gcm_state_module.JCMState(prog={}, phydata={}, metadata="initial-state")
 
     step_function = component._generate_step_function(jitted=False)
     next_state, predictions = step_function(state, "forcing")
@@ -406,16 +411,16 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
             self.terrain = terrain
 
     monkeypatch.setattr(
-        jax_gcm_module.Parameters,
+        jax_gcm_state_module.Parameters,
         "default",
         staticmethod(lambda: SimpleNamespace()),
     )
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_state_module,
         "SpeedyPhysics",
         lambda parameters: SimpleNamespace(parameters=parameters),
     )
-    monkeypatch.setattr(jax_gcm_module, "Model", _FakeModel)
+    monkeypatch.setattr(jax_gcm_state_module, "Model", _FakeModel)
 
     component = jax_gcm_module.make_jax_gcm(coords=coords, terrain=terrain)
 
@@ -439,7 +444,9 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
 
 
 def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
-    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
+    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
+        jax_gcm_state_module.JAXGCMSetupState
+    )
     component.spinup_time = timedelta(hours=6)
     component.model_timestep = timedelta(minutes=45)
     component.model = SimpleNamespace()
@@ -455,7 +462,9 @@ def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
 def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
+    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
+        jax_gcm_state_module.JAXGCMSetupState
+    )
     component.spinup_time = timedelta(hours=2)
     component.model_timestep = timedelta(hours=1)
     component.jitted = False
@@ -484,9 +493,9 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
             physics_calls["zeros"] = (shape, layers)
             return {"shape": shape, "layers": layers}
 
-    monkeypatch.setattr(jax_gcm_module, "PhysicsData", _FakePhysicsData)
+    monkeypatch.setattr(jax_gcm_state_module, "PhysicsData", _FakePhysicsData)
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_state_module,
         "dynamics_state_to_physics_state",
         lambda modal_state, primitive: {
             "modal_state": modal_state,
@@ -519,7 +528,9 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
 def test_jax_gcm_initialize_builds_default_forcing_when_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
+    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
+        jax_gcm_state_module.JAXGCMSetupState
+    )
     component.spinup_time = timedelta(hours=1)
     component.model_timestep = timedelta(hours=1)
     component.jitted = False
@@ -547,9 +558,9 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
 
     forcing = _FakeForcing()
 
-    monkeypatch.setattr(jax_gcm_module, "PhysicsData", _FakePhysicsData)
+    monkeypatch.setattr(jax_gcm_state_module, "PhysicsData", _FakePhysicsData)
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_state_module,
         "dynamics_state_to_physics_state",
         lambda modal_state, primitive: {
             "modal_state": modal_state,
@@ -557,7 +568,7 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
         },
     )
     monkeypatch.setattr(
-        jax_gcm_module,
+        jax_gcm_state_module,
         "default_forcing",
         lambda horizontal: forcing,
     )
@@ -584,7 +595,9 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
 def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
+    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
+        jax_gcm_state_module.JAXGCMSetupState
+    )
     component.name = "ATM"
     component.grid = make_test_grid(name="atm")
     component.settings = VercorSettings()
@@ -834,7 +847,9 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
 def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
+    component = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
     component._veros_state = _make_flux_ready_veros_state()
     component.data = {
         "model_level_height": np.full((2, 2), 100.0),
@@ -1069,6 +1084,11 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     prepared = jax.jit(veros_state_module.prepare_surface_forcing_fields)(
         taux, tauy, qnet, qnec, False
     )
+    assert isinstance(prepared, veros_state_module.VerosForcingFields)
+    assert prepared.taux.shape == (2, 2, 1)
+    assert prepared.tauy.shape == (2, 2, 1)
+    assert prepared.qnet.shape == (2, 2, 1)
+    assert prepared.qnec.shape == (2, 2, 1)
     taux_out, tauy_out, qnet_out, qnec_out = prepared
 
     assert taux_out.shape == (2, 2, 1)
@@ -1116,7 +1136,9 @@ def test_veros_set_variable_updates_only_interior_cells(
 
 
 def test_veros_initialize_validates_timestep_multiple() -> None:
-    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
+    component = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
     component.dt_tracer = 7.0
 
     with pytest.raises(ValueError, match="dt_tracer"):
@@ -1127,7 +1149,9 @@ def test_veros_initialize_validates_timestep_multiple() -> None:
 
 
 def test_veros_initialize_can_spin_up_and_extract_surface_temperature() -> None:
-    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
+    component = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
     component.dt_tracer = 10.0
     component.do_spinup = True
     component.spinup_time = timedelta(seconds=20.0)
@@ -1231,7 +1255,9 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
     restore_to_climatology: bool,
     expected_qnec: np.ndarray,
 ) -> None:
-    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
+    component = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
     component.restore_to_climatology = restore_to_climatology
     component.model_substeps = 2
     component.jitted = False
@@ -1304,7 +1330,9 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
 def test_veros_step_nan_cleans_forcing_fields_before_set_variable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = veros_gcm_module._VerosGCMState.__new__(veros_gcm_module._VerosGCMState)
+    component = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
     component.restore_to_climatology = True
     component.model_substeps = 0
     component.jitted = False

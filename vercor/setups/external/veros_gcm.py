@@ -1,28 +1,13 @@
+"""Veros ocean component factory."""
+
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
 from datetime import timedelta
-from functools import partial
-from typing import Any, cast
+from typing import Any
 
-import jax.numpy as jnp
-
-from vercor.components import (
-    ComponentSetupContext,
-    ComponentStepContext,
-    HostRuntimeComponent,
-    host_component,
-)
-from vercor.grid import RectilinearGrid
-from vercor.settings import VercorSettings
-from vercor.setups._time_helpers import (
-    assign_model_timestep_alignment,
-    run_logged_spinup,
-)
-import vercor.setups.external.veros_runtime as _veros_runtime
-import vercor.setups.external.veros_setup as _veros_setup
-import vercor.setups.external.veros_state as _veros_state
-from vercor.types import RuntimeArray
+from vercor.components import HostRuntimeComponent, host_component
+import vercor.setups.external.veros_gcm_state as _veros_gcm_state
+from vercor.setups.external.veros_gcm_state import VerosGCMSetupState
 
 try:
     import veros  # noqa: F401
@@ -30,145 +15,6 @@ except ImportError:
     raise ImportError(
         "The VerosGCM component requires the Veros package. Please install it with `pip install veros`."
     )
-
-
-_VEROS_INPUT_FIELD_NAMES = (
-    "model_level_height",
-    "u_velocity",
-    "v_velocity",
-    "potential_temperature",
-    "specific_humidity",
-    "density",
-    "temperature",
-    "net_shortwave_radiation_flux",
-    "downward_longwave_radiation_flux",
-)
-_VEROS_FIELD_DEFAULTS = {"sea_surface_temperature": 283.15}
-
-
-def _advance_veros_model_step(
-    veros_state: Any,
-    *,
-    step: Callable[[Any], Any],
-    jitted: bool,
-) -> Any:
-    """Advance a Veros state through the configured host step boundary."""
-
-    return _veros_state.pure(veros_state, jitted=jitted, step=step)
-
-
-class _VerosGCMState:
-    name: str
-    data: dict[str, RuntimeArray]
-    settings: VercorSettings
-    coupling_timestep: timedelta
-    model_timestep: timedelta
-    model_substeps: int
-    _step_function: Callable[[Any], Any]
-
-    def __init__(
-        self,
-        name: str = "OCN",
-        spinup_time: timedelta = timedelta(days=2),
-        custom_parameters: dict[str, Any] | None = None,
-        restore_to_climatology: bool = False,
-        do_spinup: bool = False,
-        jitted: bool = False,
-    ) -> None:
-        """
-        Veros GCM component based on the Global 4-degree setup from Veros.
-
-        Arguments:
-            name (str): component name
-            spinup_time (timedelta): duration of the initial Veros spinup
-            custom_parameters (dict[str, Any]): dictionary of custom parameter values to override
-                                                the default settings in the GlobalFourDegreeSetup
-            restore_to_climatology (bool): whether to apply restoring to climatology in
-                                           the surface temperature (add salinity later) tendency
-            do_spinup (bool): whether to perform the initial spinup with ERA-Interim forcing
-            jitted (bool): whether to use JIT compilation for the Veros model step function
-        """
-
-        self.name = name
-        override = custom_parameters or {}
-
-        self.model = _veros_setup.CustomGlobalFourDegree(override=override)
-        self.model.setup()
-        self._veros_state = _veros_state.copy_state(self.model.state, jitted=jitted)
-        self._step_function = cast(
-            Callable[[Any], Any],
-            partial(
-                _advance_veros_model_step,
-                step=self.model.step,
-                jitted=jitted,
-            ),
-        )
-
-        self.do_spinup = do_spinup
-        self.spinup_time = spinup_time
-        self.restore_to_climatology = restore_to_climatology
-        self.jitted = jitted
-
-        self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
-        self.spinup_steps = int(self.spinup_time.total_seconds() // self.dt_tracer)
-
-        mask = jnp.where(
-            jnp.asarray(self._veros_state.variables.maskT[:, :, -1]) > 0.0,
-            1.0,
-            0.0,
-        )
-
-        grid = RectilinearGrid(
-            name=name,
-            longitude=self._veros_state.variables.xt[2:-2],
-            latitude=self._veros_state.variables.yt[2:-2],
-            binary_mask=mask[2:-2, 2:-2].T,
-        )
-
-        self.grid = grid
-
-    def initialize(
-        self,
-        component: HostRuntimeComponent,
-        context: ComponentSetupContext,
-    ) -> None:
-        dt_seconds = context.dt_seconds
-        assign_model_timestep_alignment(
-            self,
-            dt_seconds,
-            timedelta(seconds=float(self.dt_tracer)),
-            coupling_name="dt",
-            model_name="dt_tracer",
-        )
-
-        if self.do_spinup and "ATM" in context.run_sequence.order:
-
-            def spinup_step(step_number: int) -> None:
-                _ = step_number
-                self._veros_state = self._step_function(self._veros_state)
-
-            run_logged_spinup(
-                steps=self.spinup_steps,
-                logger=context.logger,
-                intro_message=f" Performing Veros spinup for {self.spinup_time} day(s)...",
-                step_message=lambda step, total: f" Step {step} / {total}",
-                step=spinup_step,
-            )
-
-        component.seed_field(
-            "sea_surface_temperature",
-            _veros_state.extract_veros_runtime_sst(self._veros_state),
-        )
-
-    def step(
-        self,
-        fields: Mapping[str, Any],
-        context: ComponentStepContext,
-        payload: Any | None,
-    ) -> Mapping[str, Any]:
-        """Delegate Veros host-runtime advancement to the runtime helper."""
-
-        return _veros_runtime.step_veros_runtime(self, fields, context, payload)
 
 
 def make_veros_gcm(
@@ -181,7 +27,7 @@ def make_veros_gcm(
 ) -> HostRuntimeComponent:
     """Return a host-backed Veros GCM component."""
 
-    state = _VerosGCMState(
+    state = VerosGCMSetupState(
         name=name,
         spinup_time=spinup_time,
         custom_parameters=custom_parameters,
@@ -189,17 +35,13 @@ def make_veros_gcm(
         do_spinup=do_spinup,
         jitted=jitted,
     )
-    defaults = {
-        field_name: _VEROS_FIELD_DEFAULTS.get(field_name, 0.0)
-        for field_name in ("sea_surface_temperature",)
-    }
     return host_component(
         name=name,
         grid=state.grid,
         step=state.step,
-        inputs=_VEROS_INPUT_FIELD_NAMES,
+        inputs=_veros_gcm_state.VEROS_INPUT_FIELD_NAMES,
         outputs=("sea_surface_temperature",),
-        default_fields=defaults,
+        default_fields=_veros_gcm_state.veros_default_fields(),
         initialize=state.initialize,
     )
 

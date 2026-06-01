@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Callable, cast
+from typing import Any, Callable, NamedTuple, cast
 
 import jax
 import jax.numpy as jnp
@@ -14,6 +14,15 @@ from vercor.types import RuntimeArray
 configure_veros_runtime()
 
 from veros.state import VerosState  # noqa: E402
+
+
+class VerosForcingFields(NamedTuple):
+    """Prepared Veros surface forcing fields in host-state variable order."""
+
+    taux: jax.Array
+    tauy: jax.Array
+    qnet: jax.Array
+    qnec: jax.Array
 
 
 @jax.jit
@@ -33,7 +42,7 @@ def prepare_surface_forcing_fields(
     qnet: object,
     qnec: object,
     restore_to_climatology: object,
-) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+) -> VerosForcingFields:
     restore_to_climatology_jax = jnp.asarray(restore_to_climatology, dtype=bool)
 
     def _prepare(field: object) -> jax.Array:
@@ -48,7 +57,12 @@ def prepare_surface_forcing_fields(
         restore_to_climatology_jax, qnec_prepared, jnp.zeros_like(qnec_prepared)
     )
 
-    return taux_prepared, tauy_prepared, qnet_prepared, qnec_prepared
+    return VerosForcingFields(
+        taux=taux_prepared,
+        tauy=tauy_prepared,
+        qnet=qnet_prepared,
+        qnec=qnec_prepared,
+    )
 
 
 @jax.jit
@@ -128,7 +142,7 @@ def set_variable(
 
 def apply_veros_forcing_fields(
     state: VerosState,
-    forcing_fields: tuple[jax.Array, jax.Array, jax.Array, jax.Array],
+    forcing_fields: VerosForcingFields,
     *,
     jitted: bool,
 ) -> VerosState:
@@ -166,6 +180,7 @@ def advance_veros_substeps(
 
 
 __all__ = [
+    "VerosForcingFields",
     "advance_veros_substeps",
     "apply_veros_forcing_fields",
     "extract_surface_temperature",

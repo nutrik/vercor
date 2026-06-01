@@ -22,10 +22,10 @@ from vercor.setups.data.era5_land import make_era5_land
 from vercor.setups.data.era5_ocean import make_era5_ocean
 from vercor.setups.data.erainterim_ocean import make_erainterim_ocean
 from vercor.setups.data.jcm_land import make_jcm_land
-from vercor.setups.external import jax_gcm as jax_gcm_module
 from vercor.setups.external.jax_gcm import JCMState
 from vercor.setups.external.jax_gcm_fields import JAXGCM_OUTPUT_GRID_FIELD_NAMES
 import vercor.setups.external.jax_gcm_runtime as jax_gcm_runtime_module
+import vercor.setups.external.jax_gcm_state as jax_gcm_state_module
 from vercor.setups.slab.atmosphere import make_slab_atmosphere
 from vercor.setups.slab.land import make_slab_land
 from vercor.setups.slab.ocean import make_slab_ocean
@@ -187,7 +187,9 @@ def _fake_jcm_step(
 
 
 def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
-    state = jax_gcm_module._JAXGCMState.__new__(jax_gcm_module._JAXGCMState)
+    state = jax_gcm_state_module.JAXGCMSetupState.__new__(
+        jax_gcm_state_module.JAXGCMSetupState
+    )
     state.name = "ATM"
     state.grid = grid
     state.settings = VercorSettings()

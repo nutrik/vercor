@@ -171,6 +171,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     veros_source = Path("vercor/setups/external/veros_gcm.py").read_text(
         encoding="utf-8"
     )
+    veros_gcm_state_source = Path(
+        "vercor/setups/external/veros_gcm_state.py"
+    ).read_text(encoding="utf-8")
     veros_setup_source = Path("vercor/setups/external/veros_setup.py").read_text(
         encoding="utf-8"
     )
@@ -519,7 +522,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "target_vars: Sequence[str] = [" not in camulator_wind_filter_source
     assert "def _step_host_runtime_state" not in base_source
     assert "_step_host_runtime_state" not in runtime_driver_source
-    for source in (veros_source, camulator_source, camulator_land_source):
+    for source in (veros_gcm_state_source, camulator_source, camulator_land_source):
         signature = source.split("def step(", 1)[1].split(") ->", 1)[0]
         assert "coupler" not in signature
         assert "context" in signature
