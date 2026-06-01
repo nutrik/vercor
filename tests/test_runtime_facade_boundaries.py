@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pytest
 
 from tests._architecture_support import package_import_cycles, source_for
 from vercor.runtime.facade import PreparedRuntimeState, RuntimeFacadeInputs
+from vercor.runtime.resources import CouplerRuntimeResources
 
 
 def test_runtime_facade_inputs_bundle_owns_repeated_coupler_runtime_inputs() -> None:
@@ -46,6 +48,75 @@ def test_runtime_preparation_module_owns_runtime_state_preparation() -> None:
         "runtime_state",
         "runtime_contracts",
     ]
+
+
+@pytest.mark.fast_always
+def test_component_topology_module_owns_component_lookup_helpers() -> None:
+    component_topology_source = source_for("vercor/runtime/component_topology.py")
+    topology_source = source_for("vercor/runtime/topology.py")
+    initialization_source = source_for("vercor/runtime/initialization.py")
+
+    assert "VALID_TOPOLOGY_COMPONENT_NAMES" in component_topology_source
+    assert "def validate_component_topology_names(" in component_topology_source
+    assert "def get_component(" in component_topology_source
+    assert "def validate_component_topology_names(" not in topology_source
+    assert "def get_component(" not in topology_source
+    assert "from vercor.runtime.component_topology import" in topology_source
+    assert "from vercor.runtime.component_topology import" in initialization_source
+
+
+@pytest.mark.fast_always
+def test_runtime_topology_state_groups_mutable_maps() -> None:
+    topology_module = importlib.import_module("vercor.runtime.topology")
+    topology_source = source_for("vercor/runtime/topology.py")
+    resources_source = source_for("vercor/runtime/resources.py")
+
+    assert hasattr(topology_module, "RuntimeTopologyMaps")
+    RuntimeTopologyMaps = topology_module.RuntimeTopologyMaps
+    assert is_dataclass(RuntimeTopologyMaps)
+    assert [field.name for field in fields(RuntimeTopologyMaps)] == [
+        "regridders",
+        "binary_masks",
+        "fractional_masks",
+    ]
+    assert "class RuntimeTopologyMaps" in topology_source
+    assert "topology_maps: RuntimeTopologyMaps" in topology_source
+    assert "topology.regridders" not in resources_source
+    assert "topology.topology_maps" in resources_source
+
+
+@pytest.mark.fast_always
+def test_runtime_resources_hide_raw_resource_dictionaries() -> None:
+    resources = CouplerRuntimeResources()
+    resources_source = source_for("vercor/runtime/resources.py")
+    facade_source = source_for("vercor/runtime/facade.py")
+    preparation_source = source_for("vercor/runtime/preparation.py")
+
+    for raw_name in (
+        "regridders",
+        "binary_masks",
+        "fractional_masks",
+        "contracts",
+        "compiled_runtime_cache",
+        "interrupts",
+    ):
+        assert not hasattr(resources, raw_name), raw_name
+
+    assert "slots=True" in resources_source
+    assert "_topology_maps:" in resources_source
+    assert "_runtime_contracts:" in resources_source
+    assert "_compiled_runtime_cache:" in resources_source
+    assert "_interrupt_controller:" in resources_source
+    for source in (facade_source, preparation_source):
+        for raw_access in (
+            "runtime_resources.regridders",
+            "runtime_resources.binary_masks",
+            "runtime_resources.fractional_masks",
+            "runtime_resources.contracts",
+            "runtime_resources.compiled_runtime_cache",
+            "runtime_resources.interrupts",
+        ):
+            assert raw_access not in source
 
 
 @pytest.mark.fast_always

@@ -186,18 +186,19 @@ def test_compiled_scanned_runtime_translates_interrupt_callback_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     coupler = _make_pure_coupler()
-    original_checkpoint = coupler._runtime_resources.interrupts.checkpoint
+    interrupts = coupler._runtime_resources.interrupt_controller
+    original_checkpoint = interrupts.checkpoint
     requested = False
 
     def request_once_then_checkpoint(label: str = "runtime") -> None:
         nonlocal requested
         if not requested:
             requested = True
-            coupler._runtime_resources.interrupts.request(signal.SIGINT)
+            interrupts.request(signal.SIGINT)
         original_checkpoint(label)
 
     monkeypatch.setattr(
-        coupler._runtime_resources.interrupts,
+        interrupts,
         "checkpoint",
         request_once_then_checkpoint,
     )
@@ -212,18 +213,19 @@ def test_compiled_scanned_runtime_observes_wakeup_fd_interrupt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     coupler = _make_pure_coupler()
-    original_checkpoint = coupler._runtime_resources.interrupts.checkpoint
+    interrupts = coupler._runtime_resources.interrupt_controller
+    original_checkpoint = interrupts.checkpoint
     injected = False
 
     def write_wakeup_once_then_checkpoint(label: str = "runtime") -> None:
         nonlocal injected
         if not injected:
             injected = True
-            _write_wakeup_signal(coupler._runtime_resources.interrupts, signal.SIGTSTP)
+            _write_wakeup_signal(interrupts, signal.SIGTSTP)
         original_checkpoint(label)
 
     monkeypatch.setattr(
-        coupler._runtime_resources.interrupts,
+        interrupts,
         "checkpoint",
         write_wakeup_once_then_checkpoint,
     )

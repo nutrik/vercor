@@ -50,6 +50,7 @@ from vercor.runtime.exchange_dispatch import dispatch_component_exchanges
 from vercor.output import output_masks_for_component
 from vercor.runtime.topology import (
     ExchangeTopologyState,
+    RuntimeTopologyMaps,
     build_exchange_topology,
     create_exchange_masks,
     patch_exchange_masks,
@@ -169,7 +170,7 @@ def _dispatch_runtime_fields(
         runtime_state,
         component_name,
         coupler.exchanges,
-        coupler._runtime_resources.regridders,
+        coupler._runtime_resources.topology_maps.regridders,
     )
 
 
@@ -603,17 +604,20 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
     assert coupler.settings.enable_x64 is True
     assert jax_calls == [("jax_enable_x64", True)]
     assert len(created_keys) == 6
-    assert len(coupler._runtime_resources.regridders) == 6
+    topology_maps = coupler._runtime_resources.topology_maps
+    assert len(topology_maps.regridders) == 6
     assert any("already exists" in message for message in logger.warning_messages)
     assert isinstance(
-        coupler._runtime_resources.binary_masks[("ATM", "OCN", "conservative")],
+        topology_maps.binary_masks[("ATM", "OCN", "conservative")],
         jax.Array,
     )
     assert isinstance(
-        coupler._runtime_resources.fractional_masks[("ATM", "OCN", "conservative")],
+        topology_maps.fractional_masks[("ATM", "OCN", "conservative")],
         jax.Array,
     )
-    assert coupler._runtime_resources.contracts["ATM"] == RuntimeComponentContract(
+    assert coupler._runtime_resources.runtime_contracts[
+        "ATM"
+    ] == RuntimeComponentContract(
         imports=(
             "temperature",
             "specific_humidity",
@@ -627,11 +631,11 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
         ),
     )
     assert_allclose_compact(
-        coupler._runtime_resources.fractional_masks[("OCN", "ATM", "bilinear")],
+        topology_maps.fractional_masks[("OCN", "ATM", "bilinear")],
         np.full((2, 2), 0.4),
     )
     assert_allclose_compact(
-        coupler._runtime_resources.binary_masks[("LND", "ATM", "bilinear")],
+        topology_maps.binary_masks[("LND", "ATM", "bilinear")],
         lnd_mask,
     )
 
@@ -665,9 +669,9 @@ def test_build_exchange_topology_returns_explicit_patched_state(
     )
 
     assert isinstance(state, ExchangeTopologyState)
-    assert set(state.regridders) == {("OCN", "ATM", "bilinear")}
+    assert set(state.topology_maps.regridders) == {("OCN", "ATM", "bilinear")}
     assert_allclose_compact(
-        state.fractional_masks[("OCN", "ATM", "bilinear")],
+        state.topology_maps.fractional_masks[("OCN", "ATM", "bilinear")],
         np.full((2, 2), 0.4),
     )
     assert_allclose_compact(
@@ -713,7 +717,7 @@ def test_build_exchange_topology_preserves_duplicate_regridder_warning(
         logger=cast(Any, logger),
     )
 
-    assert len(state.regridders) == 1
+    assert len(state.topology_maps.regridders) == 1
     assert any("already exists" in message for message in logger.warning_messages)
 
 
@@ -744,9 +748,11 @@ def test_build_exchange_topology_does_not_mutate_existing_mappings(
     state = build_exchange_topology(
         components=cast(Any, components),
         exchanges=(exchange,),
-        regridders=existing_regridders,
-        binary_masks=existing_binary_masks,
-        fractional_masks=existing_fractional_masks,
+        topology_maps=RuntimeTopologyMaps(
+            regridders=existing_regridders,
+            binary_masks=existing_binary_masks,
+            fractional_masks=existing_fractional_masks,
+        ),
         settings=VercorSettings(),
         logger=cast(Any, _RecordingLogger()),
     )
@@ -754,9 +760,9 @@ def test_build_exchange_topology_does_not_mutate_existing_mappings(
     assert existing_regridders == {}
     assert existing_binary_masks == {}
     assert existing_fractional_masks == {}
-    assert state.regridders is not existing_regridders
+    assert state.topology_maps.regridders is not existing_regridders
     assert_allclose_compact(
-        state.binary_masks[("LND", "ATM", "bilinear")],
+        state.topology_maps.binary_masks[("LND", "ATM", "bilinear")],
         np.asarray([[1.0, 0.0], [0.0, 1.0]]),
     )
 
@@ -787,29 +793,28 @@ def test_patch_exchange_masks_updates_only_expected_bilinear_pairs() -> None:
     coupler.lnd_bmask_on_atm_grid = np.asarray([[1.0, 0.0], [0.0, 1.0]])
     coupler.lnd_fmask_on_atm_grid = np.full((2, 2), 0.75)
 
+    topology_maps = coupler._runtime_resources.topology_maps
     patch_exchange_masks(
-        binary_masks=coupler._runtime_resources.binary_masks,
-        fractional_masks=coupler._runtime_resources.fractional_masks,
+        binary_masks=topology_maps.binary_masks,
+        fractional_masks=topology_maps.fractional_masks,
         ocn_fmask_on_atm_grid=coupler.ocn_fmask_on_atm_grid,
         lnd_bmask_on_atm_grid=coupler.lnd_bmask_on_atm_grid,
         lnd_fmask_on_atm_grid=coupler.lnd_fmask_on_atm_grid,
     )
 
     assert_allclose_compact(
-        coupler._runtime_resources.fractional_masks[ocn_key], np.full((2, 2), 0.25)
+        topology_maps.fractional_masks[ocn_key], np.full((2, 2), 0.25)
     )
     assert_allclose_compact(
-        coupler._runtime_resources.binary_masks[lnd_key],
+        topology_maps.binary_masks[lnd_key],
         np.asarray([[1.0, 0.0], [0.0, 1.0]]),
     )
     assert_allclose_compact(
-        coupler._runtime_resources.fractional_masks[lnd_key], np.full((2, 2), 0.75)
+        topology_maps.fractional_masks[lnd_key], np.full((2, 2), 0.75)
     )
+    assert_allclose_compact(topology_maps.binary_masks[other_key], np.full((2, 2), 9.0))
     assert_allclose_compact(
-        coupler._runtime_resources.binary_masks[other_key], np.full((2, 2), 9.0)
-    )
-    assert_allclose_compact(
-        coupler._runtime_resources.fractional_masks[other_key], np.full((2, 2), 7.0)
+        topology_maps.fractional_masks[other_key], np.full((2, 2), 7.0)
     )
 
 
@@ -927,8 +932,8 @@ def test_output_masks_for_component_returns_destination_exchange_masks() -> None
     masks = output_masks_for_component(
         "ATM",
         coupler.exchanges,
-        coupler._runtime_resources.binary_masks,
-        coupler._runtime_resources.fractional_masks,
+        coupler._runtime_resources.topology_maps.binary_masks,
+        coupler._runtime_resources.topology_maps.fractional_masks,
     )
 
     assert set(masks) == {
@@ -1138,8 +1143,14 @@ def test_coupler_finalize_writes_runtime_outputs_for_all_components(
     assert captured["final_state"] is state
     assert captured["components"] is coupler.components
     assert captured["exchanges"] is coupler.exchanges
-    assert captured["binary_masks"] is coupler._runtime_resources.binary_masks
-    assert captured["fractional_masks"] is coupler._runtime_resources.fractional_masks
+    assert (
+        captured["binary_masks"]
+        is coupler._runtime_resources.topology_maps.binary_masks
+    )
+    assert (
+        captured["fractional_masks"]
+        is coupler._runtime_resources.topology_maps.fractional_masks
+    )
     assert captured["output_file_mask"] == Path("snapshot")
     assert captured["logger"] is coupler.logger
 
@@ -1172,8 +1183,8 @@ def test_output_boundary_builds_runtime_views_filenames_and_masks(
         final_state=state,
         components=coupler.components,
         exchanges=coupler.exchanges,
-        binary_masks=coupler._runtime_resources.binary_masks,
-        fractional_masks=coupler._runtime_resources.fractional_masks,
+        binary_masks=coupler._runtime_resources.topology_maps.binary_masks,
+        fractional_masks=coupler._runtime_resources.topology_maps.fractional_masks,
         output_file_mask=Path("snapshot"),
         logger=coupler.logger,
     )

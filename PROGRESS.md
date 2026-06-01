@@ -85,6 +85,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime-state validation boundary validation: focused
   red/green pytest, Black, flake8, mypy, full fast pytest, and full pytest
   passed as of 2026-06-01.
+- Latest local runtime resource/topology boundary validation: focused
+  red/green pytest, Black, flake8, mypy, full fast pytest, and full pytest
+  passed as of 2026-06-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -110,6 +113,42 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-01: Runtime Resource and Topology Boundary Refactor
+
+- Added `vercor.runtime.component_topology` as the owner for default
+  topology component-name validation and component lookup, leaving
+  `vercor.runtime.topology` focused on exchange regridder/mask setup.
+- Added grouped `RuntimeTopologyMaps` and changed `ExchangeTopologyState` to
+  carry topology maps as one boundary object instead of exposing three parallel
+  map fields.
+- Refactored `CouplerRuntimeResources` into a slotted private-field holder with
+  explicit topology, contract, runtime-cache, and interrupt accessors; runtime
+  facade/preparation code no longer reaches through to raw resource
+  dictionaries.
+- Made `RuntimeRunContext` frozen to document that run-context identity is a
+  static execution input bundle.
+- Updated focused boundary coverage plus runtime/topology/output tests so the
+  new ownership cannot drift back into `vercor.runtime.topology` or raw
+  resource attributes.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for component-topology ownership,
+  grouped topology maps, private runtime resources, and the frozen run context.
+- Validation run for this change:
+  focused red pytest for the missing ownership/resource boundaries,
+  focused green pytest after implementation,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy pytest tests/test_runtime_facade_boundaries.py tests/test_runtime_state.py tests/test_coupler_coverage.py -q --fast --tb=short`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: the first new boundary test imported
+  `RuntimeTopologyMaps` at module import time and failed during collection
+  instead of as an assertion; it now imports dynamically inside the test. The
+  first full fast suite exposed one stale API-boundary assertion that still
+  expected topology-name validation in `vercor.runtime.topology`; it now checks
+  `vercor.runtime.component_topology`.
 
 ### 2026-06-01: Runtime State Validation Boundary Refactor
 

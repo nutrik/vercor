@@ -23,10 +23,10 @@ from vercor.setups.external.jax_gcm_runtime import JAXGCMRuntimePayload
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.component_state import create_runtime_component_state
 from vercor.runtime.field_transfer import send_runtime_fields
-from vercor.runtime.interrupts import RuntimeInterruptController
 from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.runtime.time import RuntimeStepInfo
+from vercor.runtime.topology import RuntimeTopologyMaps
 from vercor.types import RuntimeArray
 
 
@@ -87,6 +87,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_validation_path = Path("vercor/runtime/validation.py")
     runtime_state_validation_path = Path("vercor/runtime/state_validation.py")
     runtime_topology_path = Path("vercor/runtime/topology.py")
+    runtime_component_topology_path = Path("vercor/runtime/component_topology.py")
     runtime_initialization_path = Path("vercor/runtime/initialization.py")
     runtime_preparation_path = Path("vercor/runtime/preparation.py")
     runtime_facade_path = Path("vercor/runtime/facade.py")
@@ -103,6 +104,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_validation_path.exists()
     assert runtime_state_validation_path.exists()
     assert runtime_topology_path.exists()
+    assert runtime_component_topology_path.exists()
     assert runtime_initialization_path.exists()
     assert runtime_preparation_path.exists()
     assert runtime_facade_path.exists()
@@ -129,6 +131,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         encoding="utf-8"
     )
     runtime_topology_source = runtime_topology_path.read_text(encoding="utf-8")
+    runtime_component_topology_source = runtime_component_topology_path.read_text(
+        encoding="utf-8"
+    )
     runtime_initialization_source = runtime_initialization_path.read_text(
         encoding="utf-8"
     )
@@ -394,14 +399,19 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         assert field_marker not in coupler_source
     assert "def initialize_regridders_and_masks(" in runtime_topology_source
     assert "class ExchangeTopologyState" in runtime_topology_source
+    assert "class RuntimeTopologyMaps" in runtime_topology_source
     assert "def build_exchange_topology(" in runtime_topology_source
     assert "def create_exchange_masks(" in runtime_topology_source
     assert "def validate_land_mask_consistency(" in runtime_topology_source
     assert "def patch_exchange_masks(" in runtime_topology_source
+    assert "def validate_component_topology_names(" not in runtime_topology_source
+    assert "def get_component(" not in runtime_topology_source
+    assert "def validate_component_topology_names(" in runtime_component_topology_source
+    assert "def get_component(" in runtime_component_topology_source
     assert "from vercor.runtime.topology import" not in coupler_source
     assert "from vercor.runtime.topology import" in runtime_resources_source
     assert "ExchangeTopologyState" in runtime_resources_source
-    assert "RuntimeRegridder" in runtime_resources_source
+    assert "RuntimeTopologyMaps" in runtime_resources_source
     assert "def _create_exchange_masks(" not in coupler_source
     assert "def _validate_land_mask_consistency(" not in coupler_source
     assert "def _patch_exchange_masks(" not in coupler_source
@@ -500,7 +510,9 @@ def test_runtime_contracts_refresh_after_exchange_changes() -> None:
     )
 
     runtime_state_from_coupler_components(coupler, prefill_missing=True)
-    assert coupler._runtime_resources.contracts["ATM"].exports == ("temperature",)
+    assert coupler._runtime_resources.runtime_contracts["ATM"].exports == (
+        "temperature",
+    )
 
     coupler.add_exchange(
         Exchange(
@@ -512,7 +524,7 @@ def test_runtime_contracts_refresh_after_exchange_changes() -> None:
     )
     runtime_state_from_coupler_components(coupler, prefill_missing=True)
 
-    assert coupler._runtime_resources.contracts["ATM"].exports == (
+    assert coupler._runtime_resources.runtime_contracts["ATM"].exports == (
         "temperature",
         "humidity",
     )
@@ -528,27 +540,23 @@ def test_coupler_runtime_resources_store_runtime_state() -> None:
     binary_masks = cast(Any, {("ATM", "OCN", "bilinear"): jnp.ones((2, 2))})
     fractional_masks = cast(Any, {("ATM", "OCN", "bilinear"): jnp.full((2, 2), 0.5)})
     contracts = {"ATM": RuntimeComponentContract(imports=("x",), exports=("y",))}
-    compiled_cache: dict[Any, Any] = {}
-    interrupts = RuntimeInterruptController()
+    topology_maps = RuntimeTopologyMaps(
+        regridders=regridders,
+        binary_masks=binary_masks,
+        fractional_masks=fractional_masks,
+    )
 
-    coupler._runtime_resources.regridders = regridders
-    coupler._runtime_resources.binary_masks = binary_masks
-    coupler._runtime_resources.fractional_masks = fractional_masks
-    coupler._runtime_resources.contracts = contracts
-    coupler._runtime_resources.compiled_runtime_cache = compiled_cache
-    coupler._runtime_resources.interrupts = interrupts
+    coupler._runtime_resources.replace_topology_maps(topology_maps)
+    coupler._runtime_resources.replace_contracts(contracts)
 
-    assert coupler._runtime_resources.regridders is regridders
-    assert coupler._runtime_resources.binary_masks is binary_masks
-    assert coupler._runtime_resources.fractional_masks is fractional_masks
-    assert coupler._runtime_resources.contracts is contracts
-    assert coupler._runtime_resources.compiled_runtime_cache is compiled_cache
-    assert coupler._runtime_resources.interrupts is interrupts
+    assert coupler._runtime_resources.topology_maps is topology_maps
+    assert coupler._runtime_resources.runtime_contracts is contracts
+    assert coupler._runtime_resources.interrupt_controller is not None
 
 
 def test_coupler_exposes_minimal_runtime_cache_facade() -> None:
     coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
-    coupler._runtime_resources.compiled_runtime_cache[("unit-test",)] = cast(
+    coupler._runtime_resources.runtime_cache_mapping()[("unit-test",)] = cast(
         Any,
         lambda state: state,
     )
@@ -574,10 +582,13 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
     fractional_masks: dict[tuple[str, str, str], RuntimeArray] = {
         ("ATM", "OCN", "bilinear"): jnp.full((2, 2), 0.5)
     }
-    topology = ExchangeTopologyState(
+    topology_maps = RuntimeTopologyMaps(
         regridders=regridders,
         binary_masks=binary_masks,
         fractional_masks=fractional_masks,
+    )
+    topology = ExchangeTopologyState(
+        topology_maps=topology_maps,
         ocn_fmask_on_atm_grid=jnp.full((2, 2), 0.25),
         lnd_fmask_on_atm_grid=jnp.full((2, 2), 0.75),
         lnd_bmask_on_atm_grid=jnp.ones((2, 2)),
@@ -586,12 +597,13 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
     resources.replace_contracts(contracts)
     resources.replace_topology(topology)
 
-    assert resources.contracts is contracts
-    assert resources.regridders is topology.regridders
-    assert resources.binary_masks is topology.binary_masks
-    assert resources.fractional_masks is topology.fractional_masks
+    assert resources.runtime_contracts is contracts
+    assert resources.topology_maps is topology_maps
 
-    resources.compiled_runtime_cache[("unit-test",)] = cast(Any, lambda state: state)
+    resources.runtime_cache_mapping()[("unit-test",)] = cast(
+        Any,
+        lambda state: state,
+    )
     assert resources.compiled_runtime_cache_entry_count() == 1
     assert len(resources.compiled_runtime_cache_values()) == 1
 
@@ -606,15 +618,14 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
     replacement_fractional_masks: dict[tuple[str, str, str], RuntimeArray] = {
         ("OCN", "ATM", "bilinear"): jnp.full((2, 2), 0.25)
     }
-    resources.replace_topology_maps(
+    replacement_topology_maps = RuntimeTopologyMaps(
         regridders=replacement_regridders,
         binary_masks=replacement_binary_masks,
         fractional_masks=replacement_fractional_masks,
     )
+    resources.replace_topology_maps(replacement_topology_maps)
 
-    assert resources.regridders is replacement_regridders
-    assert resources.binary_masks is replacement_binary_masks
-    assert resources.fractional_masks is replacement_fractional_masks
+    assert resources.topology_maps is replacement_topology_maps
 
     runtime_facade_source = Path("vercor/runtime/facade.py").read_text(encoding="utf-8")
     for direct_assignment in (
@@ -622,6 +633,8 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
         "runtime_resources.regridders =",
         "runtime_resources.binary_masks =",
         "runtime_resources.fractional_masks =",
+        "runtime_resources.compiled_runtime_cache =",
+        "runtime_resources.interrupts =",
     ):
         assert direct_assignment not in runtime_facade_source
 

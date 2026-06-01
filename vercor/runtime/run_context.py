@@ -13,7 +13,7 @@ from vercor.runtime.state import RuntimeCouplerState
 CompiledRuntime = Callable[[RuntimeCouplerState], RuntimeCouplerState]
 
 
-@dataclass
+@dataclass(frozen=True)
 class RuntimeRunContext:
     """Static inputs required to execute one configured coupler runtime."""
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -10,20 +10,19 @@ from vercor.dtypes import as_jax_real_array
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike
 from vercor.run_sequence import RunSequence
+from vercor.runtime.component_topology import validate_component_topology_names
 from vercor.runtime.contexts import ComponentInitContext
 from vercor.runtime.contracts import RuntimeComponentContract, build_runtime_contracts
 from vercor.runtime.topology import (
     ExchangeTopologyState,
-    RuntimeRegridder,
+    RuntimeTopologyMaps,
     build_exchange_topology,
-    validate_component_topology_names,
 )
 from vercor.runtime.validation import (
     check_not_empty_import_export_lists,
     check_valid_exchange_field_names,
 )
 from vercor.settings import VercorSettings
-from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components.base import Component
@@ -73,9 +72,7 @@ def initialize_coupler_runtime(
     settings: VercorSettings,
     logger: LoggerLike,
     enable_x64_computations: bool | None = None,
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder] | None = None,
-    binary_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
-    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
+    topology_maps: RuntimeTopologyMaps | None = None,
 ) -> RuntimeInitializationState:
     """Initialize components, contracts, and exchange topology for a coupler."""
 
@@ -124,9 +121,7 @@ def initialize_coupler_runtime(
     topology = build_exchange_topology(
         components=components,
         exchanges=exchanges,
-        regridders=regridders,
-        binary_masks=binary_masks,
-        fractional_masks=fractional_masks,
+        topology_maps=topology_maps,
         settings=settings,
         logger=logger,
     )

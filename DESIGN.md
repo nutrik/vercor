@@ -257,9 +257,11 @@ immutable runtime containers used during traced integration.
   `vercor.runtime.validation`, and configured runtime-state/topology validation
   lives in `vercor.runtime.state_validation`. Runtime coupler-state assembly
   and runtime-contract refresh live in `vercor.runtime.coupler_state`; exchange
-  topology mask/regridder setup lives
-  in `vercor.runtime.topology`, which returns an explicit
-  `ExchangeTopologyState` for the runtime facade to store. Setup-time component
+  component-name validation and component lookup live in
+  `vercor.runtime.component_topology`; exchange topology mask/regridder setup
+  lives in `vercor.runtime.topology`, which returns an explicit
+  `ExchangeTopologyState` carrying grouped `RuntimeTopologyMaps` for the runtime
+  facade to store. Setup-time component
   precision synchronization, initialization context construction, component
   setup validation, runtime contract validation, and topology handoff live in
   `vercor.runtime.initialization`. Runtime state preparation, the
@@ -267,18 +269,19 @@ immutable runtime containers used during traced integration.
   validation, and initial outgoing-store priming live in
   `vercor.runtime.preparation`; `vercor.runtime.facade` reexports these helpers
   for the coupler-facing runtime boundary but does not own their implementation.
-  Bundled `RuntimeRunContext` execution inputs and the shared compiled-runtime
+  Frozen `RuntimeRunContext` execution inputs and the shared compiled-runtime
   callable alias live in `vercor.runtime.run_context`, compiled-runtime cache
   keys and JIT wrapping live in `vercor.runtime.cache`, shared host/scanned progress messages
   plus traced callbacks live in `vercor.runtime.progress`, and the interrupt
   controller lives in `vercor.runtime.interrupts`. Mutable per-coupler runtime
   resources live in `vercor.runtime.resources.CouplerRuntimeResources`, which
-  owns exchange topology maps, refreshed runtime contracts, the compiled runtime
-  cache, and the interrupt controller. Runtime facade code replaces refreshed
-  contracts and topology maps through holder methods, and focused tests install
-  synthetic topology through the same grouped topology-map replacement helper.
-  Compiled runtime cache clearing, counting, and test inspection also live on
-  the holder rather than exposing its dictionary. `Coupler` passes repeated
+  owns private exchange topology maps, refreshed runtime contracts, the compiled
+  runtime cache, and the interrupt controller. Runtime facade and preparation
+  code use explicit holder accessors and replacement methods rather than raw
+  resource dictionaries, and focused tests install synthetic topology through
+  the same grouped topology-map replacement helper. Compiled runtime cache
+  clearing, counting, and test inspection also live on the holder rather than
+  exposing its dictionary. `Coupler` passes repeated
   runtime inputs through the internal
   `vercor.runtime.facade.RuntimeFacadeInputs` bundle and exposes only
   `clear_runtime_cache()` plus `runtime_cache_entry_count()` as a small public
@@ -331,11 +334,11 @@ model-calendar datetime values, leap-year logic, 360/noleap daily mapping, and
 runtime daily forcing indexes live in `vercor.calendar`. The canonical exchange
 field vocabulary lives in `vercor.field_names`. Rectilinear grid construction,
 center-to-edge geometry, and grid identity checks live in
-`vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while component
-lookup for exchange topology is private to `vercor.runtime.topology`. Generic
-hybrid/sigma-coordinate pressure and altitude helpers live in
-`vercor.fluxes.vertical_coordinates`, and generic PyTree transforms live in
-`vercor.pytree_utils`.
+`vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while default
+component-topology name validation and lookup are private to
+`vercor.runtime.component_topology`. Generic hybrid/sigma-coordinate pressure
+and altitude helpers live in `vercor.fluxes.vertical_coordinates`, and generic
+PyTree transforms live in `vercor.pytree_utils`.
 Adapter-specific runtime and file-output policy lives beside adapters in focused
 helpers instead of in factory/bootstrap modules. JAXGCM runtime payload,
 prefill, validation, stepping, and host recording live in

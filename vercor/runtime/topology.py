@@ -20,6 +20,7 @@ from vercor.regridders import (
     BilinearRectilinearRegridder,
     ConservativeRectilinearRegridder,
 )
+from vercor.runtime.component_topology import get_component
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
@@ -27,43 +28,63 @@ if TYPE_CHECKING:
     from vercor.components.base import Component
 
 RuntimeRegridder = BilinearRectilinearRegridder | ConservativeRectilinearRegridder
-VALID_TOPOLOGY_COMPONENT_NAMES = ("ATM", "OCN", "LND", "ICE")
 
 
 @dataclass(frozen=True)
-class ExchangeTopologyState:
-    """Exchange regridders, masks, and derived land/ocean topology arrays."""
+class RuntimeTopologyMaps:
+    """Grouped exchange topology maps used by runtime setup and dispatch."""
 
     regridders: dict[tuple[str, str, str], RuntimeRegridder]
     binary_masks: dict[tuple[str, str, str], RuntimeArray]
     fractional_masks: dict[tuple[str, str, str], RuntimeArray]
+
+    @classmethod
+    def empty(cls) -> "RuntimeTopologyMaps":
+        """Return an empty grouped topology-map bundle."""
+
+        return cls(
+            regridders={},
+            binary_masks={},
+            fractional_masks={},
+        )
+
+    @classmethod
+    def from_mappings(
+        cls,
+        topology_maps: "RuntimeTopologyMaps | None" = None,
+        *,
+        regridders: Mapping[tuple[str, str, str], RuntimeRegridder] | None = None,
+        binary_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
+        fractional_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
+    ) -> "RuntimeTopologyMaps":
+        """Return a grouped topology-map bundle copied from existing mappings."""
+
+        source_regridders = (
+            topology_maps.regridders if topology_maps is not None else regridders
+        )
+        source_binary_masks = (
+            topology_maps.binary_masks if topology_maps is not None else binary_masks
+        )
+        source_fractional_masks = (
+            topology_maps.fractional_masks
+            if topology_maps is not None
+            else fractional_masks
+        )
+        return cls(
+            regridders=dict(source_regridders or {}),
+            binary_masks=dict(source_binary_masks or {}),
+            fractional_masks=dict(source_fractional_masks or {}),
+        )
+
+
+@dataclass(frozen=True)
+class ExchangeTopologyState:
+    """Exchange topology maps and derived land/ocean topology arrays."""
+
+    topology_maps: RuntimeTopologyMaps
     ocn_fmask_on_atm_grid: RuntimeArray
     lnd_fmask_on_atm_grid: RuntimeArray
     lnd_bmask_on_atm_grid: RuntimeArray
-
-
-def validate_component_topology_names(components: dict[str, Component]) -> None:
-    """Validate registered component names supported by the default topology."""
-
-    for name in components:
-        if name not in VALID_TOPOLOGY_COMPONENT_NAMES:
-            allowed = ", ".join(VALID_TOPOLOGY_COMPONENT_NAMES)
-            raise ComponentError(f"Incorrect component name: {name}, must be {allowed}")
-
-
-def get_component(allcomponents: dict[str, Component], types: str) -> Component:
-    """Return the registered component with the requested VerCOR component name."""
-
-    components: list[Component] = [
-        component for component in allcomponents.values() if component.name == types
-    ]
-    if len(components) > 1:
-        raise CouplerError(
-            f"Multiple {components[0].name} components registered; only one supported"
-        )
-    if not components:
-        raise CouplerError(f"No component of types ({types}) registered")
-    return components[0]
 
 
 def create_exchange_masks(
@@ -193,9 +214,7 @@ def build_exchange_topology(
     exchanges: Sequence[Exchange],
     settings: VercorSettings,
     logger: LoggerLike,
-    regridders: Mapping[tuple[str, str, str], RuntimeRegridder] | None = None,
-    binary_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
-    fractional_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
+    topology_maps: RuntimeTopologyMaps | None = None,
 ) -> ExchangeTopologyState:
     """Build exchange regridders and masks as an explicit topology state."""
 
@@ -210,30 +229,26 @@ def build_exchange_topology(
     )
     logger.info(" LND <--> ATM & OCN <--> ATM masks initialization complete")
 
-    topology_regridders = dict(regridders or {})
-    topology_binary_masks = dict(binary_masks or {})
-    topology_fractional_masks = dict(fractional_masks or {})
+    initialized_maps = RuntimeTopologyMaps.from_mappings(topology_maps)
     initialize_regridders_and_masks(
         components=components,
         exchanges=exchanges,
-        regridders=topology_regridders,
-        binary_masks=topology_binary_masks,
-        fractional_masks=topology_fractional_masks,
+        regridders=initialized_maps.regridders,
+        binary_masks=initialized_maps.binary_masks,
+        fractional_masks=initialized_maps.fractional_masks,
         settings=settings,
         logger=logger,
     )
     patch_exchange_masks(
-        binary_masks=topology_binary_masks,
-        fractional_masks=topology_fractional_masks,
+        binary_masks=initialized_maps.binary_masks,
+        fractional_masks=initialized_maps.fractional_masks,
         ocn_fmask_on_atm_grid=ocn_fmask_on_atm_grid,
         lnd_bmask_on_atm_grid=lnd_bmask_on_atm_grid,
         lnd_fmask_on_atm_grid=lnd_fmask_on_atm_grid,
     )
     logger.info(" Exchange masks patching complete")
     return ExchangeTopologyState(
-        regridders=topology_regridders,
-        binary_masks=topology_binary_masks,
-        fractional_masks=topology_fractional_masks,
+        topology_maps=initialized_maps,
         ocn_fmask_on_atm_grid=ocn_fmask_on_atm_grid,
         lnd_fmask_on_atm_grid=lnd_fmask_on_atm_grid,
         lnd_bmask_on_atm_grid=lnd_bmask_on_atm_grid,

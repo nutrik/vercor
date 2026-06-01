@@ -75,15 +75,18 @@ def runtime_state_from_components(
         validate_endpoints=False,
     )
     inputs.runtime_resources.replace_contracts(runtime_contracts)
+    topology_maps = inputs.runtime_resources.topology_maps
     runtime_state = _runtime_state_from_components(
         inputs.components,
         inputs.exchanges,
-        inputs.runtime_resources.fractional_masks,
-        inputs.runtime_resources.binary_masks,
-        contracts=inputs.runtime_resources.contracts,
+        topology_maps.fractional_masks,
+        topology_maps.binary_masks,
+        contracts=inputs.runtime_resources.runtime_contracts,
         prefill_missing=prefill_missing,
     )
-    return PreparedRuntimeState(runtime_state, inputs.runtime_resources.contracts)
+    return PreparedRuntimeState(
+        runtime_state, inputs.runtime_resources.runtime_contracts
+    )
 
 
 def validate_runtime_state(
@@ -103,11 +106,11 @@ def validate_runtime_state(
         runtime_state,
         components=inputs.components,
         exchanges=inputs.exchanges,
-        regridders=inputs.runtime_resources.regridders,
-        contracts=inputs.runtime_resources.contracts,
+        regridders=inputs.runtime_resources.topology_maps.regridders,
+        contracts=inputs.runtime_resources.runtime_contracts,
         run_sequence=tuple(inputs.run_sequence),
     )
-    return inputs.runtime_resources.contracts
+    return inputs.runtime_resources.runtime_contracts
 
 
 def create_runtime_state(
@@ -126,8 +129,8 @@ def create_runtime_state(
         dispatch_context = build_runtime_dispatch_context(
             inputs.components,
             inputs.exchanges,
-            inputs.runtime_resources.regridders,
-            inputs.runtime_resources.contracts,
+            inputs.runtime_resources.topology_maps.regridders,
+            inputs.runtime_resources.runtime_contracts,
             dt_seconds=inputs.clock.dt_seconds,
             settings=inputs.settings,
         )
@@ -165,7 +168,7 @@ def prepare_runtime_state(
         return PreparedRuntimeState(initial_state, refreshed_contracts)
     return PreparedRuntimeState(
         initial_state,
-        dict(inputs.runtime_resources.contracts),
+        dict(inputs.runtime_resources.runtime_contracts),
     )
 
 

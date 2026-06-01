@@ -70,9 +70,7 @@ def initialize_coupler_runtime(
         clock=inputs.clock,
         components=dict(inputs.components),
         exchanges=inputs.exchanges,
-        regridders=inputs.runtime_resources.regridders,
-        binary_masks=inputs.runtime_resources.binary_masks,
-        fractional_masks=inputs.runtime_resources.fractional_masks,
+        topology_maps=inputs.runtime_resources.topology_maps,
         run_sequence=inputs.run_sequence,
         settings=inputs.settings,
         logger=logger,
@@ -92,8 +90,8 @@ def runtime_dispatch_context(
     return build_runtime_dispatch_context(
         inputs.components,
         inputs.exchanges,
-        inputs.runtime_resources.regridders,
-        inputs.runtime_resources.contracts,
+        inputs.runtime_resources.topology_maps.regridders,
+        inputs.runtime_resources.runtime_contracts,
         dt_seconds=inputs.clock.dt_seconds,
         settings=inputs.settings,
     )
@@ -115,8 +113,8 @@ def runtime_run_context(
         dispatch_context=runtime_dispatch_context(
             inputs=inputs,
         ),
-        compiled_runtime_cache=inputs.runtime_resources.compiled_runtime_cache,
-        interrupts=inputs.runtime_resources.interrupts,
+        compiled_runtime_cache=inputs.runtime_resources.runtime_cache_mapping(),
+        interrupts=inputs.runtime_resources.interrupt_controller,
     )
 
 
@@ -158,7 +156,7 @@ def run_scanned(
         dispatch_context=runtime_dispatch_context(
             inputs=inputs,
         ),
-        interrupts=inputs.runtime_resources.interrupts,
+        interrupts=inputs.runtime_resources.interrupt_controller,
     )
 
 
@@ -207,12 +205,13 @@ def finalize(
 
     for component in inputs.components.values():
         validate_registered_component_setup(component)
+    topology_maps = inputs.runtime_resources.topology_maps
     _output.write_coupler_runtime_outputs(
         final_state=final_state,
         components=inputs.components,
         exchanges=inputs.exchanges,
-        binary_masks=inputs.runtime_resources.binary_masks,
-        fractional_masks=inputs.runtime_resources.fractional_masks,
+        binary_masks=topology_maps.binary_masks,
+        fractional_masks=topology_maps.fractional_masks,
         output_file_mask=output_file_mask,
         logger=logger,
     )

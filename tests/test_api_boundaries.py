@@ -840,6 +840,9 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     regridder_init = Path("vercor/regridders/__init__.py").read_text(encoding="utf-8")
     grid_masks_source = Path("vercor/grid_masks.py").read_text(encoding="utf-8")
     topology_source = Path("vercor/runtime/topology.py").read_text(encoding="utf-8")
+    component_topology_source = Path("vercor/runtime/component_topology.py").read_text(
+        encoding="utf-8"
+    )
     jax_gcm_tools_source = Path("vercor/setups/external/jax_gcm_tools.py").read_text(
         encoding="utf-8"
     )
@@ -879,13 +882,15 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert '"gravity": Settings(' not in settings_source
     assert "PHYSICAL_CONSTANT_SETTINGS" in settings_source
     assert "Incorrect component name" not in coupler_source
-    assert "def validate_component_topology_names(" in topology_source
+    assert "def validate_component_topology_names(" not in topology_source
+    assert "def validate_component_topology_names(" in component_topology_source
     assert "make_rectilinear_grid" not in regridder_init
     assert "centers_to_edges" not in regridder_init
     assert "compute_land_mask" not in regridder_init
     assert "def compute_land_mask(" in grid_masks_source
     assert "def get_component(" not in grid_masks_source
-    assert "def get_component(" in topology_source
+    assert "def get_component(" not in topology_source
+    assert "def get_component(" in component_topology_source
     assert "def compute_pressure_levels(" not in jax_gcm_tools_source
     assert "def get_altitudes_sigma_levels(" not in jax_gcm_tools_source
     assert "def mean_leaf(" not in jax_gcm_tools_source

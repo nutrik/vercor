@@ -7,6 +7,7 @@ from vercor.types import RuntimeArray
 import vercor.runtime.facade as runtime_facade
 from vercor.coupler import Coupler
 from vercor.runtime.state import RuntimeCouplerState
+from vercor.runtime.topology import RuntimeTopologyMaps
 
 
 def runtime_facade_inputs(coupler: Coupler) -> runtime_facade.RuntimeFacadeInputs:
@@ -50,9 +51,13 @@ def replace_runtime_topology_maps(
     """Install synthetic topology maps for focused runtime tests."""
 
     coupler._runtime_resources.replace_topology_maps(
-        regridders=dict(regridders),
-        binary_masks={} if binary_masks is None else dict(binary_masks),
-        fractional_masks={} if fractional_masks is None else dict(fractional_masks),
+        RuntimeTopologyMaps(
+            regridders=dict(regridders),
+            binary_masks={} if binary_masks is None else dict(binary_masks),
+            fractional_masks=(
+                {} if fractional_masks is None else dict(fractional_masks)
+            ),
+        )
     )
 
 
