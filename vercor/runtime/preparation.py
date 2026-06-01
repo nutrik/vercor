@@ -10,11 +10,13 @@ from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.coupler_state import (
     refresh_runtime_contracts,
     runtime_state_from_components as _runtime_state_from_components,
-    validate_runtime_state as _validate_runtime_state,
 )
 from vercor.runtime.dispatch_context import build_runtime_dispatch_context
 from vercor.runtime.driver import prime_runtime_outgoing
 from vercor.runtime.resources import CouplerRuntimeResources
+from vercor.runtime.state_validation import (
+    validate_runtime_state as _validate_runtime_state,
+)
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.time import initial_runtime_step_info
 from vercor.run_sequence import RunSequence

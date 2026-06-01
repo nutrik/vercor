@@ -253,9 +253,10 @@ immutable runtime containers used during traced integration.
   lives in `vercor.runtime.dispatch_context`, runtime step metadata lives in
   `vercor.runtime.time`, component state creation lives in
   `vercor.runtime.component_state`, field receive/send mechanics live in
-  `vercor.runtime.field_transfer`, and runtime validation lives in
-  `vercor.runtime.validation`. Runtime coupler-state assembly and
-  runtime-contract refresh live in `vercor.runtime.coupler_state`; exchange
+  `vercor.runtime.field_transfer`, component/store runtime validation lives in
+  `vercor.runtime.validation`, and configured runtime-state/topology validation
+  lives in `vercor.runtime.state_validation`. Runtime coupler-state assembly
+  and runtime-contract refresh live in `vercor.runtime.coupler_state`; exchange
   topology mask/regridder setup lives
   in `vercor.runtime.topology`, which returns an explicit
   `ExchangeTopologyState` for the runtime facade to store. Setup-time component

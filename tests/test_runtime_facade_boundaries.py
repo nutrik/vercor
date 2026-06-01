@@ -48,6 +48,23 @@ def test_runtime_preparation_module_owns_runtime_state_preparation() -> None:
     ]
 
 
+@pytest.mark.fast_always
+def test_runtime_state_validation_module_owns_runtime_topology_validation() -> None:
+    state_validation_path = Path("vercor/runtime/state_validation.py")
+    coupler_state_source = source_for("vercor/runtime/coupler_state.py")
+    preparation_source = source_for("vercor/runtime/preparation.py")
+    facade_source = source_for("vercor/runtime/facade.py")
+    coupler_source = source_for("vercor/coupler.py")
+
+    assert state_validation_path.exists()
+    state_validation_source = state_validation_path.read_text(encoding="utf-8")
+    assert "def validate_runtime_state(" in state_validation_source
+    assert "def validate_runtime_state(" not in coupler_state_source
+    assert "from vercor.runtime.state_validation import" in preparation_source
+    assert "from vercor.runtime.state_validation import" not in facade_source
+    assert "from vercor.runtime.state_validation import" not in coupler_source
+
+
 def test_runtime_facade_reexports_preparation_without_owning_it() -> None:
     facade_source = source_for("vercor/runtime/facade.py")
 

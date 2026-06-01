@@ -85,6 +85,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_component_state_path = Path("vercor/runtime/component_state.py")
     runtime_field_transfer_path = Path("vercor/runtime/field_transfer.py")
     runtime_validation_path = Path("vercor/runtime/validation.py")
+    runtime_state_validation_path = Path("vercor/runtime/state_validation.py")
     runtime_topology_path = Path("vercor/runtime/topology.py")
     runtime_initialization_path = Path("vercor/runtime/initialization.py")
     runtime_preparation_path = Path("vercor/runtime/preparation.py")
@@ -100,6 +101,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_component_state_path.exists()
     assert runtime_field_transfer_path.exists()
     assert runtime_validation_path.exists()
+    assert runtime_state_validation_path.exists()
     assert runtime_topology_path.exists()
     assert runtime_initialization_path.exists()
     assert runtime_preparation_path.exists()
@@ -123,6 +125,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         encoding="utf-8"
     )
     runtime_validation_source = runtime_validation_path.read_text(encoding="utf-8")
+    runtime_state_validation_source = runtime_state_validation_path.read_text(
+        encoding="utf-8"
+    )
     runtime_topology_source = runtime_topology_path.read_text(encoding="utf-8")
     runtime_initialization_source = runtime_initialization_path.read_text(
         encoding="utf-8"
@@ -235,8 +240,12 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def step_runtime_component_host_enabled" not in runtime_driver_source
     assert "def compile_runtime" not in coupler_source
     assert "def runtime_state_from_components(" in runtime_coupler_state_source
-    assert "def validate_runtime_state(" in runtime_coupler_state_source
+    assert "def validate_runtime_state(" not in runtime_coupler_state_source
+    assert "def validate_runtime_state(" in runtime_state_validation_source
     assert "def runtime_dispatch_context(" not in runtime_coupler_state_source
+    assert "from vercor.runtime.state_validation import" not in coupler_source
+    assert "from vercor.runtime.state_validation import" not in runtime_facade_source
+    assert "from vercor.runtime.state_validation import" in runtime_preparation_source
     assert "import vercor.runtime.facade as _runtime_facade" in coupler_source
     assert "build_runtime_dispatch_context(" not in coupler_source
     assert "build_runtime_dispatch_context(" in runtime_facade_source

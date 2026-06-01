@@ -82,6 +82,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime-output boundary validation: focused red/green pytest,
   Black, flake8, mypy, full fast pytest, and full pytest passed as of
   2026-06-01.
+- Latest local runtime-state validation boundary validation: focused
+  red/green pytest, Black, flake8, mypy, full fast pytest, and full pytest
+  passed as of 2026-06-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -107,6 +110,30 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-01: Runtime State Validation Boundary Refactor
+
+- Moved configured runtime-state/topology validation from
+  `vercor.runtime.coupler_state` into `vercor.runtime.state_validation`, leaving
+  coupler-state ownership focused on immutable runtime state assembly and
+  runtime-contract refresh.
+- Updated `vercor.runtime.preparation` to call the new validation owner while
+  preserving its preparation-facing validation wrapper and public runtime
+  behavior.
+- Strengthened boundary coverage so validation ownership cannot drift back into
+  `vercor.runtime.coupler_state` or the public `Coupler`/runtime-facade
+  boundary.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the new validation ownership.
+- Validation run for this change:
+  focused red pytest for the missing validation owner,
+  focused green pytest after the move,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- No failed implementation approaches.
 
 ### 2026-06-01: Runtime Output Boundary Refactor
 
