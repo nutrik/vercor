@@ -127,6 +127,34 @@ def test_runtime_resources_hide_raw_resource_dictionaries() -> None:
 
 
 @pytest.mark.fast_always
+def test_runtime_compilation_cache_has_narrow_context_boundary() -> None:
+    compilation_path = Path("vercor/runtime/compilation.py")
+    assert compilation_path.exists()
+
+    compilation_source = source_for("vercor/runtime/compilation.py")
+    cache_source = source_for("vercor/runtime/cache.py")
+    run_context_source = source_for("vercor/runtime/run_context.py")
+    resources_source = source_for("vercor/runtime/resources.py")
+
+    assert "CompiledRuntime = Callable[" in compilation_source
+    assert "RuntimeCompilationKey: TypeAlias" in compilation_source
+    assert "from vercor.runtime.compilation import CompiledRuntime" in cache_source
+    assert "from vercor.runtime.compilation import CompiledRuntime" in (
+        run_context_source
+    )
+    assert "from vercor.runtime.compilation import CompiledRuntime" in (
+        resources_source
+    )
+    assert "from vercor.runtime.run_context import CompiledRuntime" not in (
+        resources_source
+    )
+    assert "RuntimeRunContext" not in cache_source
+    assert "def get_or_compile_for_context(" not in cache_source
+    assert "compiled_runtime_cache_key(" not in cache_source
+    assert "def compiled_runtime_cache_key(" in run_context_source
+
+
+@pytest.mark.fast_always
 def test_runtime_state_validation_module_owns_runtime_topology_validation() -> None:
     state_validation_path = Path("vercor/runtime/state_validation.py")
     coupler_state_source = source_for("vercor/runtime/coupler_state.py")
@@ -165,10 +193,12 @@ def test_runtime_runner_splits_path_selection_helpers() -> None:
     assert "def _run_compiled_scanned_runtime(" in runner_source
     assert "def _raise_if_donating_host_runtime(" in runner_source
     assert "compiled_runtime_cache_key(" not in run_coupler_body
-    assert "compiled_runtime_cache_key(" not in runner_source
+    assert "def compiled_runtime_cache_key(" not in runner_source
     assert "compiled_scanned_runtime," not in runner_source
     assert "return compiled_scanned_runtime(" not in runner_source
-    assert "get_or_compile_for_context(" in runner_source
+    assert "get_or_compile_for_context(" not in runner_source
+    assert "context.compiled_runtime_cache_key(" in runner_source
+    assert "get_or_compile(" in runner_source
     assert "raise CouplerError(" not in run_coupler_body
 
 

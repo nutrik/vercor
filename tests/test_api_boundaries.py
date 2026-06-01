@@ -832,6 +832,9 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     runtime_resources_source = Path("vercor/runtime/resources.py").read_text(
         encoding="utf-8"
     )
+    runtime_compilation_path = Path("vercor/runtime/compilation.py")
+    assert runtime_compilation_path.exists()
+    runtime_compilation_source = runtime_compilation_path.read_text(encoding="utf-8")
     regridder_base_source = Path("vercor/regridders/base.py").read_text(
         encoding="utf-8"
     )
@@ -870,10 +873,15 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert "ExchangeField: TypeAlias" not in exchange_recipes_source
     assert "from vercor.exchange import ExchangeField" in coupler_helpers_source
     assert "from vercor.exchange import ExchangeField" in exchange_recipes_source
-    assert "from vercor.runtime.run_context import CompiledRuntime" in (
+    assert "from vercor.runtime.compilation import CompiledRuntime" in (
+        runtime_resources_source
+    )
+    assert "from vercor.runtime.run_context import CompiledRuntime" not in (
         runtime_resources_source
     )
     assert "CompiledRuntime = Callable[" not in runtime_resources_source
+    assert "CompiledRuntime = Callable[" in runtime_compilation_source
+    assert "RuntimeCompilationKey: TypeAlias" in runtime_compilation_source
     assert "def _compute_has_identical_grids(" not in regridder_base_source
     assert "grids_identical(" in regridder_base_source
     assert "BilinearRectilinearInterpolator" not in regridder_base_source

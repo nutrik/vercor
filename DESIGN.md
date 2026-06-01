@@ -269,10 +269,13 @@ immutable runtime containers used during traced integration.
   validation, and initial outgoing-store priming live in
   `vercor.runtime.preparation`; `vercor.runtime.facade` reexports these helpers
   for the coupler-facing runtime boundary but does not own their implementation.
-  Frozen `RuntimeRunContext` execution inputs and the shared compiled-runtime
-  callable alias live in `vercor.runtime.run_context`; `CompiledRuntimeCache`,
-  compiled-runtime cache keys, and JIT wrapping live in `vercor.runtime.cache`.
-  The run context carries the cache owner rather than a mutable cache mapping.
+  Shared compiled-runtime aliases live in `vercor.runtime.compilation`. Frozen
+  `RuntimeRunContext` execution inputs live in `vercor.runtime.run_context`,
+  which also owns context-derived compiled-runtime cache keys.
+  `CompiledRuntimeCache` storage and JIT wrapping live in
+  `vercor.runtime.cache`. The run context carries the cache owner rather than a
+  mutable cache mapping, while the cache owner remains independent of run
+  context internals.
   Shared host/scanned progress messages plus traced callbacks live in
   `vercor.runtime.progress`, and the interrupt controller lives in
   `vercor.runtime.interrupts`. Mutable per-coupler runtime resources live in

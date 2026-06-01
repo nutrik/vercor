@@ -80,6 +80,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     runtime_dispatch_context_path = Path("vercor/runtime/dispatch_context.py")
     runtime_run_context_path = Path("vercor/runtime/run_context.py")
     runtime_resources_path = Path("vercor/runtime/resources.py")
+    runtime_compilation_path = Path("vercor/runtime/compilation.py")
     runtime_cache_path = Path("vercor/runtime/cache.py")
     runtime_progress_path = Path("vercor/runtime/progress.py")
     runtime_component_state_path = Path("vercor/runtime/component_state.py")
@@ -97,6 +98,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_dispatch_context_path.exists()
     assert runtime_run_context_path.exists()
     assert runtime_resources_path.exists()
+    assert runtime_compilation_path.exists()
     assert runtime_cache_path.exists()
     assert runtime_progress_path.exists()
     assert runtime_component_state_path.exists()
@@ -118,6 +120,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     )
     runtime_run_context_source = runtime_run_context_path.read_text(encoding="utf-8")
     runtime_resources_source = runtime_resources_path.read_text(encoding="utf-8")
+    runtime_compilation_source = runtime_compilation_path.read_text(encoding="utf-8")
     runtime_cache_source = runtime_cache_path.read_text(encoding="utf-8")
     runtime_progress_source = runtime_progress_path.read_text(encoding="utf-8")
     runtime_component_state_source = runtime_component_state_path.read_text(
@@ -273,6 +276,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "class RuntimeRunContext" not in runtime_runner_source
     assert "class RuntimeRunContext" in runtime_run_context_source
     assert "class CouplerRuntimeResources" in runtime_resources_source
+    assert "CompiledRuntime = Callable[" in runtime_compilation_source
+    assert "RuntimeCompilationKey: TypeAlias" in runtime_compilation_source
     assert "class CompiledRuntimeCache" in runtime_cache_source
     assert "components:" not in runtime_run_context_source
     assert "exchanges:" not in runtime_run_context_source
@@ -282,6 +287,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "MutableMapping" not in runtime_run_context_source
     assert "compiled_runtime_cache:" not in runtime_run_context_source
     assert "runtime_cache: CompiledRuntimeCache" in runtime_run_context_source
+    assert "from vercor.runtime.compilation import" in runtime_run_context_source
+    assert "from vercor.runtime.compilation import" in runtime_resources_source
+    assert "from vercor.runtime.compilation import" in runtime_cache_source
     assert "context: RuntimeRunContext" in runtime_runner_source
     assert "from vercor.runtime.run_context import" not in coupler_source
     assert "from vercor.runtime.run_context import" in runtime_facade_source
@@ -292,13 +300,15 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "runtime_resources: CouplerRuntimeResources" in runtime_facade_source
     assert "def compiled_scanned_runtime(" not in runtime_runner_source
     assert "def compiled_runtime_cache_key(" not in runtime_runner_source
-    assert "compiled_runtime_cache_key(" not in runtime_runner_source
     assert "def compiled_scanned_runtime(" not in runtime_cache_source
     assert "def get_or_compile(" in runtime_cache_source
-    assert "def get_or_compile_for_context(" in runtime_cache_source
-    assert "def compiled_runtime_cache_key(" in runtime_cache_source
+    assert "def get_or_compile_for_context(" not in runtime_cache_source
+    assert "RuntimeRunContext" not in runtime_cache_source
+    assert "compiled_runtime_cache_key(" not in runtime_cache_source
+    assert "def compiled_runtime_cache_key(" in runtime_run_context_source
     assert "from vercor.runtime.cache import" not in runtime_runner_source
-    assert "get_or_compile_for_context(" in runtime_runner_source
+    assert "get_or_compile_for_context(" not in runtime_runner_source
+    assert "context.compiled_runtime_cache_key(" in runtime_runner_source
     assert "def _run_host_runtime" not in coupler_source
     assert "def _compiled_runtime_cache_key" not in coupler_source
     run_body = coupler_source.split("def run", 1)[1]

@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from vercor.runtime.cache import CompiledRuntimeCache
+from vercor.runtime.compilation import CompiledRuntime
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.interrupts import RuntimeInterruptController
-from vercor.runtime.run_context import CompiledRuntime
 from vercor.runtime.topology import ExchangeTopologyState, RuntimeTopologyMaps
 
 

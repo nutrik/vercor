@@ -83,9 +83,11 @@ def _run_compiled_scanned_runtime(
                 interrupts=context.interrupts,
             )
 
-        return context.runtime_cache.get_or_compile_for_context(
+        return context.runtime_cache.get_or_compile(
             scanned_runtime,
-            context=context,
+            cache_key=context.compiled_runtime_cache_key(
+                donate_state=donate_state,
+            ),
             donate_state=donate_state,
         )(runtime_state)
     except JaxRuntimeError as error:
