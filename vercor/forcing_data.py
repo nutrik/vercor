@@ -10,6 +10,37 @@ from vercor.dtypes import as_jax_real_array
 from vercor.types import RuntimeArray
 
 
+def _resolve_forcing_path(
+    data_files: Mapping[str, str],
+    where: str,
+    mapping_name: str,
+) -> str:
+    try:
+        return data_files[where]
+    except KeyError as exc:
+        raise KeyError(
+            f"Provided 'where' key '{where}' not found in {mapping_name}"
+        ) from exc
+
+
+def _read_netcdf_variable(path: str, variable: str) -> np.ndarray:
+    with h5netcdf.File(path, "r") as infile:
+        try:
+            return np.array(infile.variables[variable])
+        except KeyError as exc:
+            raise KeyError(
+                f"Variable '{variable}' not found in forcing file '{path}'"
+            ) from exc
+
+
+def _legacy_transpose_to_time_last_order(values: np.ndarray) -> RuntimeArray:
+    return as_jax_real_array(values.T)
+
+
+def _flip_legacy_latitude_axis(values: RuntimeArray) -> RuntimeArray:
+    return jnp.flip(values, axis=1)
+
+
 def read_forcing(
     data_files: Mapping[str, str],
     variable: str,
@@ -20,17 +51,17 @@ def read_forcing(
 ) -> RuntimeArray:
     """Read one variable from configured NetCDF forcing files."""
 
+    path = _resolve_forcing_path(data_files, where, mapping_name)
     try:
-        with h5netcdf.File(data_files[where], "r") as infile:
-            var_obj = as_jax_real_array(np.array(infile.variables[variable]).T)
-            if flip_y:
-                return jnp.flip(var_obj, axis=1)
-            return var_obj
-    except KeyError as exc:
-        raise KeyError(
-            f"Provided 'where' key '{where}' not found in {mapping_name}"
-        ) from exc
+        values = _read_netcdf_variable(path, variable)
+    except KeyError:
+        raise
     except Exception as exc:
         raise RuntimeError(
-            f"Error reading variable '{variable}' from forcing file '{data_files[where]}'"
+            f"Error reading variable '{variable}' from forcing file '{path}'"
         ) from exc
+
+    var_obj = _legacy_transpose_to_time_last_order(values)
+    if flip_y:
+        return _flip_legacy_latitude_axis(var_obj)
+    return var_obj

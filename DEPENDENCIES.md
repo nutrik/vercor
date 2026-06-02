@@ -19,7 +19,7 @@
 19. `vercor/regridders/conservative.py` - conservative regridder wrapper over (13, 16, 17)
 20. `vercor/grid_masks.py` - land/ocean mask construction and remap-conservation checks built on (1, 12, 13, 19)
 21. `vercor/assets.py` - generic asset cache/download/checksum boundary
-22. `vercor/forcing_data.py` - canonical NetCDF forcing-file read boundary and data-component forcing reader class
+22. `vercor/forcing_data.py` - canonical NetCDF forcing-file read boundary
 23. `vercor/time_selection.py` - day-slice and periodic interpolation index helpers built on (6)
 24. `vercor/clock.py` - coupler clock and timestep iteration helpers built on (6)
 25. `vercor/_logging/*.py` and `vercor/jax_logging.py` - private logger configuration, protocol, host-emission, and JAX-callback owners behind the public logging facade for Python and traced JAX runtime diagnostics

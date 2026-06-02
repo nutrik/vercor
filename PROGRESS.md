@@ -121,6 +121,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local calendar forcing-index boundary validation: baseline fast pytest,
   focused red/green pytest, focused runtime pytest, Black, flake8, mypy, full
   fast pytest, and full pytest passed as of 2026-06-02.
+- Latest local asset/forcing-data boundary validation: baseline fast pytest,
+  focused red/green pytest, Black, focused post-format pytest, flake8, mypy,
+  full fast pytest, and full pytest passed as of 2026-06-02.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -147,9 +150,52 @@ historical commands, failure messages, or detailed validation notes.
 
 ## Follow-Up Candidates
 
-- No open follow-up candidates are recorded.
+- Evaluate a non-breaking deprecation path for the public `JCMState` reexport
+  from `vercor.setups.external.jax_gcm`; it is currently documented public API,
+  so removal was intentionally left out of the safe boundary refactor.
+- Split CAMulator setup state from `vercor.setups.external.camulator` into a
+  package-internal setup-state owner once that larger optional-dependency
+  boundary is scoped separately.
 
 ## Recent Work
+
+### 2026-06-02: Asset and Forcing-Data Boundary Refactor
+
+- Refactored `vercor.assets` so the generic asset cache/download/checksum layer
+  uses private normalized asset helpers and no longer embeds forcing-specific
+  error wording. Concrete forcing registries remain in
+  `vercor.setups.data.assets`.
+- Split `vercor.forcing_data.read_forcing()` into private path-resolution,
+  NetCDF variable lookup, legacy transpose, and latitude-flip helpers while
+  preserving successful array behavior. Missing mapping keys and missing
+  NetCDF variables now raise distinct `KeyError` messages.
+- Added explicit `year_type` validation in `vercor.forcing_index`, with
+  `vercor.calendar` compatibility delegates preserving the same behavior.
+- Added focused asset and forcing-data test files, updated the existing
+  read-forcing coverage expectation, and kept the small focused tests included
+  in `--fast` runs.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the refined asset and
+  forcing-data boundaries, including removal of the obsolete
+  data-component-reader-class wording.
+- Deferred the broader audit findings for public `JCMState` reexport cleanup
+  and CAMulator setup-state splitting because this change intentionally avoids
+  public API removals and larger optional-dependency refactors.
+- Validation run for this change:
+  baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`, focused red
+  `conda run -n scipy pytest tests/test_assets.py tests/test_forcing_data.py tests/test_tools_time_and_forcing.py::test_forcing_index_rejects_unknown_year_type tests/test_component_base_coverage.py::test_read_forcing_and_runtime_write_round_trip -q --fast --tb=short`,
+  focused green after implementation with the same focused command,
+  focused boundary/API
+  `conda run -n scipy pytest tests/test_assets.py tests/test_forcing_data.py tests/test_tools_time_and_forcing.py tests/test_component_base_coverage.py::test_read_forcing_and_runtime_write_round_trip tests/test_api_boundaries.py -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`, focused post-format with
+  the same boundary/API command,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: no failed implementation approach was encountered;
+  the only failures were the intentional red tests for generic asset wording,
+  missing-variable error reporting, and invalid forcing `year_type` validation.
 
 ### 2026-06-02: Calendar Forcing-Index Boundary Refactor
 

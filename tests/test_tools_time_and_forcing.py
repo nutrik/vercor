@@ -204,6 +204,19 @@ def test_forcing_index_owner_matches_calendar_compatibility_delegates(
         assert owner_index == compat_index == case.expected_index
 
 
+@pytest.mark.fast_always
+def test_forcing_index_rejects_unknown_year_type() -> None:
+    forcing_index_module = importlib.import_module("vercor.forcing_index")
+    calendar_module = importlib.import_module("vercor.calendar")
+    time = datetime(2001, 1, 1)
+
+    for module in (forcing_index_module, calendar_module):
+        with pytest.raises(ValueError, match="year_type must be one of"):
+            module.daily_forcing_day_of_year(time, year_type="gregorian")
+        with pytest.raises(ValueError, match="year_type must be one of"):
+            module.daily_forcing_index(time, year_type="gregorian")
+
+
 def test_get_field_time_slice_returns_jax_array_for_jax_backed_data() -> None:
     data = {"foo": jnp.arange(365 * 2, dtype=jnp.float64).reshape(365, 2)}
 

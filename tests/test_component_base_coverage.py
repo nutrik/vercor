@@ -1774,7 +1774,7 @@ def test_read_forcing_and_runtime_write_round_trip(
     with pytest.raises(KeyError, match="Provided 'where' key 'missing'"):
         read_forcing(data_files, "foo", "missing")
 
-    with pytest.raises(KeyError, match="Provided 'where' key 'sample'"):
+    with pytest.raises(KeyError, match="Variable 'bar' not found"):
         read_forcing(data_files, "bar", "sample")
 
     broken = tmp_path / "broken.nc"

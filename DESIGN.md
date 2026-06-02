@@ -397,10 +397,13 @@ protocol, with tensor staging in `vercor.setups.external.camulator_tensors` and
 field mapping in `vercor.setups.external.camulator_fields`. CAMulator CREDIT
 output writing lives in `vercor.setups.external.camulator_output`.
 
-`vercor.assets` owns generic cache, download, and checksum validation only.
-Concrete forcing product registries and `get_forcing_data(...)` defaults live
-with setup data adapters in `vercor.setups.data.assets`. Diagnostics are split
-into `vercor.diagnostics.fields`, `vercor.diagnostics.tables`, and
+`vercor.assets` owns generic cache, download, and checksum validation only, with
+asset-specific registries and product vocabulary kept outside the generic cache
+layer. Concrete forcing product registries and `get_forcing_data(...)` defaults
+live with setup data adapters in `vercor.setups.data.assets`. `vercor.forcing_data`
+owns the NetCDF forcing-variable read boundary, including mapping-key
+resolution, variable lookup, legacy transpose, and optional latitude-axis flip.
+Diagnostics are split into `vercor.diagnostics.fields`, `vercor.diagnostics.tables`, and
 `vercor.diagnostics.plotting`, with field lookup delegated to
 `vercor.runtime.views` and `vercor.diagnostics` preserving the public reexport
 surface.

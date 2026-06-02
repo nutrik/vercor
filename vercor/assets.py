@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass
 import hashlib
 import os
 from pathlib import Path
@@ -14,6 +16,22 @@ VERCOR_ASSETS_BASE_URL = (
 )
 
 _ASSETS_CACHE_DIR = Path.home() / ".vercor" / "assets"
+
+
+@dataclass(frozen=True)
+class _RegisteredAsset:
+    """Normalized asset registry entry used by the generic cache layer."""
+
+    filename: str
+    md5: str
+
+
+def _registered_asset(
+    asset_key: str,
+    registry: Mapping[str, Mapping[str, str]],
+) -> _RegisteredAsset:
+    asset = registry[asset_key]
+    return _RegisteredAsset(filename=asset["filename"], md5=asset["md5"])
 
 
 def _md5sum(path: Path) -> str:
@@ -38,46 +56,61 @@ def _asset_base_url() -> str | None:
     return stripped if stripped else None
 
 
+def _cached_asset_path(asset: _RegisteredAsset) -> Path:
+    return _ASSETS_CACHE_DIR / asset.filename
+
+
+def _verified_cached_asset_path(asset: _RegisteredAsset) -> Path | None:
+    cached_path = _cached_asset_path(asset)
+    if not cached_path.exists():
+        return None
+    if _md5sum(cached_path) == asset.md5:
+        return cached_path
+    cached_path.unlink()
+    return None
+
+
+def _download_registered_asset(asset: _RegisteredAsset, cached_path: Path) -> None:
+    base_url = _asset_base_url()
+    if base_url is None:
+        raise AssetError(
+            "Asset not found in cache and no remote base URL configured. "
+            "Set VERCOR_ASSETS_BASE_URL to a server hosting VerCOR assets. "
+            f"Missing asset: '{asset.filename}'"
+        )
+
+    url = f"{base_url}/{asset.filename}"
+    try:
+        _download_asset(url, cached_path)
+    except Exception as e:
+        raise AssetError(
+            f"Failed to download asset '{asset.filename}' from '{url}': {e}"
+        ) from e
+
+
 def ensure_registered_asset(
     asset_key: str,
     registry: dict[str, dict[str, str]],
 ) -> Path:
     """Resolve a registered asset to a verified local cache path."""
 
-    asset = registry[asset_key]
-    filename = asset["filename"]
-    expected_md5 = asset["md5"]
+    asset = _registered_asset(asset_key, registry)
 
-    cached_path = _ASSETS_CACHE_DIR / filename
-    if cached_path.exists():
-        if _md5sum(cached_path) == expected_md5:
-            return cached_path
-        cached_path.unlink()
+    cached_path = _verified_cached_asset_path(asset)
+    if cached_path is not None:
+        return cached_path
 
     _ASSETS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cached_path = _cached_asset_path(asset)
 
-    base_url = _asset_base_url()
-    if base_url is None:
-        raise AssetError(
-            "Forcing asset not found in cache and no remote base URL configured. "
-            "Set VERCOR_ASSETS_BASE_URL to a server hosting VerCOR forcing assets. "
-            f"Missing asset: '{filename}'"
-        )
-
-    url = f"{base_url}/{filename}"
-    try:
-        _download_asset(url, cached_path)
-    except Exception as e:
-        raise AssetError(
-            f"Failed to download forcing asset '{filename}' from '{url}': {e}"
-        ) from e
+    _download_registered_asset(asset, cached_path)
 
     actual_md5 = _md5sum(cached_path)
-    if actual_md5 != expected_md5:
+    if actual_md5 != asset.md5:
         if cached_path.exists():
             cached_path.unlink()
         raise AssetError(
-            f"MD5 mismatch for forcing asset '{filename}': expected {expected_md5}, got {actual_md5}"
+            f"MD5 mismatch for asset '{asset.filename}': expected {asset.md5}, got {actual_md5}"
         )
 
     return cached_path

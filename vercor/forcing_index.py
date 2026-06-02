@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import cast
+from typing import Literal, cast
 
 from vercor.calendar import (
     CalendarDate,
@@ -10,6 +10,9 @@ from vercor.calendar import (
     day_of_year_from_month_day,
     is_leap_year,
 )
+
+ForcingYearType = Literal["leap", "noleap", "360"]
+_VALID_YEAR_TYPES: tuple[ForcingYearType, ...] = ("leap", "noleap", "360")
 
 
 def gregorian_month_lengths(year: int, *, no_leap: bool) -> tuple[int, ...]:
@@ -45,6 +48,12 @@ def noleap_day_of_year(time: CalendarDate) -> int:
     return time.day_of_year
 
 
+def _validate_year_type(year_type: str) -> ForcingYearType:
+    if year_type not in _VALID_YEAR_TYPES:
+        raise ValueError("year_type must be one of: 'leap', 'noleap', '360'")
+    return cast(ForcingYearType, year_type)
+
+
 def daily_forcing_day_of_year(
     time: datetime | CalendarDate,
     *,
@@ -53,10 +62,11 @@ def daily_forcing_day_of_year(
 ) -> int:
     """Return the one-based day-of-year used for daily forcing lookup."""
 
-    if year_type == "360":
+    validated_year_type = _validate_year_type(year_type)
+    if validated_year_type == "360":
         return day_of_year_360_to_gregorian(cast(CalendarDate, time), no_leap=no_leap)
 
-    if year_type == "noleap":
+    if validated_year_type == "noleap":
         return noleap_day_of_year(cast(CalendarDate, time))
 
     day_of_year = time.timetuple().tm_yday
