@@ -1020,6 +1020,17 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     camulator_tensors_source = Path(
         "vercor/setups/external/camulator_tensors.py"
     ).read_text(encoding="utf-8")
+    camulator_wind_filter_source = Path(
+        "vercor/setups/external/camulator_wind_filter.py"
+    ).read_text(encoding="utf-8")
+    camulator_private_wind_filtering_path = Path(
+        "vercor/setups/external/_camulator_wind_filtering.py"
+    )
+    camulator_private_wind_filtering_source = (
+        camulator_private_wind_filtering_path.read_text(encoding="utf-8")
+        if camulator_private_wind_filtering_path.exists()
+        else ""
+    )
     camulator_init_source = Path("vercor/setups/external/camulator_init.py").read_text(
         encoding="utf-8"
     )
@@ -1129,6 +1140,15 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "from vercor.setups.external.camulator_wind_filter import" in (
         camulator_imports_source
     )
+    assert camulator_private_wind_filtering_path.exists()
+    assert (
+        "import vercor.setups.external._camulator_wind_filtering as _wind_filtering"
+        in camulator_wind_filter_source
+    )
+    assert "torch.nn.functional" not in camulator_wind_filter_source
+    assert "def build_wind_filter_artifacts(" in camulator_private_wind_filtering_source
+    assert "def apply_wind_filter_to_tensor(" in camulator_private_wind_filtering_source
+    assert "F.conv2d(" in camulator_private_wind_filtering_source
     assert "_jax_gcm_fields._map_jcm_output_fields(" not in jax_gcm_runtime_source
     assert "_camulator_fields._prepare_camulator_surface_forcing(" not in (
         camulator_runtime_source

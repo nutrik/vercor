@@ -394,7 +394,11 @@ function so setup modules preserve lazy optional-dependency boundaries. CAMulato
 prediction-block and runtime step orchestration live in
 `vercor.setups.external.camulator_runtime` behind a private runtime-state
 protocol, with tensor staging in `vercor.setups.external.camulator_tensors` and
-field mapping in `vercor.setups.external.camulator_fields`.
+field mapping in `vercor.setups.external.camulator_fields`. CAMulator wind
+artifact filtering keeps public configuration and log-and-skip failure policy in
+`vercor.setups.external.camulator_wind_filter`, while private PyTorch
+mask/kernel construction and selected tensor mutation live in
+`vercor.setups.external._camulator_wind_filtering`.
 `vercor.setups.external.camulator_gcm_state` owns CAMulator atmosphere
 setup-time model resources, timestep alignment, field seeding, and lifecycle
 callbacks, while `vercor.setups.external.camulator` remains the thin public
@@ -419,6 +423,7 @@ initialization are split across
 `vercor.setups.external.camulator_imports`,
 `vercor.setups.external.camulator_forcing`,
 `vercor.setups.external.camulator_tensors`,
+`vercor.setups.external._camulator_wind_filtering`,
 `vercor.setups.external.camulator_stepper`,
 `vercor.setups.external.camulator_runtime`,
 `vercor.setups.external.camulator_output`,
@@ -432,7 +437,9 @@ typed `TensorVariableIndex` values in `camulator_tensors`, while
 callers that inspect tensor channels. CAMulator wind-filter configuration
 validates with explicit exceptions and avoids mutable function defaults so tests
 and callers see stable failure modes independent of Python optimization
-settings.
+settings. Low-level wind mask artifacts and in-place tensor filtering stay
+behind the private wind-filtering owner; public setup factories and examples
+should not import that private module directly.
 
 ### Settings container
 

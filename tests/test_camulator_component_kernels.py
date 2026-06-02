@@ -115,6 +115,88 @@ def test_wind_artifact_filter_config_raises_value_error_for_invalid_values() -> 
         ).validate()
 
 
+@pytest.mark.fast_always
+def test_wind_filter_private_owner_returns_shape_stable_artifacts() -> None:
+    import vercor.setups.external._camulator_wind_filtering as wind_filtering
+
+    u_wind = torch.zeros(5, 5)
+    v_wind = torch.zeros(5, 5)
+    u_wind[2, 2] = 5.0
+
+    artifacts = wind_filtering.build_wind_filter_artifacts(
+        u_wind,
+        v_wind,
+        speed_threshold=0.5,
+        smooth_sigma=1.0,
+        dilation_zonal=1,
+        dilation_meridional=1,
+        falloff_sigma=1.0,
+    )
+
+    assert artifacts.u_filtered.shape == u_wind.shape
+    assert artifacts.v_filtered.shape == v_wind.shape
+    assert artifacts.gaussian_2d.ndim == 2
+    assert artifacts.gaussian_2d.shape == (artifacts.kernel_size, artifacts.kernel_size)
+    assert artifacts.smooth_blend_mask.shape == (1, 1, *u_wind.shape)
+
+
+@pytest.mark.fast_always
+def test_wind_artifact_filter_updates_only_selected_variable_levels() -> None:
+    tensor = torch.zeros(1, 12, 5, 5)
+    tensor[:, 1, 2, 2] = 5.0
+    tensor[:, 4, 2, 2] = 5.0
+    tensor[:, 7, 2, 2] = 9.0
+    before = tensor.clone()
+
+    camulator_wind_filter_module.apply_wind_artifact_filter_to_tensor(
+        x=tensor,
+        varname_upper=["U", "V", "T", "Qtot"],
+        levels_per_var=3,
+        mask_level=1,
+        target_levels=(1,),
+        target_vars=("T",),
+        speed_threshold=0.5,
+        smooth_sigma=1.0,
+        dilation_zonal=1,
+        dilation_meridional=1,
+        falloff_sigma=1.0,
+    )
+
+    target_channel = 7
+    unchanged_channels = [channel for channel in range(12) if channel != target_channel]
+    assert not torch.equal(tensor[:, target_channel], before[:, target_channel])
+    assert torch.equal(tensor[:, unchanged_channels], before[:, unchanged_channels])
+
+
+@pytest.mark.fast_always
+def test_post_process_wind_artifacts_logs_and_skips_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tensor = torch.ones(1, 4, 3, 3)
+    before = tensor.clone()
+
+    def fail_filter(*args: Any, **kwargs: Any) -> None:
+        _ = args, kwargs
+        raise RuntimeError("forced failure")
+
+    monkeypatch.setattr(
+        camulator_wind_filter_module,
+        "apply_wind_artifact_filter_to_tensor",
+        fail_filter,
+    )
+
+    conf = {
+        "postprocessing": {"wind_artifact_filter": {"activate": True}},
+        "data": {"variables": ["U", "V"]},
+        "model": {"levels": 2},
+    }
+    with capture_logger_output(DEFAULT_LOGGER_NAME) as output:
+        camulator_wind_filter_module.post_process_wind_artifacts(tensor, conf)
+
+    assert "Wind artifact filtering failed: forced failure" in output.getvalue()
+    assert torch.equal(tensor, before)
+
+
 def test_prepare_camulator_surface_forcing_supports_jit_and_gradients() -> None:
     sea_surface_temperature = jnp.asarray([[jnp.nan, 2.0], [5.0, 7.0]])
     land_surface_temperature = jnp.asarray([[10.0, jnp.nan], [15.0, 20.0]])

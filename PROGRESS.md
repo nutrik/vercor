@@ -127,6 +127,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local external adapter factory/setup-state boundary validation:
   focused red/green pytest, Black, flake8, mypy, full fast pytest, and full
   pytest passed as of 2026-06-02.
+- Latest local CAMulator wind-filter boundary validation: focused red/green
+  pytest, Black, focused post-format pytest, flake8, mypy, full fast pytest,
+  and full pytest passed as of 2026-06-02.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -156,6 +159,36 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-02: CAMulator Wind-Filter Boundary Refactor
+
+- Split CAMulator wind artifact tensor mechanics into private
+  `vercor.setups.external._camulator_wind_filtering`, which now owns PyTorch
+  mask/kernel artifact construction, field filtering, and selected in-place
+  tensor updates.
+- Kept `vercor.setups.external.camulator_wind_filter` as the public facade for
+  configuration loading/validation, compatibility functions, and the existing
+  log-and-skip failure policy used during optional post-processing.
+- Added focused behavior and architecture coverage for shape-stable wind-filter
+  artifacts, target-only tensor mutation, log-and-skip failure handling, and the
+  public-to-private wind-filter boundary. Updated `DESIGN.md` and
+  `DEPENDENCIES.md` for the new owner split.
+- Validation run for this change:
+  focused red
+  `conda run -n scipy pytest tests/test_camulator_component_kernels.py tests/test_api_boundaries.py -q --fast --tb=short`
+  failed as expected on missing
+  `vercor.setups.external._camulator_wind_filtering` and the missing private
+  boundary file assertion. Focused green with the same command passed after
+  implementation. Then `conda run -n scipy black vercor examples tests`,
+  focused post-format pytest with the same command,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short` passed. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: the first flake8 pass found one Black-formatted
+  computed slice with E203 in `_camulator_wind_filtering.py`; rewriting the
+  split helper to use explicit `start`/`end` variables fixed the style issue.
 
 ### 2026-06-02: External Adapter Factory/Setup-State Boundary Refactor
 

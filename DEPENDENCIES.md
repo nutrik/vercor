@@ -39,7 +39,7 @@
 39. `vercor/setups/external/camulator_forcing.py` - CAMulator config loading, forcing context, and runtime forcing cursors built on (26, 38)
 40. `vercor/setups/external/camulator_tensors.py` - typed CAMulator tensor-variable indexing, public package-internal static forcing tensor staging, and JAX-to-Torch transfer helpers
 41. `vercor/setups/external/camulator_contracts.py` and `camulator_fields.py` - lightweight CAMulator runtime field contract ownership, public package-internal runtime field initialization, forcing prep, and prediction-field mapping built on (1, 7, 10, 40)
-42. `vercor/setups/external/camulator_wind_filter.py` - CAMulator-only wind artifact post-processing with explicit configuration validation
+42. `vercor/setups/external/_camulator_wind_filtering.py` and `camulator_wind_filter.py` - private CAMulator wind-mask/kernel/tensor filtering mechanics plus the public configuration and log-and-skip post-processing facade built on (25)
 43. `vercor/setups/external/camulator_stepper.py` - CAMulator state shifting, forcing concatenation, stepping, and optional post-processing built on (38, 40, 42)
 44. `vercor/setups/external/camulator_init.py` - CAMulator model, transform, forcing, metadata, init-noise, and stepper initialization built on (38, 40, 43)
 45. `vercor/setups/external/camulator_runtime_settings.py` - CAMulator TensorFlow/OpenMP/MKL import-time environment settings boundary
