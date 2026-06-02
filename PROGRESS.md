@@ -112,6 +112,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local external-adapter setup-state boundary validation: focused
   red/green pytest, Black, focused fast pytest, flake8, mypy, full fast pytest,
   and full pytest passed as of 2026-06-01.
+- Latest local logging facade/private-owner boundary validation: baseline fast
+  pytest, focused red/green pytest, Black, flake8, mypy, focused logging pytest,
+  full fast pytest, and full pytest passed as of 2026-06-02.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -137,6 +140,40 @@ historical commands, failure messages, or detailed validation notes.
    transcript.
 
 ## Recent Work
+
+### 2026-06-02: Logging Facade Private-Owner Boundary Refactor
+
+- Split the former monolithic `vercor.jax_logging` implementation into private
+  owner modules under `vercor._logging`: `config` for canonical logger setup,
+  `protocols` for logger-like contracts and level checks, `host` for host-side
+  message formatting/emission, and `callback` for traced-value partitioning plus
+  `JaxCallbackLogger`.
+- Kept `vercor.jax_logging` as the only production-facing public facade with an
+  explicit `__all__`, preserving existing public imports and callback logging
+  behavior while preventing production modules from importing private logging
+  internals directly.
+- Added architecture-boundary coverage for the thin facade, private logging
+  package ownership, private package cycle absence, public API preservation, and
+  production import direction.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the logging facade/private-owner
+  boundary.
+- Validation run for this change:
+  baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`, focused red
+  `conda run -n scipy pytest tests/test_logging_boundaries.py -q --tb=short`,
+  focused green after implementation
+  `conda run -n scipy pytest tests/test_logging_boundaries.py tests/test_coupler_coverage.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  focused post-format
+  `conda run -n scipy pytest tests/test_logging_boundaries.py tests/test_coupler_coverage.py -q --tb=short`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: the first focused green run exposed a migrated
+  canonical log-format mismatch (`VerCOR ─ ...` instead of the tested
+  `VerCOR: ...` format). The private config constant was corrected before
+  continuing validation.
 
 ### 2026-06-01: External Adapter Setup-State Boundary Refactor
 

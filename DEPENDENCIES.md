@@ -22,7 +22,7 @@
 22. `vercor/forcing_data.py` - canonical NetCDF forcing-file read boundary and data-component forcing reader class
 23. `vercor/time_selection.py` - day-slice and periodic interpolation index helpers built on (6)
 24. `vercor/clock.py` - coupler clock and timestep iteration helpers built on (6)
-25. `vercor/jax_logging.py` - callback-backed logger protocol and setup helper for Python and traced JAX runtime diagnostics
+25. `vercor/_logging/*.py` and `vercor/jax_logging.py` - private logger configuration, protocol, host-emission, and JAX-callback owners behind the public logging facade for Python and traced JAX runtime diagnostics
 26. `vercor/setups/_time_helpers.py` - shared setup-time timestep validation, lifecycle assignment, spinup logging, forcing-index, and default-field seeding helpers built on (23)
 27. `vercor/setups/_lazy_imports.py` - shared lazy package export helper for setup modules with optional dependencies
 28. `vercor/exchange.py`, `vercor/setups/exchange_recipes.py`, and `vercor/setups/coupler_helpers.py` - public exchange declarations and exchange-owned field/factory aliases, shared exchange field recipes, compact `ExchangeSpec` construction, and orchestration helpers built on (12, 17, 18, 19)

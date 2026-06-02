@@ -465,6 +465,14 @@ instantiation with `Coupler(..., log_level=...)`; disabled levels are filtered
 before callbacks enter the traced graph. Runtime hooks should pass traced values
 as logger arguments, for example `logger.info("Mean SST: {}", jnp.mean(sst))`,
 instead of converting tracers with `float(...)` or `int(...)`.
+`vercor.jax_logging` is the public compatibility facade for logging contracts,
+constants, setup helpers, host emission, and the callback-backed logger. The
+implementation is split across private `vercor._logging` owner modules:
+`config` owns canonical Python logger configuration, `protocols` owns
+logger-like contracts and level checks, `host` owns host-side formatting and
+emission, and `callback` owns traced-value partitioning plus
+`JaxCallbackLogger`. Production code outside the facade should import from
+`vercor.jax_logging`, not from `vercor._logging`.
 Initialization, runtime, and finalization helpers that are reached outside a
 coupler context use the default `VerCOR` Python logger from
 `vercor.jax_logging.get_default_logger()`. Helpers reached from
