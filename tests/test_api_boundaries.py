@@ -812,6 +812,7 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     import vercor.calendar as calendar_module
     import vercor.clock as clock_module
     import vercor.field_names as field_names_module
+    import vercor.forcing_index as forcing_index_module
     import vercor.fluxes.vertical_coordinates as vertical_module
     import vercor.grid_geometry as grid_geometry_module
     import vercor.grid_masks as grid_masks_module
@@ -821,6 +822,10 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
 
     assert callable(calendar_module.is_leap_year)
     assert callable(calendar_module.daily_forcing_index)
+    assert (
+        forcing_index_module.daily_forcing_index
+        is not calendar_module.daily_forcing_index
+    )
     assert not hasattr(clock_module, "DateTime360")
     assert not hasattr(clock_module, "DateTime365")
     assert not hasattr(clock_module, "ModelDateTime")
@@ -844,6 +849,10 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert hasattr(exchange_module, "RegridderFactory")
 
     clock_source = Path("vercor/clock.py").read_text(encoding="utf-8")
+    calendar_source = Path("vercor/calendar.py").read_text(encoding="utf-8")
+    time_selection_source = Path("vercor/time_selection.py").read_text(encoding="utf-8")
+    forcing_index_path = Path("vercor/forcing_index.py")
+    forcing_index_source = forcing_index_path.read_text(encoding="utf-8")
     runtime_time_source = Path("vercor/runtime/time.py").read_text(encoding="utf-8")
     runtime_validation_source = Path("vercor/runtime/validation.py").read_text(
         encoding="utf-8"
@@ -876,6 +885,23 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
         encoding="utf-8"
     )
 
+    assert forcing_index_path.exists()
+    assert "mapped_day_in_month =" not in calendar_source
+    assert 'if year_type == "360"' not in calendar_source
+    assert "from vercor.forcing_index import daily_forcing_day_of_year" in (
+        time_selection_source
+    )
+    assert "_custom_360_day_to_gregorian_day_of_year" not in time_selection_source
+    assert "from vercor.forcing_index import daily_forcing_index" in (
+        runtime_time_source
+    )
+    assert "from vercor.calendar import daily_forcing_index" not in runtime_time_source
+    assert "from vercor.calendar import" in forcing_index_source
+    assert "daily_forcing_index" in forcing_index_source
+    assert not any(
+        "vercor.forcing_index" in cycle
+        for cycle in package_import_cycles("vercor", "vercor")
+    )
     assert "class _ModelDateTimeBase" not in clock_source
     assert "class DateTime365" not in clock_source
     assert "class DateTime360" not in clock_source

@@ -355,12 +355,14 @@ owned by `vercor.exchange` and imported by setup helper modules rather than
 duplicated beside recipes.
 
 Core helper ownership follows the same boundary. Calendar constants,
-model-calendar datetime values, leap-year logic, 360/noleap daily mapping, and
-runtime daily forcing indexes live in `vercor.calendar`. The canonical exchange
-field vocabulary lives in `vercor.field_names`. Rectilinear grid construction,
-center-to-edge geometry, and grid identity checks live in
-`vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while default
-component-topology name validation and lookup are private to
+model-calendar datetime values, leap-year logic, and month/day conversion live
+in `vercor.calendar`. Daily forcing-index policy, including noleap and 360-day
+calendar mapping to forcing-file day indexes, lives in `vercor.forcing_index`;
+`vercor.calendar` preserves thin compatibility delegates for the historic import
+path. The canonical exchange field vocabulary lives in `vercor.field_names`.
+Rectilinear grid construction, center-to-edge geometry, and grid identity checks
+live in `vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while
+default component-topology name validation and lookup are private to
 `vercor.runtime.component_topology`. Generic hybrid/sigma-coordinate pressure
 and altitude helpers live in `vercor.fluxes.vertical_coordinates`, and generic
 PyTree transforms live in `vercor.pytree_utils`.

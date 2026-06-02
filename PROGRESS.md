@@ -118,6 +118,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local bilinear interpolator boundary validation: baseline fast pytest,
   focused red/green pytest, Black, flake8, mypy, full fast pytest, and full
   pytest passed as of 2026-06-02.
+- Latest local calendar forcing-index boundary validation: baseline fast pytest,
+  focused red/green pytest, focused runtime pytest, Black, flake8, mypy, full
+  fast pytest, and full pytest passed as of 2026-06-02.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -144,12 +147,44 @@ historical commands, failure messages, or detailed validation notes.
 
 ## Follow-Up Candidates
 
-- `vercor/calendar.py` still combines model-calendar datetime value objects with
-  daily forcing-index policy. A future boundary refactor should split
-  forcing-index selection into a focused helper module while preserving the
-  existing public calendar API.
+- No open follow-up candidates are recorded.
 
 ## Recent Work
+
+### 2026-06-02: Calendar Forcing-Index Boundary Refactor
+
+- Added `vercor.forcing_index` as the focused owner for daily forcing lookup
+  policy, including Gregorian month lengths, noleap mapping, 360-day to
+  Gregorian day mapping, one-based forcing day selection, and zero-based daily
+  forcing indexes.
+- Kept `vercor.calendar` focused on calendar constants, model-calendar datetime
+  values, leap-year logic, and month/day conversion while preserving the
+  historic forcing-index imports through thin compatibility delegates.
+- Updated `vercor.time_selection` and `vercor.runtime.time` to import forcing
+  policy from `vercor.forcing_index`, removing the local 360-day wrapper from
+  time selection.
+- Added boundary and behavior coverage for forcing-index ownership, runtime
+  import direction, absence of a `vercor.forcing_index` top-level import cycle,
+  and compatibility-delegate parity across Gregorian, noleap, leap-day, and
+  360-day daily forcing cases.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the new forcing-index owner.
+- Validation run for this change:
+  baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`, focused red
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_tools_time_and_forcing.py -q --fast --tb=short`,
+  focused green after implementation
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_tools_time_and_forcing.py -q --fast --tb=short`,
+  focused runtime
+  `conda run -n scipy pytest tests/test_coupler_runtime.py -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`, focused post-format
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_tools_time_and_forcing.py -q --fast --tb=short`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: no failed implementation approach was encountered;
+  the only failures were the intentional red boundary/behavior tests before
+  adding `vercor.forcing_index` and moving runtime imports to the new owner.
 
 ### 2026-06-02: Bilinear Interpolator Private-Owner Boundary Refactor
 

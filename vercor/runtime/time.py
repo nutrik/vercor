@@ -7,9 +7,10 @@ from typing import cast
 
 import jax
 
-from vercor.calendar import ModelDateTime, daily_forcing_index
+from vercor.calendar import ModelDateTime
 from vercor.clock import Clock
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
+from vercor.forcing_index import daily_forcing_index
 from vercor.pytree import PyTreeNodeMixin
 from vercor.settings import VercorSettings
 from vercor.time_selection import (

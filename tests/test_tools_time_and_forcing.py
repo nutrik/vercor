@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import hashlib
+import importlib
 from pathlib import Path
 
 import jax
@@ -34,6 +35,16 @@ class TimeSliceCase:
     time: datetime | DateTime360 | DateTime365
     no_leap: bool
     expected: np.ndarray | float
+
+
+@dataclass(frozen=True)
+class DailyForcingIndexCase:
+    case_id: str
+    time: datetime | DateTime360 | DateTime365
+    year_type: str
+    no_leap: bool
+    expected_day_of_year: int
+    expected_index: int
 
 
 @pytest.mark.fast_always
@@ -114,6 +125,83 @@ def test_get_field_time_slice_cases(
         )
         assert isinstance(out, jax.Array)
         assert_allclose_compact(out, case.expected, label=case.case_id)
+
+
+@pytest.mark.fast_always
+def test_forcing_index_owner_matches_calendar_compatibility_delegates(
+    select_fast_cases: SelectFastCases,
+) -> None:
+    forcing_index_module = importlib.import_module("vercor.forcing_index")
+    calendar_module = importlib.import_module("vercor.calendar")
+    cases = [
+        DailyForcingIndexCase(
+            case_id="gregorian-common",
+            time=datetime(2001, 12, 31),
+            year_type="leap",
+            no_leap=False,
+            expected_day_of_year=365,
+            expected_index=364,
+        ),
+        DailyForcingIndexCase(
+            case_id="gregorian-leap-day-collapses-for-noleap-forcing",
+            time=datetime(2000, 2, 29),
+            year_type="leap",
+            no_leap=True,
+            expected_day_of_year=59,
+            expected_index=58,
+        ),
+        DailyForcingIndexCase(
+            case_id="noleap-model-calendar",
+            time=DateTime365(2001, 3, 1, 0, 0, 0, 0, 60),
+            year_type="noleap",
+            no_leap=True,
+            expected_day_of_year=60,
+            expected_index=59,
+        ),
+        DailyForcingIndexCase(
+            case_id="360-model-calendar-noleap-forcing",
+            time=DateTime360(2001, 2, 30, 0, 0, 0, 0, 60),
+            year_type="360",
+            no_leap=True,
+            expected_day_of_year=59,
+            expected_index=58,
+        ),
+        DailyForcingIndexCase(
+            case_id="360-model-calendar-leap-forcing",
+            time=DateTime360(2000, 2, 30, 0, 0, 0, 0, 60),
+            year_type="360",
+            no_leap=False,
+            expected_day_of_year=60,
+            expected_index=59,
+        ),
+    ]
+
+    for case in select_fast_cases(
+        cases, case_id=lambda case: case.case_id, min_cases=3
+    ):
+        owner_day = forcing_index_module.daily_forcing_day_of_year(
+            case.time,
+            year_type=case.year_type,
+            no_leap=case.no_leap,
+        )
+        compat_day = calendar_module.daily_forcing_day_of_year(
+            case.time,
+            year_type=case.year_type,
+            no_leap=case.no_leap,
+        )
+        owner_index = forcing_index_module.daily_forcing_index(
+            case.time,
+            year_type=case.year_type,
+            no_leap=case.no_leap,
+        )
+        compat_index = calendar_module.daily_forcing_index(
+            case.time,
+            year_type=case.year_type,
+            no_leap=case.no_leap,
+        )
+
+        assert owner_day == compat_day == case.expected_day_of_year
+        assert owner_index == compat_index == case.expected_index
 
 
 def test_get_field_time_slice_returns_jax_array_for_jax_backed_data() -> None:

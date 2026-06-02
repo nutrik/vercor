@@ -9,8 +9,8 @@ from vercor.calendar import (
     DateTime360,
     DateTime365,
     ModelDateTime,
-    daily_forcing_day_of_year,
 )
+from vercor.forcing_index import daily_forcing_day_of_year
 from vercor.types import RuntimeArray
 
 
@@ -65,13 +65,6 @@ def datetime_to_seconds_in_year(dt: datetime | ModelDateTime) -> float:
     )
 
 
-def _custom_360_day_to_gregorian_day_of_year(
-    time: datetime | ModelDateTime,
-    no_leap: bool,
-) -> int:
-    return daily_forcing_day_of_year(time, year_type="360", no_leap=no_leap)
-
-
 def get_field_time_slice(
     field_name: str,
     data: Mapping[str, RuntimeArray],
@@ -81,7 +74,11 @@ def get_field_time_slice(
     """Return a field indexed by day-of-year without time interpolation."""
 
     if isinstance(time, DateTime360):
-        tm_yday = _custom_360_day_to_gregorian_day_of_year(time, no_leap=no_leap)
+        tm_yday = daily_forcing_day_of_year(
+            time,
+            year_type="360",
+            no_leap=no_leap,
+        )
     elif isinstance(time, DateTime365):
         tm_yday = daily_forcing_day_of_year(
             time,

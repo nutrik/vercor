@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import time as _time
-from typing import ClassVar, Literal, Protocol, Self, cast
+from typing import ClassVar, Literal, Protocol, Self
 
 DAYS_PER_MONTH_GREGORIAN_LEAP = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 DAYS_PER_MONTH_GREGORIAN_NO_LEAP = (
@@ -340,11 +340,15 @@ def month_day_from_day_of_year(
 
 
 def gregorian_month_lengths(year: int, *, no_leap: bool) -> tuple[int, ...]:
-    """Return Gregorian month lengths for forcing-index selection."""
+    """Return Gregorian month lengths for forcing-index selection.
 
-    if no_leap or not is_leap_year(year):
-        return DAYS_PER_MONTH_GREGORIAN_NO_LEAP
-    return DAYS_PER_MONTH_GREGORIAN_LEAP
+    This compatibility delegate preserves the historic ``vercor.calendar``
+    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
+    """
+
+    from vercor.forcing_index import gregorian_month_lengths as _month_lengths
+
+    return _month_lengths(year, no_leap=no_leap)
 
 
 def day_of_year_360_to_gregorian(
@@ -352,24 +356,27 @@ def day_of_year_360_to_gregorian(
     *,
     no_leap: bool,
 ) -> int:
-    """Map a 360-day calendar date to a Gregorian day-of-year."""
+    """Map a 360-day calendar date to a Gregorian day-of-year.
 
-    month_lengths = gregorian_month_lengths(time.year, no_leap=no_leap)
-    month_length = month_lengths[time.month - 1]
-    mapped_day_in_month = ((time.day - 1) * (month_length - 1)) // 29 + 1
-    return day_of_year_from_month_day(
-        month_lengths,
-        time.month,
-        mapped_day_in_month,
-    )
+    This compatibility delegate preserves the historic ``vercor.calendar``
+    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
+    """
+
+    from vercor.forcing_index import day_of_year_360_to_gregorian as _map_day
+
+    return _map_day(time, no_leap=no_leap)
 
 
 def noleap_day_of_year(time: CalendarDate) -> int:
-    """Return a one-based no-leap model-calendar day-of-year."""
+    """Return a one-based no-leap model-calendar day-of-year.
 
-    if time.day_of_year is None:
-        raise ValueError("ModelDateTime.day_of_year is not initialized")
-    return time.day_of_year
+    This compatibility delegate preserves the historic ``vercor.calendar``
+    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
+    """
+
+    from vercor.forcing_index import noleap_day_of_year as _noleap_day
+
+    return _noleap_day(time)
 
 
 def daily_forcing_day_of_year(
@@ -378,18 +385,15 @@ def daily_forcing_day_of_year(
     year_type: str,
     no_leap: bool = True,
 ) -> int:
-    """Return the one-based day-of-year used for daily forcing lookup."""
+    """Return the one-based day-of-year used for daily forcing lookup.
 
-    if year_type == "360":
-        return day_of_year_360_to_gregorian(cast(CalendarDate, time), no_leap=no_leap)
+    This compatibility delegate preserves the historic ``vercor.calendar``
+    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
+    """
 
-    if year_type == "noleap":
-        return noleap_day_of_year(cast(CalendarDate, time))
+    from vercor.forcing_index import daily_forcing_day_of_year as _day_of_year
 
-    day_of_year = time.timetuple().tm_yday
-    if no_leap and is_leap_year(time.year) and day_of_year > 59:
-        day_of_year -= 1
-    return day_of_year
+    return _day_of_year(time, year_type=year_type, no_leap=no_leap)
 
 
 def daily_forcing_index(
@@ -398,13 +402,12 @@ def daily_forcing_index(
     year_type: str,
     no_leap: bool = True,
 ) -> int:
-    """Return the zero-based daily forcing index for a runtime timestamp."""
+    """Return the zero-based daily forcing index for a runtime timestamp.
 
-    return (
-        daily_forcing_day_of_year(
-            time,
-            year_type=year_type,
-            no_leap=no_leap,
-        )
-        - 1
-    )
+    This compatibility delegate preserves the historic ``vercor.calendar``
+    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
+    """
+
+    from vercor.forcing_index import daily_forcing_index as _daily_index
+
+    return _daily_index(time, year_type=year_type, no_leap=no_leap)

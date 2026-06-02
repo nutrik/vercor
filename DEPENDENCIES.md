@@ -3,7 +3,7 @@
 3. `vercor/pytree.py` - shared declarative PyTree mixin for immutable JAX-registered containers
 4. `vercor/settings.py` - unified metadata-backed `VercorSettings` container and static runtime controls built on (2)
 5. `vercor/field_names.py` - canonical exchange-field vocabulary
-6. `vercor/calendar.py` - calendar constants, model-calendar datetime values, leap-year logic, noleap/360-day mapping, and daily forcing-index helpers
+6. `vercor/calendar.py` and `vercor/forcing_index.py` - calendar constants, model-calendar datetime values, leap-year logic, month/day conversion, compatibility delegates, and daily forcing-index policy
 7. `vercor/fluxes/vertical_coordinates.py` - hybrid/sigma-coordinate pressure and altitude helpers built on (1, 4)
 8. `vercor/fluxes/utilities.py` - JAX-native scalar/array thermodynamic helpers built on (1, 4)
 9. `vercor/fluxes/bulk_formula_cesm.py` - JAX-native atmosphere-ocean / atmosphere-ice bulk flux kernels built on (1, 4, 8)
