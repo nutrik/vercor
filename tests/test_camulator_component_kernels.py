@@ -12,10 +12,10 @@ import pytest
 import torch
 import xarray as xr
 
-import vercor.setups.external.camulator as camulator_module
 import vercor.setups.external.camulator_contracts as camulator_contracts_module
 import vercor.setups.external.camulator_fields as camulator_fields_module
 import vercor.setups.external.camulator_forcing as camulator_forcing_module
+import vercor.setups.external.camulator_gcm_state as camulator_gcm_state_module
 import vercor.setups.external.camulator_imports as camulator_imports_module
 import vercor.setups.external.camulator_init as camulator_init_module
 import vercor.setups.external.camulator_land as camulator_land_module
@@ -837,8 +837,8 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
 
     component = cast(
         Any,
-        camulator_module._CAMulatorGCMState.__new__(
-            camulator_module._CAMulatorGCMState
+        camulator_gcm_state_module.CAMulatorGCMSetupState.__new__(
+            camulator_gcm_state_module.CAMulatorGCMSetupState
         ),
     )
     component.model_substeps = 2

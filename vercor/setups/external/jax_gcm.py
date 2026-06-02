@@ -13,7 +13,7 @@ from vercor.components import Component, differentiable_component
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
 import vercor.setups.external.jax_gcm_runtime as _jax_gcm_runtime
 import vercor.setups.external.jax_gcm_state as _jax_gcm_state
-from vercor.setups.external.jax_gcm_state import JAXGCMSetupState, JCMState
+from vercor.setups.external.jax_gcm_state import JAXGCMSetupState
 
 try:
     import jcm  # noqa: F401
@@ -83,6 +83,5 @@ def make_jax_gcm(
 
 
 __all__ = [
-    "JCMState",
     "make_jax_gcm",
 ]

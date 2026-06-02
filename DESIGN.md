@@ -375,11 +375,11 @@ host recording live in
 `vercor.setups.external.jax_gcm_runtime`, which consumes the setup object through
 a private protocol rather than an unbounded state object.
 `vercor.setups.external.jax_gcm_state` owns JAXGCM setup-time model resources,
-spinup policy, lifecycle callbacks, and the public `JCMState` bundle reexported
-by the factory module. `vercor.setups.external.jax_gcm` remains a thin public
-factory that constructs setup state and binds named lifecycle callbacks without
-owning runtime payload or setup-state internals. JAXGCM output cadence and
-NetCDF writing live in `vercor.setups.external.jax_gcm_output`, while
+spinup policy, lifecycle callbacks, and the canonical `JCMState` bundle.
+`vercor.setups.external.jax_gcm` remains a thin public factory that constructs
+setup state and binds named lifecycle callbacks without reexporting state
+bundles or owning runtime payload/setup-state internals. JAXGCM output cadence
+and NetCDF writing live in `vercor.setups.external.jax_gcm_output`, while
 surface-temperature cleanup and output-field mapping live in
 `vercor.setups.external.jax_gcm_fields`. Veros host-runtime flux application and
 substep orchestration live in
@@ -394,8 +394,12 @@ function so setup modules preserve lazy optional-dependency boundaries. CAMulato
 prediction-block and runtime step orchestration live in
 `vercor.setups.external.camulator_runtime` behind a private runtime-state
 protocol, with tensor staging in `vercor.setups.external.camulator_tensors` and
-field mapping in `vercor.setups.external.camulator_fields`. CAMulator CREDIT
-output writing lives in `vercor.setups.external.camulator_output`.
+field mapping in `vercor.setups.external.camulator_fields`.
+`vercor.setups.external.camulator_gcm_state` owns CAMulator atmosphere
+setup-time model resources, timestep alignment, field seeding, and lifecycle
+callbacks, while `vercor.setups.external.camulator` remains the thin public
+factory. CAMulator CREDIT output writing lives in
+`vercor.setups.external.camulator_output`.
 
 `vercor.assets` owns generic cache, download, and checksum validation only, with
 asset-specific registries and product vocabulary kept outside the generic cache

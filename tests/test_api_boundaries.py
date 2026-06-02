@@ -219,6 +219,10 @@ def test_obsolete_compatibility_api_surfaces_are_removed() -> None:
     assert not hasattr(jax_gcm_module, "JAXGCMRuntimePayload")
     assert "JAXGCMRuntimePayload" not in external_module.__all__
     assert "JAXGCMRuntimePayload" not in external_module._LAZY_EXPORTS
+    assert not hasattr(jax_gcm_module, "JCMState")
+    assert "JCMState" not in getattr(jax_gcm_module, "__all__", [])
+    assert "JCMState" not in external_module.__all__
+    assert "JCMState" not in external_module._LAZY_EXPORTS
 
     assert not hasattr(settings_module, "ComponentSettings")
     assert not hasattr(forcing_data_module, "ComponentForcingData")
@@ -1007,6 +1011,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     camulator_runtime_source = Path(
         "vercor/setups/external/camulator_runtime.py"
     ).read_text(encoding="utf-8")
+    camulator_gcm_state_source = Path(
+        "vercor/setups/external/camulator_gcm_state.py"
+    ).read_text(encoding="utf-8")
     camulator_fields_source = Path(
         "vercor/setups/external/camulator_fields.py"
     ).read_text(encoding="utf-8")
@@ -1034,6 +1041,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
 
     assert Path("vercor/setups/external/camulator_land.py").exists()
     assert Path("vercor/setups/external/camulator_runtime.py").exists()
+    assert Path("vercor/setups/external/camulator_gcm_state.py").exists()
     assert Path("vercor/setups/external/jax_gcm_output.py").exists()
     assert Path("vercor/setups/external/jax_gcm_fields.py").exists()
     assert Path("vercor/setups/external/jax_gcm_runtime.py").exists()
@@ -1082,7 +1090,15 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def _should_write_output(" not in jax_gcm_source
     assert "def _write_output(" not in jax_gcm_source
     assert "os.environ[" not in camulator_source
+    assert "import torch" not in camulator_source
+    assert "import xarray" not in camulator_source
+    assert "RectilinearGrid" not in camulator_source
+    assert "CamulatorRuntimeCursor" not in camulator_source
+    assert "assign_model_timestep_alignment" not in camulator_source
+    assert "seed_grid_field_defaults" not in camulator_source
     assert "def configure_camulator_runtime(" in camulator_runtime_settings_source
+    assert "class CAMulatorGCMSetupState" not in camulator_source
+    assert "class CAMulatorGCMSetupState" in camulator_gcm_state_source
     assert "def coerce_camulator_datetime(" in camulator_runtime_source
     assert "def run_camulator_prediction_block(" in camulator_runtime_source
     assert "def step_camulator_runtime(" in camulator_runtime_source
@@ -1283,12 +1299,17 @@ def test_assets_and_diagnostics_have_focused_ownership_boundaries() -> None:
 
 @pytest.mark.fast_always
 def test_camulator_adapters_share_runtime_cursor_state_transition_helper() -> None:
+    for path in (Path("vercor/setups/external/camulator_gcm_state.py"),):
+        source = path.read_text(encoding="utf-8")
+        assert "CamulatorRuntimeCursor" in source, path
+        assert "runtime_forcing_index(" not in source, path
+        assert "timestep_counter += 1" not in source, path
+
     for path in (
         Path("vercor/setups/external/camulator.py"),
         Path("vercor/setups/external/camulator_land.py"),
     ):
         source = path.read_text(encoding="utf-8")
-        assert "CamulatorRuntimeCursor" in source, path
         assert "runtime_forcing_index(" not in source, path
         assert "timestep_counter += 1" not in source, path
 
@@ -1301,6 +1322,7 @@ def test_camulator_state_facade_is_removed() -> None:
         Path("vercor/setups/external/camulator_tensors.py"),
         Path("vercor/setups/external/camulator_stepper.py"),
         Path("vercor/setups/external/camulator_init.py"),
+        Path("vercor/setups/external/camulator_gcm_state.py"),
     )
     for path in focused_modules:
         assert path.exists(), path

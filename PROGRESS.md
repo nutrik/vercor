@@ -124,6 +124,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local asset/forcing-data boundary validation: baseline fast pytest,
   focused red/green pytest, Black, focused post-format pytest, flake8, mypy,
   full fast pytest, and full pytest passed as of 2026-06-02.
+- Latest local external adapter factory/setup-state boundary validation:
+  focused red/green pytest, Black, flake8, mypy, full fast pytest, and full
+  pytest passed as of 2026-06-02.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -150,14 +153,46 @@ historical commands, failure messages, or detailed validation notes.
 
 ## Follow-Up Candidates
 
-- Evaluate a non-breaking deprecation path for the public `JCMState` reexport
-  from `vercor.setups.external.jax_gcm`; it is currently documented public API,
-  so removal was intentionally left out of the safe boundary refactor.
-- Split CAMulator setup state from `vercor.setups.external.camulator` into a
-  package-internal setup-state owner once that larger optional-dependency
-  boundary is scoped separately.
+- No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-02: External Adapter Factory/Setup-State Boundary Refactor
+
+- Removed the public `JCMState` compatibility aliases from
+  `vercor.setups.external` and `vercor.setups.external.jax_gcm`; the canonical
+  state bundle owner is now only `vercor.setups.external.jax_gcm_state`.
+- Split CAMulator atmosphere setup-state ownership into
+  `vercor.setups.external.camulator_gcm_state.CAMulatorGCMSetupState`, leaving
+  `vercor.setups.external.camulator` as a thin `make_camulator_gcm(...)`
+  factory that binds the host-component lifecycle methods.
+- Updated boundary/runtime tests, `DESIGN.md`, and `DEPENDENCIES.md` for the
+  stricter JAXGCM public surface and CAMulator setup-state owner.
+- Validation run for this change:
+  initial focused red
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_camulator_component_kernels.py tests/test_coupler_runtime.py -q --fast --tb=short`
+  first exposed an over-eager test import of the not-yet-created CAMulator
+  setup-state module; after moving that assertion back to the boundary test,
+  the same focused red command failed as expected on the remaining `JCMState`
+  alias and missing `camulator_gcm_state.py`. Focused green with the same
+  command passed after implementation. Then
+  `conda run -n scipy black vercor examples tests`,
+  focused post-format pytest with the same boundary/runtime command,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`, and
+  `conda run -n scipy pytest tests/ -q --fast --tb=short` passed. The first
+  full `conda run -n scipy pytest tests/ -q --tb=short` exposed one stale
+  full-only boundary assertion in `tests/test_runtime_state.py` that still
+  looked for `def step(...)` in `camulator.py`; the exact failing test then
+  passed after retargeting it to `camulator_gcm_state.py`. Final Black,
+  focused boundary/runtime pytest, flake8, mypy, full fast pytest, and full
+  pytest all passed. The existing Black Python 3.13/target-3.14 warning and
+  JAX dtype-promotion warning remain.
+- Failed approaches recorded: the initial top-level import of
+  `camulator_gcm_state` in the CAMulator kernel tests caused collection to fail
+  before the intended red boundary assertion, and the first full suite run found
+  a stale boundary test that still treated the CAMulator factory as the
+  setup-state owner. Both were corrected in the test harness.
 
 ### 2026-06-02: Asset and Forcing-Data Boundary Refactor
 
@@ -177,9 +212,10 @@ historical commands, failure messages, or detailed validation notes.
 - Updated `DESIGN.md` and `DEPENDENCIES.md` for the refined asset and
   forcing-data boundaries, including removal of the obsolete
   data-component-reader-class wording.
-- Deferred the broader audit findings for public `JCMState` reexport cleanup
-  and CAMulator setup-state splitting because this change intentionally avoids
-  public API removals and larger optional-dependency refactors.
+- The broader audit findings for public `JCMState` reexport cleanup and
+  CAMulator setup-state splitting were intentionally left out of this
+  asset/forcing-data pass and completed in the later 2026-06-02 external
+  adapter factory/setup-state boundary refactor.
 - Validation run for this change:
   baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`, focused red
   `conda run -n scipy pytest tests/test_assets.py tests/test_forcing_data.py tests/test_tools_time_and_forcing.py::test_forcing_index_rejects_unknown_year_type tests/test_component_base_coverage.py::test_read_forcing_and_runtime_write_round_trip -q --fast --tb=short`,
@@ -303,7 +339,8 @@ historical commands, failure messages, or detailed validation notes.
 - Added `vercor.setups.external.jax_gcm_state` as the owner for JAXGCM setup
   state, model construction, spinup, and lifecycle callback wiring; the public
   `jax_gcm.py` module now stays focused on the `make_jax_gcm(...)` factory and
-  `JCMState` reexport.
+  then-existing `JCMState` reexport, which was later removed in the 2026-06-02
+  external adapter factory/setup-state boundary refactor.
 - Added `vercor.setups.external.veros_gcm_state` as the owner for Veros setup
   state, grid derivation, spinup, and host step delegation; the public
   `veros_gcm.py` module now stays focused on `make_veros_gcm(...)`.

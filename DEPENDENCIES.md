@@ -29,7 +29,7 @@
 29. `vercor/setups/external/jax_gcm_tools.py` - JCM-specific parameter and input-data helpers built on (1, 7, 8, 11)
 30. `vercor/setups/external/jax_gcm_fields.py` - public package-internal JCM output-field mapping and surface-temperature forcing helpers built on (1, 7)
 31. `vercor/setups/external/jax_gcm_output.py` - JAXGCM output cadence and NetCDF writing helpers built on (6, 25)
-32. `vercor/setups/external/jax_gcm_runtime.py`, `jax_gcm_state.py`, and `jax_gcm.py` - JAXGCM private runtime-state protocol, payload/hooks/stepping, setup-state/lifecycle ownership, named factory callback wiring, and thin JCM adapter factory boundary built on (1, 3, 11, 26, 29, 30, 31, 62)
+32. `vercor/setups/external/jax_gcm_runtime.py`, `jax_gcm_state.py`, and `jax_gcm.py` - JAXGCM private runtime-state protocol, payload/hooks/stepping, setup-state/lifecycle and canonical `JCMState` ownership, named factory callback wiring, and thin JCM adapter factory boundary built on (1, 3, 11, 26, 29, 30, 31, 62)
 33. `vercor/setups/external/veros_runtime_settings.py` - explicit lazy Veros backend/runtime configuration side-effect boundary
 34. `vercor/setups/external/veros_setup.py` - concrete Veros setup subclass and setup policy built on (33)
 35. `vercor/setups/external/veros_fluxes.py` - Veros-to-VerCOR flux conversion built on (1, 4, 9, 33)
@@ -45,7 +45,7 @@
 45. `vercor/setups/external/camulator_runtime_settings.py` - CAMulator TensorFlow/OpenMP/MKL import-time environment settings boundary
 46. `vercor/setups/external/camulator_output.py` - CAMulator CREDIT output writing helpers
 47. `vercor/setups/external/camulator_land.py` - CAMulator land host-runtime adapter with shared timestep/cursor setup built on (1, 12, 20, 26, 39)
-48. `vercor/setups/external/camulator_runtime.py` and `camulator.py` - CAMulator private runtime-state protocol, public package-internal host-runtime prediction-block/step helpers, and atmosphere adapter factory/setup boundary built on (7, 10, 26, 39, 40, 41, 44, 45, 46)
+48. `vercor/setups/external/camulator_runtime.py`, `camulator_gcm_state.py`, and `camulator.py` - CAMulator private runtime-state protocol, public package-internal host-runtime prediction-block/step helpers, atmosphere setup-state/lifecycle ownership, and thin adapter factory boundary built on (7, 10, 26, 39, 40, 41, 44, 45, 46)
 49. `vercor/setups/data/assets.py` - concrete ERA/ECMWF setup forcing asset registry built on (21)
 50. `vercor/setups/data/_field_helpers.py` - shared JAX-backed data-adapter positive masks, surface canonicalization, and field normalization helpers built on (1, 14)
 51. `vercor/setups/data/_component_helpers.py` - shared data-component construction helper for time-interpolated forcing adapters built on (12, 23, 26)
