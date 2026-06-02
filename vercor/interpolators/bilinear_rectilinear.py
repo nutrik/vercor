@@ -1,52 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 from jax import Array, lax
 
 from vercor.dtypes import as_jax_real_array, jax_full, jax_index_dtype
+import vercor.interpolators._bilinear_extrapolation as _extrapolation
+import vercor.interpolators._bilinear_geometry as _geometry
+import vercor.interpolators._bilinear_weights as _weights
 from vercor.pytree import PyTreeNodeMixin
-
-
-def _wrap_like(lon_deg: Array, base0_deg: float) -> Array:
-    r"""Maps longitudes (deg) into the [base0, base0+360) interval."""
-
-    return base0_deg + jnp.mod(lon_deg - base0_deg, 360.0)
-
-
-def _unit_east_north(lon_rad: Array, lat_rad: Array) -> tuple[Array, Array]:
-    r"""Computes unit vectors (east, north) in 3-D for given lon/lat (radians)."""
-
-    slon, clon = jnp.sin(lon_rad), jnp.cos(lon_rad)
-    slat, clat = jnp.sin(lat_rad), jnp.cos(lat_rad)
-
-    e_east = jnp.stack((-slon, clon, jnp.zeros_like(lon_rad)), axis=-1)
-    e_north = jnp.stack((-slat * clon, -slat * slon, clat), axis=-1)
-    return (e_east, e_north)
-
-
-def _great_circle_distance_rad(
-    lon1: Array, lat1: Array, lon2: Array, lat2: Array
-) -> Array:
-    r"""Haversine great-circle distance (radians) between points on the unit sphere."""
-
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    sdlat2 = jnp.sin(dlat * 0.5)
-    sdlon2 = jnp.sin(dlon * 0.5)
-    a = sdlat2 * sdlat2 + jnp.cos(lat1) * jnp.cos(lat2) * sdlon2 * sdlon2
-    a = jnp.clip(a, 0.0, 1.0)
-    return 2.0 * jnp.arctan2(jnp.sqrt(a), jnp.sqrt(1.0 - a))
-
-
-def _all_positive(values: Array) -> bool:
-    return bool(jnp.all(values > 0.0))
-
-
-def _all_negative(values: Array) -> bool:
-    return bool(jnp.all(values < 0.0))
 
 
 @jax.tree_util.register_pytree_node_class
@@ -142,8 +106,8 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         lon_diff = jnp.diff(lon_src_deg)
         lat_diff = jnp.diff(lat_src_deg)
 
-        lon_ascending = _all_positive(lon_diff)
-        lon_descending = _all_negative(lon_diff)
+        lon_ascending = _geometry.all_positive(lon_diff)
+        lon_descending = _geometry.all_negative(lon_diff)
         if not (lon_ascending or lon_descending):
             raise ValueError(
                 "lon_src must be strictly monotonic (ascending or descending)."
@@ -154,8 +118,8 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         else:
             self._lon_flipped = False
 
-        self.lat_ascending = _all_positive(lat_diff)
-        self.lat_descending = _all_negative(lat_diff)
+        self.lat_ascending = _geometry.all_positive(lat_diff)
+        self.lat_descending = _geometry.all_negative(lat_diff)
         if not (self.lat_ascending or self.lat_descending):
             raise ValueError(
                 "lat_src must be strictly monotonic (ascending or descending)."
@@ -200,84 +164,43 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
 
         self._precompute_cells_and_weights()
 
-        self._e_east_t, self._e_north_t = _unit_east_north(
+        self._e_east_t, self._e_north_t = _geometry.unit_east_north(
             self.lon_tgt_rad, self.lat_tgt_rad
         )
         lon_src_2d, lat_src_2d = jnp.meshgrid(self.lon_src_rad, self.lat_src_rad)
-        self._e_east_src, self._e_north_src = _unit_east_north(lon_src_2d, lat_src_2d)
+        self._e_east_src, self._e_north_src = _geometry.unit_east_north(
+            lon_src_2d,
+            lat_src_2d,
+        )
         self._lon_src_2d = lon_src_2d
         self._lat_src_2d = lat_src_2d
         self._lon_src_flat = lon_src_2d.reshape(-1)
         self._lat_src_flat = lat_src_2d.reshape(-1)
 
     def _precompute_cells_and_weights(self) -> None:
-        nlon, nlat = self.nlon, self.nlat
-        lon_src = self.lon_src_deg
-        lat_src = self.lat_src_deg
+        weights = _weights.compute_bilinear_cell_weights(
+            lon_src_deg=self.lon_src_deg,
+            lat_src_deg=self.lat_src_deg,
+            lon_tgt_deg=self.lon_tgt_deg,
+            lat_tgt_deg=self.lat_tgt_deg,
+            periodic=self.periodic,
+            lat_ascending=self.lat_ascending,
+        )
 
-        if self.periodic:
-            base0 = float(lon_src[0])
-            lon_tgt_mapped = _wrap_like(self.lon_tgt_deg, base0)
-        else:
-            lon_tgt_mapped = jnp.clip(
-                self.lon_tgt_deg, jnp.min(lon_src), jnp.max(lon_src)
-            )
-
-        i1 = jnp.searchsorted(lon_src, lon_tgt_mapped, side="right")
-        i0 = i1 - 1
-        if self.periodic:
-            i0 = jnp.mod(i0, nlon)
-            i1 = jnp.mod(i1, nlon)
-        else:
-            i0 = jnp.clip(i0, 0, nlon - 2)
-            i1 = i0 + 1
-
-        if self.lat_ascending:
-            j1 = jnp.searchsorted(lat_src, self.lat_tgt_deg, side="right")
-            j0 = j1 - 1
-        else:
-            lat_inv = jnp.flip(lat_src)
-            j1_inv = jnp.searchsorted(lat_inv, self.lat_tgt_deg, side="right")
-            j0_inv = j1_inv - 1
-            j0 = (nlat - 1) - jnp.clip(j0_inv, 0, nlat - 2) - 1
-            j1 = j0 + 1
-
-        j0 = jnp.clip(j0, 0, nlat - 2)
-        j1 = j0 + 1
-
-        lon0 = self.lon_src_rad[i0]
-        lon1 = self.lon_src_rad[i1]
-        dlon = lon1 - lon0
-        wrap = i1 <= i0
-        dlon = jnp.where(wrap, (lon1 + 2.0 * jnp.pi) - lon0, dlon)
-
-        dlam = self.lon_tgt_rad - lon0
-        dlam = jnp.where(dlam < 0.0, dlam + 2.0 * jnp.pi, dlam)
-        fx = jnp.where(dlon != 0.0, dlam / dlon, 0.0)
-        fx = jnp.clip(fx, 0.0, 1.0)
-
-        lat0 = self.lat_src_rad[j0]
-        lat1 = self.lat_src_rad[j1]
-        dphi = lat1 - lat0
-        fy = jnp.where(dphi != 0.0, (self.lat_tgt_rad - lat0) / dphi, 0.0)
-        fy = jnp.clip(fy, 0.0, 1.0)
-
-        self.i0 = i0.astype(jax_index_dtype())
-        self.i1 = i1.astype(jax_index_dtype())
-        self.j0 = j0.astype(jax_index_dtype())
-        self.j1 = j1.astype(jax_index_dtype())
-        self.fx = fx
-        self.fy = fy
-        self.w00 = (1.0 - fx) * (1.0 - fy)
-        self.w10 = fx * (1.0 - fy)
-        self.w01 = (1.0 - fx) * fy
-        self.w11 = fx * fy
+        self.i0 = weights.i0.astype(jax_index_dtype())
+        self.i1 = weights.i1.astype(jax_index_dtype())
+        self.j0 = weights.j0.astype(jax_index_dtype())
+        self.j1 = weights.j1.astype(jax_index_dtype())
+        self.fx = weights.fx
+        self.fy = weights.fy
+        self.w00 = weights.w00
+        self.w10 = weights.w10
+        self.w01 = weights.w01
+        self.w11 = weights.w11
 
     @staticmethod
     def _ensure_src_mask(src: Array, src_mask: Array | None) -> Array:
-        if src_mask is None:
-            return jnp.isfinite(src)
-        return jnp.asarray(src_mask, dtype=bool) & jnp.isfinite(src)
+        return _extrapolation.valid_scalar_source_mask(src, src_mask)
 
     def _prepare_source_field(self, src: Array) -> Array:
         src_array = as_jax_real_array(src)
@@ -330,51 +253,20 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             return jax_full(self.tshape, self.fill_value)
 
         src_array = self._prepare_source_field(src)
-        valid = self._ensure_src_mask(src_array, src_mask).reshape(-1)
-        values = src_array.reshape(-1)
-        fill_flat = jnp.full(
-            (self._lon_tgt_flat.size,), self.fill_value, dtype=values.dtype
+        valid = self._ensure_src_mask(src_array, src_mask)
+        return _extrapolation.extrapolate_scalar_field(
+            source_values=src_array,
+            valid_source_mask=valid,
+            target_shape=self.tshape,
+            target_lon_flat=self._lon_tgt_flat,
+            target_lat_flat=self._lat_tgt_flat,
+            source_lon_flat=self._lon_src_flat,
+            source_lat_flat=self._lat_src_flat,
+            mode=self.extrapolation_mode,
+            idw_k=self.idw_k,
+            idw_eps=self.idw_eps,
+            fill_value=self.fill_value,
         )
-
-        def no_valid(_: None) -> Array:
-            return fill_flat
-
-        def compute_extrapolated(_: None) -> Array:
-            distances = _great_circle_distance_rad(
-                self._lon_tgt_flat[:, None],
-                self._lat_tgt_flat[:, None],
-                self._lon_src_flat[None, :],
-                self._lat_src_flat[None, :],
-            )
-            masked_distances = jnp.where(valid[None, :], distances, jnp.inf)
-
-            if self.extrapolation_mode == "nearest":
-                idx = jnp.argmin(masked_distances, axis=1)
-                return cast(Array, values[idx])
-
-            if self.extrapolation_mode == "idw":
-                k = min(self.idw_k, values.size)
-                neg_distances = -masked_distances
-                top_neg, idx = lax.top_k(neg_distances, k)
-                dist_k = -top_neg
-                val_k = values[idx]
-                weights = jnp.where(
-                    jnp.isfinite(dist_k), 1.0 / (dist_k + self.idw_eps), 0.0
-                )
-                wsum = jnp.sum(weights, axis=1)
-                return cast(
-                    Array,
-                    jnp.where(
-                        wsum > 0.0,
-                        jnp.sum(weights * val_k, axis=1) / wsum,
-                        self.fill_value,
-                    ),
-                )
-
-            raise ValueError("extrapolation_mode must be 'nearest', 'idw', or None")
-
-        flat = lax.cond(jnp.any(valid), compute_extrapolated, no_valid, operand=None)
-        return cast(Array, flat.reshape(self.tshape))
 
     def apply_scalar(self, src: Any) -> Any:
         out, _ = self._apply_bilinear_scalar(src)

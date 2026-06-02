@@ -115,6 +115,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local logging facade/private-owner boundary validation: baseline fast
   pytest, focused red/green pytest, Black, flake8, mypy, focused logging pytest,
   full fast pytest, and full pytest passed as of 2026-06-02.
+- Latest local bilinear interpolator boundary validation: baseline fast pytest,
+  focused red/green pytest, Black, flake8, mypy, full fast pytest, and full
+  pytest passed as of 2026-06-02.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -139,7 +142,46 @@ historical commands, failure messages, or detailed validation notes.
 6. Before stopping, update this file with a compact summary, not a full command
    transcript.
 
+## Follow-Up Candidates
+
+- `vercor/calendar.py` still combines model-calendar datetime value objects with
+  daily forcing-index policy. A future boundary refactor should split
+  forcing-index selection into a focused helper module while preserving the
+  existing public calendar API.
+
 ## Recent Work
+
+### 2026-06-02: Bilinear Interpolator Private-Owner Boundary Refactor
+
+- Split bilinear interpolation internals into private owner modules under
+  `vercor.interpolators`: `_bilinear_geometry` for spherical geometry and
+  orientation checks, `_bilinear_weights` for target-to-source cell lookup and
+  bilinear weights, and `_bilinear_extrapolation` for nearest/IDW fill policy
+  plus valid-source mask normalization.
+- Kept `BilinearRectilinearInterpolator` as the public PyTree facade with the
+  same constructor options, public precomputed weight attributes, scalar/vector
+  methods, JIT behavior, and regridder integration.
+- Added architecture-boundary coverage for private helper ownership, package
+  import-cycle absence, private helper import direction, periodic dateline
+  weight construction, and empty-valid-source extrapolation fill behavior.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` for the bilinear private-owner
+  boundary and recorded the `calendar.py` forcing-index split as a follow-up.
+- Validation run for this change:
+  baseline `conda run -n scipy pytest tests/ -q --fast --tb=short`, focused red
+  `conda run -n scipy pytest tests/test_bilinear_interpolator_boundaries.py -q --tb=short`,
+  focused green after implementation
+  `conda run -n scipy pytest tests/test_bilinear_interpolator_boundaries.py tests/test_bilinear_rectilinear_interpolator.py tests/test_bilinear_rectilinear_regridder.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  focused post-format
+  `conda run -n scipy pytest tests/test_bilinear_interpolator_boundaries.py tests/test_bilinear_rectilinear_interpolator.py tests/test_bilinear_rectilinear_regridder.py -q --tb=short`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approach recorded: no failed implementation approach was encountered;
+  the only failures were the intentional red boundary tests before adding the
+  private helper owner modules and public facade delegation.
 
 ### 2026-06-02: Logging Facade Private-Owner Boundary Refactor
 

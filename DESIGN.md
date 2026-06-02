@@ -27,6 +27,15 @@ The codebase is organized into modules corresponding to physical, numerical and 
 Interpolation, exchangers, grids, model components, output routines etc. are all separate modules with well-defined interfaces. 
 This allows different agents to work on different components in parallel and makes testing easier.
 
+For bilinear rectilinear interpolation, `BilinearRectilinearInterpolator` is the
+public PyTree and user-facing facade. Private helper owners under
+`vercor.interpolators` keep lower-level concerns separate:
+`_bilinear_geometry` owns spherical geometry and orientation checks,
+`_bilinear_weights` owns target-to-source cell lookup and bilinear weights, and
+`_bilinear_extrapolation` owns nearest/IDW fill policy plus valid-source mask
+normalization. Production code outside `vercor.interpolators` should depend on
+the public interpolator or regridder boundary, not these private helpers.
+
 The output module handles all data saving and logging, ensuring a clean separation between computation and I/O.
 
 ### Pure functional style
