@@ -1418,15 +1418,22 @@ def test_data_and_host_factories_return_core_contract_instances() -> None:
 def test_unrelated_setup_imports_do_not_initialize_optional_adapters(
     import_statement: str,
 ) -> None:
+    module_probe = (
+        "import sys\n"
+        f"statement = {import_statement!r}\n"
+        "exec(statement)\n"
+        "heavy = {'torch', 'jcm', 'dinosaur', 'veros'} & set(sys.modules)\n"
+        "assert not heavy, sorted(heavy)\n"
+    )
+
     completed = subprocess.run(
-        [sys.executable, "-c", import_statement],
+        [sys.executable, "-c", module_probe],
         cwd=Path(__file__).resolve().parents[1],
         text=True,
         capture_output=True,
         check=True,
     )
     output = completed.stdout + completed.stderr
-
     forbidden_markers = (
         "CREDIT modules not fully available",
         "credit.postblock not available",
@@ -1437,17 +1444,3 @@ def test_unrelated_setup_imports_do_not_initialize_optional_adapters(
     )
     for marker in forbidden_markers:
         assert marker not in output
-
-    module_probe = (
-        "import sys\n"
-        f"{import_statement}\n"
-        "heavy = {'torch', 'jcm', 'dinosaur', 'veros'} & set(sys.modules)\n"
-        "assert not heavy, sorted(heavy)\n"
-    )
-    subprocess.run(
-        [sys.executable, "-c", module_probe],
-        cwd=Path(__file__).resolve().parents[1],
-        text=True,
-        capture_output=True,
-        check=True,
-    )

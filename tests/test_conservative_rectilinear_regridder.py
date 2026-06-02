@@ -1,3 +1,4 @@
+import importlib
 from inspect import signature
 from typing import Any
 
@@ -142,6 +143,53 @@ def test_regridder_has_identical_grids_true_for_equal_coords() -> None:
 
     regridder = ConservativeRectilinearRegridder(src, dst)
     assert regridder.has_identical_grids is True
+
+
+def test_regridder_identical_grid_skips_remapper_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conservative_module = importlib.import_module("vercor.regridders.conservative")
+
+    def fail_if_called(*args: Any, **kwargs: Any) -> object:
+        _ = args, kwargs
+        raise AssertionError("identity regridder should not build remapper")
+
+    monkeypatch.setattr(
+        conservative_module, "ConservativeRectilinearRemapper", fail_if_called
+    )
+
+    lon = np.array([0.5, 1.5])
+    lat = np.array([0.5, 1.5])
+    src = _grid("src", lon.copy(), lat.copy())
+    dst = _grid("dst", lon.copy(), lat.copy())
+
+    regridder = ConservativeRectilinearRegridder(src, dst)
+
+    assert regridder.has_identical_grids is True
+    assert regridder.interpolator is not None
+
+
+def test_regridder_non_identical_grid_constructs_remapper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conservative_module = importlib.import_module("vercor.regridders.conservative")
+    calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    def record_call(*args: Any, **kwargs: Any) -> object:
+        calls.append((args, kwargs))
+        return object()
+
+    monkeypatch.setattr(
+        conservative_module, "ConservativeRectilinearRemapper", record_call
+    )
+
+    src = _grid("src", np.array([0.5, 1.5]), np.array([0.5, 1.5]))
+    dst = _grid("dst", np.array([0.5, 1.5, 2.5]), np.array([0.5, 1.5, 2.5]))
+
+    regridder = ConservativeRectilinearRegridder(src, dst)
+
+    assert regridder.has_identical_grids is False
+    assert len(calls) == 1
 
 
 def test_regridder_has_identical_grids_false_for_different_coords() -> None:

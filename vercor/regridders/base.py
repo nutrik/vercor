@@ -17,6 +17,20 @@ class SupportsScalarVectorInterpolation(Protocol):
         ...
 
 
+class _IdentityInterpolator:
+    """Return source fields unchanged for identical-grid regridders."""
+
+    def apply_scalar(self, src: Any) -> Any:
+        """Return the source scalar field unchanged."""
+
+        return src
+
+    def apply_vector(self, u_src: Any, v_src: Any) -> tuple[Any, Any]:
+        """Return source vector fields unchanged."""
+
+        return u_src, v_src
+
+
 class Regridder:
     def __init__(
         self, source_grid: RectilinearGrid, destination_grid: RectilinearGrid

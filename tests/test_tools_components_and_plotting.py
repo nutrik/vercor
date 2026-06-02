@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+import tempfile
 from typing import Any, cast
 
 import jax
@@ -8,6 +11,7 @@ import matplotlib
 import numpy as np
 import pytest
 
+import tests.conftest as conftest_module
 from tests._tools_support import DummyComponentA, DummyComponentB
 from tests.assertions import assert_allclose_compact
 import vercor.diagnostics as diagnostics_module
@@ -29,6 +33,21 @@ from vercor.runtime.component_topology import get_component
 from vercor.grid_geometry import grids_identical
 
 matplotlib.use("Agg")
+
+
+@pytest.mark.fast_always
+def test_test_environment_uses_writable_plotting_cache_defaults() -> None:
+    temp_root = Path(tempfile.gettempdir())
+
+    assert "MPLBACKEND" in os.environ
+    assert "MPLCONFIGDIR" in os.environ
+    assert "XDG_CACHE_HOME" in os.environ
+    if conftest_module._PLOTTING_CACHE_ENV_DEFAULTED["MPLBACKEND"]:
+        assert os.environ["MPLBACKEND"] == "Agg"
+    if conftest_module._PLOTTING_CACHE_ENV_DEFAULTED["MPLCONFIGDIR"]:
+        assert Path(os.environ["MPLCONFIGDIR"]).parent == temp_root
+    if conftest_module._PLOTTING_CACHE_ENV_DEFAULTED["XDG_CACHE_HOME"]:
+        assert Path(os.environ["XDG_CACHE_HOME"]).parent == temp_root
 
 
 def test_flatten_fields_and_append_unique() -> None:

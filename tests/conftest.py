@@ -4,12 +4,31 @@ from collections import defaultdict
 from collections.abc import Callable, Sequence
 import hashlib
 import math
+import os
+from pathlib import Path
+import tempfile
 from typing import Protocol, TypeVar
 
 import jax
 import pytest
 
 jax.config.update("jax_enable_x64", True)
+
+_TEST_CACHE_ROOT = Path(tempfile.gettempdir())
+_PLOTTING_CACHE_ENV_DEFAULTED = {
+    "MPLBACKEND": "MPLBACKEND" not in os.environ,
+    "MPLCONFIGDIR": "MPLCONFIGDIR" not in os.environ,
+    "XDG_CACHE_HOME": "XDG_CACHE_HOME" not in os.environ,
+}
+os.environ.setdefault("MPLBACKEND", "Agg")
+os.environ.setdefault(
+    "MPLCONFIGDIR",
+    str(_TEST_CACHE_ROOT / "vercor-matplotlib-cache"),
+)
+os.environ.setdefault(
+    "XDG_CACHE_HOME",
+    str(_TEST_CACHE_ROOT / "vercor-xdg-cache"),
+)
 
 CaseT = TypeVar("CaseT")
 

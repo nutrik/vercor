@@ -1,3 +1,4 @@
+import importlib
 from typing import Any
 
 import jax.numpy as jnp
@@ -120,6 +121,51 @@ def test_regridder_has_identical_grids_true_for_equal_coords() -> None:
 
     regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
     assert regridder.has_identical_grids is True
+
+
+def test_regridder_identical_grid_skips_interpolator_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bilinear_module = importlib.import_module("vercor.regridders.bilinear")
+
+    def fail_if_called(*args: Any, **kwargs: Any) -> object:
+        _ = args, kwargs
+        raise AssertionError("identity regridder should not build interpolator")
+
+    monkeypatch.setattr(
+        bilinear_module, "BilinearRectilinearInterpolator", fail_if_called
+    )
+
+    lon = np.array([0.0, 1.0, 2.0])
+    lat = np.array([0.0, 1.0])
+    src_grid = _make_grid("src", lon.copy(), lat.copy())
+    dst_grid = _make_grid("dst", lon.copy(), lat.copy())
+
+    regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
+
+    assert regridder.has_identical_grids is True
+    assert regridder.interpolator is not None
+
+
+def test_regridder_non_identical_grid_constructs_interpolator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bilinear_module = importlib.import_module("vercor.regridders.bilinear")
+    calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    def record_call(*args: Any, **kwargs: Any) -> object:
+        calls.append((args, kwargs))
+        return object()
+
+    monkeypatch.setattr(bilinear_module, "BilinearRectilinearInterpolator", record_call)
+
+    src_grid = _make_grid("src", np.array([0.0, 1.0, 2.0]), np.array([0.0, 1.0]))
+    dst_grid = _make_grid("dst", np.array([0.0, 2.0, 4.0]), np.array([0.0, 1.0]))
+
+    regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
+
+    assert regridder.has_identical_grids is False
+    assert len(calls) == 1
 
 
 def test_regridder_identical_grid_uses_shared_coordinate_tolerance() -> None:

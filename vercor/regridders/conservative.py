@@ -5,7 +5,7 @@ from vercor.grid_geometry import centers_to_edges
 from vercor.interpolators.conservative_remap_rectilinear import (
     ConservativeRectilinearRemapper,
 )
-from vercor.regridders.base import Regridder
+from vercor.regridders.base import Regridder, _IdentityInterpolator
 from vercor.types import RuntimeArray
 
 
@@ -20,6 +20,9 @@ class ConservativeRectilinearRegridder(Regridder):
     ) -> None:
 
         super().__init__(source_grid, destination_grid)
+        if self.has_identical_grids:
+            self.interpolator = _IdentityInterpolator()
+            return
 
         if (
             source_grid.longitude_edges is not None

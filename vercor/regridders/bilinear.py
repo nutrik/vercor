@@ -1,6 +1,6 @@
 from vercor.grid import RectilinearGrid
 from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
-from vercor.regridders.base import Regridder
+from vercor.regridders.base import Regridder, _IdentityInterpolator
 
 
 class BilinearRectilinearRegridder(Regridder):
@@ -19,6 +19,9 @@ class BilinearRectilinearRegridder(Regridder):
     ) -> None:
 
         super().__init__(source_grid, destination_grid)
+        if self.has_identical_grids:
+            self.interpolator = _IdentityInterpolator()
+            return
 
         self.interpolator = BilinearRectilinearInterpolator(
             self.source_grid.longitude,

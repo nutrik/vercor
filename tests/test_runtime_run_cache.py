@@ -287,8 +287,8 @@ def test_runtime_profile_harness_runs_small_slab_profile() -> None:
 
     result = profile_runtime.profile_runtime(
         steps=1,
-        grid_nx=4,
-        grid_ny=3,
+        grid_nx=2,
+        grid_ny=2,
         log_level="WARNING",
         donate_state=False,
     )

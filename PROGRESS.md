@@ -130,6 +130,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local CAMulator wind-filter boundary validation: focused red/green
   pytest, Black, focused post-format pytest, flake8, mypy, full fast pytest,
   and full pytest passed as of 2026-06-02.
+- Latest local unit-test speedup validation: focused red/green pytest, Black,
+  focused post-format pytest, flake8, mypy, full fast pytest with durations,
+  full pytest with durations, and coverage pytest passed as of 2026-06-02.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -159,6 +162,44 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-02: Unit-Test Speedup Pass
+
+- Added test-cache defaults in `tests/conftest.py` so Matplotlib and
+  fontconfig use writable temp cache paths during pytest while preserving any
+  caller-provided environment values.
+- Added an internal identity interpolator path for identical-grid bilinear and
+  conservative regridders. Identical grids now avoid eager interpolator/remapper
+  construction while preserving the existing unchanged-field call behavior.
+- Consolidated optional setup-import boundary checks from two subprocesses per
+  import case to one isolated subprocess per case, keeping both output-marker
+  and heavy-optional-module assertions. Reduced the runtime profile smoke grid
+  from 4x3 to 2x2 while keeping the parser/build/run/cache coverage.
+- Validation run for this change:
+  focused red
+  `conda run -n scipy pytest tests/test_bilinear_rectilinear_regridder.py::test_regridder_identical_grid_skips_interpolator_construction tests/test_conservative_rectilinear_regridder.py::test_regridder_identical_grid_skips_remapper_construction -q --tb=short`
+  failed as expected on the constructors still building the expensive
+  interpolator/remapper. Focused cache red
+  `conda run -n scipy pytest tests/test_tools_components_and_plotting.py::test_test_environment_uses_writable_plotting_cache_defaults -q --tb=short`
+  failed as expected on missing `MPLBACKEND`.
+  After implementation, the same focused checks passed. Then
+  `conda run -n scipy pytest tests/test_bilinear_rectilinear_regridder.py tests/test_conservative_rectilinear_regridder.py -q --tb=short`,
+  `conda run -n scipy pytest tests/test_api_boundaries.py::test_unrelated_setup_imports_do_not_initialize_optional_adapters -q --tb=short --durations=10`,
+  `conda run -n scipy pytest tests/test_tools_components_and_plotting.py::test_plot_component_scalar_vector_comparison_aligns_axes_and_shapes -q --tb=short --durations=5`,
+  `conda run -n scipy pytest tests/test_runtime_run_cache.py -q --tb=short --durations=10`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short --durations=25`,
+  `conda run -n scipy pytest tests/ -q --tb=short --durations=25`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+- Final duration checks: the fast-suite plotting test dropped from the prior
+  ~15s hotspot to 0.22s in the fast duration table after cache warm-up; the
+  optional setup-import probes dropped from ~2.4-2.8s each to about 1.02-1.59s
+  in the final fast duration table and 0.95-1.16s in the final full duration
+  table; runtime profile smoke dropped from ~4.8s focused to 0.69s focused.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-02: CAMulator Wind-Filter Boundary Refactor
 
