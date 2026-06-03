@@ -392,6 +392,11 @@ substep orchestration live in
 `vercor.setups.external.veros_gcm_state` owns Veros setup-time model resources,
 spinup policy, grid derivation, and lifecycle callbacks, while
 `vercor.setups.external.veros_gcm` remains the thin public factory.
+Opt-in Veros period-output extraction, native Veros variable metadata handling,
+ghost-cell removal, and direct `h5netcdf` average-file writing live in
+`vercor.setups.external.veros_output`; `vercor.setups.external.veros_runtime`
+records selected snapshots and flushes them with the same day/month/year cadence
+policy used by JAXGCM.
 Veros host-state mutation helpers and the named tuple-compatible
 `VerosForcingFields` container live in `vercor.setups.external.veros_state`.
 Veros backend settings are imported only inside the explicit configuration

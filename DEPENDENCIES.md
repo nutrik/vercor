@@ -34,7 +34,7 @@
 34. `vercor/setups/external/veros_setup.py` - concrete Veros setup subclass and setup policy built on (33)
 35. `vercor/setups/external/veros_fluxes.py` - Veros-to-VerCOR flux conversion built on (1, 4, 9, 33)
 36. `vercor/setups/external/veros_state.py` - public package-internal Veros host-state copy, mutation, named forcing-field container, forcing, and stepping helpers built on (1, 10, 33)
-37. `vercor/setups/external/veros_runtime.py`, `veros_gcm_state.py`, and `veros_gcm.py` - Veros private runtime-state protocol, host-runtime stepping helper, setup-state/lifecycle ownership, named host step adapter, and thin adapter factory boundary built on (26, 34, 35, 36)
+37. `vercor/setups/external/veros_output.py`, `veros_runtime.py`, `veros_gcm_state.py`, and `veros_gcm.py` - Veros opt-in h5netcdf period-output extraction/writing, private runtime-state protocol, host-runtime stepping helper, setup-state/lifecycle ownership, named host step adapter, and thin adapter factory boundary built on (6, 10, 25, 31, 34, 35, 36)
 38. `vercor/setups/external/camulator_imports.py` - public package-internal lazy CREDIT/postblock/CAMulator wind-filter optional-dependency loading
 39. `vercor/setups/external/camulator_forcing.py` - CAMulator config loading, forcing context, and runtime forcing cursors built on (26, 38)
 40. `vercor/setups/external/camulator_tensors.py` - typed CAMulator tensor-variable indexing, public package-internal static forcing tensor staging, and JAX-to-Torch transfer helpers

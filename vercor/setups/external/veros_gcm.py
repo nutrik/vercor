@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any
 
@@ -23,6 +24,8 @@ def make_veros_gcm(
     custom_parameters: dict[str, Any] | None = None,
     restore_to_climatology: bool = False,
     do_spinup: bool = False,
+    output_frequency: str | None = None,
+    output_variables: Sequence[str] | None = None,
     jitted: bool = False,
 ) -> HostRuntimeComponent:
     """Return a host-backed Veros GCM component."""
@@ -33,6 +36,8 @@ def make_veros_gcm(
         custom_parameters=custom_parameters,
         restore_to_climatology=restore_to_climatology,
         do_spinup=do_spinup,
+        output_frequency=output_frequency,
+        output_variables=output_variables,
         jitted=jitted,
     )
     return host_component(

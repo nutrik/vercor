@@ -24,6 +24,7 @@ import vercor.setups.external.veros_fluxes as veros_fluxes_module
 import vercor.setups.external.veros_gcm as veros_gcm_module
 import vercor.setups.external.veros_gcm_state as veros_gcm_state_module
 import vercor.setups.external.veros_runtime as veros_runtime_module
+import vercor.setups.external.veros_runtime_settings as veros_runtime_settings_module
 import vercor.setups.external.veros_setup as veros_setup_module
 import vercor.setups.external.veros_state as veros_state_module
 import vercor.pytree_utils as pytree_utils_module
@@ -208,6 +209,26 @@ def _make_fake_veros_state(surface_temperature: float = 10.0) -> Any:
     temp = np.full((8, 8, 1, 1), surface_temperature, dtype=float)
     variables = SimpleNamespace(temp=temp, tau=0)
     return SimpleNamespace(variables=variables)
+
+
+def _make_veros_output_state(offset: float = 0.0) -> Any:
+    variables = SimpleNamespace(
+        tau=1,
+        xt=np.asarray([-2.0, -1.0, 0.0, 4.0, 8.0, 99.0], dtype=float),
+        xu=np.asarray([-3.0, -1.0, 1.0, 5.0, 9.0, 99.0], dtype=float),
+        yt=np.asarray([-4.0, -2.0, -45.0, 0.0, 45.0, 88.0, 99.0], dtype=float),
+        yu=np.asarray([-5.0, -2.0, -40.0, 5.0, 50.0, 88.0, 99.0], dtype=float),
+        zt=np.asarray([-100.0, -20.0], dtype=float),
+        zw=np.asarray([-150.0, -5.0], dtype=float),
+        temp=np.arange(6 * 7 * 2 * 3, dtype=float).reshape(6, 7, 2, 3) + offset,
+        u=np.arange(6 * 7 * 2 * 3, dtype=float).reshape(6, 7, 2, 3) + 100.0 + offset,
+        surface_taux=np.arange(6 * 7, dtype=float).reshape(6, 7) + 200.0 + offset,
+        psi=np.arange(6 * 7 * 3, dtype=float).reshape(6, 7, 3) + 300.0 + offset,
+    )
+    return SimpleNamespace(
+        settings=SimpleNamespace(enable_streamfunction=True, coord_degree=True),
+        variables=variables,
+    )
 
 
 def _make_flux_ready_veros_state() -> Any:
@@ -1118,6 +1139,14 @@ def test_custom_global_four_degree_set_diagnostics_populates_outputs() -> None:
     ]
 
 
+def test_configure_veros_runtime_sets_diskless_mode() -> None:
+    from veros import runtime_settings
+
+    veros_runtime_settings_module.configure_veros_runtime()
+
+    assert getattr(runtime_settings, "diskless_mode") is True
+
+
 def test_veros_copy_state_jitted_path_deep_copies_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1251,6 +1280,102 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     )
 
 
+def test_veros_output_snapshot_uses_variable_metadata_and_current_timestep() -> None:
+    import vercor.setups.external.veros_output as veros_output_module
+
+    state = _make_veros_output_state()
+
+    snapshot = veros_output_module.extract_veros_output_snapshot(
+        state,
+        ("temp", "u", "surface_taux", "psi"),
+    )
+
+    assert snapshot["temp"].dims == ("xt", "yt", "zt")
+    assert snapshot["temp"].attrs["units"] == "deg C"
+    assert snapshot["temp"].attrs["long_name"] == "Conservative temperature"
+    assert_allclose_compact(
+        snapshot["temp"].values,
+        state.variables.temp[2:-2, 2:-2, :, state.variables.tau],
+    )
+    assert snapshot["u"].dims == ("xu", "yt", "zt")
+    assert_allclose_compact(
+        snapshot["u"].values,
+        state.variables.u[2:-2, 2:-2, :, state.variables.tau],
+    )
+    assert snapshot["surface_taux"].dims == ("xu", "yt")
+    assert_allclose_compact(
+        snapshot["surface_taux"].values,
+        state.variables.surface_taux[2:-2, 2:-2],
+    )
+    assert snapshot["psi"].dims == ("xu", "yu")
+    assert snapshot["psi"].attrs["units"] == "m^3/s"
+    assert snapshot["psi"].attrs["long_name"] == "Barotropic streamfunction"
+    assert_allclose_compact(
+        snapshot["psi"].values,
+        state.variables.psi[2:-2, 2:-2, state.variables.tau],
+    )
+
+
+def test_veros_write_output_persists_period_mean_and_coordinates(
+    tmp_path: Path,
+) -> None:
+    import vercor.setups.external.veros_output as veros_output_module
+
+    state = _make_veros_output_state()
+    predictions = [
+        veros_output_module.extract_veros_output_snapshot(
+            _make_veros_output_state(offset=0.0),
+            ("temp", "surface_taux", "psi"),
+        ),
+        veros_output_module.extract_veros_output_snapshot(
+            _make_veros_output_state(offset=20.0),
+            ("temp", "surface_taux", "psi"),
+        ),
+    ]
+    output = tmp_path / "veros_output.nc"
+
+    veros_output_module.write_veros_averages_output(
+        predictions,
+        str(output),
+        veros_state=state,
+        output_time=datetime(2000, 1, 2),
+    )
+
+    with h5netcdf.File(output, "r") as actual:
+        assert actual.variables["time"].attrs["calendar"] == "proleptic_gregorian"
+        assert_allclose_compact(
+            np.asarray(actual.variables["xt"]),
+            state.variables.xt[2:-2],
+        )
+        assert_allclose_compact(
+            np.asarray(actual.variables["yt"]),
+            state.variables.yt[2:-2],
+        )
+        assert actual.variables["zt"].attrs["positive"] == "up"
+        assert actual.variables["temp"].dimensions == ("time", "xt", "yt", "zt")
+        assert actual.variables["temp"].shape == (1, 2, 3, 2)
+        assert actual.variables["temp"].attrs["units"] == "deg C"
+        assert actual.variables["temp"].attrs["long_name"] == (
+            "Conservative temperature"
+        )
+        expected_temp = state.variables.temp[2:-2, 2:-2, :, state.variables.tau] + 10.0
+        assert_allclose_compact(np.asarray(actual.variables["temp"])[0], expected_temp)
+        assert actual.variables["surface_taux"].dimensions == ("time", "xu", "yt")
+        assert actual.variables["psi"].dimensions == ("time", "xu", "yu")
+        assert actual.variables["psi"].attrs["units"] == "m^3/s"
+    assert predictions == []
+
+
+def test_veros_output_variables_rejects_bare_string() -> None:
+    import vercor.setups.external.veros_output as veros_output_module
+
+    with pytest.raises(ValueError, match="output_variables"):
+        veros_output_module.normalize_veros_output_variables(
+            "temp",
+            settings=SimpleNamespace(enable_streamfunction=True),
+        )
+
+
 def test_veros_set_variable_updates_only_interior_cells(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1362,6 +1487,8 @@ def test_veros_constructor_builds_jax_backed_grid(
 
     component = veros_gcm_module.make_veros_gcm(
         custom_parameters={"dt_tracer": 600.0},
+        output_frequency="month",
+        output_variables=("temp", "surface_taux"),
         jitted=False,
     )
 
@@ -1468,6 +1595,147 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
         np.full((4, 4), 288.15),
     )
     assert isinstance(component_state.data.get("sea_surface_temperature"), jax.Array)
+
+
+def test_veros_step_records_selected_outputs_and_writes_on_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    component = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
+    component.restore_to_climatology = False
+    component.model_substeps = 0
+    component.jitted = False
+    component._veros_state = _make_fake_veros_state(surface_temperature=12.0)
+    component.name = "OCN"
+    component.output_variables = ("temp",)
+    component.output_frequency = "day"
+    component._predictions_list = []
+    component._step_function = lambda state: state
+
+    monkeypatch.setattr(
+        veros_fluxes_module,
+        "compute_fluxes",
+        lambda veros_state, runtime_fields, settings: (
+            np.ones((2, 2)),
+            np.ones((2, 2)),
+            np.ones((2, 2)),
+            np.ones((2, 2)),
+        ),
+    )
+    monkeypatch.setattr(
+        veros_state_module,
+        "set_variable",
+        lambda *args, **kwargs: args[0],
+    )
+
+    extracted: dict[str, Any] = {}
+    written: dict[str, Any] = {}
+
+    def fake_extract(
+        veros_state: Any,
+        output_variables: tuple[str, ...],
+    ) -> dict[str, Any]:
+        extracted["state"] = veros_state
+        extracted["variables"] = output_variables
+        return {"temp": "snapshot"}
+
+    def fake_write(
+        predictions: list[Any],
+        output: str,
+        *,
+        veros_state: Any,
+        output_time: datetime | DateTime360 | DateTime365,
+        logger: Any | None = None,
+    ) -> None:
+        _ = logger
+        written["predictions"] = list(predictions)
+        written["path"] = output
+        written["state"] = veros_state
+        written["output_time"] = output_time
+        predictions.clear()
+
+    monkeypatch.setattr(
+        veros_runtime_module,
+        "should_write_period_output",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(
+        veros_runtime_module,
+        "extract_veros_output_snapshot",
+        fake_extract,
+    )
+    monkeypatch.setattr(
+        veros_runtime_module,
+        "write_veros_averages_output",
+        fake_write,
+    )
+
+    context = ComponentStepContext(
+        dt_seconds=86400.0,
+        settings=VercorSettings(),
+        time=datetime(2000, 1, 2),
+        logger=None,
+    )
+
+    veros_runtime_module.step_veros_runtime(component, {}, context, None)
+
+    assert extracted["variables"] == ("temp",)
+    assert written["predictions"] == [{"temp": "snapshot"}]
+    assert written["path"] == "veros.averages.2000-01-02.nc"
+    assert written["state"] is component._veros_state
+    assert written["output_time"] == datetime(2000, 1, 2)
+    assert component._predictions_list == []
+
+
+def test_veros_step_skips_output_when_no_variables_selected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    component = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
+    component.restore_to_climatology = False
+    component.model_substeps = 0
+    component.jitted = False
+    component._veros_state = _make_fake_veros_state(surface_temperature=12.0)
+    component.name = "OCN"
+    component.output_variables = ()
+    component.output_frequency = None
+    component._predictions_list = []
+    component._step_function = lambda state: state
+
+    monkeypatch.setattr(
+        veros_fluxes_module,
+        "compute_fluxes",
+        lambda veros_state, runtime_fields, settings: (
+            np.ones((2, 2)),
+            np.ones((2, 2)),
+            np.ones((2, 2)),
+            np.ones((2, 2)),
+        ),
+    )
+    monkeypatch.setattr(
+        veros_state_module,
+        "set_variable",
+        lambda *args, **kwargs: args[0],
+    )
+    monkeypatch.setattr(
+        veros_runtime_module,
+        "extract_veros_output_snapshot",
+        lambda *args, **kwargs: pytest.fail("unexpected Veros output extraction"),
+        raising=False,
+    )
+
+    context = ComponentStepContext(
+        dt_seconds=86400.0,
+        settings=VercorSettings(),
+        time=datetime(2000, 1, 2),
+        logger=None,
+    )
+
+    veros_runtime_module.step_veros_runtime(component, {}, context, None)
+
+    assert component._predictions_list == []
 
 
 def test_veros_step_nan_cleans_forcing_fields_before_set_variable(

@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import timedelta
 from typing import Any, Protocol
 
 from vercor.components import ComponentStepContext
+from vercor.setups.external.jax_gcm_output import should_write_period_output
+from vercor.setups.external.veros_output import (
+    extract_veros_output_snapshot,
+    write_veros_averages_output,
+)
 import vercor.setups.external.veros_fluxes as _veros_fluxes
 import vercor.setups.external.veros_state as _veros_state
 
@@ -18,6 +24,9 @@ class _VerosRuntimeState(Protocol):
     restore_to_climatology: bool
     jitted: bool
     model_substeps: int
+    output_frequency: str | None
+    output_variables: tuple[str, ...]
+    _predictions_list: list[Any]
 
 
 def step_veros_runtime(
@@ -54,6 +63,7 @@ def step_veros_runtime(
         model_substeps=state.model_substeps,
         logger=logger,
     )
+    record_veros_output(state, context)
 
     return {
         "sea_surface_temperature": _veros_state.extract_veros_runtime_sst(
@@ -62,4 +72,36 @@ def step_veros_runtime(
     }
 
 
-__all__ = ["step_veros_runtime"]
+def record_veros_output(
+    state: _VerosRuntimeState,
+    context: ComponentStepContext,
+) -> None:
+    """Record selected Veros variables and write optional period output."""
+
+    output_variables = getattr(state, "output_variables", ())
+    if not output_variables:
+        return
+
+    time = context.time
+    if time is None:
+        return
+
+    state._predictions_list.append(
+        extract_veros_output_snapshot(state._veros_state, output_variables)
+    )
+    if should_write_period_output(
+        time=time,
+        dt=timedelta(seconds=context.dt_seconds),
+        output_frequency=state.output_frequency,
+    ):
+        date_time = time.strftime("%Y-%m-%d")
+        write_veros_averages_output(
+            state._predictions_list,
+            output=f"veros.averages.{date_time}.nc",
+            veros_state=state._veros_state,
+            output_time=time,
+            logger=context.logger,
+        )
+
+
+__all__ = ["record_veros_output", "step_veros_runtime"]

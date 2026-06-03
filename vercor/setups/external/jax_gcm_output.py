@@ -162,6 +162,14 @@ def _time_value_and_attrs(
     )
 
 
+def output_time_value_and_attrs(
+    time: datetime | ModelDateTime,
+) -> tuple[NDArray[Any], dict[str, Any]]:
+    """Return NetCDF time-coordinate values and calendar attrs for period output."""
+
+    return _time_value_and_attrs(time)
+
+
 def _host_array(value: Any) -> NDArray[Any]:
     return np.asarray(jax.device_get(value))
 

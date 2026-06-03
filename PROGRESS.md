@@ -136,6 +136,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local JAXGCM h5netcdf average-output validation: focused red/green
   pytest, Black, focused writer/API pytest, flake8, mypy, full fast pytest,
   full pytest, and coverage pytest passed as of 2026-06-03.
+- Latest local Veros h5netcdf period-output validation: baseline fast pytest,
+  focused red/green pytest, Black, focused post-format pytest, flake8, mypy,
+  full fast pytest, full pytest, and coverage pytest passed as of 2026-06-03.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -165,6 +168,46 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-03: Veros h5netcdf Period Output
+
+- Disabled Veros native output machinery in the explicit runtime settings
+  boundary by setting `diskless_mode=True` alongside the NumPy backend and
+  force-overwrite settings.
+- Added opt-in Veros period-output support through `make_veros_gcm` /
+  `VerosGCMSetupState` `output_variables` and `output_frequency` arguments.
+  Selected Veros variables are extracted with native Veros metadata, current
+  timestep selection, ghost-cell removal, and native dimension order, then
+  written as period means to `veros.averages.YYYY-MM-DD.nc` via `h5netcdf`.
+- Kept output file I/O in the new `vercor.setups.external.veros_output` host
+  boundary. Veros runtime now records selected snapshots and flushes through the
+  existing JAXGCM day/month/year cadence helper, leaving the SST exchange output
+  unchanged when no output variables are selected.
+- Validation run for this change:
+  baseline
+  `conda run -n scipy pytest tests/ -v --fast 2>&1 | tail -20` passed.
+  Focused red
+  `conda run -n scipy pytest tests/test_external_components_coverage.py::test_configure_veros_runtime_sets_diskless_mode tests/test_external_components_coverage.py::test_veros_output_snapshot_uses_variable_metadata_and_current_timestep tests/test_external_components_coverage.py::test_veros_write_output_persists_period_mean_and_coordinates tests/test_external_components_coverage.py::test_veros_output_variables_rejects_bare_string tests/test_external_components_coverage.py::test_veros_constructor_builds_jax_backed_grid tests/test_external_components_coverage.py::test_veros_step_records_selected_outputs_and_writes_on_gate tests/test_external_components_coverage.py::test_veros_step_skips_output_when_no_variables_selected tests/test_api_boundaries.py::test_setup_helper_and_external_output_ownership_boundaries -q --tb=short`
+  failed as expected on missing diskless mode, missing `veros_output`, missing
+  Veros output API args, and missing runtime output hooks. After implementation,
+  focused feature/API/NumPy-boundary checks passed. Then
+  `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_api_boundaries.py tests/test_production_numpy_boundaries.py tests/test_jax_gcm_output_frequency.py -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: the first no-op runtime test omitted the
+  `_step_function` fake even though `step_veros_runtime` reads it before the
+  zero-substep loop; adding an identity fake fixed the fixture. The first writer
+  test used fake Veros settings without `coord_degree`, which real Veros
+  coordinate metadata requires; adding that setting fixed the fixture. The first
+  lint/type pass exposed a Black/E203 slice-spacing conflict and an overly
+  precise mutable-sequence type annotation; adding a local `noqa` and matching
+  the existing JAXGCM writer's `MutableSequence[Any]` pattern fixed them.
 
 ### 2026-06-03: JAXGCM h5netcdf Average Output Writer
 

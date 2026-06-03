@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import timedelta
 from functools import partial
 from typing import Any, cast
@@ -21,6 +21,7 @@ from vercor.setups._time_helpers import (
     run_logged_spinup,
 )
 import vercor.setups.external.veros_runtime as _veros_runtime
+import vercor.setups.external.veros_output as _veros_output
 import vercor.setups.external.veros_setup as _veros_setup
 import vercor.setups.external.veros_state as _veros_state
 from vercor.types import RuntimeArray
@@ -68,6 +69,8 @@ class VerosGCMSetupState:
         custom_parameters: dict[str, Any] | None = None,
         restore_to_climatology: bool = False,
         do_spinup: bool = False,
+        output_frequency: str | None = None,
+        output_variables: Sequence[str] | None = None,
         jitted: bool = False,
     ) -> None:
         """Build Veros model resources and the VerCOR ocean grid."""
@@ -91,6 +94,12 @@ class VerosGCMSetupState:
         self.spinup_time = spinup_time
         self.restore_to_climatology = restore_to_climatology
         self.jitted = jitted
+        self.output_frequency = output_frequency
+        self.output_variables = _veros_output.normalize_veros_output_variables(
+            output_variables,
+            settings=self._veros_state.settings,
+        )
+        self._predictions_list: list[Any] = []
 
         self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
         self.spinup_steps = int(self.spinup_time.total_seconds() // self.dt_tracer)
@@ -138,6 +147,7 @@ class VerosGCMSetupState:
                 step=spinup_step,
             )
 
+        self._predictions_list = []
         component.seed_field(
             "sea_surface_temperature",
             _veros_state.extract_veros_runtime_sst(self._veros_state),
