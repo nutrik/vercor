@@ -1239,6 +1239,16 @@ def test_jax_gcm_factory_uses_named_runtime_callbacks() -> None:
 
 
 @pytest.mark.fast_always
+def test_jax_gcm_average_writer_bypasses_xarray_adapter() -> None:
+    source = Path("vercor/setups/external/jax_gcm_output.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "import xarray" not in source
+    assert ".to_xarray(" not in source
+
+
+@pytest.mark.fast_always
 def test_external_package_has_no_top_level_import_cycles() -> None:
     assert (
         package_import_cycles("vercor/setups/external", "vercor.setups.external") == []

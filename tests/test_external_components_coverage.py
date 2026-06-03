@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Literal, cast
 
+import h5netcdf
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -28,6 +29,7 @@ import vercor.setups.external.veros_state as veros_state_module
 import vercor.pytree_utils as pytree_utils_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
+from vercor.calendar import DateTime360, DateTime365
 from vercor.components.data import DataComponent
 from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
 from vercor.runtime.contracts import RuntimeComponentContract
@@ -57,12 +59,68 @@ def _runtime_component_state(
     )
 
 
+class _FakeDynamicsPrediction:
+    def __init__(
+        self,
+        *,
+        temperature: np.ndarray,
+        u_wind: np.ndarray | None = None,
+    ) -> None:
+        self.temperature = temperature
+        self.u_wind = np.ones_like(temperature) if u_wind is None else u_wind
+
+    def asdict(self) -> dict[str, np.ndarray]:
+        return {
+            "temperature": self.temperature,
+            "u_wind": self.u_wind,
+        }
+
+
 @dataclass
-class _PredictionDataset:
-    dataset: xr.Dataset
+class _PredictionValues:
+    dynamics: _FakeDynamicsPrediction
+    physics: Any
+    times: np.ndarray
 
     def to_xarray(self) -> xr.Dataset:
-        return self.dataset
+        raise AssertionError("write_jax_gcm_averages_output must not call to_xarray()")
+
+
+class _FakePhysicsModule:
+    UNITS_TABLE_CSV_PATH: str | Path | None = None
+
+    def __init__(self, physics_data: dict[str, np.ndarray] | None = None) -> None:
+        self.physics_data = physics_data or {}
+        self.cached_coords: Any | None = None
+
+    def cache_coords(self, coords: Any) -> None:
+        self.cached_coords = coords
+
+    def data_struct_to_dict(
+        self,
+        struct: Any,
+        nodal_shape: tuple[int, ...],
+    ) -> dict[str, np.ndarray]:
+        _ = struct, nodal_shape
+        return self.physics_data
+
+
+def _make_jax_gcm_output_coords() -> SimpleNamespace:
+    layers = 3
+    nodal_shape = (2, 3)
+    lon = np.deg2rad(np.asarray([0.0, 180.0]))
+    sin_lat = np.sin(np.deg2rad(np.asarray([-45.0, 0.0, 45.0])))
+    return SimpleNamespace(
+        horizontal=SimpleNamespace(
+            nodal_axes=(lon, sin_lat),
+            modal_axes=(np.asarray([0]), np.asarray([0])),
+            nodal_shape=nodal_shape,
+            modal_shape=(1, 1),
+        ),
+        vertical=SimpleNamespace(centers=np.asarray([0.2, 0.5, 0.8]), layers=layers),
+        surface_nodal_shape=nodal_shape,
+        asdict=lambda: {},
+    )
 
 
 class _FakeForcing:
@@ -606,7 +664,11 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
         "land_surface_temperature": np.asarray([[270.0, np.nan], [0.0, 284.0]]),
     }
     component.model = SimpleNamespace(
-        terrain=SimpleNamespace(fmask=np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=float))
+        terrain=SimpleNamespace(
+            fmask=np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=float)
+        ),
+        coords=_make_jax_gcm_output_coords(),
+        physics=SimpleNamespace(),
     )
     component.forcing = _FakeForcing()
     cast(Any, component).sigma_levels = np.asarray([0.2, 1.0], dtype=float)
@@ -614,7 +676,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     component._predictions_list = []
     component.output_frequency = "day"
 
-    written: dict[str, str] = {}
+    written: dict[str, Any] = {}
 
     p = SimpleNamespace(
         surface_flux=SimpleNamespace(
@@ -688,10 +750,17 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     def fake_write_jax_gcm_averages_output(
         predictions: list[Any],
         output: str,
+        *,
+        coords: Any,
+        output_time: datetime | DateTime360 | DateTime365,
+        physics_module: Any | None = None,
         logger: Any | None = None,
     ) -> None:
         _ = logger
         written["path"] = output
+        written["coords"] = coords
+        written["output_time"] = output_time
+        written["physics_module"] = physics_module
         predictions.clear()
 
     monkeypatch.setattr(
@@ -805,26 +874,36 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     )
     assert_allclose_compact(data.get("model_level_height"), np.full((2, 2), 150.0))
     assert written["path"] == "jcm.averages.2000-01-02.nc"
+    assert written["coords"] is component.model.coords
+    assert written["output_time"] == datetime(2000, 1, 2)
+    assert written["physics_module"] is component.model.physics
 
 
 def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
-    dataset = xr.Dataset(
-        {
-            "temperature": (
-                ("time", "wvi_id", "hsg_level", "level", "lat", "lon"),
-                np.arange(2.0).reshape(2, 1, 1, 1, 1, 1),
-            )
-        },
-        coords={
-            "time": np.asarray(["2000-01-01", "2000-01-02"], dtype="datetime64[ns]"),
-            "wvi_id": [0],
-            "hsg_level": [0],
-            "level": [0],
-            "lat": [0],
-            "lon": [0],
-        },
-    )
-    predictions = [_PredictionDataset(dataset=dataset)]
+    coords = _make_jax_gcm_output_coords()
+    first_temperature = np.arange(18.0).reshape(3, 2, 3)
+    second_temperature = first_temperature + 18.0
+    physics_data = {
+        "wvi_output": np.arange(12.0).reshape(1, 2, 2, 3),
+        "hsg_output": np.arange(24.0).reshape(1, 4, 2, 3),
+    }
+    physics_module = _FakePhysicsModule(physics_data=physics_data)
+    predictions = [
+        _PredictionValues(
+            dynamics=_FakeDynamicsPrediction(
+                temperature=first_temperature[np.newaxis, ...],
+            ),
+            physics=SimpleNamespace(),
+            times=np.asarray([0.0]),
+        ),
+        _PredictionValues(
+            dynamics=_FakeDynamicsPrediction(
+                temperature=second_temperature[np.newaxis, ...],
+            ),
+            physics=SimpleNamespace(),
+            times=np.asarray([1.0]),
+        ),
+    ]
 
     output = tmp_path / "jcm_output.nc"
     logger_name = "VerCOR.test.jax-gcm-output"
@@ -834,14 +913,78 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
         jax_gcm_output_module.write_jax_gcm_averages_output(
             predictions,
             str(output),
+            coords=coords,
+            output_time=datetime(2000, 1, 2),
+            physics_module=physics_module,
             logger=logger,
         )
 
-    with xr.open_dataset(output) as actual:
-        assert actual["temperature"].shape == (1, 1, 1, 1, 1, 1)
-        assert np.isclose(float(actual["temperature"].values.squeeze()), 0.5)
+    with h5netcdf.File(output, "r") as actual:
+        temperature = actual.variables["temperature"]
+        assert temperature.dimensions == ("time", "level", "lat", "lon")
+        assert temperature.shape == (1, 3, 3, 2)
+        assert np.isclose(np.asarray(temperature)[0, 0, 0, 0], 9.0)
+        assert temperature.attrs["units"] == "K"
+        assert temperature.attrs["description"] == "temperature"
+        assert actual.variables["wvi_output"].dimensions == (
+            "time",
+            "wvi_id",
+            "lat",
+            "lon",
+        )
+        assert actual.variables["hsg_output"].dimensions == (
+            "time",
+            "hsg_level",
+            "lat",
+            "lon",
+        )
+        assert actual.variables["time"].shape == (1,)
+        assert actual.variables["time"].attrs["calendar"] == "proleptic_gregorian"
     assert predictions == []
+    assert physics_module.cached_coords is coords
     assert f"Output file: {output}" in stream.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("output_time", "expected_calendar", "expected_day_of_year", "days_per_year"),
+    [
+        (DateTime360(2001, 2, 30, 0, 0, 0, 0, 60), "360_day", 60, 360),
+        (DateTime365(2001, 3, 1, 0, 0, 0, 0, 60), "noleap", 60, 365),
+    ],
+)
+def test_jax_gcm_write_output_preserves_model_calendar_attrs(
+    tmp_path: Path,
+    output_time: DateTime360 | DateTime365,
+    expected_calendar: str,
+    expected_day_of_year: int,
+    days_per_year: int,
+) -> None:
+    coords = _make_jax_gcm_output_coords()
+    predictions = [
+        _PredictionValues(
+            dynamics=_FakeDynamicsPrediction(
+                temperature=np.ones((1, 3, 2, 3), dtype=float),
+            ),
+            physics=SimpleNamespace(),
+            times=np.asarray([0.0]),
+        )
+    ]
+    output = tmp_path / "jcm_model_calendar_output.nc"
+
+    jax_gcm_output_module.write_jax_gcm_averages_output(
+        predictions,
+        str(output),
+        coords=coords,
+        output_time=output_time,
+        physics_module=_FakePhysicsModule(),
+    )
+
+    with h5netcdf.File(output, "r") as actual:
+        time = actual.variables["time"]
+        assert time.attrs["calendar"] == expected_calendar
+        assert time.attrs["day_of_year"] == expected_day_of_year
+        assert time.attrs["days_per_year"] == days_per_year
+        assert time.attrs["fixed_30_day_months"] == int(expected_calendar == "360_day")
 
 
 def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(

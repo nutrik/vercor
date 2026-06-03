@@ -287,6 +287,9 @@ def record_jax_gcm_host_step(
         write_jax_gcm_averages_output(
             state._predictions_list,
             output=f"jcm.averages.{date_time}.nc",
+            coords=state.model.coords,
+            output_time=time,
+            physics_module=getattr(state.model, "physics", None),
             logger=logger,
         )
 

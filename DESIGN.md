@@ -80,8 +80,10 @@ The output is done in a structured format, such as NetCDF, HDF5, that can be eas
 
 Model restart files are supported and written in compact HDF5 format using `h5py`.
 
-Current example output snapshots are also written in HDF5. NetCDF output for broader
-VerCOR workflows remains future work.
+Current example output snapshots are also written in HDF5. JAXGCM averaged
+period outputs are written directly with `h5netcdf`, bypassing xarray conversion
+so the adapter can preserve VerCOR calendar timestamps and shape-derived JCM
+coordinates at the file boundary.
 
 ### Data flow: PyTree-based result objects
 
@@ -379,8 +381,11 @@ spinup policy, lifecycle callbacks, and the canonical `JCMState` bundle.
 `vercor.setups.external.jax_gcm` remains a thin public factory that constructs
 setup state and binds named lifecycle callbacks without reexporting state
 bundles or owning runtime payload/setup-state internals. JAXGCM output cadence
-and NetCDF writing live in `vercor.setups.external.jax_gcm_output`, while
-surface-temperature cleanup and output-field mapping live in
+and direct `h5netcdf` average-file writing live in
+`vercor.setups.external.jax_gcm_output`; this boundary consumes prediction
+objects directly instead of calling their xarray adapters, and stores runtime
+calendar metadata from VerCOR step contexts. Surface-temperature cleanup and
+output-field mapping live in
 `vercor.setups.external.jax_gcm_fields`. Veros host-runtime flux application and
 substep orchestration live in
 `vercor.setups.external.veros_runtime` behind a private runtime-state protocol.

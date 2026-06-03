@@ -133,6 +133,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local unit-test speedup validation: focused red/green pytest, Black,
   focused post-format pytest, flake8, mypy, full fast pytest with durations,
   full pytest with durations, and coverage pytest passed as of 2026-06-02.
+- Latest local JAXGCM h5netcdf average-output validation: focused red/green
+  pytest, Black, focused writer/API pytest, flake8, mypy, full fast pytest,
+  full pytest, and coverage pytest passed as of 2026-06-03.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -162,6 +165,41 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-03: JAXGCM h5netcdf Average Output Writer
+
+- Replaced the JAXGCM averages writer's xarray merge/mean/to_netcdf path with a
+  direct `h5netcdf` writer that consumes prediction dynamics/physics/times
+  directly, writes runtime-calendar time metadata, preserves JCM unit-table
+  metadata, and clears the prediction buffer only after a successful write.
+- Updated the host runtime output gate to pass model coordinates, runtime
+  timestamp, and the model physics module into the writer. Added coverage that
+  `to_xarray()` is not called, h5netcdf dimensions/metadata are persisted, and
+  DateTime360/DateTime365 calendar attrs are written.
+- Updated `DESIGN.md`, `DEPENDENCIES.md`, and the NumPy-boundary allowlist for
+  the new output-file host boundary.
+- Validation run for this change:
+  focused red
+  `conda run -n scipy pytest tests/test_external_components_coverage.py::test_jax_gcm_write_output_persists_mean_dataset tests/test_api_boundaries.py::test_jax_gcm_average_writer_bypasses_xarray_adapter -q --tb=short`
+  failed as expected on the old writer missing the `coords` keyword and still
+  importing xarray. After implementation, the focused writer/calendar/runtime
+  gate/API checks passed. Then
+  `conda run -n scipy pytest tests/test_external_components_coverage.py::test_jax_gcm_write_output_persists_mean_dataset -q --tb=short`,
+  `conda run -n scipy pytest tests/test_jax_gcm_output_frequency.py tests/test_external_components_coverage.py tests/test_api_boundaries.py -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: the first h5netcdf green run used a fake coordinate
+  fixture with `layers=3` but only two level centers, causing an incompatible
+  NetCDF dimension size; aligning the level coordinate length fixed it. The
+  first model-calendar write used a boolean NetCDF attr for
+  `fixed_30_day_months`, which h5netcdf rejects in valid NetCDF mode; storing
+  the flag as `0`/`1` fixed the file metadata.
 
 ### 2026-06-02: Unit-Test Speedup Pass
 
