@@ -48,9 +48,9 @@ if __name__ == "__main__":
             "w",
             "surface_taux",
             "surface_tauy",
-            "psi"
-            ),
-        )
+            "psi",
+        ),
+    )
 
     jcm_setup = build_jcm_land_atmosphere_components(
         ocn.grid,

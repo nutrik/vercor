@@ -397,11 +397,14 @@ The shared output-period accumulator lives in
 `vercor.setups.external.period_averages` and stores one running sum plus one
 finite-value count array per variable, preserving current `nanmean` semantics
 without retaining every timestep. Opt-in Veros period-output extraction, native
-Veros variable metadata handling, ghost-cell removal, and direct `h5netcdf`
-average-file writing live in
+Veros variable metadata handling, ghost-cell removal, write-time native Veros
+spatial-axis transposition, and direct `h5netcdf` average-file writing live in
 `vercor.setups.external.veros_output`; `vercor.setups.external.veros_runtime`
 streams selected snapshots into that accumulator and flushes them with the same
-day/month/year cadence policy used by JAXGCM.
+day/month/year cadence policy used by JAXGCM. Veros average files keep VerCOR's
+lowercase `time` dimension while matching native Veros spatial NetCDF dimension
+order, and the accumulator averages only across recorded runtime samples rather
+than reducing horizontal or vertical axes.
 Veros host-state mutation helpers and the named tuple-compatible
 `VerosForcingFields` container live in `vercor.setups.external.veros_state`.
 Veros backend settings are imported only inside the explicit configuration

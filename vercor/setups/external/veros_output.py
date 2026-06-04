@@ -231,13 +231,22 @@ def _mean_accumulated_variables(
         ) from exc
 
     return {
-        name: VerosOutputVariable(
-            dims=(_TIME_NAME, *sample.dims),
-            values=sample.values[np.newaxis, ...],
-            attrs=dict(sample.attrs),
-        )
+        name: _mean_sample_to_output_variable(sample)
         for name, sample in mean_samples.items()
     }
+
+
+def _mean_sample_to_output_variable(sample: PeriodAverageSample) -> VerosOutputVariable:
+    axes = tuple(reversed(range(sample.values.ndim)))
+    values = sample.values
+    if axes != tuple(range(sample.values.ndim)):
+        values = np.transpose(values, axes=axes)
+
+    return VerosOutputVariable(
+        dims=(_TIME_NAME, *reversed(sample.dims)),
+        values=values[np.newaxis, ...],
+        attrs=dict(sample.attrs),
+    )
 
 
 def _used_coordinate_dims(

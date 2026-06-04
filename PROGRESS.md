@@ -142,6 +142,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local streaming period-average output validation: focused red/green
   pytest, Black, focused boundary pytest, flake8, mypy, full fast pytest, full
   pytest, and coverage pytest passed as of 2026-06-04.
+- Latest local Veros average dimension-order validation: focused red/green
+  pytest, Black, flake8, mypy, full fast pytest, full pytest, and coverage
+  pytest passed as of 2026-06-04.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -171,6 +174,37 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-04: Veros Average Output Dimension Order
+
+- Fixed Veros h5netcdf average output to keep snapshot extraction and
+  accumulation in Veros internal array order, then transpose spatial axes once
+  at write time. Files now keep VerCOR's lowercase `time` dimension while
+  matching native Veros spatial NetCDF order such as
+  `temp(time, zt, yt, xt)` and `psi(time, yu, xu)`.
+- Expanded Veros average-output coverage for `temp`, `salt`, `u`,
+  `surface_taux`, and `psi`. The writer test now asserts each persisted value
+  is the elementwise mean of two runtime snapshots after spatial transposition,
+  proving period averaging does not reduce a horizontal or vertical axis.
+- Black also normalized the existing Veros/JCM example `output_variables` tuple
+  formatting in `examples/run_jcm_with_veros.py` while running the requested
+  formatter command across `examples`.
+- Validation run for this change:
+  focused red
+  `conda run -n scipy pytest tests/test_external_components_coverage.py::test_veros_write_output_persists_period_mean_and_coordinates -q --tb=short`
+  failed as expected on the old `("time", "xt", "yt", "zt")` dimension order.
+  After implementation,
+  `conda run -n scipy pytest tests/test_external_components_coverage.py::test_veros_output_snapshot_uses_variable_metadata_and_current_timestep tests/test_external_components_coverage.py::test_veros_write_output_persists_period_mean_and_coordinates tests/test_period_averages.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: no failed implementation approach; the focused
+  red test caught the intended pre-fix dimension-order regression.
 
 ### 2026-06-04: Streaming Period-Average Output Accumulation
 

@@ -221,6 +221,7 @@ def _make_veros_output_state(offset: float = 0.0) -> Any:
         zt=np.asarray([-100.0, -20.0], dtype=float),
         zw=np.asarray([-150.0, -5.0], dtype=float),
         temp=np.arange(6 * 7 * 2 * 3, dtype=float).reshape(6, 7, 2, 3) + offset,
+        salt=np.arange(6 * 7 * 2 * 3, dtype=float).reshape(6, 7, 2, 3) + 50.0 + offset,
         u=np.arange(6 * 7 * 2 * 3, dtype=float).reshape(6, 7, 2, 3) + 100.0 + offset,
         surface_taux=np.arange(6 * 7, dtype=float).reshape(6, 7) + 200.0 + offset,
         psi=np.arange(6 * 7 * 3, dtype=float).reshape(6, 7, 3) + 300.0 + offset,
@@ -1405,11 +1406,11 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
     snapshots = [
         veros_output_module.extract_veros_output_snapshot(
             _make_veros_output_state(offset=0.0),
-            ("temp", "surface_taux", "psi"),
+            ("temp", "salt", "u", "surface_taux", "psi"),
         ),
         veros_output_module.extract_veros_output_snapshot(
             _make_veros_output_state(offset=20.0),
-            ("temp", "surface_taux", "psi"),
+            ("temp", "salt", "u", "surface_taux", "psi"),
         ),
     ]
     accumulator = PeriodAverageAccumulator()
@@ -1435,16 +1436,41 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
             state.variables.yt[2:-2],
         )
         assert actual.variables["zt"].attrs["positive"] == "up"
-        assert actual.variables["temp"].dimensions == ("time", "xt", "yt", "zt")
+        assert actual.variables["temp"].dimensions == ("time", "zt", "yt", "xt")
         assert actual.variables["temp"].shape == (1, 2, 3, 2)
         assert actual.variables["temp"].attrs["units"] == "deg C"
         assert actual.variables["temp"].attrs["long_name"] == (
             "Conservative temperature"
         )
         expected_temp = state.variables.temp[2:-2, 2:-2, :, state.variables.tau] + 10.0
-        assert_allclose_compact(np.asarray(actual.variables["temp"])[0], expected_temp)
-        assert actual.variables["surface_taux"].dimensions == ("time", "xu", "yt")
-        assert actual.variables["psi"].dimensions == ("time", "xu", "yu")
+        assert_allclose_compact(
+            np.asarray(actual.variables["temp"])[0],
+            np.transpose(expected_temp),
+        )
+        expected_salt = state.variables.salt[2:-2, 2:-2, :, state.variables.tau] + 10.0
+        assert actual.variables["salt"].dimensions == ("time", "zt", "yt", "xt")
+        assert_allclose_compact(
+            np.asarray(actual.variables["salt"])[0],
+            np.transpose(expected_salt),
+        )
+        expected_u = state.variables.u[2:-2, 2:-2, :, state.variables.tau] + 10.0
+        assert actual.variables["u"].dimensions == ("time", "zt", "yt", "xu")
+        assert_allclose_compact(
+            np.asarray(actual.variables["u"])[0],
+            np.transpose(expected_u),
+        )
+        expected_taux = state.variables.surface_taux[2:-2, 2:-2] + 10.0
+        assert actual.variables["surface_taux"].dimensions == ("time", "yt", "xu")
+        assert_allclose_compact(
+            np.asarray(actual.variables["surface_taux"])[0],
+            np.transpose(expected_taux),
+        )
+        expected_psi = state.variables.psi[2:-2, 2:-2, state.variables.tau] + 10.0
+        assert actual.variables["psi"].dimensions == ("time", "yu", "xu")
+        assert_allclose_compact(
+            np.asarray(actual.variables["psi"])[0],
+            np.transpose(expected_psi),
+        )
         assert actual.variables["psi"].attrs["units"] == "m^3/s"
     assert accumulator.empty
 
