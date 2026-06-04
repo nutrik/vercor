@@ -37,7 +37,20 @@ if __name__ == "__main__":
     # change the values of the parameters to be optimized here
     # custom_jcm_parameters['surface_flux.vgust'] = 5.01
 
-    ocn = make_veros_gcm(do_spinup=True)
+    ocn = make_veros_gcm(
+        do_spinup=True,
+        output_frequency="month",
+        output_variables=(
+            "temp",
+            "salt",
+            "u",
+            "v",
+            "w",
+            "surface_taux",
+            "surface_tauy",
+            "psi"
+            ),
+        )
 
     jcm_setup = build_jcm_land_atmosphere_components(
         ocn.grid,
