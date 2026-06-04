@@ -139,6 +139,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local Veros h5netcdf period-output validation: baseline fast pytest,
   focused red/green pytest, Black, focused post-format pytest, flake8, mypy,
   full fast pytest, full pytest, and coverage pytest passed as of 2026-06-03.
+- Latest local streaming period-average output validation: focused red/green
+  pytest, Black, focused boundary pytest, flake8, mypy, full fast pytest, full
+  pytest, and coverage pytest passed as of 2026-06-04.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -168,6 +171,46 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-04: Streaming Period-Average Output Accumulation
+
+- Replaced the JAXGCM and Veros period-output sample buffers with a shared
+  host-side `PeriodAverageAccumulator` that stores one running sum and one
+  per-element finite-value count array per variable. This preserves current
+  `np.nanmean` behavior, including sparse/all-NaN cells, without retaining each
+  timestep/snapshot until output.
+- Updated JAXGCM output recording to accumulate prediction variables over their
+  prediction `time` dimension at record time, then add the NetCDF `time`
+  dimension and canonical output ordering only at write time. JAXGCM spinup
+  predictions continue seeding the first output period through the accumulator.
+- Updated Veros output recording to accumulate selected extracted snapshots and
+  write the same `veros.averages.YYYY-MM-DD.nc` mean files with native
+  coordinate/metadata preservation. The output writers clear accumulators only
+  after successful file writes.
+- Updated `DESIGN.md`, `DEPENDENCIES.md`, explicit NumPy/API boundary coverage,
+  and accumulator/runtime/writer tests for the new package-internal host output
+  boundary.
+- Validation run for this change:
+  focused red
+  `conda run -n scipy pytest tests/test_period_averages.py -q --tb=short`
+  failed as expected on missing `vercor.setups.external.period_averages`.
+  After implementation,
+  `conda run -n scipy pytest tests/test_period_averages.py -q --tb=short`,
+  `conda run -n scipy pytest tests/test_period_averages.py tests/test_external_components_coverage.py::test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_jax_gcm_write_output_persists_mean_dataset tests/test_external_components_coverage.py::test_jax_gcm_write_output_preserves_model_calendar_attrs tests/test_external_components_coverage.py::test_veros_write_output_persists_period_mean_and_coordinates tests/test_external_components_coverage.py::test_veros_step_records_selected_outputs_and_writes_on_gate tests/test_external_components_coverage.py::test_veros_step_skips_output_when_no_variables_selected -q --tb=short`,
+  `conda run -n scipy pytest tests/test_api_boundaries.py::test_setup_helper_and_external_output_ownership_boundaries tests/test_production_numpy_boundaries.py::test_numpy_imports_match_explicit_host_boundaries tests/test_external_components_coverage.py::test_jax_gcm_write_output_persists_mean_dataset tests/test_external_components_coverage.py::test_veros_write_output_persists_period_mean_and_coordinates -q --tb=short`,
+  `conda run -n scipy pytest tests/test_period_averages.py tests/test_external_components_coverage.py tests/test_api_boundaries.py tests/test_production_numpy_boundaries.py tests/test_jax_gcm_output_frequency.py -q --fast --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: an initial focused boundary command used the
+  stale test name `test_external_adapter_helpers_stay_in_owner_modules`; rerun
+  with `test_setup_helper_and_external_output_ownership_boundaries` covered the
+  intended boundary assertions.
 
 ### 2026-06-03: Veros h5netcdf Period Output
 

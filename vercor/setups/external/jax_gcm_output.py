@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import MutableSequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from importlib import resources
@@ -19,6 +18,10 @@ from numpy.typing import NDArray
 from vercor.calendar import ModelDateTime
 from vercor.host_arrays import runtime_array_to_host
 from vercor.jax_logging import LoggerLike, get_default_logger
+from vercor.setups.external.period_averages import (
+    PeriodAverageAccumulator,
+    PeriodAverageSample,
+)
 from vercor.types import RuntimeArray
 
 _TIME_NAME = "time"
@@ -376,42 +379,54 @@ def _prediction_to_variables(
     return variables
 
 
-def _concatenate_prediction_variables(
-    prediction_variables: list[dict[str, _VariableData]],
-) -> dict[str, _VariableData]:
-    if not prediction_variables:
-        raise ValueError("JAXGCM average output requires at least one prediction.")
+def accumulate_jax_gcm_period_prediction(
+    accumulator: PeriodAverageAccumulator,
+    prediction: Any,
+    *,
+    coords: Any,
+    physics_module: _PhysicsModuleLike | None = None,
+) -> None:
+    """Accumulate one JAXGCM prediction block into period running sums."""
 
-    output: dict[str, _VariableData] = {}
-    variable_names = tuple(prediction_variables[0].keys())
-    for variables in prediction_variables[1:]:
-        if tuple(variables.keys()) != variable_names:
-            raise ValueError("JAXGCM prediction variables changed across outputs.")
-
-    for name in variable_names:
-        first = prediction_variables[0][name]
-        time_axis = first.dims.index(_TIME_NAME)
-        arrays = [variables[name].values for variables in prediction_variables]
-        for variables in prediction_variables[1:]:
-            if variables[name].dims != first.dims:
-                raise ValueError(f"JAXGCM variable {name!r} dimensions changed.")
-        output[name] = _VariableData(
-            dims=first.dims,
-            values=np.concatenate(arrays, axis=time_axis),
-        )
-    return output
+    selected_physics_module = physics_module or _default_physics_module()
+    variables = _prediction_to_variables(
+        cast(_PredictionLike, prediction),
+        coords=coords,
+        physics_module=selected_physics_module,
+    )
+    accumulator.add_samples(
+        {
+            name: PeriodAverageSample(
+                dims=variable.dims,
+                values=variable.values,
+            )
+            for name, variable in variables.items()
+        },
+        summation_dim=_TIME_NAME,
+    )
 
 
-def _mean_and_transpose_variable(variable: _VariableData) -> _VariableData:
-    time_axis = variable.dims.index(_TIME_NAME)
-    values = np.nanmean(variable.values, axis=time_axis, keepdims=True)
-    ordered_dims = tuple(
-        dim for dim in _CANONICAL_DIM_ORDER if dim in variable.dims
-    ) + tuple(dim for dim in variable.dims if dim not in _CANONICAL_DIM_ORDER)
-    axes = tuple(variable.dims.index(dim) for dim in ordered_dims)
+def _period_mean_sample_to_variable(sample: PeriodAverageSample) -> _VariableData:
+    dims = (_TIME_NAME, *sample.dims)
+    values = sample.values[np.newaxis, ...]
+    ordered_dims = tuple(dim for dim in _CANONICAL_DIM_ORDER if dim in dims) + tuple(
+        dim for dim in dims if dim not in _CANONICAL_DIM_ORDER
+    )
+    axes = tuple(dims.index(dim) for dim in ordered_dims)
     if axes != tuple(range(len(axes))):
         values = np.transpose(values, axes=axes)
     return _VariableData(dims=ordered_dims, values=values)
+
+
+def _jax_gcm_mean_samples(
+    accumulator: PeriodAverageAccumulator,
+) -> dict[str, PeriodAverageSample]:
+    try:
+        return accumulator.mean_samples()
+    except ValueError as exc:
+        raise ValueError(
+            "JAXGCM average output requires at least one prediction."
+        ) from exc
 
 
 def _read_units_table(path: Path) -> dict[str, dict[str, str]]:
@@ -475,7 +490,7 @@ def _write_netcdf(
 
 
 def write_jax_gcm_averages_output(
-    predictions: MutableSequence[Any],
+    accumulator: PeriodAverageAccumulator,
     output: str,
     *,
     coords: Any,
@@ -483,25 +498,15 @@ def write_jax_gcm_averages_output(
     physics_module: _PhysicsModuleLike | None = None,
     logger: LoggerLike | None = None,
 ) -> None:
-    """Write mean JAXGCM predictions to NetCDF and clear the prediction buffer."""
+    """Write mean JAXGCM predictions to NetCDF and clear the accumulator."""
 
     log = logger if logger is not None else get_default_logger()
     log.info(f"Output file: {output:s}")
 
     selected_physics_module = physics_module or _default_physics_module()
-    prediction_variables = [
-        _prediction_to_variables(
-            cast(_PredictionLike, prediction),
-            coords=coords,
-            physics_module=selected_physics_module,
-        )
-        for prediction in predictions
-    ]
     mean_variables = {
-        name: _mean_and_transpose_variable(variable)
-        for name, variable in _concatenate_prediction_variables(
-            prediction_variables
-        ).items()
+        name: _period_mean_sample_to_variable(sample)
+        for name, sample in _jax_gcm_mean_samples(accumulator).items()
     }
     _write_netcdf(
         output=output,
@@ -511,4 +516,4 @@ def write_jax_gcm_averages_output(
         unit_metadata=_unit_metadata(selected_physics_module),
     )
 
-    predictions.clear()
+    accumulator.clear()

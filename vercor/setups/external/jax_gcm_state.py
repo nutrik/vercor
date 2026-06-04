@@ -40,8 +40,10 @@ from vercor.setups._time_helpers import (
     seed_grid_field_defaults,
 )
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
+import vercor.setups.external.jax_gcm_output as _jax_gcm_output
 import vercor.setups.external.jax_gcm_runtime as _jax_gcm_runtime
 from vercor.setups.external.jax_gcm_tools import change_jcm_parameter_values
+from vercor.setups.external.period_averages import PeriodAverageAccumulator
 from vercor.types import RuntimeArray
 
 
@@ -58,7 +60,7 @@ class JCMState:
 class JAXGCMSetupState:
     """Mutable setup-time owner for a JAXGCM/JCM atmosphere adapter."""
 
-    _predictions_list: list[Predictions]
+    _period_average_accumulator: PeriodAverageAccumulator
     _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, Predictions]]
     _state: JCMState
     forcing: ForcingData
@@ -122,6 +124,7 @@ class JAXGCMSetupState:
         self.name = name
         self.grid = grid
         self.settings: Any | None = None
+        self._period_average_accumulator = PeriodAverageAccumulator()
 
     def _generate_step_function(
         self, jitted: bool = True
@@ -206,7 +209,7 @@ class JAXGCMSetupState:
             },
         )
 
-        self._predictions_list = []
+        self._period_average_accumulator = PeriodAverageAccumulator()
 
         if self.do_spinup and "OCN" in context.run_sequence.order:
 
@@ -217,7 +220,12 @@ class JAXGCMSetupState:
                     self.forcing,
                 )
                 self._state = _new_state
-                self._predictions_list.append(_predictions)
+                _jax_gcm_output.accumulate_jax_gcm_period_prediction(
+                    self._period_average_accumulator,
+                    _predictions,
+                    coords=self.model.coords,
+                    physics_module=getattr(self.model, "physics", None),
+                )
 
             run_logged_spinup(
                 steps=self.spinup_steps,

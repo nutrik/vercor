@@ -28,7 +28,7 @@
 28. `vercor/exchange.py`, `vercor/setups/exchange_recipes.py`, and `vercor/setups/coupler_helpers.py` - public exchange declarations and exchange-owned field/factory aliases, shared exchange field recipes, compact `ExchangeSpec` construction, and orchestration helpers built on (12, 17, 18, 19)
 29. `vercor/setups/external/jax_gcm_tools.py` - JCM-specific parameter and input-data helpers built on (1, 7, 8, 11)
 30. `vercor/setups/external/jax_gcm_fields.py` - public package-internal JCM output-field mapping and surface-temperature forcing helpers built on (1, 7)
-31. `vercor/setups/external/jax_gcm_output.py` - JAXGCM output cadence, VerCOR-calendar time encoding, and direct h5netcdf averaged NetCDF writing helpers built on (6, 10, 25)
+31. `vercor/setups/external/period_averages.py` and `jax_gcm_output.py` - shared host-side sum/count period-average accumulation plus JAXGCM output cadence, VerCOR-calendar time encoding, and direct h5netcdf averaged NetCDF writing helpers built on (6, 10, 25)
 32. `vercor/setups/external/jax_gcm_runtime.py`, `jax_gcm_state.py`, and `jax_gcm.py` - JAXGCM private runtime-state protocol, payload/hooks/stepping, setup-state/lifecycle and canonical `JCMState` ownership, named factory callback wiring, and thin JCM adapter factory boundary built on (1, 3, 11, 26, 29, 30, 31, 62)
 33. `vercor/setups/external/veros_runtime_settings.py` - explicit lazy Veros backend/runtime configuration side-effect boundary
 34. `vercor/setups/external/veros_setup.py` - concrete Veros setup subclass and setup policy built on (33)

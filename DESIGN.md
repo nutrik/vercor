@@ -382,8 +382,9 @@ spinup policy, lifecycle callbacks, and the canonical `JCMState` bundle.
 setup state and binds named lifecycle callbacks without reexporting state
 bundles or owning runtime payload/setup-state internals. JAXGCM output cadence
 and direct `h5netcdf` average-file writing live in
-`vercor.setups.external.jax_gcm_output`; this boundary consumes prediction
-objects directly instead of calling their xarray adapters, and stores runtime
+`vercor.setups.external.jax_gcm_output`; this boundary streams prediction
+objects into the shared host-side sum/count period accumulator instead of
+retaining all period samples or calling xarray adapters, and stores runtime
 calendar metadata from VerCOR step contexts. Surface-temperature cleanup and
 output-field mapping live in
 `vercor.setups.external.jax_gcm_fields`. Veros host-runtime flux application and
@@ -392,11 +393,15 @@ substep orchestration live in
 `vercor.setups.external.veros_gcm_state` owns Veros setup-time model resources,
 spinup policy, grid derivation, and lifecycle callbacks, while
 `vercor.setups.external.veros_gcm` remains the thin public factory.
-Opt-in Veros period-output extraction, native Veros variable metadata handling,
-ghost-cell removal, and direct `h5netcdf` average-file writing live in
+The shared output-period accumulator lives in
+`vercor.setups.external.period_averages` and stores one running sum plus one
+finite-value count array per variable, preserving current `nanmean` semantics
+without retaining every timestep. Opt-in Veros period-output extraction, native
+Veros variable metadata handling, ghost-cell removal, and direct `h5netcdf`
+average-file writing live in
 `vercor.setups.external.veros_output`; `vercor.setups.external.veros_runtime`
-records selected snapshots and flushes them with the same day/month/year cadence
-policy used by JAXGCM.
+streams selected snapshots into that accumulator and flushes them with the same
+day/month/year cadence policy used by JAXGCM.
 Veros host-state mutation helpers and the named tuple-compatible
 `VerosForcingFields` container live in `vercor.setups.external.veros_state`.
 Veros backend settings are imported only inside the explicit configuration

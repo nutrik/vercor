@@ -16,9 +16,11 @@ from vercor.pytree_utils import mean_leaf, stack_objects, unwrap_leading_dims
 from vercor.settings import VercorSettings
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
 from vercor.setups.external.jax_gcm_output import (
+    accumulate_jax_gcm_period_prediction,
     should_write_period_output,
     write_jax_gcm_averages_output,
 )
+from vercor.setups.external.period_averages import PeriodAverageAccumulator
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
@@ -37,7 +39,7 @@ class _JAXGCMRuntimeState(Protocol):
     output_frequency: str | None
     _state: Any
     forcing: Any
-    _predictions_list: list[Any]
+    _period_average_accumulator: PeriodAverageAccumulator
     _step_function: Callable[[Any, Any], tuple[Any, Any]]
 
 
@@ -265,7 +267,12 @@ def record_jax_gcm_host_step(
     if isinstance(step_result.payload, JAXGCMRuntimePayload):
         state._state = step_result.payload.jcm_state
         state.forcing = applied_forcing
-    state._predictions_list.append(prediction)
+    accumulate_jax_gcm_period_prediction(
+        state._period_average_accumulator,
+        prediction,
+        coords=state.model.coords,
+        physics_module=getattr(state.model, "physics", None),
+    )
 
     _, _, _, cold_surface_cells = _jax_gcm_fields.cleanup_surface_temperature_fields(
         step_result.fields.get("land_surface_temperature"),
@@ -285,7 +292,7 @@ def record_jax_gcm_host_step(
     ):
         date_time = time.strftime("%Y-%m-%d")
         write_jax_gcm_averages_output(
-            state._predictions_list,
+            state._period_average_accumulator,
             output=f"jcm.averages.{date_time}.nc",
             coords=state.model.coords,
             output_time=time,

@@ -9,9 +9,11 @@ from typing import Any, Protocol
 from vercor.components import ComponentStepContext
 from vercor.setups.external.jax_gcm_output import should_write_period_output
 from vercor.setups.external.veros_output import (
+    accumulate_veros_output_snapshot,
     extract_veros_output_snapshot,
     write_veros_averages_output,
 )
+from vercor.setups.external.period_averages import PeriodAverageAccumulator
 import vercor.setups.external.veros_fluxes as _veros_fluxes
 import vercor.setups.external.veros_state as _veros_state
 
@@ -26,7 +28,7 @@ class _VerosRuntimeState(Protocol):
     model_substeps: int
     output_frequency: str | None
     output_variables: tuple[str, ...]
-    _predictions_list: list[Any]
+    _period_average_accumulator: PeriodAverageAccumulator
 
 
 def step_veros_runtime(
@@ -86,8 +88,9 @@ def record_veros_output(
     if time is None:
         return
 
-    state._predictions_list.append(
-        extract_veros_output_snapshot(state._veros_state, output_variables)
+    accumulate_veros_output_snapshot(
+        state._period_average_accumulator,
+        extract_veros_output_snapshot(state._veros_state, output_variables),
     )
     if should_write_period_output(
         time=time,
@@ -96,7 +99,7 @@ def record_veros_output(
     ):
         date_time = time.strftime("%Y-%m-%d")
         write_veros_averages_output(
-            state._predictions_list,
+            state._period_average_accumulator,
             output=f"veros.averages.{date_time}.nc",
             veros_state=state._veros_state,
             output_time=time,

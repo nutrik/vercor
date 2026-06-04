@@ -972,6 +972,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     import vercor.setups.external.camulator_land as camulator_land_module
     import vercor.setups.external.camulator_runtime_settings as camulator_runtime_settings_module
     import vercor.setups.external.jax_gcm as jax_gcm_module
+    import vercor.setups.external.period_averages as period_averages_module
     import vercor.setups.external.veros_fluxes as veros_fluxes_module
     import vercor.setups.external.veros_gcm as veros_gcm_module
     import vercor.setups.external.veros_output as veros_output_module
@@ -984,6 +985,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert camulator_contracts_module.CAMULATOR_RUNTIME_FIELD_NAMES
     assert callable(camulator_fields_module.prepare_camulator_surface_forcing)
     assert callable(camulator_runtime_settings_module.configure_camulator_runtime)
+    assert callable(period_averages_module.PeriodAverageAccumulator)
     assert callable(veros_fluxes_module.compute_fluxes)
     assert callable(veros_output_module.write_veros_averages_output)
     assert callable(veros_state_module.copy_state)
@@ -1048,6 +1050,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     veros_runtime_source = Path("vercor/setups/external/veros_runtime.py").read_text(
         encoding="utf-8"
     )
+    period_averages_source = Path(
+        "vercor/setups/external/period_averages.py"
+    ).read_text(encoding="utf-8")
     veros_output_source = Path("vercor/setups/external/veros_output.py").read_text(
         encoding="utf-8"
     )
@@ -1067,6 +1072,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert Path("vercor/setups/external/camulator_runtime_settings.py").exists()
     assert Path("vercor/setups/external/camulator_wind_filter.py").exists()
     assert Path("vercor/setups/external/veros_fluxes.py").exists()
+    assert Path("vercor/setups/external/period_averages.py").exists()
     assert Path("vercor/setups/external/veros_output.py").exists()
     assert Path("vercor/setups/external/veros_setup.py").exists()
     assert Path("vercor/setups/external/veros_state.py").exists()
@@ -1148,6 +1154,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "import numpy" not in veros_gcm_source
     assert "import numpy" not in veros_runtime_source
     assert "import h5netcdf" in veros_output_source
+    assert "import numpy" in period_averages_source
     assert "import numpy" in veros_output_source
     assert "from vercor.setups.external.camulator_wind_filter import" in (
         camulator_imports_source

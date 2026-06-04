@@ -24,6 +24,7 @@ import vercor.setups.external.veros_runtime as _veros_runtime
 import vercor.setups.external.veros_output as _veros_output
 import vercor.setups.external.veros_setup as _veros_setup
 import vercor.setups.external.veros_state as _veros_state
+from vercor.setups.external.period_averages import PeriodAverageAccumulator
 from vercor.types import RuntimeArray
 
 VEROS_INPUT_FIELD_NAMES = (
@@ -61,6 +62,7 @@ class VerosGCMSetupState:
     model_timestep: timedelta
     model_substeps: int
     _step_function: Callable[[Any], Any]
+    _period_average_accumulator: PeriodAverageAccumulator
 
     def __init__(
         self,
@@ -99,7 +101,7 @@ class VerosGCMSetupState:
             output_variables,
             settings=self._veros_state.settings,
         )
-        self._predictions_list: list[Any] = []
+        self._period_average_accumulator = PeriodAverageAccumulator()
 
         self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
         self.spinup_steps = int(self.spinup_time.total_seconds() // self.dt_tracer)
@@ -147,7 +149,7 @@ class VerosGCMSetupState:
                 step=spinup_step,
             )
 
-        self._predictions_list = []
+        self._period_average_accumulator = PeriodAverageAccumulator()
         component.seed_field(
             "sea_surface_temperature",
             _veros_state.extract_veros_runtime_sst(self._veros_state),

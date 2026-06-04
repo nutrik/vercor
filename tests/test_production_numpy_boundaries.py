@@ -12,6 +12,7 @@ ALLOWED_NUMPY_BOUNDARIES = {
     "vercor/forcing_data.py",
     "vercor/host_arrays.py",
     "vercor/setups/external/jax_gcm_output.py",
+    "vercor/setups/external/period_averages.py",
     "vercor/setups/external/veros_output.py",
     "vercor/types.py",
 }

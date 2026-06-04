@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, MutableSequence, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -15,6 +15,10 @@ from numpy.typing import NDArray
 from vercor.calendar import ModelDateTime
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.setups.external.jax_gcm_output import output_time_value_and_attrs
+from vercor.setups.external.period_averages import (
+    PeriodAverageAccumulator,
+    PeriodAverageSample,
+)
 from vercor.setups.external.veros_runtime_settings import configure_veros_runtime
 
 configure_veros_runtime()
@@ -74,27 +78,45 @@ def extract_veros_output_snapshot(
     return {name: _extract_variable(veros_state, name) for name in selected_variables}
 
 
+def accumulate_veros_output_snapshot(
+    accumulator: PeriodAverageAccumulator,
+    snapshot: Mapping[str, VerosOutputVariable],
+) -> None:
+    """Accumulate one selected Veros output snapshot for period averaging."""
+
+    accumulator.add_samples(
+        {
+            name: PeriodAverageSample(
+                dims=variable.dims,
+                values=variable.values,
+                attrs=variable.attrs,
+            )
+            for name, variable in snapshot.items()
+        }
+    )
+
+
 def write_veros_averages_output(
-    predictions: MutableSequence[Any],
+    accumulator: PeriodAverageAccumulator,
     output: str,
     *,
     veros_state: Any,
     output_time: datetime | ModelDateTime,
     logger: LoggerLike | None = None,
 ) -> None:
-    """Write mean Veros output snapshots to NetCDF and clear the buffer."""
+    """Write mean Veros output snapshots to NetCDF and clear the accumulator."""
 
     log = logger if logger is not None else get_default_logger()
     log.info(f"Output file: {output:s}")
 
-    mean_variables = _mean_prediction_variables(predictions)
+    mean_variables = _mean_accumulated_variables(accumulator)
     _write_netcdf(
         output=output,
         veros_state=veros_state,
         output_time=output_time,
         variables=mean_variables,
     )
-    predictions.clear()
+    accumulator.clear()
 
 
 def _resolve_metadata(value: Any, settings: Any) -> Any:
@@ -198,32 +220,24 @@ def _coordinate_variable(veros_state: Any, dim: str) -> VerosOutputVariable:
     )
 
 
-def _mean_prediction_variables(
-    predictions: MutableSequence[Any],
+def _mean_accumulated_variables(
+    accumulator: PeriodAverageAccumulator,
 ) -> dict[str, VerosOutputVariable]:
-    if not predictions:
-        raise ValueError("Veros average output requires at least one prediction.")
+    try:
+        mean_samples = accumulator.mean_samples()
+    except ValueError as exc:
+        raise ValueError(
+            "Veros average output requires at least one prediction."
+        ) from exc
 
-    variable_names = tuple(predictions[0].keys())
-    for variables in predictions[1:]:
-        if tuple(variables.keys()) != variable_names:
-            raise ValueError("Veros output variables changed across predictions.")
-
-    mean_variables: dict[str, VerosOutputVariable] = {}
-    for name in variable_names:
-        first = predictions[0][name]
-        arrays = []
-        for variables in predictions:
-            variable = variables[name]
-            if variable.dims != first.dims:
-                raise ValueError(f"Veros variable {name!r} dimensions changed.")
-            arrays.append(variable.values)
-        mean_variables[name] = VerosOutputVariable(
-            dims=(_TIME_NAME, *first.dims),
-            values=np.nanmean(np.stack(arrays, axis=0), axis=0)[np.newaxis, ...],
-            attrs=first.attrs,
+    return {
+        name: VerosOutputVariable(
+            dims=(_TIME_NAME, *sample.dims),
+            values=sample.values[np.newaxis, ...],
+            attrs=dict(sample.attrs),
         )
-    return mean_variables
+        for name, sample in mean_samples.items()
+    }
 
 
 def _used_coordinate_dims(
@@ -284,6 +298,7 @@ def _write_netcdf(
 
 __all__ = [
     "VerosOutputVariable",
+    "accumulate_veros_output_snapshot",
     "extract_veros_output_snapshot",
     "normalize_veros_output_variables",
     "write_veros_averages_output",
