@@ -9,8 +9,7 @@ from typing import Any, Protocol
 from vercor.components import ComponentStepContext
 from vercor.setups.external.jax_gcm_output import should_write_period_output
 from vercor.setups.external.veros_output import (
-    accumulate_veros_output_snapshot,
-    extract_veros_output_snapshot,
+    accumulate_veros_period_state,
     write_veros_averages_output,
 )
 from vercor.setups.external.period_averages import PeriodAverageAccumulator
@@ -88,9 +87,10 @@ def record_veros_output(
     if time is None:
         return
 
-    accumulate_veros_output_snapshot(
+    accumulate_veros_period_state(
         state._period_average_accumulator,
-        extract_veros_output_snapshot(state._veros_state, output_variables),
+        state._veros_state,
+        output_variables,
     )
     if should_write_period_output(
         time=time,

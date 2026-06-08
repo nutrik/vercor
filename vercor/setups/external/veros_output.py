@@ -96,6 +96,22 @@ def accumulate_veros_output_snapshot(
     )
 
 
+def accumulate_veros_period_state(
+    accumulator: PeriodAverageAccumulator,
+    veros_state: Any,
+    output_variables: Sequence[str],
+) -> None:
+    """Extract and accumulate selected Veros state variables for a period."""
+
+    if not output_variables:
+        return
+
+    accumulate_veros_output_snapshot(
+        accumulator,
+        extract_veros_output_snapshot(veros_state, output_variables),
+    )
+
+
 def write_veros_averages_output(
     accumulator: PeriodAverageAccumulator,
     output: str,
@@ -308,6 +324,7 @@ def _write_netcdf(
 __all__ = [
     "VerosOutputVariable",
     "accumulate_veros_output_snapshot",
+    "accumulate_veros_period_state",
     "extract_veros_output_snapshot",
     "normalize_veros_output_variables",
     "write_veros_averages_output",

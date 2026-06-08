@@ -145,6 +145,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local Veros average dimension-order validation: focused red/green
   pytest, Black, flake8, mypy, full fast pytest, full pytest, and coverage
   pytest passed as of 2026-06-04.
+- Latest local Veros spinup period-average validation: focused red/green
+  pytest, Black, flake8, mypy, full fast pytest, full pytest, and coverage
+  pytest passed as of 2026-06-08.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -174,6 +177,38 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-08: Veros Spinup Period-Average Accumulation
+
+- Fixed Veros setup spinup to accumulate selected `output_variables` into the
+  same `PeriodAverageAccumulator` used by runtime output, matching the existing
+  JAXGCM behavior where spinup samples seed the first averaged output period.
+  Spinup still does not write NetCDF files; runtime period gates remain the
+  only write boundary.
+- Added a shared package-internal Veros output helper that extracts and
+  accumulates one Veros state. Runtime output recording and setup spinup now
+  use that helper, so extraction/accumulation behavior stays in one owner.
+- Added regression coverage proving two Veros spinup steps accumulate two
+  selected-output samples without breaking setup-time SST seeding.
+- Validation run for this change:
+  focused red
+  `conda run -n scipy pytest tests/test_external_components_coverage.py::test_veros_initialize_spinup_accumulates_selected_outputs -q --tb=short`
+  failed as expected because no spinup states were accumulated. After
+  implementation,
+  `conda run -n scipy pytest tests/test_external_components_coverage.py::test_veros_initialize_spinup_accumulates_selected_outputs -q --tb=short`,
+  `conda run -n scipy pytest tests/test_external_components_coverage.py::test_veros_initialize_can_spin_up_and_extract_surface_temperature tests/test_external_components_coverage.py::test_veros_initialize_spinup_accumulates_selected_outputs tests/test_external_components_coverage.py::test_veros_step_records_selected_outputs_and_writes_on_gate tests/test_external_components_coverage.py::test_veros_step_skips_output_when_no_variables_selected tests/test_external_components_coverage.py::test_veros_write_output_persists_period_mean_and_coordinates -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: the first post-implementation focused run exposed
+  a test-fixture issue where fake spinup state temperatures drifted by 1 K;
+  the fixture was narrowed to vary only `step_id` so the test remains focused
+  on period accumulation.
 
 ### 2026-06-04: Veros Average Output Dimension Order
 

@@ -135,11 +135,18 @@ class VerosGCMSetupState:
             model_name="dt_tracer",
         )
 
+        self._period_average_accumulator = PeriodAverageAccumulator()
+
         if self.do_spinup and "ATM" in context.run_sequence.order:
 
             def spinup_step(step_number: int) -> None:
                 _ = step_number
                 self._veros_state = self._step_function(self._veros_state)
+                _veros_output.accumulate_veros_period_state(
+                    self._period_average_accumulator,
+                    self._veros_state,
+                    getattr(self, "output_variables", ()),
+                )
 
             run_logged_spinup(
                 steps=self.spinup_steps,
@@ -149,7 +156,6 @@ class VerosGCMSetupState:
                 step=spinup_step,
             )
 
-        self._period_average_accumulator = PeriodAverageAccumulator()
         component.seed_field(
             "sea_surface_temperature",
             _veros_state.extract_veros_runtime_sst(self._veros_state),

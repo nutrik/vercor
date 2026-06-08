@@ -1568,6 +1568,88 @@ def test_veros_initialize_can_spin_up_and_extract_surface_temperature() -> None:
     )
 
 
+def test_veros_initialize_spinup_accumulates_selected_outputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from vercor.setups.external.period_averages import (
+        PeriodAverageAccumulator,
+        PeriodAverageSample,
+    )
+
+    component = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
+    component.dt_tracer = 10.0
+    component.do_spinup = True
+    component.spinup_time = timedelta(seconds=20.0)
+    component.spinup_steps = 2
+    component._veros_state = _make_fake_veros_state(surface_temperature=10.0)
+    component.name = "OCN"
+    component.output_variables = ("temp",)
+    component.grid = make_test_grid(
+        name="ocn",
+        longitude=np.arange(4.0),
+        latitude=np.arange(4.0),
+    )
+    component.data = {}
+    component.settings = VercorSettings()
+
+    accumulated_states: list[Any] = []
+    accumulated_variables: list[tuple[str, ...]] = []
+    step_calls = {"count": 0}
+
+    def fake_step_function(state: Any) -> Any:
+        _ = state
+        step_calls["count"] += 1
+        next_state = _make_fake_veros_state(surface_temperature=10.0)
+        next_state.variables.step_id = step_calls["count"]
+        return next_state
+
+    def fake_accumulate_veros_period_state(
+        accumulator: PeriodAverageAccumulator,
+        veros_state: Any,
+        output_variables: tuple[str, ...],
+    ) -> None:
+        accumulated_states.append(veros_state)
+        accumulated_variables.append(output_variables)
+        accumulator.add_samples(
+            {"temp": PeriodAverageSample(("x",), np.asarray([1.0]))}
+        )
+
+    component._step_function = fake_step_function
+    monkeypatch.setattr(
+        veros_gcm_state_module._veros_output,
+        "accumulate_veros_period_state",
+        fake_accumulate_veros_period_state,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        veros_gcm_state_module._veros_output,
+        "write_veros_averages_output",
+        lambda *args, **kwargs: pytest.fail("spinup must not write Veros output"),
+    )
+
+    hook_component = DataComponent.from_fields(
+        name="OCN",
+        grid=component.grid,
+        settings=component.settings,
+    )
+    coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
+    component.initialize(cast(Any, hook_component), coupler)
+
+    assert [state.variables.step_id for state in accumulated_states] == [1, 2]
+    assert accumulated_variables == [("temp",), ("temp",)]
+    assert_allclose_compact(
+        component._period_average_accumulator.variables["temp"].counts,
+        np.asarray([2]),
+    )
+    assert isinstance(hook_component.data["sea_surface_temperature"], jax.Array)
+    assert_allclose_compact(
+        hook_component.data["sea_surface_temperature"],
+        np.full((4, 4), 283.15),
+    )
+
+
 def test_veros_constructor_builds_jax_backed_grid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1746,19 +1828,13 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
     extracted: dict[str, Any] = {}
     written: dict[str, Any] = {}
 
-    def fake_extract(
+    def fake_accumulate_period_state(
+        accumulator: PeriodAverageAccumulator,
         veros_state: Any,
         output_variables: tuple[str, ...],
-    ) -> dict[str, Any]:
+    ) -> None:
         extracted["state"] = veros_state
         extracted["variables"] = output_variables
-        return {"temp": "snapshot"}
-
-    def fake_accumulate(
-        accumulator: PeriodAverageAccumulator,
-        snapshot: dict[str, Any],
-    ) -> None:
-        written["snapshot"] = snapshot
         accumulator.add_samples(
             {"temp": PeriodAverageSample(("x",), np.asarray([1.0]))}
         )
@@ -1785,13 +1861,8 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
     )
     monkeypatch.setattr(
         veros_runtime_module,
-        "extract_veros_output_snapshot",
-        fake_extract,
-    )
-    monkeypatch.setattr(
-        veros_runtime_module,
-        "accumulate_veros_output_snapshot",
-        fake_accumulate,
+        "accumulate_veros_period_state",
+        fake_accumulate_period_state,
     )
     monkeypatch.setattr(
         veros_runtime_module,
@@ -1808,8 +1879,8 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
 
     veros_runtime_module.step_veros_runtime(component, {}, context, None)
 
+    assert extracted["state"] is component._veros_state
     assert extracted["variables"] == ("temp",)
-    assert written["snapshot"] == {"temp": "snapshot"}
     assert_allclose_compact(written["counts"], np.asarray([1]))
     assert written["path"] == "veros.averages.2000-01-02.nc"
     assert written["state"] is component._veros_state
