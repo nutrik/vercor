@@ -995,6 +995,9 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
             coords=coords,
             physics_module=physics_module,
         )
+    accumulated_temperature = accumulator.variables["temperature"]
+    assert isinstance(accumulated_temperature.sum_values, jax.Array)
+    assert isinstance(accumulated_temperature.counts, jax.Array)
 
     output = tmp_path / "jcm_output.nc"
     logger_name = "VerCOR.test.jax-gcm-output"
@@ -1373,6 +1376,7 @@ def test_veros_output_snapshot_uses_variable_metadata_and_current_timestep() -> 
     assert snapshot["temp"].dims == ("xt", "yt", "zt")
     assert snapshot["temp"].attrs["units"] == "deg C"
     assert snapshot["temp"].attrs["long_name"] == "Conservative temperature"
+    assert isinstance(snapshot["temp"].values, jax.Array)
     assert_allclose_compact(
         snapshot["temp"].values,
         state.variables.temp[2:-2, 2:-2, :, state.variables.tau],
@@ -1416,6 +1420,9 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
     accumulator = PeriodAverageAccumulator()
     for snapshot in snapshots:
         veros_output_module.accumulate_veros_output_snapshot(accumulator, snapshot)
+    accumulated_temperature = accumulator.variables["temp"]
+    assert isinstance(accumulated_temperature.sum_values, jax.Array)
+    assert isinstance(accumulated_temperature.counts, jax.Array)
     output = tmp_path / "veros_output.nc"
 
     veros_output_module.write_veros_averages_output(

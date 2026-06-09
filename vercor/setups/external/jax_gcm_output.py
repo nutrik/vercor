@@ -12,11 +12,10 @@ from typing import Any, Literal, Protocol, cast
 import h5netcdf
 import jax
 import jax.numpy as jnp
-import numpy as np
-from numpy.typing import NDArray
 
 from vercor.calendar import ModelDateTime
-from vercor.host_arrays import runtime_array_to_host
+from vercor.dtypes import as_jax_index_array, as_jax_real_array, jax_index_dtype
+from vercor.host_arrays import array_to_host, host_int64_array
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.setups.external.period_averages import (
     PeriodAverageAccumulator,
@@ -73,10 +72,10 @@ class _PhysicsModuleLike(Protocol):
 
 @dataclass(frozen=True)
 class _VariableData:
-    """Variable payload with source dimensions and host-backed values."""
+    """Variable payload with source dimensions and JAX-backed values."""
 
     dims: tuple[str, ...]
-    values: NDArray[Any]
+    values: jax.Array
 
 
 def is_period_end(
@@ -133,11 +132,11 @@ def _timedelta_to_microseconds(delta: timedelta) -> int:
 
 def _time_value_and_attrs(
     time: datetime | ModelDateTime,
-) -> tuple[NDArray[Any], dict[str, Any]]:
+) -> tuple[Any, dict[str, Any]]:
     if isinstance(time, datetime):
         delta = time - datetime(1, 1, 1)
         return (
-            np.asarray([_timedelta_to_microseconds(delta)], dtype=np.int64),
+            host_int64_array([_timedelta_to_microseconds(delta)]),
             {
                 "units": _TIME_UNITS,
                 "calendar": "proleptic_gregorian",
@@ -153,7 +152,7 @@ def _time_value_and_attrs(
 
     calendar = "360_day" if time.fixed_30_day_months else "noleap"
     return (
-        np.asarray([_timedelta_to_microseconds(model_delta)], dtype=np.int64),
+        host_int64_array([_timedelta_to_microseconds(model_delta)]),
         {
             "units": _TIME_UNITS,
             "calendar": calendar,
@@ -167,22 +166,18 @@ def _time_value_and_attrs(
 
 def output_time_value_and_attrs(
     time: datetime | ModelDateTime,
-) -> tuple[NDArray[Any], dict[str, Any]]:
+) -> tuple[Any, dict[str, Any]]:
     """Return NetCDF time-coordinate values and calendar attrs for period output."""
 
     return _time_value_and_attrs(time)
 
 
-def _host_array(value: Any) -> NDArray[Any]:
-    return np.asarray(jax.device_get(value))
-
-
-def _runtime_host_array(value: RuntimeArray) -> NDArray[Any]:
-    return runtime_array_to_host(value)
+def _jax_array(value: Any) -> jax.Array:
+    return as_jax_real_array(value)
 
 
 def _vertical_layers(coords: Any) -> int:
-    level = _runtime_host_array(coords.vertical.centers)
+    level = _jax_array(coords.vertical.centers)
     layers = getattr(coords.vertical, "layers", None)
     if layers is None:
         return int(level.shape[0])
@@ -203,25 +198,25 @@ def _coordinate_values(
     *,
     coords: Any,
     output_time: datetime | ModelDateTime,
-) -> tuple[dict[str, NDArray[Any]], dict[str, dict[str, Any]]]:
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     lon, sin_lat = coords.horizontal.nodal_axes
     lon_k, lat_k = coords.horizontal.modal_axes
-    level = _runtime_host_array(coords.vertical.centers)
+    level = _jax_array(coords.vertical.centers)
     layers = _vertical_layers(coords)
     time_values, time_attrs = _time_value_and_attrs(output_time)
 
     coordinate_values = {
         _TIME_NAME: time_values,
-        _LON_NAME: _runtime_host_array(lon) * 180.0 / np.pi,
-        _LAT_NAME: np.arcsin(_runtime_host_array(sin_lat)) * 180.0 / np.pi,
-        _LON_MODE_NAME: _runtime_host_array(lon_k),
-        _LAT_MODE_NAME: _runtime_host_array(lat_k),
+        _LON_NAME: _jax_array(lon) * 180.0 / jnp.pi,
+        _LAT_NAME: jnp.arcsin(_jax_array(sin_lat)) * 180.0 / jnp.pi,
+        _LON_MODE_NAME: as_jax_index_array(lon_k),
+        _LAT_MODE_NAME: as_jax_index_array(lat_k),
         _LEVEL_NAME: level,
-        _WVI_NAME: np.asarray([1, 2], dtype=np.int64),
-        _HSG_LEVEL_NAME: np.arange(layers + 1, dtype=np.int64),
+        _WVI_NAME: as_jax_index_array([1, 2]),
+        _HSG_LEVEL_NAME: jnp.arange(layers + 1, dtype=jax_index_dtype()),
     }
     if layers != 1:
-        coordinate_values[_SURFACE_NAME] = np.ones(1, dtype=float)
+        coordinate_values[_SURFACE_NAME] = _jax_array([1.0])
 
     coordinate_attrs = {
         _TIME_NAME: time_attrs,
@@ -231,14 +226,14 @@ def _coordinate_values(
     return coordinate_values, coordinate_attrs
 
 
-def _additional_coordinate_values(coords: Any) -> dict[str, NDArray[Any]]:
+def _additional_coordinate_values(coords: Any) -> dict[str, jax.Array]:
     layers = _vertical_layers(coords)
-    values: dict[str, NDArray[Any]] = {
-        _WVI_NAME: np.asarray([1, 2], dtype=np.int64),
-        _HSG_LEVEL_NAME: np.arange(layers + 1, dtype=np.int64),
+    values: dict[str, jax.Array] = {
+        _WVI_NAME: as_jax_index_array([1, 2]),
+        _HSG_LEVEL_NAME: jnp.arange(layers + 1, dtype=jax_index_dtype()),
     }
     if layers != 1:
-        values[_SURFACE_NAME] = np.ones(1, dtype=float)
+        values[_SURFACE_NAME] = _jax_array([1.0])
     return values
 
 
@@ -260,7 +255,7 @@ def _infer_shape_to_dims(
         nodal_shape: (_LON_NAME, _LAT_NAME),
         modal_shape: (_LON_MODE_NAME, _LAT_MODE_NAME),
         (layers,): (_LEVEL_NAME,),
-        tuple(_host_array(sin_lat).shape): (_LAT_NAME,),
+        tuple(_jax_array(sin_lat).shape): (_LAT_NAME,),
         tuple(coords.surface_nodal_shape): (_LON_NAME, _LAT_NAME),
     }
 
@@ -348,7 +343,7 @@ def _prediction_to_variables(
 ) -> dict[str, _VariableData]:
     dynamics_predictions = _float0s_to_nans(prediction.dynamics)
     physics_predictions = _float0s_to_nans(prediction.physics)
-    time_values = _host_array(prediction.times)
+    time_values = _jax_array(prediction.times)
     time_shape = tuple(time_values.shape)
     shape_to_dims = _infer_shape_to_dims(coords=coords, time_shape=time_shape)
 
@@ -367,7 +362,7 @@ def _prediction_to_variables(
 
     variables: dict[str, _VariableData] = {}
     for name, value in _iter_data_items(data):
-        values = _host_array(value)
+        values = _jax_array(value)
         dims = shape_to_dims.get(tuple(values.shape))
         if dims is None:
             raise ValueError(
@@ -408,13 +403,13 @@ def accumulate_jax_gcm_period_prediction(
 
 def _period_mean_sample_to_variable(sample: PeriodAverageSample) -> _VariableData:
     dims = (_TIME_NAME, *sample.dims)
-    values = sample.values[np.newaxis, ...]
+    values = _jax_array(sample.values)[jnp.newaxis, ...]
     ordered_dims = tuple(dim for dim in _CANONICAL_DIM_ORDER if dim in dims) + tuple(
         dim for dim in dims if dim not in _CANONICAL_DIM_ORDER
     )
     axes = tuple(dims.index(dim) for dim in ordered_dims)
     if axes != tuple(range(len(axes))):
-        values = np.transpose(values, axes=axes)
+        values = jnp.transpose(values, axes=axes)
     return _VariableData(dims=ordered_dims, values=values)
 
 
@@ -470,7 +465,11 @@ def _write_netcdf(
         outfile.attrs["Conventions"] = "CF-1.8"
         for name, values in coordinate_values.items():
             outfile.dimensions[name] = values.shape[0]
-            coordinate = outfile.create_variable(name, (name,), data=values)
+            coordinate = outfile.create_variable(
+                name,
+                (name,),
+                data=array_to_host(values),
+            )
             for attr_name, attr_value in coordinate_attrs.get(name, {}).items():
                 if attr_value is not None:
                     coordinate.attrs[attr_name] = attr_value
@@ -482,7 +481,7 @@ def _write_netcdf(
             variable = outfile.create_variable(
                 name,
                 variable_data.dims,
-                data=variable_data.values,
+                data=array_to_host(variable_data.values),
             )
             for attr_name, attr_value in unit_metadata.get(name, {}).items():
                 if attr_value:

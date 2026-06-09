@@ -3,6 +3,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+import jax
+import jax.numpy as jnp
+
 from tests.assertions import assert_allclose_compact
 from vercor.setups.external.period_averages import (
     PeriodAverageAccumulator,
@@ -24,6 +27,10 @@ def test_period_average_accumulator_preserves_nanmean_counts() -> None:
     mean_sample = accumulator.mean_samples()["temp"]
 
     assert mean_sample.dims == ("x",)
+    assert isinstance(accumulated.sum_values, jax.Array)
+    assert isinstance(accumulated.counts, jax.Array)
+    assert isinstance(mean_sample.values, jax.Array)
+    assert accumulated.counts.dtype == jnp.int32
     assert_allclose_compact(accumulated.counts, np.asarray([2, 1, 0]))
     assert_allclose_compact(mean_sample.values, np.asarray([2.0, 5.0, np.nan]))
 

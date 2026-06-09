@@ -148,6 +148,10 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local Veros spinup period-average validation: focused red/green
   pytest, Black, flake8, mypy, full fast pytest, full pytest, and coverage
   pytest passed as of 2026-06-08.
+- Latest local JAX-backed output-array boundary validation: baseline fast
+  pytest, focused red/green pytest, focused mypy, Black, flake8, full mypy,
+  focused post-format pytest, full fast pytest, full pytest, and coverage
+  pytest passed as of 2026-06-09.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -177,6 +181,44 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-09: JAX-Backed JCM/Veros Output Arrays
+
+- Converted the shared period-average accumulator to store JAX-backed running
+  sums, finite-value counts, and mean samples while preserving current
+  `nanmean` behavior. Counts now use VerCOR's canonical index dtype.
+- Updated JAXGCM and Veros period-output extraction/mean-shaping to keep
+  VerCOR-owned output values as JAX arrays and to use `vercor.dtypes` helpers.
+  Direct NumPy imports were removed from `jax_gcm_output.py`,
+  `period_averages.py`, and `veros_output.py`.
+- Added `vercor.host_arrays` helpers for explicit final host transfer and the
+  deliberate host `int64` NetCDF time-coordinate exception. The output writers
+  now convert to host arrays only at the `h5netcdf` boundary.
+- Tightened production NumPy-boundary and output tests so accumulator internals,
+  JCM accumulation, and Veros snapshots/accumulation are JAX-backed before file
+  writing. Updated `DESIGN.md` and `DEPENDENCIES.md` for the new boundary.
+- Validation run for this change:
+  baseline
+  `conda run -n scipy pytest tests/ -q --fast --tb=short` passed after sandbox
+  approval for `conda run -n scipy`. Focused red
+  `conda run -n scipy pytest tests/test_period_averages.py tests/test_external_components_coverage.py::test_jax_gcm_write_output_persists_mean_dataset tests/test_external_components_coverage.py::test_veros_output_snapshot_uses_variable_metadata_and_current_timestep tests/test_external_components_coverage.py::test_veros_write_output_persists_period_mean_and_coordinates tests/test_production_numpy_boundaries.py -q --tb=short`
+  failed as expected because the accumulator/snapshots were still NumPy-backed
+  and the output modules still imported NumPy. After implementation,
+  `conda run -n scipy pytest tests/test_period_averages.py tests/test_external_components_coverage.py::test_jax_gcm_write_output_persists_mean_dataset tests/test_external_components_coverage.py::test_veros_output_snapshot_uses_variable_metadata_and_current_timestep tests/test_external_components_coverage.py::test_veros_write_output_persists_period_mean_and_coordinates tests/test_production_numpy_boundaries.py -q --tb=short`,
+  `conda run -n scipy mypy vercor/host_arrays.py vercor/setups/external/period_averages.py vercor/setups/external/jax_gcm_output.py vercor/setups/external/veros_output.py tests/test_period_averages.py tests/test_external_components_coverage.py tests/test_production_numpy_boundaries.py`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/test_api_boundaries.py::test_setup_helper_and_external_output_ownership_boundaries -q --tb=short`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
+- Failed approaches recorded: the first post-implementation fast suite exposed
+  a stale API-boundary assertion that still required NumPy in
+  `period_averages.py` and `veros_output.py`; the assertion was updated to make
+  `host_arrays.py` the explicit NumPy owner for output host conversion.
 
 ### 2026-06-08: Veros Spinup Period-Average Accumulation
 

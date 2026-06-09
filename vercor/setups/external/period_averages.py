@@ -1,4 +1,4 @@
-"""Host-side streaming accumulators for period-average output variables."""
+"""JAX-backed streaming accumulators for period-average output variables."""
 
 from __future__ import annotations
 
@@ -7,16 +7,18 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
 
-import numpy as np
-from numpy.typing import NDArray
+import jax
+import jax.numpy as jnp
+
+from vercor.dtypes import as_jax_real_array, jax_index_dtype
 
 
 @dataclass(frozen=True)
 class PeriodAverageSample:
-    """One host-backed output variable sample with dimension metadata."""
+    """One JAX-backed output variable sample with dimension metadata."""
 
     dims: tuple[str, ...]
-    values: NDArray[Any]
+    values: Any
     attrs: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -25,20 +27,20 @@ class AccumulatedPeriodVariable:
     """Running sum and per-element finite-value counts for one variable."""
 
     dims: tuple[str, ...]
-    sum_values: NDArray[Any]
-    counts: NDArray[Any]
+    sum_values: jax.Array
+    counts: jax.Array
     attrs: Mapping[str, Any] = field(default_factory=dict)
 
     def mean_sample(self) -> PeriodAverageSample:
         """Return the current period mean, preserving ``nanmean`` semantics."""
 
-        mean_dtype = np.result_type(self.sum_values.dtype, np.float32)
-        mean_values = np.full(self.sum_values.shape, np.nan, dtype=mean_dtype)
-        np.divide(
-            self.sum_values,
-            self.counts,
-            out=mean_values,
-            where=self.counts > 0,
+        mean_dtype = jnp.result_type(self.sum_values.dtype, jnp.float32)
+        denominator = jnp.where(self.counts > 0, self.counts, 1)
+        finite_means = self.sum_values / denominator
+        mean_values = jnp.where(
+            self.counts > 0,
+            finite_means,
+            jnp.full(self.sum_values.shape, jnp.nan, dtype=mean_dtype),
         )
         return PeriodAverageSample(
             dims=self.dims,
@@ -141,12 +143,18 @@ def _sample_sum_and_counts(
     sample: PeriodAverageSample,
     *,
     summation_dim: str | None,
-) -> tuple[tuple[str, ...], NDArray[Any], NDArray[Any]]:
+) -> tuple[tuple[str, ...], jax.Array, jax.Array]:
     dims = sample.dims
     if not isinstance(dims, tuple) or not all(isinstance(dim, str) for dim in dims):
         raise ValueError(f"Period average variable {name!r} has invalid dimensions.")
 
-    values = np.asarray(sample.values)
+    try:
+        values = as_jax_real_array(sample.values)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Period average variable {name!r} must contain numeric values."
+        ) from exc
+
     if values.ndim != len(dims):
         raise ValueError(
             f"Period average variable {name!r} has shape {values.shape} "
@@ -154,14 +162,14 @@ def _sample_sum_and_counts(
         )
 
     try:
-        finite = np.isfinite(values)
+        finite = jnp.isfinite(values)
     except TypeError as exc:
         raise ValueError(
             f"Period average variable {name!r} must contain numeric values."
         ) from exc
 
-    sum_values = np.where(finite, values, 0.0)
-    counts = finite.astype(np.int64)
+    sum_values = jnp.where(finite, values, 0.0)
+    counts = finite.astype(jax_index_dtype())
 
     if summation_dim is None:
         return dims, sum_values, counts
@@ -175,8 +183,8 @@ def _sample_sum_and_counts(
     reduced_dims = dims[:axis] + dims[axis + 1 :]  # noqa: E203
     return (
         reduced_dims,
-        np.sum(sum_values, axis=axis),
-        np.sum(counts, axis=axis),
+        jnp.sum(sum_values, axis=axis),
+        jnp.sum(counts, axis=axis),
     )
 
 

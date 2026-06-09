@@ -1056,6 +1056,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     veros_output_source = Path("vercor/setups/external/veros_output.py").read_text(
         encoding="utf-8"
     )
+    host_arrays_source = Path("vercor/host_arrays.py").read_text(encoding="utf-8")
     camulator_imports_source = Path(
         "vercor/setups/external/camulator_imports.py"
     ).read_text(encoding="utf-8")
@@ -1154,8 +1155,12 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "import numpy" not in veros_gcm_source
     assert "import numpy" not in veros_runtime_source
     assert "import h5netcdf" in veros_output_source
-    assert "import numpy" in period_averages_source
-    assert "import numpy" in veros_output_source
+    assert "import numpy" not in period_averages_source
+    assert "import numpy" not in veros_output_source
+    assert "import jax.numpy as jnp" in period_averages_source
+    assert "import jax.numpy as jnp" in veros_output_source
+    assert "def array_to_host(" in host_arrays_source
+    assert "def host_int64_array(" in host_arrays_source
     assert "from vercor.setups.external.camulator_wind_filter import" in (
         camulator_imports_source
     )

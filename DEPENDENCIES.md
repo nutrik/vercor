@@ -7,7 +7,7 @@
 7. `vercor/fluxes/vertical_coordinates.py` - hybrid/sigma-coordinate pressure and altitude helpers built on (1, 4)
 8. `vercor/fluxes/utilities.py` - JAX-native scalar/array thermodynamic helpers built on (1, 4)
 9. `vercor/fluxes/bulk_formula_cesm.py` - JAX-native atmosphere-ocean / atmosphere-ice bulk flux kernels built on (1, 4, 8)
-10. `vercor/host_arrays.py` - explicit JAX/NumPy host-transfer boundary for non-differentiable adapters and output
+10. `vercor/host_arrays.py` - explicit JAX/NumPy host-transfer boundary for non-differentiable adapters, output, and host `int64` NetCDF time coordinates
 11. `vercor/pytree_utils.py` - generic leafwise PyTree transforms and casting helpers used by setup adapters
 12. `vercor/grid.py` - JAX-friendly `RectilinearGrid` holder with eager validation and PyTree registration built on (3)
 13. `vercor/grid_geometry.py` - rectilinear grid construction, center-to-edge geometry, and grid identity built on (1, 12)
@@ -28,13 +28,13 @@
 28. `vercor/exchange.py`, `vercor/setups/exchange_recipes.py`, and `vercor/setups/coupler_helpers.py` - public exchange declarations and exchange-owned field/factory aliases, shared exchange field recipes, compact `ExchangeSpec` construction, and orchestration helpers built on (12, 17, 18, 19)
 29. `vercor/setups/external/jax_gcm_tools.py` - JCM-specific parameter and input-data helpers built on (1, 7, 8, 11)
 30. `vercor/setups/external/jax_gcm_fields.py` - public package-internal JCM output-field mapping and surface-temperature forcing helpers built on (1, 7)
-31. `vercor/setups/external/period_averages.py` and `jax_gcm_output.py` - shared host-side sum/count period-average accumulation plus JAXGCM output cadence, VerCOR-calendar time encoding, and direct h5netcdf averaged NetCDF writing helpers built on (6, 10, 25)
+31. `vercor/setups/external/period_averages.py` and `jax_gcm_output.py` - shared JAX-backed sum/count period-average accumulation plus JAXGCM output cadence, VerCOR-calendar time encoding, and direct h5netcdf averaged NetCDF writing helpers with host conversion delegated to (10), built on (1, 6, 10, 25)
 32. `vercor/setups/external/jax_gcm_runtime.py`, `jax_gcm_state.py`, and `jax_gcm.py` - JAXGCM private runtime-state protocol, payload/hooks/stepping, setup-state/lifecycle and canonical `JCMState` ownership, named factory callback wiring, and thin JCM adapter factory boundary built on (1, 3, 11, 26, 29, 30, 31, 62)
 33. `vercor/setups/external/veros_runtime_settings.py` - explicit lazy Veros backend/runtime configuration side-effect boundary
 34. `vercor/setups/external/veros_setup.py` - concrete Veros setup subclass and setup policy built on (33)
 35. `vercor/setups/external/veros_fluxes.py` - Veros-to-VerCOR flux conversion built on (1, 4, 9, 33)
 36. `vercor/setups/external/veros_state.py` - public package-internal Veros host-state copy, mutation, named forcing-field container, forcing, and stepping helpers built on (1, 10, 33)
-37. `vercor/setups/external/veros_output.py`, `veros_runtime.py`, `veros_gcm_state.py`, and `veros_gcm.py` - Veros opt-in h5netcdf period-output extraction/writing, private runtime-state protocol, host-runtime stepping helper, setup-state/lifecycle ownership, named host step adapter, and thin adapter factory boundary built on (6, 10, 25, 31, 34, 35, 36)
+37. `vercor/setups/external/veros_output.py`, `veros_runtime.py`, `veros_gcm_state.py`, and `veros_gcm.py` - Veros opt-in JAX-backed h5netcdf period-output extraction/writing, private runtime-state protocol, host-runtime stepping helper, setup-state/lifecycle ownership, named host step adapter, and thin adapter factory boundary built on (1, 6, 10, 25, 31, 34, 35, 36)
 38. `vercor/setups/external/camulator_imports.py` - public package-internal lazy CREDIT/postblock/CAMulator wind-filter optional-dependency loading
 39. `vercor/setups/external/camulator_forcing.py` - CAMulator config loading, forcing context, and runtime forcing cursors built on (26, 38)
 40. `vercor/setups/external/camulator_tensors.py` - typed CAMulator tensor-variable indexing, public package-internal static forcing tensor staging, and JAX-to-Torch transfer helpers

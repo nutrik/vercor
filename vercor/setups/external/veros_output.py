@@ -9,10 +9,11 @@ from typing import Any
 
 import h5netcdf
 import jax
-import numpy as np
-from numpy.typing import NDArray
+import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
+from vercor.dtypes import as_jax_index_array, as_jax_real_array
+from vercor.host_arrays import array_to_host
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.setups.external.jax_gcm_output import output_time_value_and_attrs
 from vercor.setups.external.period_averages import (
@@ -32,10 +33,10 @@ _GHOST_DIMS = ("xt", "yt", "xu", "yu")
 
 @dataclass(frozen=True)
 class VerosOutputVariable:
-    """Host-backed Veros variable values with resolved NetCDF metadata."""
+    """JAX-backed Veros variable values with resolved NetCDF metadata."""
 
     dims: tuple[str, ...]
-    values: NDArray[Any]
+    values: jax.Array
     attrs: dict[str, Any]
 
 
@@ -141,8 +142,8 @@ def _resolve_metadata(value: Any, settings: Any) -> Any:
     return value
 
 
-def _host_array(value: Any) -> NDArray[Any]:
-    return np.asarray(jax.device_get(value))
+def _jax_array(value: Any) -> jax.Array:
+    return as_jax_real_array(value)
 
 
 def _variable_definition(name: str) -> Any:
@@ -176,26 +177,26 @@ def _attrs_for_variable(variable: Any, settings: Any) -> dict[str, Any]:
 
 
 def _current_timestep_index(vs: Any) -> int:
-    return int(_host_array(vs.tau))
+    return int(array_to_host(as_jax_index_array(vs.tau)))
 
 
 def _drop_timestep_dim(
-    values: NDArray[Any],
+    values: jax.Array,
     dims: tuple[str, ...],
     vs: Any,
-) -> tuple[NDArray[Any], tuple[str, ...]]:
+) -> tuple[jax.Array, tuple[str, ...]]:
     if _TIMESTEP_DIM not in dims:
         return values, dims
 
     time_axis = dims.index(_TIMESTEP_DIM)
-    current_values = np.take(values, _current_timestep_index(vs), axis=time_axis)
+    current_values = jnp.take(values, _current_timestep_index(vs), axis=time_axis)
     return current_values, dims[:time_axis] + dims[time_axis + 1 :]  # noqa: E203
 
 
 def _remove_ghost_cells(
-    values: NDArray[Any],
+    values: jax.Array,
     dims: tuple[str, ...],
-) -> NDArray[Any]:
+) -> jax.Array:
     if not dims:
         return values
     slices = tuple(slice(2, -2) if dim in _GHOST_DIMS else slice(None) for dim in dims)
@@ -206,7 +207,7 @@ def _extract_variable(veros_state: Any, name: str) -> VerosOutputVariable:
     vs = veros_state.variables
     variable = _variable_definition(name)
     dims = _resolved_dims(variable, veros_state.settings, name)
-    values = _host_array(getattr(vs, name))
+    values = _jax_array(getattr(vs, name))
     values, dims = _drop_timestep_dim(values, dims, vs)
     values = _remove_ghost_cells(values, dims)
     if values.ndim != len(dims):
@@ -228,7 +229,7 @@ def _coordinate_variable(veros_state: Any, dim: str) -> VerosOutputVariable:
         raise ValueError(f"Veros coordinate {dim!r} must have dimensions ({dim!r},).")
     if not hasattr(veros_state.variables, dim):
         raise ValueError(f"Veros coordinate variable {dim!r} is missing.")
-    values = _remove_ghost_cells(_host_array(getattr(veros_state.variables, dim)), dims)
+    values = _remove_ghost_cells(_jax_array(getattr(veros_state.variables, dim)), dims)
     return VerosOutputVariable(
         dims=dims,
         values=values,
@@ -254,13 +255,13 @@ def _mean_accumulated_variables(
 
 def _mean_sample_to_output_variable(sample: PeriodAverageSample) -> VerosOutputVariable:
     axes = tuple(reversed(range(sample.values.ndim)))
-    values = sample.values
+    values = _jax_array(sample.values)
     if axes != tuple(range(sample.values.ndim)):
-        values = np.transpose(values, axes=axes)
+        values = jnp.transpose(values, axes=axes)
 
     return VerosOutputVariable(
         dims=(_TIME_NAME, *reversed(sample.dims)),
-        values=values[np.newaxis, ...],
+        values=values[jnp.newaxis, ...],
         attrs=dict(sample.attrs),
     )
 
@@ -291,7 +292,7 @@ def _write_netcdf(
         time_variable = outfile.create_variable(
             _TIME_NAME,
             (_TIME_NAME,),
-            data=time_values,
+            data=array_to_host(time_values),
         )
         for attr_name, attr_value in time_attrs.items():
             if attr_value is not None:
@@ -303,7 +304,7 @@ def _write_netcdf(
             coordinate_variable = outfile.create_variable(
                 dim,
                 (dim,),
-                data=coordinate.values,
+                data=array_to_host(coordinate.values),
             )
             for attr_name, attr_value in coordinate.attrs.items():
                 coordinate_variable.attrs[attr_name] = attr_value
@@ -315,7 +316,7 @@ def _write_netcdf(
             output_variable = outfile.create_variable(
                 name,
                 variable.dims,
-                data=variable.values,
+                data=array_to_host(variable.values),
             )
             for attr_name, attr_value in variable.attrs.items():
                 output_variable.attrs[attr_name] = attr_value
