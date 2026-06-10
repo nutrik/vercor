@@ -33,6 +33,8 @@ from vercor.components import (
 )
 from vercor.dtypes import as_jax_real_array, jax_ones
 from vercor.grid import RectilinearGrid
+import vercor.output.jax_gcm as _jax_gcm_output
+from vercor.output.period_averages import PeriodAverageAccumulator
 from vercor.pytree_utils import asfloat, mean_leaf
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
@@ -40,10 +42,8 @@ from vercor.setups._time_helpers import (
     seed_grid_field_defaults,
 )
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
-import vercor.setups.external.jax_gcm_output as _jax_gcm_output
 import vercor.setups.external.jax_gcm_runtime as _jax_gcm_runtime
 from vercor.setups.external.jax_gcm_tools import change_jcm_parameter_values
-from vercor.setups.external.period_averages import PeriodAverageAccumulator
 from vercor.types import RuntimeArray
 
 

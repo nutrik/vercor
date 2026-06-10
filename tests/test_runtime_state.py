@@ -164,7 +164,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         path.read_text(encoding="utf-8")
         for path in sorted(Path("vercor/diagnostics").glob("*.py"))
     )
-    output_source = Path("vercor/output.py").read_text(encoding="utf-8")
+    output_source = Path("vercor/output/runtime.py").read_text(encoding="utf-8")
     jax_gcm_source = Path("vercor/setups/external/jax_gcm.py").read_text(
         encoding="utf-8"
     )

@@ -11,16 +11,16 @@ import jax.numpy as jnp
 from vercor.components import Component, ComponentStepContext, ComponentStepResult
 from vercor.dtypes import as_jax_real_array, jax_zeros
 from vercor.exceptions import ComponentError, CouplerError
+from vercor.output.jax_gcm import (
+    accumulate_jax_gcm_period_prediction,
+    write_jax_gcm_averages_output,
+)
+from vercor.output.period_averages import PeriodAverageAccumulator
+from vercor.output.time import should_write_period_output
 from vercor.pytree import PyTreeNodeMixin
 from vercor.pytree_utils import mean_leaf, stack_objects, unwrap_leading_dims
 from vercor.settings import VercorSettings
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
-from vercor.setups.external.jax_gcm_output import (
-    accumulate_jax_gcm_period_prediction,
-    should_write_period_output,
-    write_jax_gcm_averages_output,
-)
-from vercor.setups.external.period_averages import PeriodAverageAccumulator
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:

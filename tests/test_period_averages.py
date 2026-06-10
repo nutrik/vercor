@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from tests.assertions import assert_allclose_compact
-from vercor.setups.external.period_averages import (
+from vercor.output.period_averages import (
     PeriodAverageAccumulator,
     PeriodAverageSample,
 )

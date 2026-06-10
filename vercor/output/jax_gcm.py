@@ -1,29 +1,29 @@
-"""JAXGCM output cadence and NetCDF writing helpers."""
+"""JAXGCM output extraction and period-average writing helpers."""
 
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from importlib import resources
 from pathlib import Path
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Protocol, cast
 
-import h5netcdf
 import jax
 import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array, jax_index_dtype
-from vercor.host_arrays import array_to_host, host_int64_array
 from vercor.jax_logging import LoggerLike, get_default_logger
-from vercor.setups.external.period_averages import (
+from vercor.output.netcdf import write_netcdf_dataset
+from vercor.output.period_averages import (
     PeriodAverageAccumulator,
     PeriodAverageSample,
 )
+from vercor.output.time import TIME_NAME, output_time_value_and_attrs
+from vercor.output.variables import OutputVariable
 from vercor.types import RuntimeArray
 
-_TIME_NAME = "time"
+_TIME_NAME = TIME_NAME
 _LEVEL_NAME = "level"
 _LON_NAME = "lon"
 _LAT_NAME = "lat"
@@ -43,9 +43,6 @@ _CANONICAL_DIM_ORDER = (
     _LON_MODE_NAME,
     _LAT_MODE_NAME,
 )
-_TIME_UNITS = "microseconds since 0001-01-01 00:00:00.000000"
-_MICROSECONDS_PER_SECOND = 1_000_000
-_SECONDS_PER_DAY = 86_400
 
 
 class _PredictionLike(Protocol):
@@ -70,108 +67,6 @@ class _PhysicsModuleLike(Protocol):
     ) -> dict[str, Any]: ...
 
 
-@dataclass(frozen=True)
-class _VariableData:
-    """Variable payload with source dimensions and JAX-backed values."""
-
-    dims: tuple[str, ...]
-    values: jax.Array
-
-
-def is_period_end(
-    time: datetime | ModelDateTime,
-    dt: timedelta,
-    frequency: Literal["day", "month", "year"],
-) -> bool:
-    """Return whether ``time + dt`` crosses the requested calendar boundary."""
-
-    next_time = time + dt
-
-    if frequency == "day":
-        return (
-            next_time.year != time.year
-            or next_time.month != time.month
-            or next_time.day != time.day
-        )
-    if frequency == "month":
-        return next_time.year != time.year or next_time.month != time.month
-
-    return next_time.year != time.year
-
-
-def should_write_period_output(
-    *,
-    time: datetime | ModelDateTime,
-    dt: timedelta,
-    output_frequency: str | None,
-) -> bool:
-    """Return whether JAXGCM should write an output average for this step."""
-
-    if output_frequency is None:
-        return True
-
-    if not isinstance(output_frequency, str):
-        return False
-
-    frequency = output_frequency.lower()
-    if frequency not in ("day", "month", "year"):
-        return False
-
-    return is_period_end(
-        time=time,
-        dt=dt,
-        frequency=cast(Literal["day", "month", "year"], frequency),
-    )
-
-
-def _timedelta_to_microseconds(delta: timedelta) -> int:
-    return (
-        delta.days * _SECONDS_PER_DAY + delta.seconds
-    ) * _MICROSECONDS_PER_SECOND + delta.microseconds
-
-
-def _time_value_and_attrs(
-    time: datetime | ModelDateTime,
-) -> tuple[Any, dict[str, Any]]:
-    if isinstance(time, datetime):
-        delta = time - datetime(1, 1, 1)
-        return (
-            host_int64_array([_timedelta_to_microseconds(delta)]),
-            {
-                "units": _TIME_UNITS,
-                "calendar": "proleptic_gregorian",
-                "isoformat": time.isoformat(),
-                "day_of_year": time.timetuple().tm_yday,
-            },
-        )
-
-    origin = type(time)(1, 1, 1, 0, 0, 0, 0, 1)
-    model_delta = time - origin
-    if not isinstance(model_delta, timedelta):
-        raise TypeError("model-calendar output time subtraction must return timedelta")
-
-    calendar = "360_day" if time.fixed_30_day_months else "noleap"
-    return (
-        host_int64_array([_timedelta_to_microseconds(model_delta)]),
-        {
-            "units": _TIME_UNITS,
-            "calendar": calendar,
-            "isoformat": time.isoformat(),
-            "day_of_year": time.day_of_year,
-            "days_per_year": time.days_per_year,
-            "fixed_30_day_months": int(time.fixed_30_day_months),
-        },
-    )
-
-
-def output_time_value_and_attrs(
-    time: datetime | ModelDateTime,
-) -> tuple[Any, dict[str, Any]]:
-    """Return NetCDF time-coordinate values and calendar attrs for period output."""
-
-    return _time_value_and_attrs(time)
-
-
 def _vertical_layers(coords: Any) -> int:
     level = as_jax_real_array(coords.vertical.centers)
     layers = getattr(coords.vertical, "layers", None)
@@ -190,36 +85,50 @@ def _float0s_to_nans(pytree: Any) -> Any:
     return jax.tree_util.tree_map(_float0_leaf_to_nan, pytree)
 
 
-def _coordinate_values(
+def _coordinate_variables(
     *,
     coords: Any,
     output_time: datetime | ModelDateTime,
-) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+) -> dict[str, OutputVariable]:
     lon, sin_lat = coords.horizontal.nodal_axes
     lon_k, lat_k = coords.horizontal.modal_axes
     level = as_jax_real_array(coords.vertical.centers)
     layers = _vertical_layers(coords)
-    time_values, time_attrs = _time_value_and_attrs(output_time)
+    time_values, time_attrs = output_time_value_and_attrs(output_time)
 
-    coordinate_values = {
-        _TIME_NAME: time_values,
-        _LON_NAME: as_jax_real_array(lon) * 180.0 / jnp.pi,
-        _LAT_NAME: jnp.arcsin(as_jax_real_array(sin_lat)) * 180.0 / jnp.pi,
-        _LON_MODE_NAME: as_jax_index_array(lon_k),
-        _LAT_MODE_NAME: as_jax_index_array(lat_k),
-        _LEVEL_NAME: level,
-        _WVI_NAME: as_jax_index_array([1, 2]),
-        _HSG_LEVEL_NAME: jnp.arange(layers + 1, dtype=jax_index_dtype()),
+    coordinate_variables = {
+        _TIME_NAME: OutputVariable((_TIME_NAME,), time_values, time_attrs),
+        _LON_NAME: OutputVariable(
+            (_LON_NAME,),
+            as_jax_real_array(lon) * 180.0 / jnp.pi,
+            {"units": "degrees_east"},
+        ),
+        _LAT_NAME: OutputVariable(
+            (_LAT_NAME,),
+            jnp.arcsin(as_jax_real_array(sin_lat)) * 180.0 / jnp.pi,
+            {"units": "degrees_north"},
+        ),
+        _LON_MODE_NAME: OutputVariable(
+            (_LON_MODE_NAME,),
+            as_jax_index_array(lon_k),
+        ),
+        _LAT_MODE_NAME: OutputVariable(
+            (_LAT_MODE_NAME,),
+            as_jax_index_array(lat_k),
+        ),
+        _LEVEL_NAME: OutputVariable((_LEVEL_NAME,), level),
+        _WVI_NAME: OutputVariable((_WVI_NAME,), as_jax_index_array([1, 2])),
+        _HSG_LEVEL_NAME: OutputVariable(
+            (_HSG_LEVEL_NAME,),
+            jnp.arange(layers + 1, dtype=jax_index_dtype()),
+        ),
     }
     if layers != 1:
-        coordinate_values[_SURFACE_NAME] = as_jax_real_array([1.0])
-
-    coordinate_attrs = {
-        _TIME_NAME: time_attrs,
-        _LON_NAME: {"units": "degrees_east"},
-        _LAT_NAME: {"units": "degrees_north"},
-    }
-    return coordinate_values, coordinate_attrs
+        coordinate_variables[_SURFACE_NAME] = OutputVariable(
+            (_SURFACE_NAME,),
+            as_jax_real_array([1.0]),
+        )
+    return coordinate_variables
 
 
 def _additional_coordinate_values(coords: Any) -> dict[str, jax.Array]:
@@ -336,7 +245,7 @@ def _prediction_to_variables(
     *,
     coords: Any,
     physics_module: _PhysicsModuleLike,
-) -> dict[str, _VariableData]:
+) -> dict[str, OutputVariable]:
     dynamics_predictions = _float0s_to_nans(prediction.dynamics)
     physics_predictions = _float0s_to_nans(prediction.physics)
     time_values = as_jax_real_array(prediction.times)
@@ -356,17 +265,18 @@ def _prediction_to_variables(
         )
     )
 
-    variables: dict[str, _VariableData] = {}
+    variables: dict[str, OutputVariable] = {}
     for name, value in _iter_data_items(data):
         values = as_jax_real_array(value)
         dims = shape_to_dims.get(tuple(values.shape))
         if dims is None:
             raise ValueError(
-                f"Value of shape {values.shape} for variable {name!r} is not recognized."
+                f"Value of shape {values.shape} for variable {name!r} "
+                "is not recognized."
             )
         if _TIME_NAME not in dims:
             raise ValueError(f"Variable {name!r} does not include a time dimension.")
-        variables[name] = _VariableData(dims=dims, values=values)
+        variables[name] = OutputVariable(dims=dims, values=values)
     return variables
 
 
@@ -390,6 +300,7 @@ def accumulate_jax_gcm_period_prediction(
             name: PeriodAverageSample(
                 dims=variable.dims,
                 values=variable.values,
+                attrs=variable.attrs,
             )
             for name, variable in variables.items()
         },
@@ -397,7 +308,7 @@ def accumulate_jax_gcm_period_prediction(
     )
 
 
-def _period_mean_sample_to_variable(sample: PeriodAverageSample) -> _VariableData:
+def _period_mean_sample_to_variable(sample: PeriodAverageSample) -> OutputVariable:
     dims = (_TIME_NAME, *sample.dims)
     values = as_jax_real_array(sample.values)[jnp.newaxis, ...]
     ordered_dims = tuple(dim for dim in _CANONICAL_DIM_ORDER if dim in dims) + tuple(
@@ -406,7 +317,7 @@ def _period_mean_sample_to_variable(sample: PeriodAverageSample) -> _VariableDat
     axes = tuple(dims.index(dim) for dim in ordered_dims)
     if axes != tuple(range(len(axes))):
         values = jnp.transpose(values, axes=axes)
-    return _VariableData(dims=ordered_dims, values=values)
+    return OutputVariable(dims=ordered_dims, values=values, attrs=dict(sample.attrs))
 
 
 def _jax_gcm_mean_samples(
@@ -450,38 +361,31 @@ def _write_netcdf(
     output: str,
     coords: Any,
     output_time: datetime | ModelDateTime,
-    variables: dict[str, _VariableData],
+    variables: dict[str, OutputVariable],
     unit_metadata: dict[str, dict[str, str]],
 ) -> None:
-    coordinate_values, coordinate_attrs = _coordinate_values(
-        coords=coords,
-        output_time=output_time,
+    write_netcdf_dataset(
+        output=output,
+        coordinate_variables=_coordinate_variables(
+            coords=coords,
+            output_time=output_time,
+        ),
+        data_variables={
+            name: OutputVariable(
+                dims=variable_data.dims,
+                values=variable_data.values,
+                attrs={
+                    **dict(variable_data.attrs),
+                    **{
+                        attr_name: attr_value
+                        for attr_name, attr_value in unit_metadata.get(name, {}).items()
+                        if attr_value
+                    },
+                },
+            )
+            for name, variable_data in variables.items()
+        },
     )
-    with h5netcdf.File(output, "w") as outfile:
-        outfile.attrs["Conventions"] = "CF-1.8"
-        for name, values in coordinate_values.items():
-            outfile.dimensions[name] = values.shape[0]
-            coordinate = outfile.create_variable(
-                name,
-                (name,),
-                data=array_to_host(values),
-            )
-            for attr_name, attr_value in coordinate_attrs.get(name, {}).items():
-                if attr_value is not None:
-                    coordinate.attrs[attr_name] = attr_value
-
-        for name, variable_data in variables.items():
-            for dim, size in zip(variable_data.dims, variable_data.values.shape):
-                if dim not in outfile.dimensions:
-                    outfile.dimensions[dim] = size
-            variable = outfile.create_variable(
-                name,
-                variable_data.dims,
-                data=array_to_host(variable_data.values),
-            )
-            for attr_name, attr_value in unit_metadata.get(name, {}).items():
-                if attr_value:
-                    variable.attrs[attr_name] = attr_value
 
 
 def write_jax_gcm_averages_output(
@@ -512,3 +416,9 @@ def write_jax_gcm_averages_output(
     )
 
     accumulator.clear()
+
+
+__all__ = [
+    "accumulate_jax_gcm_period_prediction",
+    "write_jax_gcm_averages_output",
+]

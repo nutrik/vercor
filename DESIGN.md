@@ -83,10 +83,13 @@ Model restart files are supported and written in compact HDF5 format using `h5py
 Current example output snapshots are also written in HDF5. JAXGCM and Veros
 averaged period outputs are written directly with `h5netcdf`, bypassing xarray
 conversion so the adapters can preserve VerCOR calendar timestamps,
-shape-derived JCM coordinates, and native Veros metadata. VerCOR-owned period
-output samples, accumulators, extracted variables, and mean variables stay
-JAX-backed until the file boundary; `vercor.host_arrays` owns the final host
-transfer. NetCDF time-coordinate values intentionally remain host `int64`
+shape-derived JCM coordinates, and native Veros metadata. Shared period-output
+cadence, calendar time encoding, accumulation, variable containers, and NetCDF
+writing live in `vercor.output`; model-specific JAXGCM and Veros modules only
+adapt native model objects into that shared output boundary. VerCOR-owned
+period output samples, accumulators, extracted variables, and mean variables
+stay JAX-backed until the file boundary; `vercor.host_arrays` owns the final
+host transfer. NetCDF time-coordinate values intentionally remain host `int64`
 arrays because the CF microsecond offsets can overflow JAX integers when
 `jax_enable_x64` is disabled.
 
@@ -389,28 +392,27 @@ a private protocol rather than an unbounded state object.
 spinup policy, lifecycle callbacks, and the canonical `JCMState` bundle.
 `vercor.setups.external.jax_gcm` remains a thin public factory that constructs
 setup state and binds named lifecycle callbacks without reexporting state
-bundles or owning runtime payload/setup-state internals. JAXGCM output cadence
-and direct `h5netcdf` average-file writing live in
-`vercor.setups.external.jax_gcm_output`; this boundary streams prediction
-objects into the shared JAX-backed sum/count period accumulator instead of
-retaining all period samples or calling xarray adapters, and stores runtime
-calendar metadata from VerCOR step contexts. Surface-temperature cleanup and
-output-field mapping live in
+bundles or owning runtime payload/setup-state internals. JAXGCM output
+extraction and mean-variable shaping live in `vercor.output.jax_gcm`, which
+streams prediction objects into the shared JAX-backed sum/count period
+accumulator instead of retaining all period samples or calling xarray adapters.
+Shared cadence, calendar time metadata, and direct `h5netcdf` writing live in
+`vercor.output.time`, `vercor.output.period_averages`, and
+`vercor.output.netcdf`. Surface-temperature cleanup and output-field mapping
+live in
 `vercor.setups.external.jax_gcm_fields`. Veros host-runtime flux application and
 substep orchestration live in
 `vercor.setups.external.veros_runtime` behind a private runtime-state protocol.
 `vercor.setups.external.veros_gcm_state` owns Veros setup-time model resources,
 spinup policy, grid derivation, and lifecycle callbacks, while
 `vercor.setups.external.veros_gcm` remains the thin public factory.
-The shared output-period accumulator lives in
-`vercor.setups.external.period_averages` and stores one running sum plus one
+The shared output-period accumulator stores one running sum plus one
 finite-value count array per variable as JAX arrays, preserving current
 `nanmean` semantics without retaining every timestep. Opt-in Veros period-output
-extraction, native Veros variable metadata handling, ghost-cell removal,
-write-time native Veros spatial-axis transposition, and direct `h5netcdf`
-average-file writing live in
-`vercor.setups.external.veros_output`; `vercor.setups.external.veros_runtime`
-streams selected snapshots into that accumulator and flushes them with the same
+extraction, native Veros variable metadata handling, ghost-cell removal, and
+write-time native Veros spatial-axis transposition live in
+`vercor.output.veros`; `vercor.setups.external.veros_runtime` streams selected
+snapshots into the shared accumulator and flushes them with the same
 day/month/year cadence policy used by JAXGCM. Veros average files keep VerCOR's
 lowercase `time` dimension while matching native Veros spatial NetCDF dimension
 order, and the accumulator averages only across recorded runtime samples rather
@@ -510,7 +512,8 @@ Production kernels and adapters should use the dtype helpers rather than
 hard-coded `jnp.float64`, `jnp.float32`, `jnp.float_`, `jnp.int64`, or
 `jnp.int32` annotations. NumPy remains restricted to explicit host and dtype
 boundaries. File-output adapters should keep VerCOR-owned values JAX-backed and
-call `vercor.host_arrays` only when a non-JAX consumer, such as `h5netcdf` or a
+delegate final file-transfer conversion to `vercor.output.netcdf`, which calls
+`vercor.host_arrays` only when a non-JAX consumer, such as `h5netcdf` or a
 host-backed model runtime, requires a host array.
 
 ### Logging across JAX runtime transforms

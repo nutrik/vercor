@@ -1,43 +1,35 @@
-"""Veros period-output extraction and NetCDF writing helpers."""
+"""Veros period-output extraction and average-file helpers."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-import h5netcdf
-import jax
 import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor.host_arrays import array_to_host
 from vercor.jax_logging import LoggerLike, get_default_logger
-from vercor.setups.external.jax_gcm_output import output_time_value_and_attrs
-from vercor.setups.external.period_averages import (
+from vercor.output.netcdf import write_netcdf_dataset
+from vercor.output.period_averages import (
     PeriodAverageAccumulator,
     PeriodAverageSample,
 )
+from vercor.output.time import TIME_NAME, output_time_value_and_attrs
+from vercor.output.variables import OutputVariable
 from vercor.setups.external.veros_runtime_settings import configure_veros_runtime
 
 configure_veros_runtime()
 
 from veros import variables as veros_variables  # noqa: E402
 
-_TIME_NAME = "time"
+_TIME_NAME = TIME_NAME
 _TIMESTEP_DIM = "timesteps"
 _GHOST_DIMS = ("xt", "yt", "xu", "yu")
 
-
-@dataclass(frozen=True)
-class VerosOutputVariable:
-    """JAX-backed Veros variable values with resolved NetCDF metadata."""
-
-    dims: tuple[str, ...]
-    values: jax.Array
-    attrs: dict[str, Any]
+VerosOutputVariable = OutputVariable
 
 
 def normalize_veros_output_variables(
@@ -69,7 +61,7 @@ def normalize_veros_output_variables(
 def extract_veros_output_snapshot(
     veros_state: Any,
     output_variables: Sequence[str],
-) -> dict[str, VerosOutputVariable]:
+) -> dict[str, OutputVariable]:
     """Extract selected Veros variables at the current state timestep."""
 
     selected_variables = normalize_veros_output_variables(
@@ -81,7 +73,7 @@ def extract_veros_output_snapshot(
 
 def accumulate_veros_output_snapshot(
     accumulator: PeriodAverageAccumulator,
-    snapshot: Mapping[str, VerosOutputVariable],
+    snapshot: Mapping[str, OutputVariable],
 ) -> None:
     """Accumulate one selected Veros output snapshot for period averaging."""
 
@@ -177,10 +169,10 @@ def _current_timestep_index(vs: Any) -> int:
 
 
 def _drop_timestep_dim(
-    values: jax.Array,
+    values: jnp.ndarray,
     dims: tuple[str, ...],
     vs: Any,
-) -> tuple[jax.Array, tuple[str, ...]]:
+) -> tuple[jnp.ndarray, tuple[str, ...]]:
     if _TIMESTEP_DIM not in dims:
         return values, dims
 
@@ -190,16 +182,16 @@ def _drop_timestep_dim(
 
 
 def _remove_ghost_cells(
-    values: jax.Array,
+    values: jnp.ndarray,
     dims: tuple[str, ...],
-) -> jax.Array:
+) -> jnp.ndarray:
     if not dims:
         return values
     slices = tuple(slice(2, -2) if dim in _GHOST_DIMS else slice(None) for dim in dims)
     return values[slices]
 
 
-def _extract_variable(veros_state: Any, name: str) -> VerosOutputVariable:
+def _extract_variable(veros_state: Any, name: str) -> OutputVariable:
     vs = veros_state.variables
     variable = _variable_definition(name)
     dims = _resolved_dims(variable, veros_state.settings, name)
@@ -211,14 +203,14 @@ def _extract_variable(veros_state: Any, name: str) -> VerosOutputVariable:
             f"Veros output variable {name!r} has shape {values.shape} "
             f"but dimensions {dims}."
         )
-    return VerosOutputVariable(
+    return OutputVariable(
         dims=dims,
         values=values,
         attrs=_attrs_for_variable(variable, veros_state.settings),
     )
 
 
-def _extract_coordinate_variable(veros_state: Any, dim: str) -> VerosOutputVariable:
+def _extract_coordinate_variable(veros_state: Any, dim: str) -> OutputVariable:
     variable = _variable_definition(dim)
     dims = _resolved_dims(variable, veros_state.settings, dim)
     if dims != (dim,):
@@ -228,7 +220,7 @@ def _extract_coordinate_variable(veros_state: Any, dim: str) -> VerosOutputVaria
     values = _remove_ghost_cells(
         as_jax_real_array(getattr(veros_state.variables, dim)), dims
     )
-    return VerosOutputVariable(
+    return OutputVariable(
         dims=dims,
         values=values,
         attrs=_attrs_for_variable(variable, veros_state.settings),
@@ -237,7 +229,7 @@ def _extract_coordinate_variable(veros_state: Any, dim: str) -> VerosOutputVaria
 
 def _mean_accumulated_variables(
     accumulator: PeriodAverageAccumulator,
-) -> dict[str, VerosOutputVariable]:
+) -> dict[str, OutputVariable]:
     try:
         mean_samples = accumulator.mean_samples()
     except ValueError as exc:
@@ -251,13 +243,13 @@ def _mean_accumulated_variables(
     }
 
 
-def _mean_sample_to_output_variable(sample: PeriodAverageSample) -> VerosOutputVariable:
+def _mean_sample_to_output_variable(sample: PeriodAverageSample) -> OutputVariable:
     axes = tuple(reversed(range(sample.values.ndim)))
     values = as_jax_real_array(sample.values)
     if axes != tuple(range(sample.values.ndim)):
         values = jnp.transpose(values, axes=axes)
 
-    return VerosOutputVariable(
+    return OutputVariable(
         dims=(_TIME_NAME, *reversed(sample.dims)),
         values=values[jnp.newaxis, ...],
         attrs=dict(sample.attrs),
@@ -265,7 +257,7 @@ def _mean_sample_to_output_variable(sample: PeriodAverageSample) -> VerosOutputV
 
 
 def _used_coordinate_dims(
-    variables: Mapping[str, VerosOutputVariable],
+    variables: Mapping[str, OutputVariable],
 ) -> tuple[str, ...]:
     used: list[str] = []
     for variable in variables.values():
@@ -275,49 +267,37 @@ def _used_coordinate_dims(
     return tuple(used)
 
 
+def _coordinate_variables(
+    *,
+    veros_state: Any,
+    output_time: datetime | ModelDateTime,
+    variables: Mapping[str, OutputVariable],
+) -> dict[str, OutputVariable]:
+    time_values, time_attrs = output_time_value_and_attrs(output_time)
+    coordinate_variables = {
+        _TIME_NAME: OutputVariable((_TIME_NAME,), time_values, time_attrs)
+    }
+    for dim in _used_coordinate_dims(variables):
+        coordinate_variables[dim] = _extract_coordinate_variable(veros_state, dim)
+    return coordinate_variables
+
+
 def _write_netcdf(
     *,
     output: str,
     veros_state: Any,
     output_time: datetime | ModelDateTime,
-    variables: Mapping[str, VerosOutputVariable],
+    variables: Mapping[str, OutputVariable],
 ) -> None:
-    time_values, time_attrs = output_time_value_and_attrs(output_time)
-
-    with h5netcdf.File(output, "w") as outfile:
-        outfile.attrs["Conventions"] = "CF-1.8"
-        outfile.dimensions[_TIME_NAME] = time_values.shape[0]
-        time_variable = outfile.create_variable(
-            _TIME_NAME,
-            (_TIME_NAME,),
-            data=array_to_host(time_values),
-        )
-        for attr_name, attr_value in time_attrs.items():
-            if attr_value is not None:
-                time_variable.attrs[attr_name] = attr_value
-
-        for dim in _used_coordinate_dims(variables):
-            coordinate = _extract_coordinate_variable(veros_state, dim)
-            outfile.dimensions[dim] = coordinate.values.shape[0]
-            coordinate_variable = outfile.create_variable(
-                dim,
-                (dim,),
-                data=array_to_host(coordinate.values),
-            )
-            for attr_name, attr_value in coordinate.attrs.items():
-                coordinate_variable.attrs[attr_name] = attr_value
-
-        for name, variable in variables.items():
-            for dim, size in zip(variable.dims, variable.values.shape):
-                if dim not in outfile.dimensions:
-                    outfile.dimensions[dim] = size
-            output_variable = outfile.create_variable(
-                name,
-                variable.dims,
-                data=array_to_host(variable.values),
-            )
-            for attr_name, attr_value in variable.attrs.items():
-                output_variable.attrs[attr_name] = attr_value
+    write_netcdf_dataset(
+        output=output,
+        coordinate_variables=_coordinate_variables(
+            veros_state=veros_state,
+            output_time=output_time,
+            variables=variables,
+        ),
+        data_variables=variables,
+    )
 
 
 __all__ = [

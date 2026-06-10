@@ -17,7 +17,7 @@ import xarray as xr
 
 import vercor.setups.external.jax_gcm as jax_gcm_module
 import vercor.setups.external.jax_gcm_fields as jax_gcm_fields_module
-import vercor.setups.external.jax_gcm_output as jax_gcm_output_module
+import vercor.output.jax_gcm as jax_gcm_output_module
 import vercor.setups.external.jax_gcm_runtime as jax_gcm_runtime_module
 import vercor.setups.external.jax_gcm_state as jax_gcm_state_module
 import vercor.setups.external.veros_fluxes as veros_fluxes_module
@@ -542,7 +542,7 @@ def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
 def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.setups.external.period_averages import (
+    from vercor.output.period_averages import (
         PeriodAverageAccumulator,
         PeriodAverageSample,
     )
@@ -704,7 +704,7 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
 def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.setups.external.period_averages import (
+    from vercor.output.period_averages import (
         PeriodAverageAccumulator,
         PeriodAverageSample,
     )
@@ -961,7 +961,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
 
 
 def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
-    from vercor.setups.external.period_averages import PeriodAverageAccumulator
+    from vercor.output.period_averages import PeriodAverageAccumulator
 
     coords = _make_jax_gcm_output_coords()
     first_temperature = np.arange(18.0).reshape(3, 2, 3)
@@ -1053,7 +1053,7 @@ def test_jax_gcm_write_output_preserves_model_calendar_attrs(
     expected_day_of_year: int,
     days_per_year: int,
 ) -> None:
-    from vercor.setups.external.period_averages import PeriodAverageAccumulator
+    from vercor.output.period_averages import PeriodAverageAccumulator
 
     coords = _make_jax_gcm_output_coords()
     physics_module = _FakePhysicsModule()
@@ -1364,7 +1364,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
 
 
 def test_veros_output_snapshot_uses_variable_metadata_and_current_timestep() -> None:
-    import vercor.setups.external.veros_output as veros_output_module
+    import vercor.output.veros as veros_output_module
 
     state = _make_veros_output_state()
 
@@ -1403,8 +1403,8 @@ def test_veros_output_snapshot_uses_variable_metadata_and_current_timestep() -> 
 def test_veros_write_output_persists_period_mean_and_coordinates(
     tmp_path: Path,
 ) -> None:
-    from vercor.setups.external.period_averages import PeriodAverageAccumulator
-    import vercor.setups.external.veros_output as veros_output_module
+    from vercor.output.period_averages import PeriodAverageAccumulator
+    import vercor.output.veros as veros_output_module
 
     state = _make_veros_output_state()
     snapshots = [
@@ -1483,7 +1483,7 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
 
 
 def test_veros_output_variables_rejects_bare_string() -> None:
-    import vercor.setups.external.veros_output as veros_output_module
+    import vercor.output.veros as veros_output_module
 
     with pytest.raises(ValueError, match="output_variables"):
         veros_output_module.normalize_veros_output_variables(
@@ -1578,7 +1578,7 @@ def test_veros_initialize_can_spin_up_and_extract_surface_temperature() -> None:
 def test_veros_initialize_spinup_accumulates_selected_outputs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.setups.external.period_averages import (
+    from vercor.output.period_averages import (
         PeriodAverageAccumulator,
         PeriodAverageSample,
     )
@@ -1798,7 +1798,7 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
 def test_veros_step_records_selected_outputs_and_writes_on_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.setups.external.period_averages import (
+    from vercor.output.period_averages import (
         PeriodAverageAccumulator,
         PeriodAverageSample,
     )
@@ -1898,7 +1898,7 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
 def test_veros_step_skips_output_when_no_variables_selected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.setups.external.period_averages import PeriodAverageAccumulator
+    from vercor.output.period_averages import PeriodAverageAccumulator
 
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState

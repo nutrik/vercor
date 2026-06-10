@@ -158,6 +158,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local trivial internal wrapper cleanup validation: focused cleanup
   scan, focused pytest, Black, flake8, mypy, full fast pytest, and full pytest
   passed as of 2026-06-10.
+- Latest local unified GCM output package validation: focused red/green pytest,
+  Black, flake8, mypy, full fast pytest, full pytest, and coverage pytest
+  passed as of 2026-06-10.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -187,6 +190,41 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-10: Unified GCM Output Package
+
+- Replaced the parallel JAXGCM/Veros setup-external output modules with the
+  canonical `vercor.output` package. Runtime-view final output now lives in
+  `vercor.output.runtime` behind lazy top-level reexports, shared period
+  accumulation/time/variable/NetCDF helpers live in focused `vercor.output`
+  modules, and model-specific period-output adaptation lives in
+  `vercor.output.jax_gcm` and `vercor.output.veros`.
+- Removed `vercor.setups.external.jax_gcm_output`,
+  `vercor.setups.external.period_averages`, and
+  `vercor.setups.external.veros_output` without compatibility wrappers. Updated
+  JAXGCM/Veros setup and runtime imports plus architecture tests to enforce the
+  hard move and centralized `h5netcdf` ownership in `vercor.output.netcdf`.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` to record the new output ownership
+  and dependency split. `vercor.output.__init__` keeps runtime-output reexports
+  lazy so period-output imports do not pull runtime-state internals into setup
+  adapters.
+- Red/green notes: the focused output/API suite first failed on
+  `vercor.output` still being a module instead of a package. After the package
+  migration it passed. The first full suite exposed one stale test monkeypatch
+  targeting the lazy top-level facade instead of `vercor.output.runtime`; the
+  test was updated to patch the new owner module and the isolated regression
+  passed.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_period_averages.py tests/test_jax_gcm_output_frequency.py tests/test_external_components_coverage.py tests/test_api_boundaries.py tests/test_production_numpy_boundaries.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `git diff --check`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-10: Trivial Internal Wrapper Cleanup
 

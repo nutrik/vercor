@@ -7,12 +7,12 @@ from datetime import timedelta
 from typing import Any, Protocol
 
 from vercor.components import ComponentStepContext
-from vercor.setups.external.jax_gcm_output import should_write_period_output
-from vercor.setups.external.veros_output import (
+from vercor.output.period_averages import PeriodAverageAccumulator
+from vercor.output.time import should_write_period_output
+from vercor.output.veros import (
     accumulate_veros_period_state,
     write_veros_averages_output,
 )
-from vercor.setups.external.period_averages import PeriodAverageAccumulator
 import vercor.setups.external.veros_fluxes as _veros_fluxes
 import vercor.setups.external.veros_state as _veros_state
 

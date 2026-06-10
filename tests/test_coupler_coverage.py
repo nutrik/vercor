@@ -15,6 +15,7 @@ import pytest
 import vercor.runtime.surface_masks as surface_masks_module
 import vercor.coupler as coupler_module
 import vercor.output as output_module
+import vercor.output.runtime as output_runtime_module
 from tests._coverage_support import (
     DummyComponent,
     RecordingRegridder,
@@ -1196,7 +1197,7 @@ def test_output_boundary_builds_runtime_views_filenames_and_masks(
         captured.append((view.name, view, filename, masks or {}))
 
     monkeypatch.setattr(
-        output_module, "write_runtime_component_view_to_netcdf", fake_write
+        output_runtime_module, "write_runtime_component_view_to_netcdf", fake_write
     )
 
     output_module.write_coupler_runtime_outputs(

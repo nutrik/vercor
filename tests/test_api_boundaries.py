@@ -972,10 +972,10 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     import vercor.setups.external.camulator_land as camulator_land_module
     import vercor.setups.external.camulator_runtime_settings as camulator_runtime_settings_module
     import vercor.setups.external.jax_gcm as jax_gcm_module
-    import vercor.setups.external.period_averages as period_averages_module
+    import vercor.output.period_averages as period_averages_module
+    import vercor.output.veros as veros_output_module
     import vercor.setups.external.veros_fluxes as veros_fluxes_module
     import vercor.setups.external.veros_gcm as veros_gcm_module
-    import vercor.setups.external.veros_output as veros_output_module
     import vercor.setups.external.veros_setup as veros_setup_module
     import vercor.setups.external.veros_state as veros_state_module
 
@@ -1050,12 +1050,13 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     veros_runtime_source = Path("vercor/setups/external/veros_runtime.py").read_text(
         encoding="utf-8"
     )
-    period_averages_source = Path(
-        "vercor/setups/external/period_averages.py"
-    ).read_text(encoding="utf-8")
-    veros_output_source = Path("vercor/setups/external/veros_output.py").read_text(
+    output_init_source = Path("vercor/output/__init__.py").read_text(encoding="utf-8")
+    period_averages_source = Path("vercor/output/period_averages.py").read_text(
         encoding="utf-8"
     )
+    jax_gcm_output_source = Path("vercor/output/jax_gcm.py").read_text(encoding="utf-8")
+    veros_output_source = Path("vercor/output/veros.py").read_text(encoding="utf-8")
+    netcdf_output_source = Path("vercor/output/netcdf.py").read_text(encoding="utf-8")
     host_arrays_source = Path("vercor/host_arrays.py").read_text(encoding="utf-8")
     camulator_imports_source = Path(
         "vercor/setups/external/camulator_imports.py"
@@ -1064,7 +1065,12 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert Path("vercor/setups/external/camulator_land.py").exists()
     assert Path("vercor/setups/external/camulator_runtime.py").exists()
     assert Path("vercor/setups/external/camulator_gcm_state.py").exists()
-    assert Path("vercor/setups/external/jax_gcm_output.py").exists()
+    assert Path("vercor/output/jax_gcm.py").exists()
+    assert Path("vercor/output/netcdf.py").exists()
+    assert Path("vercor/output/period_averages.py").exists()
+    assert Path("vercor/output/time.py").exists()
+    assert Path("vercor/output/variables.py").exists()
+    assert Path("vercor/output/veros.py").exists()
     assert Path("vercor/setups/external/jax_gcm_fields.py").exists()
     assert Path("vercor/setups/external/jax_gcm_runtime.py").exists()
     assert Path("vercor/setups/external/camulator_output.py").exists()
@@ -1073,13 +1079,14 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert Path("vercor/setups/external/camulator_runtime_settings.py").exists()
     assert Path("vercor/setups/external/camulator_wind_filter.py").exists()
     assert Path("vercor/setups/external/veros_fluxes.py").exists()
-    assert Path("vercor/setups/external/period_averages.py").exists()
-    assert Path("vercor/setups/external/veros_output.py").exists()
     assert Path("vercor/setups/external/veros_setup.py").exists()
     assert Path("vercor/setups/external/veros_state.py").exists()
     assert Path("vercor/setups/external/veros_runtime.py").exists()
     assert Path("vercor/setups/external/jax_gcm_state.py").exists()
     assert Path("vercor/setups/external/veros_gcm_state.py").exists()
+    assert not Path("vercor/setups/external/jax_gcm_output.py").exists()
+    assert not Path("vercor/setups/external/period_averages.py").exists()
+    assert not Path("vercor/setups/external/veros_output.py").exists()
     assert not Path("vercor/setups/jax_array_helpers.py").exists()
     assert not Path("vercor/setups/data/camulator_land.py").exists()
     assert not Path("vercor/setups/external/windpp.py").exists()
@@ -1152,13 +1159,17 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "advance_veros_substeps(" not in veros_gcm_source
     assert "import h5netcdf" not in veros_gcm_source
     assert "import h5netcdf" not in veros_runtime_source
+    assert "import h5netcdf" not in jax_gcm_output_source
     assert "import numpy" not in veros_gcm_source
     assert "import numpy" not in veros_runtime_source
-    assert "import h5netcdf" in veros_output_source
+    assert "import h5netcdf" in netcdf_output_source
     assert "import numpy" not in period_averages_source
+    assert "import numpy" not in jax_gcm_output_source
     assert "import numpy" not in veros_output_source
     assert "import jax.numpy as jnp" in period_averages_source
     assert "import jax.numpy as jnp" in veros_output_source
+    assert "def __getattr__(" in output_init_source
+    assert "from vercor.output import runtime as _runtime" in output_init_source
     assert "def array_to_host(" in host_arrays_source
     assert "def host_int64_array(" in host_arrays_source
     assert "from vercor.setups.external.camulator_wind_filter import" in (
@@ -1264,9 +1275,7 @@ def test_jax_gcm_factory_uses_named_runtime_callbacks() -> None:
 
 @pytest.mark.fast_always
 def test_jax_gcm_average_writer_bypasses_xarray_adapter() -> None:
-    source = Path("vercor/setups/external/jax_gcm_output.py").read_text(
-        encoding="utf-8"
-    )
+    source = Path("vercor/output/jax_gcm.py").read_text(encoding="utf-8")
 
     assert "import xarray" not in source
     assert ".to_xarray(" not in source
@@ -1277,6 +1286,11 @@ def test_external_package_has_no_top_level_import_cycles() -> None:
     assert (
         package_import_cycles("vercor/setups/external", "vercor.setups.external") == []
     )
+
+
+@pytest.mark.fast_always
+def test_output_package_has_no_top_level_import_cycles() -> None:
+    assert package_import_cycles("vercor/output", "vercor.output") == []
 
 
 @pytest.mark.fast_always

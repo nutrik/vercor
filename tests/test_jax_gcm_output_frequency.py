@@ -8,7 +8,7 @@ import pytest
 
 from tests.conftest import SelectFastCases
 from vercor.calendar import DateTime360
-from vercor.setups.external.jax_gcm_output import should_write_period_output
+from vercor.output.time import should_write_period_output
 
 
 @dataclass(frozen=True)
