@@ -142,10 +142,6 @@ def _resolve_metadata(value: Any, settings: Any) -> Any:
     return value
 
 
-def _jax_array(value: Any) -> jax.Array:
-    return as_jax_real_array(value)
-
-
 def _variable_definition(name: str) -> Any:
     variable = veros_variables.VARIABLES.get(name)
     if variable is None:
@@ -207,7 +203,7 @@ def _extract_variable(veros_state: Any, name: str) -> VerosOutputVariable:
     vs = veros_state.variables
     variable = _variable_definition(name)
     dims = _resolved_dims(variable, veros_state.settings, name)
-    values = _jax_array(getattr(vs, name))
+    values = as_jax_real_array(getattr(vs, name))
     values, dims = _drop_timestep_dim(values, dims, vs)
     values = _remove_ghost_cells(values, dims)
     if values.ndim != len(dims):
@@ -229,7 +225,9 @@ def _extract_coordinate_variable(veros_state: Any, dim: str) -> VerosOutputVaria
         raise ValueError(f"Veros coordinate {dim!r} must have dimensions ({dim!r},).")
     if not hasattr(veros_state.variables, dim):
         raise ValueError(f"Veros coordinate variable {dim!r} is missing.")
-    values = _remove_ghost_cells(_jax_array(getattr(veros_state.variables, dim)), dims)
+    values = _remove_ghost_cells(
+        as_jax_real_array(getattr(veros_state.variables, dim)), dims
+    )
     return VerosOutputVariable(
         dims=dims,
         values=values,
@@ -255,7 +253,7 @@ def _mean_accumulated_variables(
 
 def _mean_sample_to_output_variable(sample: PeriodAverageSample) -> VerosOutputVariable:
     axes = tuple(reversed(range(sample.values.ndim)))
-    values = _jax_array(sample.values)
+    values = as_jax_real_array(sample.values)
     if axes != tuple(range(sample.values.ndim)):
         values = jnp.transpose(values, axes=axes)
 

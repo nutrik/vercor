@@ -155,6 +155,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local internal naming consistency validation: focused pytest, Black,
   flake8, mypy, full fast pytest, full pytest, and coverage pytest passed as of
   2026-06-10.
+- Latest local trivial internal wrapper cleanup validation: focused cleanup
+  scan, focused pytest, Black, flake8, mypy, full fast pytest, and full pytest
+  passed as of 2026-06-10.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -184,6 +187,32 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-10: Trivial Internal Wrapper Cleanup
+
+- Removed private pass-through helpers that only forwarded to canonical
+  implementations: flux `_as_jax_array()` aliases, JAXGCM/Veros output
+  `_jax_array()` aliases, the bilinear interpolator source-mask delegate,
+  forcing-data legacy transpose/flip delegates, and the CAMulator land
+  temperature-normalization delegate.
+- Replaced call sites with direct `as_jax_real_array(...)`,
+  `_extrapolation.valid_scalar_source_mask(...)`, and `jnp.flip(...)` calls.
+  Public compatibility aliases and documented facade/accessor boundaries were
+  left unchanged.
+- Removed the stale CAMulator helper-only test while keeping component-level
+  JAX-array storage coverage.
+- The precise cleanup scan reported no removed-helper definitions or call sites:
+  `rg -n "def (_as_jax_array|_jax_array|_prepare_camulator_land_surface_temperature|_legacy_transpose_to_time_last_order|_flip_legacy_latitude_axis)\b|_ensure_src_mask\b|\b(_as_jax_array|_jax_array|_prepare_camulator_land_surface_temperature|_legacy_transpose_to_time_last_order|_flip_legacy_latitude_axis)\(" vercor tests examples`,
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_fluxes_utilities.py tests/test_bilinear_rectilinear_interpolator.py tests/test_forcing_data.py tests/test_jax_gcm_output_frequency.py tests/test_data_component_kernels.py tests/test_camulator_component_kernels.py tests/test_external_components_coverage.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `git diff --check`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short` passed. The broader
+  substring cleanup scan still matches preserved public/test names such as
+  `torch_tensor_from_jax_array`.
 
 ### 2026-06-10: Internal Naming Consistency Pass
 

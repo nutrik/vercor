@@ -172,12 +172,8 @@ def output_time_value_and_attrs(
     return _time_value_and_attrs(time)
 
 
-def _jax_array(value: Any) -> jax.Array:
-    return as_jax_real_array(value)
-
-
 def _vertical_layers(coords: Any) -> int:
-    level = _jax_array(coords.vertical.centers)
+    level = as_jax_real_array(coords.vertical.centers)
     layers = getattr(coords.vertical, "layers", None)
     if layers is None:
         return int(level.shape[0])
@@ -201,14 +197,14 @@ def _coordinate_values(
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     lon, sin_lat = coords.horizontal.nodal_axes
     lon_k, lat_k = coords.horizontal.modal_axes
-    level = _jax_array(coords.vertical.centers)
+    level = as_jax_real_array(coords.vertical.centers)
     layers = _vertical_layers(coords)
     time_values, time_attrs = _time_value_and_attrs(output_time)
 
     coordinate_values = {
         _TIME_NAME: time_values,
-        _LON_NAME: _jax_array(lon) * 180.0 / jnp.pi,
-        _LAT_NAME: jnp.arcsin(_jax_array(sin_lat)) * 180.0 / jnp.pi,
+        _LON_NAME: as_jax_real_array(lon) * 180.0 / jnp.pi,
+        _LAT_NAME: jnp.arcsin(as_jax_real_array(sin_lat)) * 180.0 / jnp.pi,
         _LON_MODE_NAME: as_jax_index_array(lon_k),
         _LAT_MODE_NAME: as_jax_index_array(lat_k),
         _LEVEL_NAME: level,
@@ -216,7 +212,7 @@ def _coordinate_values(
         _HSG_LEVEL_NAME: jnp.arange(layers + 1, dtype=jax_index_dtype()),
     }
     if layers != 1:
-        coordinate_values[_SURFACE_NAME] = _jax_array([1.0])
+        coordinate_values[_SURFACE_NAME] = as_jax_real_array([1.0])
 
     coordinate_attrs = {
         _TIME_NAME: time_attrs,
@@ -233,7 +229,7 @@ def _additional_coordinate_values(coords: Any) -> dict[str, jax.Array]:
         _HSG_LEVEL_NAME: jnp.arange(layers + 1, dtype=jax_index_dtype()),
     }
     if layers != 1:
-        values[_SURFACE_NAME] = _jax_array([1.0])
+        values[_SURFACE_NAME] = as_jax_real_array([1.0])
     return values
 
 
@@ -255,7 +251,7 @@ def _infer_shape_to_dims(
         nodal_shape: (_LON_NAME, _LAT_NAME),
         modal_shape: (_LON_MODE_NAME, _LAT_MODE_NAME),
         (layers,): (_LEVEL_NAME,),
-        tuple(_jax_array(sin_lat).shape): (_LAT_NAME,),
+        tuple(as_jax_real_array(sin_lat).shape): (_LAT_NAME,),
         tuple(coords.surface_nodal_shape): (_LON_NAME, _LAT_NAME),
     }
 
@@ -343,7 +339,7 @@ def _prediction_to_variables(
 ) -> dict[str, _VariableData]:
     dynamics_predictions = _float0s_to_nans(prediction.dynamics)
     physics_predictions = _float0s_to_nans(prediction.physics)
-    time_values = _jax_array(prediction.times)
+    time_values = as_jax_real_array(prediction.times)
     time_shape = tuple(time_values.shape)
     shape_to_dims = _infer_shape_to_dims(coords=coords, time_shape=time_shape)
 
@@ -362,7 +358,7 @@ def _prediction_to_variables(
 
     variables: dict[str, _VariableData] = {}
     for name, value in _iter_data_items(data):
-        values = _jax_array(value)
+        values = as_jax_real_array(value)
         dims = shape_to_dims.get(tuple(values.shape))
         if dims is None:
             raise ValueError(
@@ -403,7 +399,7 @@ def accumulate_jax_gcm_period_prediction(
 
 def _period_mean_sample_to_variable(sample: PeriodAverageSample) -> _VariableData:
     dims = (_TIME_NAME, *sample.dims)
-    values = _jax_array(sample.values)[jnp.newaxis, ...]
+    values = as_jax_real_array(sample.values)[jnp.newaxis, ...]
     ordered_dims = tuple(dim for dim in _CANONICAL_DIM_ORDER if dim in dims) + tuple(
         dim for dim in dims if dim not in _CANONICAL_DIM_ORDER
     )

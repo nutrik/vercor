@@ -33,14 +33,6 @@ def _read_netcdf_variable(path: str, variable: str) -> np.ndarray:
             ) from exc
 
 
-def _legacy_transpose_to_time_last_order(values: np.ndarray) -> RuntimeArray:
-    return as_jax_real_array(values.T)
-
-
-def _flip_legacy_latitude_axis(values: RuntimeArray) -> RuntimeArray:
-    return jnp.flip(values, axis=1)
-
-
 def read_forcing(
     data_files: Mapping[str, str],
     variable: str,
@@ -61,7 +53,7 @@ def read_forcing(
             f"Error reading variable '{variable}' from forcing file '{path}'"
         ) from exc
 
-    var_obj = _legacy_transpose_to_time_last_order(values)
+    var_obj = as_jax_real_array(values.T)
     if flip_y:
-        return _flip_legacy_latitude_axis(var_obj)
+        return jnp.flip(var_obj, axis=1)
     return var_obj

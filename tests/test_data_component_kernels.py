@@ -24,9 +24,6 @@ from vercor.setups.data.erainterim_ocean import (
     _assemble_erainterim_latitude,
     _binary_ocean_mask_from_salinity,
 )
-from vercor.setups.external.camulator_land import (
-    _prepare_camulator_land_surface_temperature,
-)
 from vercor.setups.data.jcm_land import (
     _jcm_coordinates_in_degrees,
     _prepare_jcm_land_runtime_fields,
@@ -368,17 +365,3 @@ def test_jcm_land_runtime_helper_supports_jit_and_gradients() -> None:
         temperature_gradient, np.ones_like(np.asarray(land_surface_temperature))
     )
     assert_allclose_compact(soil_gradient, np.ones_like(np.asarray(soil_moisture)))
-
-
-def test_camulator_land_temperature_helper_supports_jit() -> None:
-    land_surface_temperature = jnp.asarray([[281.0, 282.0], [283.0, 284.0]])
-
-    prepared_temperature = jax.jit(_prepare_camulator_land_surface_temperature)(
-        land_surface_temperature
-    )
-
-    assert isinstance(prepared_temperature, jax.Array)
-    assert_allclose_compact(
-        prepared_temperature,
-        np.asarray([[281.0, 282.0], [283.0, 284.0]]),
-    )

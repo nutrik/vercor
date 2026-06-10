@@ -198,10 +198,6 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         self.w01 = weights.w01
         self.w11 = weights.w11
 
-    @staticmethod
-    def _ensure_src_mask(src: Array, src_mask: Array | None) -> Array:
-        return _extrapolation.valid_scalar_source_mask(src, src_mask)
-
     def _prepare_source_field(self, src: Array) -> Array:
         src_array = as_jax_real_array(src)
         if self._lon_flipped:
@@ -214,7 +210,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             raise ValueError(
                 f"src field must have shape (nlat,nlon)=({self.nlat},{self.nlon})"
             )
-        valid = self._ensure_src_mask(src_array, self.src_mask)
+        valid = _extrapolation.valid_scalar_source_mask(src_array, self.src_mask)
 
         v00 = src_array[self.j0, self.i0]
         v10 = src_array[self.j0, self.i1]
@@ -253,7 +249,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             return jax_full(self.tshape, self.fill_value)
 
         src_array = self._prepare_source_field(src)
-        valid = self._ensure_src_mask(src_array, src_mask)
+        valid = _extrapolation.valid_scalar_source_mask(src_array, src_mask)
         return _extrapolation.extrapolate_scalar_field(
             source_values=src_array,
             valid_source_mask=valid,

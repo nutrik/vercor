@@ -8,10 +8,6 @@ from vercor.fluxes.utilities import cdn, psimhu, psixhu, qsat
 from vercor.settings import VercorSettings
 
 
-def _as_jax_array(value: ArrayLike) -> jax.Array:
-    return as_jax_real_array(value)
-
-
 def _compute_stability_terms(
     settings: VercorSettings,
     zbot: jax.Array,
@@ -107,17 +103,17 @@ def compute_ocean_surface_fluxes(
 
     _ = missval
 
-    mask_array = _as_jax_array(mask)
-    zbot_array = _as_jax_array(zbot)
-    ubot_array = _as_jax_array(ubot)
-    vbot_array = _as_jax_array(vbot)
-    thbot_array = _as_jax_array(thbot)
-    qbot_array = _as_jax_array(qbot)
-    rbot_array = _as_jax_array(rbot)
-    tbot_array = _as_jax_array(tbot)
-    us_array = _as_jax_array(us)
-    vs_array = _as_jax_array(vs)
-    ts_array = _as_jax_array(ts)
+    mask_array = as_jax_real_array(mask)
+    zbot_array = as_jax_real_array(zbot)
+    ubot_array = as_jax_real_array(ubot)
+    vbot_array = as_jax_real_array(vbot)
+    thbot_array = as_jax_real_array(thbot)
+    qbot_array = as_jax_real_array(qbot)
+    rbot_array = as_jax_real_array(rbot)
+    tbot_array = as_jax_real_array(tbot)
+    us_array = as_jax_real_array(us)
+    vs_array = as_jax_real_array(vs)
+    ts_array = as_jax_real_array(ts)
 
     zref = 10.0
     ztref = 2.0
@@ -308,14 +304,14 @@ def shr_flux_atmIce(
     _ = missval
     _ = tbot
 
-    mask_array = _as_jax_array(mask)
-    zbot_array = _as_jax_array(zbot)
-    ubot_array = _as_jax_array(ubot)
-    vbot_array = _as_jax_array(vbot)
-    thbot_array = _as_jax_array(thbot)
-    qbot_array = _as_jax_array(qbot)
-    rbot_array = _as_jax_array(rbot)
-    ts_array = _as_jax_array(ts)
+    mask_array = as_jax_real_array(mask)
+    zbot_array = as_jax_real_array(zbot)
+    ubot_array = as_jax_real_array(ubot)
+    vbot_array = as_jax_real_array(vbot)
+    thbot_array = as_jax_real_array(thbot)
+    qbot_array = as_jax_real_array(qbot)
+    rbot_array = as_jax_real_array(rbot)
+    ts_array = as_jax_real_array(ts)
 
     zref = 10.0
     ztref = 2.0

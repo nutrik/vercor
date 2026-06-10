@@ -2,9 +2,6 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, cast
 
-import jax
-from jax.typing import ArrayLike
-
 from vercor.components import (
     ComponentSetupContext,
     ComponentStepContext,
@@ -22,14 +19,6 @@ from vercor.setups.external.camulator_forcing import (
 
 _CAMULATOR_LAND_OUTPUTS = ("land_surface_temperature",)
 _CAMULATOR_LAND_DEFAULT_FIELDS = {"land_surface_temperature": 283.0}
-
-
-def _prepare_camulator_land_surface_temperature(
-    land_surface_temperature: ArrayLike,
-) -> jax.Array:
-    """Normalize CAMulator land temperature fields for JAX-backed runtime storage."""
-
-    return as_jax_real_array(land_surface_temperature)
 
 
 @dataclass
@@ -124,11 +113,7 @@ def make_camulator_land(
 
         state.runtime_cursor.advance()
 
-        return {
-            "land_surface_temperature": _prepare_camulator_land_surface_temperature(
-                ts["TS"].values
-            )
-        }
+        return {"land_surface_temperature": as_jax_real_array(ts["TS"].values)}
 
     return host_component(
         name=name,
