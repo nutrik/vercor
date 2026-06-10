@@ -8,7 +8,7 @@ from vercor.fluxes.utilities import cdn, psimhu, psixhu, qsat
 from vercor.settings import VercorSettings
 
 
-def _asarray(value: ArrayLike) -> jax.Array:
+def _as_jax_array(value: ArrayLike) -> jax.Array:
     return as_jax_real_array(value)
 
 
@@ -107,17 +107,17 @@ def compute_ocean_surface_fluxes(
 
     _ = missval
 
-    mask_array = _asarray(mask)
-    zbot_array = _asarray(zbot)
-    ubot_array = _asarray(ubot)
-    vbot_array = _asarray(vbot)
-    thbot_array = _asarray(thbot)
-    qbot_array = _asarray(qbot)
-    rbot_array = _asarray(rbot)
-    tbot_array = _asarray(tbot)
-    us_array = _asarray(us)
-    vs_array = _asarray(vs)
-    ts_array = _asarray(ts)
+    mask_array = _as_jax_array(mask)
+    zbot_array = _as_jax_array(zbot)
+    ubot_array = _as_jax_array(ubot)
+    vbot_array = _as_jax_array(vbot)
+    thbot_array = _as_jax_array(thbot)
+    qbot_array = _as_jax_array(qbot)
+    rbot_array = _as_jax_array(rbot)
+    tbot_array = _as_jax_array(tbot)
+    us_array = _as_jax_array(us)
+    vs_array = _as_jax_array(vs)
+    ts_array = _as_jax_array(ts)
 
     zref = 10.0
     ztref = 2.0
@@ -308,14 +308,14 @@ def shr_flux_atmIce(
     _ = missval
     _ = tbot
 
-    mask_array = _asarray(mask)
-    zbot_array = _asarray(zbot)
-    ubot_array = _asarray(ubot)
-    vbot_array = _asarray(vbot)
-    thbot_array = _asarray(thbot)
-    qbot_array = _asarray(qbot)
-    rbot_array = _asarray(rbot)
-    ts_array = _asarray(ts)
+    mask_array = _as_jax_array(mask)
+    zbot_array = _as_jax_array(zbot)
+    ubot_array = _as_jax_array(ubot)
+    vbot_array = _as_jax_array(vbot)
+    thbot_array = _as_jax_array(thbot)
+    qbot_array = _as_jax_array(qbot)
+    rbot_array = _as_jax_array(rbot)
+    ts_array = _as_jax_array(ts)
 
     zref = 10.0
     ztref = 2.0

@@ -222,7 +222,7 @@ def _extract_variable(veros_state: Any, name: str) -> VerosOutputVariable:
     )
 
 
-def _coordinate_variable(veros_state: Any, dim: str) -> VerosOutputVariable:
+def _extract_coordinate_variable(veros_state: Any, dim: str) -> VerosOutputVariable:
     variable = _variable_definition(dim)
     dims = _resolved_dims(variable, veros_state.settings, dim)
     if dims != (dim,):
@@ -299,7 +299,7 @@ def _write_netcdf(
                 time_variable.attrs[attr_name] = attr_value
 
         for dim in _used_coordinate_dims(variables):
-            coordinate = _coordinate_variable(veros_state, dim)
+            coordinate = _extract_coordinate_variable(veros_state, dim)
             outfile.dimensions[dim] = coordinate.values.shape[0]
             coordinate_variable = outfile.create_variable(
                 dim,

@@ -157,14 +157,14 @@ def normalize_component_step_callable(
 
         return step_fields_and_context
 
-    def step_fields_context_payload(
+    def step_fields_context_and_payload(
         fields: Mapping[str, RuntimeArray],
         context: ComponentStepContext,
         payload: Any | None,
     ) -> ComponentStepReturn:
         return step(fields, context, payload)
 
-    return step_fields_context_payload
+    return step_fields_context_and_payload
 
 
 def _component_step_signature_error() -> ComponentError:

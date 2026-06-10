@@ -251,7 +251,9 @@ immutable runtime containers used during traced integration.
   `(fields, context, payload)` and return either a field-update mapping or
   `ComponentStepResult(fields, payload)` when the runtime payload must
   be replaced. Callable-backed differentiable and host components share
-  signature normalization and step-result application helpers, while
+  signature normalization and step-result application helpers. Internal
+  normalized callable adapters use names that spell out which author arguments
+  they forward, while
   `Component.from_model()` and `HostRuntimeComponent.from_model()` construct
   their own private runtime-kind wrappers directly. Both declare their runtime
   contract with the same `ComponentFieldSpec` path used by subclasses, and
@@ -372,7 +374,9 @@ live in `vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while
 default component-topology name validation and lookup are private to
 `vercor.runtime.component_topology`. Generic hybrid/sigma-coordinate pressure
 and altitude helpers live in `vercor.fluxes.vertical_coordinates`, and generic
-PyTree transforms live in `vercor.pytree_utils`.
+PyTree transforms live in `vercor.pytree_utils`. Flux helper modules keep local
+JAX array normalization helpers explicitly named as JAX conversion boundaries so
+they are not confused with host-array or NumPy transfer helpers.
 Adapter-specific runtime and file-output policy lives beside adapters in focused
 helpers instead of in factory/bootstrap modules. Exported adapter helpers use
 plain public package-internal names in their owner modules; underscored helpers
@@ -410,7 +414,9 @@ streams selected snapshots into that accumulator and flushes them with the same
 day/month/year cadence policy used by JAXGCM. Veros average files keep VerCOR's
 lowercase `time` dimension while matching native Veros spatial NetCDF dimension
 order, and the accumulator averages only across recorded runtime samples rather
-than reducing horizontal or vertical axes.
+than reducing horizontal or vertical axes. Private Veros output helpers keep
+variable and coordinate extraction names parallel to make data-variable versus
+coordinate-variable responsibilities explicit.
 Veros host-state mutation helpers and the named tuple-compatible
 `VerosForcingFields` container live in `vercor.setups.external.veros_state`.
 Veros backend settings are imported only inside the explicit configuration

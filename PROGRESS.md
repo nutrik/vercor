@@ -152,6 +152,9 @@ historical commands, failure messages, or detailed validation notes.
   pytest, focused red/green pytest, focused mypy, Black, flake8, full mypy,
   focused post-format pytest, full fast pytest, full pytest, and coverage
   pytest passed as of 2026-06-09.
+- Latest local internal naming consistency validation: focused pytest, Black,
+  flake8, mypy, full fast pytest, full pytest, and coverage pytest passed as of
+  2026-06-10.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -181,6 +184,39 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-10: Internal Naming Consistency Pass
+
+- Swept the Python codebase inventory for semantically similar definitions:
+  206 Python files, 1,528 functions/methods, and 180 classes were parsed
+  successfully. The pass focused on internal/private names only; public and
+  ambiguous similarities were left unchanged for API stability.
+- Renamed local internal helpers without changing behavior:
+  `vercor.fluxes.bulk_formula_cesm._asarray()` is now `_as_jax_array()`,
+  the 3-argument callable adapter in
+  `vercor.components._callable_wrappers.normalize_component_step_callable()`
+  is now `step_fields_context_and_payload()`, and
+  `vercor.setups.external.veros_output._coordinate_variable()` is now
+  `_extract_coordinate_variable()`.
+- Left intentionally parallel names unchanged: JAX/NumPy dtype helpers,
+  runtime-cache owner versus resource-facade methods,
+  `step_runtime_state()` versus `step_host_runtime_state()`, component factory
+  helpers, scalar/vector and inverse helper pairs, and the public historical
+  `shr_flux_atmIce()` physics API.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` to record the internal naming
+  boundary rationale for callable adapters, flux JAX-array normalization, and
+  Veros output variable/coordinate extraction. No module dependency order
+  changed.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_fluxes_utilities.py tests/test_slab_kernels.py tests/test_component_base_coverage.py tests/test_external_components_coverage.py tests/test_production_numpy_boundaries.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-09: JAX-Backed JCM/Veros Output Arrays
 
