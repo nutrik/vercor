@@ -17,7 +17,9 @@ from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.output.netcdf import write_netcdf_dataset
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
-    PeriodAverageSample,
+    mean_samples_or_raise,
+    period_mean_sample_to_output_variable,
+    samples_from_output_variables,
 )
 from vercor.output.time import TIME_NAME, output_time_value_and_attrs
 from vercor.output.variables import OutputVariable
@@ -296,39 +298,9 @@ def accumulate_jax_gcm_period_prediction(
         physics_module=selected_physics_module,
     )
     accumulator.add_samples(
-        {
-            name: PeriodAverageSample(
-                dims=variable.dims,
-                values=variable.values,
-                attrs=variable.attrs,
-            )
-            for name, variable in variables.items()
-        },
+        samples_from_output_variables(variables),
         summation_dim=_TIME_NAME,
     )
-
-
-def _period_mean_sample_to_variable(sample: PeriodAverageSample) -> OutputVariable:
-    dims = (_TIME_NAME, *sample.dims)
-    values = as_jax_real_array(sample.values)[jnp.newaxis, ...]
-    ordered_dims = tuple(dim for dim in _CANONICAL_DIM_ORDER if dim in dims) + tuple(
-        dim for dim in dims if dim not in _CANONICAL_DIM_ORDER
-    )
-    axes = tuple(dims.index(dim) for dim in ordered_dims)
-    if axes != tuple(range(len(axes))):
-        values = jnp.transpose(values, axes=axes)
-    return OutputVariable(dims=ordered_dims, values=values, attrs=dict(sample.attrs))
-
-
-def _jax_gcm_mean_samples(
-    accumulator: PeriodAverageAccumulator,
-) -> dict[str, PeriodAverageSample]:
-    try:
-        return accumulator.mean_samples()
-    except ValueError as exc:
-        raise ValueError(
-            "JAXGCM average output requires at least one prediction."
-        ) from exc
 
 
 def _read_units_table(path: Path) -> dict[str, dict[str, str]]:
@@ -404,8 +376,15 @@ def write_jax_gcm_averages_output(
 
     selected_physics_module = physics_module or _default_physics_module()
     mean_variables = {
-        name: _period_mean_sample_to_variable(sample)
-        for name, sample in _jax_gcm_mean_samples(accumulator).items()
+        name: period_mean_sample_to_output_variable(
+            sample,
+            time_dim=_TIME_NAME,
+            dimension_order=_CANONICAL_DIM_ORDER,
+        )
+        for name, sample in mean_samples_or_raise(
+            accumulator,
+            "JAXGCM average output requires at least one prediction.",
+        ).items()
     }
     _write_netcdf(
         output=output,

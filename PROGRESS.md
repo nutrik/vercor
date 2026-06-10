@@ -161,6 +161,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local unified GCM output package validation: focused red/green pytest,
   Black, flake8, mypy, full fast pytest, full pytest, and coverage pytest
   passed as of 2026-06-10.
+- Latest local shared h5netcdf output helper validation: focused red/green
+  pytest, Black, git diff whitespace check, flake8, mypy, full fast pytest,
+  full pytest, and coverage pytest passed as of 2026-06-10.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -190,6 +193,37 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-10: Shared h5netcdf Output Helpers
+
+- Added shared period-output conversion helpers in `vercor.output.period_averages`
+  for mapping `OutputVariable` values to accumulator samples, applying
+  adapter-specific empty-accumulator errors, and reshaping period means into
+  one-time-step output variables with explicit dimension ordering.
+- Refactored JAXGCM and Veros average writers to use the shared conversion
+  helpers while keeping model-specific coordinate extraction, metadata, and
+  dimension policy local to their adapters.
+- Replaced the final runtime-view `xarray` writer with `OutputVariable` maps and
+  the existing `vercor.output.netcdf.write_netcdf_dataset` h5netcdf boundary.
+  Tests now read runtime output back with `h5netcdf`, and architecture tests
+  assert `vercor.output.runtime` does not import xarray or call `.to_netcdf()`.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` to record shared output helper
+  ownership and the direct h5netcdf runtime-output path.
+- Red/green notes: new period-helper tests first failed on missing
+  `mean_samples_or_raise`; the output ownership test then failed on
+  `import xarray as xr` in `vercor.output.runtime`. After adding shared helpers,
+  refactoring adapters, and delegating runtime writes to `write_netcdf_dataset`,
+  the focused regressions passed.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_period_averages.py tests/test_component_base_coverage.py::test_read_forcing_and_runtime_write_round_trip tests/test_api_boundaries.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`, `git diff --check`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-10: Unified GCM Output Package
 

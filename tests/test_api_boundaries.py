@@ -1051,6 +1051,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
         encoding="utf-8"
     )
     output_init_source = Path("vercor/output/__init__.py").read_text(encoding="utf-8")
+    runtime_output_source = Path("vercor/output/runtime.py").read_text(encoding="utf-8")
     period_averages_source = Path("vercor/output/period_averages.py").read_text(
         encoding="utf-8"
     )
@@ -1163,11 +1164,23 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "import numpy" not in veros_gcm_source
     assert "import numpy" not in veros_runtime_source
     assert "import h5netcdf" in netcdf_output_source
+    assert "import xarray" not in runtime_output_source
+    assert ".to_netcdf(" not in runtime_output_source
+    assert "from vercor.output.netcdf import write_netcdf_dataset" in (
+        runtime_output_source
+    )
+    assert "write_netcdf_dataset(" in runtime_output_source
     assert "import numpy" not in period_averages_source
     assert "import numpy" not in jax_gcm_output_source
     assert "import numpy" not in veros_output_source
     assert "import jax.numpy as jnp" in period_averages_source
     assert "import jax.numpy as jnp" in veros_output_source
+    assert "samples_from_output_variables(" in jax_gcm_output_source
+    assert "mean_samples_or_raise(" in jax_gcm_output_source
+    assert "period_mean_sample_to_output_variable(" in jax_gcm_output_source
+    assert "samples_from_output_variables(" in veros_output_source
+    assert "mean_samples_or_raise(" in veros_output_source
+    assert "period_mean_sample_to_output_variable(" in veros_output_source
     assert "def __getattr__(" in output_init_source
     assert "from vercor.output import runtime as _runtime" in output_init_source
     assert "def array_to_host(" in host_arrays_source

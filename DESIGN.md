@@ -81,17 +81,18 @@ The output is done in a structured format, such as NetCDF, HDF5, that can be eas
 Model restart files are supported and written in compact HDF5 format using `h5py`.
 
 Current example output snapshots are also written in HDF5. JAXGCM and Veros
-averaged period outputs are written directly with `h5netcdf`, bypassing xarray
-conversion so the adapters can preserve VerCOR calendar timestamps,
-shape-derived JCM coordinates, and native Veros metadata. Shared period-output
-cadence, calendar time encoding, accumulation, variable containers, and NetCDF
-writing live in `vercor.output`; model-specific JAXGCM and Veros modules only
-adapt native model objects into that shared output boundary. VerCOR-owned
-period output samples, accumulators, extracted variables, and mean variables
-stay JAX-backed until the file boundary; `vercor.host_arrays` owns the final
-host transfer. NetCDF time-coordinate values intentionally remain host `int64`
-arrays because the CF microsecond offsets can overflow JAX integers when
-`jax_enable_x64` is disabled.
+averaged period outputs and final runtime-view NetCDF files are written
+directly with `h5netcdf`, bypassing xarray conversion so adapters can preserve
+VerCOR calendar timestamps, shape-derived JCM coordinates, native Veros
+metadata, and runtime field attrs. Shared period-output cadence, calendar time
+encoding, accumulation, variable containers, mean-sample conversion, and
+NetCDF writing live in `vercor.output`; model-specific JAXGCM and Veros
+modules only adapt native model objects into that shared output boundary.
+VerCOR-owned period output samples, accumulators, extracted variables, mean
+variables, and runtime-view fields stay JAX-backed until the file boundary;
+`vercor.host_arrays` owns the final host transfer. NetCDF time-coordinate
+values intentionally remain host `int64` arrays because the CF microsecond
+offsets can overflow JAX integers when `jax_enable_x64` is disabled.
 
 ### Data flow: PyTree-based result objects
 
@@ -396,10 +397,10 @@ bundles or owning runtime payload/setup-state internals. JAXGCM output
 extraction and mean-variable shaping live in `vercor.output.jax_gcm`, which
 streams prediction objects into the shared JAX-backed sum/count period
 accumulator instead of retaining all period samples or calling xarray adapters.
-Shared cadence, calendar time metadata, and direct `h5netcdf` writing live in
-`vercor.output.time`, `vercor.output.period_averages`, and
-`vercor.output.netcdf`. Surface-temperature cleanup and output-field mapping
-live in
+Shared cadence, calendar time metadata, period-sample conversion, and direct
+`h5netcdf` writing live in `vercor.output.time`,
+`vercor.output.period_averages`, and `vercor.output.netcdf`.
+Surface-temperature cleanup and output-field mapping live in
 `vercor.setups.external.jax_gcm_fields`. Veros host-runtime flux application and
 substep orchestration live in
 `vercor.setups.external.veros_runtime` behind a private runtime-state protocol.

@@ -7,6 +7,7 @@ import importlib.util
 from pathlib import Path
 from typing import Any, cast
 
+import h5netcdf
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -1800,20 +1801,29 @@ def test_read_forcing_and_runtime_write_round_trip(
         masks={"fmask_OCN_ATM_bilinear": jnp.ones((2, 2))},
     )
 
-    with xr.open_dataset(output) as dataset:
+    with h5netcdf.File(output, "r") as dataset:
         assert_allclose_compact(
-            dataset["incoming_temperature"].values,
+            np.asarray(dataset.variables["incoming_temperature"]),
             state.incoming.get("temperature"),
         )
         assert_allclose_compact(
-            dataset["outgoing_humidity"].values,
+            np.asarray(dataset.variables["outgoing_humidity"]),
             state.outgoing.get("humidity"),
         )
-        assert_allclose_compact(dataset["latitude"].values, np.asarray([-1.0, 1.0]))
-        assert_allclose_compact(dataset["longitude"].values, np.asarray([0.0, 1.0]))
-        assert dataset["incoming_temperature"].attrs["component"] == "ATM"
-        assert dataset["incoming_temperature"].attrs["runtime_store"] == "incoming"
-        assert "fmask_OCN_ATM_bilinear" in dataset
+        assert_allclose_compact(
+            np.asarray(dataset.variables["latitude"]),
+            np.asarray([-1.0, 1.0]),
+        )
+        assert_allclose_compact(
+            np.asarray(dataset.variables["longitude"]),
+            np.asarray([0.0, 1.0]),
+        )
+        assert dataset.variables["incoming_temperature"].attrs["component"] == "ATM"
+        assert (
+            dataset.variables["incoming_temperature"].attrs["runtime_store"]
+            == "incoming"
+        )
+        assert "fmask_OCN_ATM_bilinear" in dataset.variables
 
     view_output = tmp_path / "runtime-view.nc"
     write_runtime_component_view_to_netcdf(
@@ -1824,5 +1834,5 @@ def test_read_forcing_and_runtime_write_round_trip(
         ),
         view_output,
     )
-    with xr.open_dataset(view_output) as dataset:
-        assert dataset["outgoing_humidity"].attrs["component"] == "ATM"
+    with h5netcdf.File(view_output, "r") as dataset:
+        assert dataset.variables["outgoing_humidity"].attrs["component"] == "ATM"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
@@ -11,6 +11,7 @@ import jax
 import jax.numpy as jnp
 
 from vercor.dtypes import as_jax_real_array, jax_index_dtype
+from vercor.output.variables import OutputVariable
 
 
 @dataclass(frozen=True)
@@ -138,6 +139,74 @@ class PeriodAverageAccumulator:
         )
 
 
+def samples_from_output_variables(
+    variables: Mapping[str, OutputVariable],
+) -> dict[str, PeriodAverageSample]:
+    """Return period-average samples matching shared output variables."""
+
+    return {
+        name: PeriodAverageSample(
+            dims=variable.dims,
+            values=variable.values,
+            attrs=dict(variable.attrs),
+        )
+        for name, variable in variables.items()
+    }
+
+
+def mean_samples_or_raise(
+    accumulator: PeriodAverageAccumulator,
+    error_message: str,
+) -> dict[str, PeriodAverageSample]:
+    """Return accumulated period means with an adapter-specific error message."""
+
+    try:
+        return accumulator.mean_samples()
+    except ValueError as exc:
+        raise ValueError(error_message) from exc
+
+
+def period_mean_sample_to_output_variable(
+    sample: PeriodAverageSample,
+    *,
+    time_dim: str,
+    value_dims: Sequence[str] | None = None,
+    dimension_order: Sequence[str] | None = None,
+) -> OutputVariable:
+    """Convert one period-mean sample into a one-step output variable."""
+
+    values = as_jax_real_array(sample.values)[jnp.newaxis, ...]
+    base_dims = (time_dim, *sample.dims)
+    output_dims = (
+        time_dim,
+        *(tuple(value_dims) if value_dims is not None else sample.dims),
+    )
+
+    _validate_output_dims(base_dims, output_dims)
+
+    if dimension_order is not None:
+        ordered_prefix = tuple(dim for dim in dimension_order if dim in output_dims)
+        ordered_rest = tuple(dim for dim in output_dims if dim not in ordered_prefix)
+        output_dims = ordered_prefix + ordered_rest
+
+    axes = tuple(base_dims.index(dim) for dim in output_dims)
+    if axes != tuple(range(len(axes))):
+        values = jnp.transpose(values, axes=axes)
+    return OutputVariable(dims=output_dims, values=values, attrs=dict(sample.attrs))
+
+
+def _validate_output_dims(
+    base_dims: tuple[str, ...],
+    output_dims: tuple[str, ...],
+) -> None:
+    if len(set(base_dims)) != len(base_dims):
+        raise ValueError("Period average output dimensions must be unique.")
+    if len(set(output_dims)) != len(output_dims) or set(output_dims) != set(base_dims):
+        raise ValueError(
+            "Period average output value_dims must be a permutation of sample dimensions."
+        )
+
+
 def _sample_sum_and_counts(
     name: str,
     sample: PeriodAverageSample,
@@ -192,4 +261,7 @@ __all__ = [
     "AccumulatedPeriodVariable",
     "PeriodAverageAccumulator",
     "PeriodAverageSample",
+    "mean_samples_or_raise",
+    "period_mean_sample_to_output_variable",
+    "samples_from_output_variables",
 ]

@@ -15,7 +15,9 @@ from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.output.netcdf import write_netcdf_dataset
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
-    PeriodAverageSample,
+    mean_samples_or_raise,
+    period_mean_sample_to_output_variable,
+    samples_from_output_variables,
 )
 from vercor.output.time import TIME_NAME, output_time_value_and_attrs
 from vercor.output.variables import OutputVariable
@@ -77,16 +79,7 @@ def accumulate_veros_output_snapshot(
 ) -> None:
     """Accumulate one selected Veros output snapshot for period averaging."""
 
-    accumulator.add_samples(
-        {
-            name: PeriodAverageSample(
-                dims=variable.dims,
-                values=variable.values,
-                attrs=variable.attrs,
-            )
-            for name, variable in snapshot.items()
-        }
-    )
+    accumulator.add_samples(samples_from_output_variables(snapshot))
 
 
 def accumulate_veros_period_state(
@@ -230,30 +223,17 @@ def _extract_coordinate_variable(veros_state: Any, dim: str) -> OutputVariable:
 def _mean_accumulated_variables(
     accumulator: PeriodAverageAccumulator,
 ) -> dict[str, OutputVariable]:
-    try:
-        mean_samples = accumulator.mean_samples()
-    except ValueError as exc:
-        raise ValueError(
-            "Veros average output requires at least one prediction."
-        ) from exc
-
     return {
-        name: _mean_sample_to_output_variable(sample)
-        for name, sample in mean_samples.items()
+        name: period_mean_sample_to_output_variable(
+            sample,
+            time_dim=_TIME_NAME,
+            value_dims=tuple(reversed(sample.dims)),
+        )
+        for name, sample in mean_samples_or_raise(
+            accumulator,
+            "Veros average output requires at least one prediction.",
+        ).items()
     }
-
-
-def _mean_sample_to_output_variable(sample: PeriodAverageSample) -> OutputVariable:
-    axes = tuple(reversed(range(sample.values.ndim)))
-    values = as_jax_real_array(sample.values)
-    if axes != tuple(range(sample.values.ndim)):
-        values = jnp.transpose(values, axes=axes)
-
-    return OutputVariable(
-        dims=(_TIME_NAME, *reversed(sample.dims)),
-        values=values[jnp.newaxis, ...],
-        attrs=dict(sample.attrs),
-    )
 
 
 def _used_coordinate_dims(
