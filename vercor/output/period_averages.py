@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
@@ -11,6 +11,7 @@ import jax
 import jax.numpy as jnp
 
 from vercor.dtypes import as_jax_real_array, jax_index_dtype
+from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
 
 
@@ -154,6 +155,20 @@ def samples_from_output_variables(
     }
 
 
+def accumulate_output_variables(
+    accumulator: PeriodAverageAccumulator,
+    variables: Mapping[str, OutputVariable],
+    *,
+    summation_dim: str | None = None,
+) -> None:
+    """Add shared output variables to a period-average accumulator."""
+
+    accumulator.add_samples(
+        samples_from_output_variables(variables),
+        summation_dim=summation_dim,
+    )
+
+
 def mean_samples_or_raise(
     accumulator: PeriodAverageAccumulator,
     error_message: str,
@@ -164,6 +179,34 @@ def mean_samples_or_raise(
         return accumulator.mean_samples()
     except ValueError as exc:
         raise ValueError(error_message) from exc
+
+
+def period_mean_output_variables(
+    accumulator: PeriodAverageAccumulator,
+    *,
+    empty_error_message: str,
+    time_dim: str = TIME_NAME,
+    value_dims_for_sample: Callable[[PeriodAverageSample], Sequence[str]] | None = None,
+    dimension_order: Sequence[str] | None = None,
+) -> dict[str, OutputVariable]:
+    """Return one-step output variables for all accumulated period means."""
+
+    return {
+        name: period_mean_sample_to_output_variable(
+            sample,
+            time_dim=time_dim,
+            value_dims=(
+                tuple(value_dims_for_sample(sample))
+                if value_dims_for_sample is not None
+                else None
+            ),
+            dimension_order=dimension_order,
+        )
+        for name, sample in mean_samples_or_raise(
+            accumulator,
+            empty_error_message,
+        ).items()
+    }
 
 
 def period_mean_sample_to_output_variable(
@@ -261,7 +304,9 @@ __all__ = [
     "AccumulatedPeriodVariable",
     "PeriodAverageAccumulator",
     "PeriodAverageSample",
+    "accumulate_output_variables",
     "mean_samples_or_raise",
+    "period_mean_output_variables",
     "period_mean_sample_to_output_variable",
     "samples_from_output_variables",
 ]

@@ -14,14 +14,14 @@ import jax.numpy as jnp
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array, jax_index_dtype
 from vercor.jax_logging import LoggerLike, get_default_logger
+from vercor.output.datasets import time_coordinate_variable
 from vercor.output.netcdf import write_netcdf_dataset
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
-    mean_samples_or_raise,
-    period_mean_sample_to_output_variable,
-    samples_from_output_variables,
+    accumulate_output_variables,
+    period_mean_output_variables,
 )
-from vercor.output.time import TIME_NAME, output_time_value_and_attrs
+from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
 from vercor.types import RuntimeArray
 
@@ -96,10 +96,9 @@ def _coordinate_variables(
     lon_k, lat_k = coords.horizontal.modal_axes
     level = as_jax_real_array(coords.vertical.centers)
     layers = _vertical_layers(coords)
-    time_values, time_attrs = output_time_value_and_attrs(output_time)
 
     coordinate_variables = {
-        _TIME_NAME: OutputVariable((_TIME_NAME,), time_values, time_attrs),
+        _TIME_NAME: time_coordinate_variable(output_time, time_dim=_TIME_NAME),
         _LON_NAME: OutputVariable(
             (_LON_NAME,),
             as_jax_real_array(lon) * 180.0 / jnp.pi,
@@ -297,8 +296,9 @@ def accumulate_jax_gcm_period_prediction(
         coords=coords,
         physics_module=selected_physics_module,
     )
-    accumulator.add_samples(
-        samples_from_output_variables(variables),
+    accumulate_output_variables(
+        accumulator,
+        variables,
         summation_dim=_TIME_NAME,
     )
 
@@ -375,17 +375,12 @@ def write_jax_gcm_averages_output(
     log.info(f"Output file: {output:s}")
 
     selected_physics_module = physics_module or _default_physics_module()
-    mean_variables = {
-        name: period_mean_sample_to_output_variable(
-            sample,
-            time_dim=_TIME_NAME,
-            dimension_order=_CANONICAL_DIM_ORDER,
-        )
-        for name, sample in mean_samples_or_raise(
-            accumulator,
-            "JAXGCM average output requires at least one prediction.",
-        ).items()
-    }
+    mean_variables = period_mean_output_variables(
+        accumulator,
+        empty_error_message="JAXGCM average output requires at least one prediction.",
+        time_dim=_TIME_NAME,
+        dimension_order=_CANONICAL_DIM_ORDER,
+    )
     _write_netcdf(
         output=output,
         coords=coords,

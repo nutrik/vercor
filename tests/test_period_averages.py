@@ -11,7 +11,9 @@ from vercor.output.variables import OutputVariable
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
     PeriodAverageSample,
+    accumulate_output_variables,
     mean_samples_or_raise,
+    period_mean_output_variables,
     period_mean_sample_to_output_variable,
     samples_from_output_variables,
 )
@@ -123,6 +125,28 @@ def test_samples_from_output_variables_preserves_metadata() -> None:
     assert_allclose_compact(samples["temp"].values, values)
 
 
+def test_accumulate_output_variables_preserves_attrs_and_reduces_dimension() -> None:
+    accumulator = PeriodAverageAccumulator()
+
+    accumulate_output_variables(
+        accumulator,
+        {
+            "temp": OutputVariable(
+                ("time", "x"),
+                np.asarray([[1.0, np.nan], [3.0, 5.0]]),
+                {"units": "K"},
+            )
+        },
+        summation_dim="time",
+    )
+
+    mean_sample = accumulator.mean_samples()["temp"]
+
+    assert mean_sample.dims == ("x",)
+    assert mean_sample.attrs == {"units": "K"}
+    assert_allclose_compact(mean_sample.values, np.asarray([2.0, 5.0]))
+
+
 def test_mean_samples_or_raise_uses_adapter_error_message() -> None:
     accumulator = PeriodAverageAccumulator()
 
@@ -153,3 +177,61 @@ def test_period_mean_sample_to_output_variable_accepts_output_value_dims() -> No
 
     assert variable.dims == ("time", "zt", "yt", "xt")
     assert_allclose_compact(variable.values[0], np.transpose(values, axes=(2, 1, 0)))
+
+
+def test_period_mean_output_variables_applies_jcm_dimension_order() -> None:
+    accumulator = PeriodAverageAccumulator()
+    values = np.arange(2 * 3 * 4, dtype=float).reshape((2, 3, 4))
+    accumulator.add_samples(
+        {
+            "temp": PeriodAverageSample(
+                ("lat", "lon", "level"),
+                values,
+                {"units": "K"},
+            )
+        }
+    )
+
+    variables = period_mean_output_variables(
+        accumulator,
+        empty_error_message="missing samples",
+        time_dim="time",
+        dimension_order=("time", "level", "lat", "lon"),
+    )
+
+    assert variables["temp"].dims == ("time", "level", "lat", "lon")
+    assert variables["temp"].attrs == {"units": "K"}
+    assert_allclose_compact(
+        variables["temp"].values[0],
+        np.transpose(values, axes=(2, 0, 1)),
+    )
+
+
+def test_period_mean_output_variables_applies_variable_specific_value_dims() -> None:
+    accumulator = PeriodAverageAccumulator()
+    temp_values = np.arange(2 * 3 * 4, dtype=float).reshape((2, 3, 4))
+    psi_values = np.arange(2 * 3, dtype=float).reshape((2, 3))
+    accumulator.add_samples(
+        {
+            "temp": PeriodAverageSample(("xt", "yt", "zt"), temp_values),
+            "psi": PeriodAverageSample(("xu", "yu"), psi_values),
+        }
+    )
+
+    variables = period_mean_output_variables(
+        accumulator,
+        empty_error_message="missing samples",
+        time_dim="time",
+        value_dims_for_sample=lambda sample: tuple(reversed(sample.dims)),
+    )
+
+    assert variables["temp"].dims == ("time", "zt", "yt", "xt")
+    assert_allclose_compact(
+        variables["temp"].values[0],
+        np.transpose(temp_values, axes=(2, 1, 0)),
+    )
+    assert variables["psi"].dims == ("time", "yu", "xu")
+    assert_allclose_compact(
+        variables["psi"].values[0],
+        np.transpose(psi_values, axes=(1, 0)),
+    )

@@ -12,14 +12,14 @@ from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor.host_arrays import array_to_host
 from vercor.jax_logging import LoggerLike, get_default_logger
+from vercor.output.datasets import time_coordinate_variable, used_dimension_names
 from vercor.output.netcdf import write_netcdf_dataset
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
-    mean_samples_or_raise,
-    period_mean_sample_to_output_variable,
-    samples_from_output_variables,
+    accumulate_output_variables,
+    period_mean_output_variables,
 )
-from vercor.output.time import TIME_NAME, output_time_value_and_attrs
+from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
 from vercor.setups.external.veros_runtime_settings import configure_veros_runtime
 
@@ -79,7 +79,7 @@ def accumulate_veros_output_snapshot(
 ) -> None:
     """Accumulate one selected Veros output snapshot for period averaging."""
 
-    accumulator.add_samples(samples_from_output_variables(snapshot))
+    accumulate_output_variables(accumulator, snapshot)
 
 
 def accumulate_veros_period_state(
@@ -223,28 +223,12 @@ def _extract_coordinate_variable(veros_state: Any, dim: str) -> OutputVariable:
 def _mean_accumulated_variables(
     accumulator: PeriodAverageAccumulator,
 ) -> dict[str, OutputVariable]:
-    return {
-        name: period_mean_sample_to_output_variable(
-            sample,
-            time_dim=_TIME_NAME,
-            value_dims=tuple(reversed(sample.dims)),
-        )
-        for name, sample in mean_samples_or_raise(
-            accumulator,
-            "Veros average output requires at least one prediction.",
-        ).items()
-    }
-
-
-def _used_coordinate_dims(
-    variables: Mapping[str, OutputVariable],
-) -> tuple[str, ...]:
-    used: list[str] = []
-    for variable in variables.values():
-        for dim in variable.dims:
-            if dim != _TIME_NAME and dim not in used:
-                used.append(dim)
-    return tuple(used)
+    return period_mean_output_variables(
+        accumulator,
+        empty_error_message="Veros average output requires at least one prediction.",
+        time_dim=_TIME_NAME,
+        value_dims_for_sample=lambda sample: tuple(reversed(sample.dims)),
+    )
 
 
 def _coordinate_variables(
@@ -253,11 +237,10 @@ def _coordinate_variables(
     output_time: datetime | ModelDateTime,
     variables: Mapping[str, OutputVariable],
 ) -> dict[str, OutputVariable]:
-    time_values, time_attrs = output_time_value_and_attrs(output_time)
     coordinate_variables = {
-        _TIME_NAME: OutputVariable((_TIME_NAME,), time_values, time_attrs)
+        _TIME_NAME: time_coordinate_variable(output_time, time_dim=_TIME_NAME)
     }
-    for dim in _used_coordinate_dims(variables):
+    for dim in used_dimension_names(variables, excluded_dims=(_TIME_NAME,)):
         coordinate_variables[dim] = _extract_coordinate_variable(veros_state, dim)
     return coordinate_variables
 

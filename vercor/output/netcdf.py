@@ -50,6 +50,13 @@ def _ensure_dimensions(outfile: h5netcdf.File, variable: OutputVariable) -> None
     for dim, size in zip(variable.dims, variable.values.shape):
         if dim not in outfile.dimensions:
             outfile.dimensions[dim] = size
+            continue
+        existing_size = len(outfile.dimensions[dim])
+        if existing_size != size:
+            raise ValueError(
+                f"NetCDF dimension {dim!r} has existing size {existing_size} "
+                f"but new size {size}."
+            )
 
 
 def _write_attrs(target_attrs: Any, attrs: Mapping[str, Any]) -> None:

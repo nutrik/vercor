@@ -164,6 +164,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local shared h5netcdf output helper validation: focused red/green
   pytest, Black, git diff whitespace check, flake8, mypy, full fast pytest,
   full pytest, and coverage pytest passed as of 2026-06-10.
+- Latest local shared JCM/Veros output dataset helper validation: focused
+  red/green pytest, Black, git diff whitespace check, flake8, mypy, full fast
+  pytest, full pytest, and coverage pytest passed as of 2026-06-11.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -193,6 +196,36 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-11: Shared JCM/Veros Output Dataset Helpers
+
+- Added `vercor.output.datasets` for shared one-step time-coordinate variables
+  and first-use dimension discovery across output-variable maps.
+- Extended `vercor.output.period_averages` with shared helpers for accumulating
+  `OutputVariable` mappings and converting accumulated period means into
+  one-time-step output variables, keeping JCM/Veros-specific extraction,
+  metadata, and dimension policy local to their adapters.
+- Refactored JAXGCM and Veros period output to use the shared dataset and
+  period-output helpers, preserving direct `h5netcdf` output through
+  `vercor.output.netcdf` with no xarray conversion in `vercor.output`.
+- Hardened the h5netcdf writer to reject reused dimension names with conflicting
+  sizes before creating invalid datasets.
+- Updated `DESIGN.md`, `DEPENDENCIES.md`, and architecture tests to record and
+  enforce the shared helper ownership.
+- Red/green notes: focused helper tests first failed on missing
+  `accumulate_output_variables` and missing `vercor.output.datasets`. After
+  adding the helpers and refactoring adapters, the focused output/API suite
+  passed.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_period_averages.py tests/test_output_datasets.py tests/test_output_netcdf.py tests/test_external_components_coverage.py tests/test_api_boundaries.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`, `git diff --check`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-10: Shared h5netcdf Output Helpers
 
