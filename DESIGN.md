@@ -86,9 +86,9 @@ directly with `h5netcdf`, bypassing xarray conversion so adapters can preserve
 VerCOR calendar timestamps, shape-derived JCM coordinates, native Veros
 metadata, and runtime field attrs. Shared period-output cadence, calendar time
 encoding, dataset coordinate helpers, accumulation, variable containers,
-mean-output conversion, and NetCDF writing live in `vercor.output`;
-model-specific JAXGCM and Veros modules only adapt native model objects into
-that shared output boundary.
+mean-output conversion, period-file write lifecycle, and NetCDF writing live in
+`vercor.output`; model-specific JAXGCM and Veros modules only adapt native
+model objects into that shared output boundary.
 VerCOR-owned period output samples, accumulators, extracted variables, mean
 variables, and runtime-view fields stay JAX-backed until the file boundary;
 `vercor.host_arrays` owns the final host transfer. NetCDF time-coordinate
@@ -399,9 +399,11 @@ extraction and mean-variable shaping live in `vercor.output.jax_gcm`, which
 streams prediction objects into the shared JAX-backed sum/count period
 accumulator instead of retaining all period samples or calling xarray adapters.
 Shared cadence, calendar time metadata, dataset coordinate discovery,
-period-sample/output conversion, and direct `h5netcdf` writing live in
+period-sample/output conversion, period-average file orchestration, and direct
+`h5netcdf` writing live in
 `vercor.output.time`, `vercor.output.datasets`,
-`vercor.output.period_averages`, and `vercor.output.netcdf`.
+`vercor.output.period_averages`, `vercor.output.period_files`, and
+`vercor.output.netcdf`.
 Surface-temperature cleanup and output-field mapping live in
 `vercor.setups.external.jax_gcm_fields`. Veros host-runtime flux application and
 substep orchestration live in
@@ -515,7 +517,8 @@ Production kernels and adapters should use the dtype helpers rather than
 hard-coded `jnp.float64`, `jnp.float32`, `jnp.float_`, `jnp.int64`, or
 `jnp.int32` annotations. NumPy remains restricted to explicit host and dtype
 boundaries. File-output adapters should keep VerCOR-owned values JAX-backed and
-delegate final file-transfer conversion to `vercor.output.netcdf`, which calls
+delegate period-average write orchestration to `vercor.output.period_files` and
+final file-transfer conversion to `vercor.output.netcdf`, which calls
 `vercor.host_arrays` only when a non-JAX consumer, such as `h5netcdf` or a
 host-backed model runtime, requires a host array.
 

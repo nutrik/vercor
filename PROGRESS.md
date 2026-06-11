@@ -167,6 +167,10 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local shared JCM/Veros output dataset helper validation: focused
   red/green pytest, Black, git diff whitespace check, flake8, mypy, full fast
   pytest, full pytest, and coverage pytest passed as of 2026-06-11.
+- Latest local shared period-average output writer validation: focused
+  red/green pytest, focused output/API pytest, Black, git diff whitespace
+  check, flake8, mypy, full fast pytest, full pytest, and coverage pytest
+  passed as of 2026-06-11.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -196,6 +200,36 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-11: Shared Period-Average Output Writer
+
+- Added `vercor.output.period_files.write_period_average_netcdf()` as the
+  shared log/build/write/clear lifecycle for period-average NetCDF files,
+  keeping direct `h5netcdf` access in `vercor.output.netcdf`.
+- Refactored JAXGCM and Veros average writers to provide model-specific mean,
+  coordinate, and metadata builders to the shared writer while preserving JCM
+  shape-derived coordinates/units and Veros native metadata/axis policy.
+- Added focused tests for successful writes, data-variable metadata transforms,
+  and preserving accumulated samples when a write fails.
+- Updated `DESIGN.md`, `DEPENDENCIES.md`, and architecture tests to record and
+  enforce the shared period-file lifecycle boundary.
+- Red/green notes: `tests/test_period_files.py` first failed with missing
+  `vercor.output.period_files`; after adding the helper, focused period-file
+  tests passed. Mypy then caught overly narrow test callback annotations, which
+  were corrected to `Mapping[str, OutputVariable]`.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_period_files.py -q --tb=short`,
+  `conda run -n scipy pytest tests/test_period_files.py tests/test_period_averages.py tests/test_output_datasets.py tests/test_output_netcdf.py tests/test_external_components_coverage.py -q --tb=short`,
+  `conda run -n scipy pytest tests/test_api_boundaries.py -q --tb=short`,
+  `conda run -n scipy pytest tests/test_period_files.py tests/test_period_averages.py tests/test_output_datasets.py tests/test_output_netcdf.py tests/test_external_components_coverage.py tests/test_api_boundaries.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`, `git diff --check`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short` passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-11: Shared JCM/Veros Output Dataset Helpers
 

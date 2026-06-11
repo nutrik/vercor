@@ -11,14 +11,14 @@ import jax.numpy as jnp
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor.host_arrays import array_to_host
-from vercor.jax_logging import LoggerLike, get_default_logger
+from vercor.jax_logging import LoggerLike
 from vercor.output.datasets import time_coordinate_variable, used_dimension_names
-from vercor.output.netcdf import write_netcdf_dataset
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
     accumulate_output_variables,
     period_mean_output_variables,
 )
+from vercor.output.period_files import write_period_average_netcdf
 from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
 from vercor.setups.external.veros_runtime_settings import configure_veros_runtime
@@ -108,17 +108,22 @@ def write_veros_averages_output(
 ) -> None:
     """Write mean Veros output snapshots to NetCDF and clear the accumulator."""
 
-    log = logger if logger is not None else get_default_logger()
-    log.info(f"Output file: {output:s}")
+    def build_coordinate_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return _coordinate_variables(
+            veros_state=veros_state,
+            output_time=output_time,
+            variables=variables,
+        )
 
-    mean_variables = _mean_accumulated_variables(accumulator)
-    _write_netcdf(
-        output=output,
-        veros_state=veros_state,
-        output_time=output_time,
-        variables=mean_variables,
+    write_period_average_netcdf(
+        accumulator,
+        output,
+        build_mean_variables=_mean_accumulated_variables,
+        build_coordinate_variables=build_coordinate_variables,
+        logger=logger,
     )
-    accumulator.clear()
 
 
 def _resolve_metadata(value: Any, settings: Any) -> Any:
@@ -243,24 +248,6 @@ def _coordinate_variables(
     for dim in used_dimension_names(variables, excluded_dims=(_TIME_NAME,)):
         coordinate_variables[dim] = _extract_coordinate_variable(veros_state, dim)
     return coordinate_variables
-
-
-def _write_netcdf(
-    *,
-    output: str,
-    veros_state: Any,
-    output_time: datetime | ModelDateTime,
-    variables: Mapping[str, OutputVariable],
-) -> None:
-    write_netcdf_dataset(
-        output=output,
-        coordinate_variables=_coordinate_variables(
-            veros_state=veros_state,
-            output_time=output_time,
-            variables=variables,
-        ),
-        data_variables=variables,
-    )
 
 
 __all__ = [

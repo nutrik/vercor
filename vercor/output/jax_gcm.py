@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Mapping
 from datetime import datetime
 from importlib import resources
 from pathlib import Path
@@ -13,14 +14,14 @@ import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array, jax_index_dtype
-from vercor.jax_logging import LoggerLike, get_default_logger
+from vercor.jax_logging import LoggerLike
 from vercor.output.datasets import time_coordinate_variable
-from vercor.output.netcdf import write_netcdf_dataset
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
     accumulate_output_variables,
     period_mean_output_variables,
 )
+from vercor.output.period_files import write_period_average_netcdf
 from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
 from vercor.types import RuntimeArray
@@ -328,36 +329,36 @@ def _unit_metadata(physics_module: _PhysicsModuleLike) -> dict[str, dict[str, st
     return metadata
 
 
-def _write_netcdf(
-    *,
-    output: str,
-    coords: Any,
-    output_time: datetime | ModelDateTime,
-    variables: dict[str, OutputVariable],
-    unit_metadata: dict[str, dict[str, str]],
-) -> None:
-    write_netcdf_dataset(
-        output=output,
-        coordinate_variables=_coordinate_variables(
-            coords=coords,
-            output_time=output_time,
-        ),
-        data_variables={
-            name: OutputVariable(
-                dims=variable_data.dims,
-                values=variable_data.values,
-                attrs={
-                    **dict(variable_data.attrs),
-                    **{
-                        attr_name: attr_value
-                        for attr_name, attr_value in unit_metadata.get(name, {}).items()
-                        if attr_value
-                    },
-                },
-            )
-            for name, variable_data in variables.items()
-        },
+def _mean_accumulated_variables(
+    accumulator: PeriodAverageAccumulator,
+) -> dict[str, OutputVariable]:
+    return period_mean_output_variables(
+        accumulator,
+        empty_error_message="JAXGCM average output requires at least one prediction.",
+        time_dim=_TIME_NAME,
+        dimension_order=_CANONICAL_DIM_ORDER,
     )
+
+
+def _data_variables_with_unit_metadata(
+    variables: Mapping[str, OutputVariable],
+    unit_metadata: Mapping[str, Mapping[str, str]],
+) -> dict[str, OutputVariable]:
+    return {
+        name: OutputVariable(
+            dims=variable_data.dims,
+            values=variable_data.values,
+            attrs={
+                **dict(variable_data.attrs),
+                **{
+                    attr_name: attr_value
+                    for attr_name, attr_value in unit_metadata.get(name, {}).items()
+                    if attr_value
+                },
+            },
+        )
+        for name, variable_data in variables.items()
+    }
 
 
 def write_jax_gcm_averages_output(
@@ -371,25 +372,31 @@ def write_jax_gcm_averages_output(
 ) -> None:
     """Write mean JAXGCM predictions to NetCDF and clear the accumulator."""
 
-    log = logger if logger is not None else get_default_logger()
-    log.info(f"Output file: {output:s}")
-
     selected_physics_module = physics_module or _default_physics_module()
-    mean_variables = period_mean_output_variables(
-        accumulator,
-        empty_error_message="JAXGCM average output requires at least one prediction.",
-        time_dim=_TIME_NAME,
-        dimension_order=_CANONICAL_DIM_ORDER,
-    )
-    _write_netcdf(
-        output=output,
-        coords=coords,
-        output_time=output_time,
-        variables=mean_variables,
-        unit_metadata=_unit_metadata(selected_physics_module),
-    )
+    unit_metadata = _unit_metadata(selected_physics_module)
 
-    accumulator.clear()
+    def build_coordinate_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        _ = variables
+        return _coordinate_variables(
+            coords=coords,
+            output_time=output_time,
+        )
+
+    def build_data_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return _data_variables_with_unit_metadata(variables, unit_metadata)
+
+    write_period_average_netcdf(
+        accumulator,
+        output,
+        build_mean_variables=_mean_accumulated_variables,
+        build_coordinate_variables=build_coordinate_variables,
+        build_data_variables=build_data_variables,
+        logger=logger,
+    )
 
 
 __all__ = [
