@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from datetime import timedelta
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from vercor.components import ComponentStepContext
-from vercor.output.period_averages import PeriodAverageAccumulator
 from vercor.output.time import should_write_period_output
 from vercor.output.veros import (
     accumulate_veros_period_state,
@@ -16,22 +15,12 @@ from vercor.output.veros import (
 import vercor.setups.external.veros_fluxes as _veros_fluxes
 import vercor.setups.external.veros_state as _veros_state
 
-
-class _VerosRuntimeState(Protocol):
-    """Private protocol for the Veros setup state consumed by runtime hooks."""
-
-    _veros_state: Any
-    _step_function: Callable[[Any], Any]
-    restore_to_climatology: bool
-    jitted: bool
-    model_substeps: int
-    output_frequency: str | None
-    output_variables: tuple[str, ...]
-    _period_average_accumulator: PeriodAverageAccumulator
+if TYPE_CHECKING:
+    from vercor.setups.external.veros_gcm_state import VerosGCMSetupState
 
 
 def step_veros_runtime(
-    state: _VerosRuntimeState,
+    state: "VerosGCMSetupState",
     fields: Mapping[str, Any],
     context: ComponentStepContext,
     payload: Any | None,
@@ -74,7 +63,7 @@ def step_veros_runtime(
 
 
 def record_veros_output(
-    state: _VerosRuntimeState,
+    state: "VerosGCMSetupState",
     context: ComponentStepContext,
 ) -> None:
     """Record selected Veros variables and write optional period output."""

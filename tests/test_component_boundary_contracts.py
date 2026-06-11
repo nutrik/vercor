@@ -22,21 +22,10 @@ def _imported_names_from(path: str, module: str) -> set[str]:
     return imported_names
 
 
-def test_runtime_component_protocol_excludes_setup_data_storage() -> None:
-    protocol_source = class_body_source(
-        "vercor/components/_protocols.py",
-        "ComponentRuntimeProtocol",
-    )
-
-    assert "data:" not in protocol_source
-    assert "setup_metadata" not in protocol_source
-
-
-def test_component_runtime_helpers_keep_private_protocol_boundary() -> None:
+def test_component_runtime_helpers_do_not_keep_annotation_only_protocol_layer() -> None:
     helper_paths = (
         "vercor/components/_runtime_fields.py",
         "vercor/components/_runtime_validation.py",
-        "vercor/components/_runtime_access.py",
         "vercor/components/_lifecycle_api.py",
         "vercor/components/_callable_wrappers.py",
         "vercor/components/runtime_execution.py",
@@ -44,28 +33,31 @@ def test_component_runtime_helpers_keep_private_protocol_boundary() -> None:
 
     for path in helper_paths:
         source = source_for(path)
-        assert "from vercor.components.base import Component" not in source, path
-        assert "vercor.components._protocols" in source, path
+        if path == "vercor/components/runtime_execution.py":
+            assert "HostRuntimeExecutionProtocol" in source, path
+        else:
+            assert "vercor.components._protocols" not in source, path
+        assert "if TYPE_CHECKING:" in source, path
 
+    protocol_source = source_for("vercor/components/_protocols.py")
+    assert protocol_source.count("class ") == 1
     components_source = source_for("vercor/components/__init__.py")
     assert "_protocols" not in components_source
 
 
 @pytest.mark.fast_always
-def test_component_execution_protocols_are_private_structural_contracts() -> None:
+def test_host_runtime_execution_protocol_is_only_private_structural_contract() -> None:
     protocol_source = source_for("vercor/components/_protocols.py")
-    execution_protocol_source = class_body_source(
-        "vercor/components/_protocols.py",
-        "ComponentExecutionProtocol",
-    )
     host_execution_protocol_source = class_body_source(
         "vercor/components/_protocols.py",
         "HostRuntimeExecutionProtocol",
     )
 
-    assert "class ComponentExecutionProtocol" in protocol_source
+    assert "class ComponentRuntimeProtocol" not in protocol_source
+    assert "class ComponentAuthoringProtocol" not in protocol_source
+    assert "class ComponentExecutionProtocol" not in protocol_source
     assert "@runtime_checkable\nclass HostRuntimeExecutionProtocol" in protocol_source
-    assert "def step_runtime_state(" in execution_protocol_source
+    assert "def step_runtime_state(" in host_execution_protocol_source
     assert "def step_host_runtime_state(" in host_execution_protocol_source
     assert "from vercor.components.base import Component" not in protocol_source
     assert "from vercor.components.host import HostRuntimeComponent" not in (
@@ -107,8 +99,9 @@ def test_lifecycle_storage_uses_private_typed_owner_boundary() -> None:
     assert "class ComponentLifecycleOwner(Protocol)" in lifecycle_source
     assert "component: ComponentLifecycleOwner" in lifecycle_source
     assert "component: Any" not in lifecycle_source
-    assert "_lifecycle_hooks: ComponentLifecycleHooks" in protocol_source
-    assert "_lifecycle_hooks: Any" not in protocol_source
+    assert "_lifecycle_hooks: ComponentLifecycleHooks" in lifecycle_source
+    assert "_lifecycle_hooks: Any" not in lifecycle_source
+    assert "_lifecycle_hooks" not in protocol_source
 
 
 @pytest.mark.fast_always

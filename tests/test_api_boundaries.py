@@ -366,11 +366,10 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def host_component_names(" in runtime_execution_source
     assert "def step_component_runtime_state(" in runtime_execution_source
     assert "from vercor.components._protocols import" in runtime_execution_source
-    assert "ComponentExecutionProtocol" in runtime_execution_source
+    assert "ComponentExecutionProtocol" not in runtime_execution_source
     assert "HostRuntimeExecutionProtocol" in runtime_execution_source
-    assert (
-        "from vercor.components.base import Component" not in runtime_execution_source
-    )
+    assert "if TYPE_CHECKING:" in runtime_execution_source
+    assert "from vercor.components.base import Component" in runtime_execution_source
     assert "from vercor.components.host import HostRuntimeComponent" not in (
         runtime_execution_source
     )
@@ -402,7 +401,8 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "from vercor.components.factories import _install_lifecycle_hooks" not in (
         callable_source
     )
-    assert "from vercor.components.base import Component" not in callable_source
+    assert "if TYPE_CHECKING:" in callable_source
+    assert "from vercor.components.base import Component" in callable_source
     assert "from vercor.components.host import HostRuntimeComponent" not in (
         callable_source
     )
@@ -466,7 +466,7 @@ def test_component_base_internals_are_private_modules() -> None:
 
 
 @pytest.mark.fast_always
-def test_component_base_gets_helper_methods_from_private_mixins() -> None:
+def test_component_base_owns_runtime_access_methods_directly() -> None:
     expected_author_methods = {
         "declare_fields",
         "update_settings",
@@ -513,10 +513,11 @@ def test_component_base_gets_helper_methods_from_private_mixins() -> None:
     }
 
     assert expected_author_methods.isdisjoint(directly_defined_methods)
-    assert expected_runtime_methods.isdisjoint(directly_defined_methods)
+    assert expected_runtime_methods.issubset(directly_defined_methods)
     assert expected_lifecycle_methods.isdisjoint(directly_defined_methods)
     assert "ComponentFieldAuthoringMixin" in source
-    assert "ComponentRuntimeAccessMixin" in source
+    assert "ComponentRuntimeAccessMixin" not in source
+    assert not Path("vercor/components/_runtime_access.py").exists()
     assert "ComponentLifecycleMixin" in source
 
 
@@ -878,9 +879,8 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     runtime_resources_source = Path("vercor/runtime/resources.py").read_text(
         encoding="utf-8"
     )
+    runtime_cache_source = Path("vercor/runtime/cache.py").read_text(encoding="utf-8")
     runtime_compilation_path = Path("vercor/runtime/compilation.py")
-    assert runtime_compilation_path.exists()
-    runtime_compilation_source = runtime_compilation_path.read_text(encoding="utf-8")
     regridder_base_source = Path("vercor/regridders/base.py").read_text(
         encoding="utf-8"
     )
@@ -902,6 +902,7 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert "from vercor.forcing_index import daily_forcing_day_of_year" in (
         time_selection_source
     )
+    assert "Protocol" not in time_selection_source
     assert "_custom_360_day_to_gregorian_day_of_year" not in time_selection_source
     assert "from vercor.forcing_index import daily_forcing_index" in (
         runtime_time_source
@@ -936,15 +937,11 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert "ExchangeField: TypeAlias" not in exchange_recipes_source
     assert "from vercor.exchange import ExchangeField" in coupler_helpers_source
     assert "from vercor.exchange import ExchangeField" in exchange_recipes_source
-    assert "from vercor.runtime.compilation import CompiledRuntime" in (
-        runtime_resources_source
-    )
-    assert "from vercor.runtime.run_context import CompiledRuntime" not in (
-        runtime_resources_source
-    )
+    assert not runtime_compilation_path.exists()
+    assert "from vercor.runtime.compilation import" not in runtime_resources_source
     assert "CompiledRuntime = Callable[" not in runtime_resources_source
-    assert "CompiledRuntime = Callable[" in runtime_compilation_source
-    assert "RuntimeCompilationKey: TypeAlias" in runtime_compilation_source
+    assert "CompiledRuntime = Callable[" in runtime_cache_source
+    assert "RuntimeCompilationKey: TypeAlias" in runtime_cache_source
     assert "def _compute_has_identical_grids(" not in regridder_base_source
     assert "grids_identical(" in regridder_base_source
     assert "BilinearRectilinearInterpolator" not in regridder_base_source
@@ -1277,31 +1274,27 @@ def test_external_adapter_all_exports_are_public() -> None:
 
 
 @pytest.mark.fast_always
-def test_external_runtime_helpers_use_private_state_protocols() -> None:
+def test_external_runtime_helpers_use_concrete_setup_state_annotations() -> None:
     runtime_sources = {
         "vercor/setups/external/jax_gcm_runtime.py": (
-            "_JAXGCMRuntimeState",
-            (
-                "\n    state: Any,",
-                "\n    settings: Any,",
-            ),
+            "JAXGCMSetupState",
+            "vercor.setups.external.jax_gcm_state",
         ),
         "vercor/setups/external/veros_runtime.py": (
-            "_VerosRuntimeState",
-            ("\n    state: Any,",),
+            "VerosGCMSetupState",
+            "vercor.setups.external.veros_gcm_state",
         ),
         "vercor/setups/external/camulator_runtime.py": (
-            "_CAMulatorRuntimeState",
-            ("\n    state: Any,",),
+            "CAMulatorGCMSetupState",
+            "vercor.setups.external.camulator_gcm_state",
         ),
     }
 
-    for path_name, (protocol_name, forbidden_markers) in runtime_sources.items():
+    for path_name, (state_name, state_module) in runtime_sources.items():
         source = Path(path_name).read_text(encoding="utf-8")
-        assert "from typing import" in source and "Protocol" in source
-        assert f"class {protocol_name}(Protocol):" in source
-        for marker in forbidden_markers:
-            assert marker not in source, f"{path_name} still exposes {marker}"
+        assert "Protocol" not in source
+        assert f"from {state_module} import {state_name}" in source
+        assert f"state: {state_name}" in source or f'state: "{state_name}"' in source
 
 
 @pytest.mark.fast_always

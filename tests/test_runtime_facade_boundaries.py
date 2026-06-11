@@ -42,6 +42,7 @@ def test_runtime_preparation_module_owns_runtime_state_preparation() -> None:
     assert "def validate_runtime_state(" in preparation_source
     assert "def create_runtime_state(" in preparation_source
     assert "def prepare_runtime_state(" in preparation_source
+    assert "RuntimePreparationInputs" not in preparation_source
 
     assert is_dataclass(PreparedRuntimeState)
     assert [field.name for field in fields(PreparedRuntimeState)] == [
@@ -139,30 +140,36 @@ def test_runtime_topology_policy_boundaries_are_focused() -> None:
 
 
 @pytest.mark.fast_always
-def test_runtime_resources_hide_raw_resource_dictionaries() -> None:
+def test_runtime_resources_expose_simple_public_resource_fields() -> None:
     resources = CouplerRuntimeResources()
     resources_source = source_for("vercor/runtime/resources.py")
     facade_source = source_for("vercor/runtime/facade.py")
     preparation_source = source_for("vercor/runtime/preparation.py")
     run_context_source = source_for("vercor/runtime/run_context.py")
 
-    for raw_name in (
-        "regridders",
-        "binary_masks",
-        "fractional_masks",
-        "contracts",
+    for old_raw_name in (
         "compiled_runtime_cache",
         "runtime_cache_mapping",
         "interrupts",
     ):
-        assert not hasattr(resources, raw_name), raw_name
+        assert not hasattr(resources, old_raw_name), old_raw_name
+
+    for public_field in (
+        "topology_maps",
+        "runtime_contracts",
+        "runtime_cache",
+        "interrupt_controller",
+    ):
+        assert hasattr(resources, public_field), public_field
 
     assert "slots=True" in resources_source
-    assert "_topology_maps:" in resources_source
-    assert "_runtime_contracts:" in resources_source
-    assert "_runtime_cache:" in resources_source
+    assert "_topology_maps:" not in resources_source
+    assert "_runtime_contracts:" not in resources_source
+    assert "_runtime_cache:" not in resources_source
     assert "_compiled_runtime_cache:" not in resources_source
-    assert "_interrupt_controller:" in resources_source
+    assert "_interrupt_controller:" not in resources_source
+    assert "def replace_contracts(" not in resources_source
+    assert "def replace_topology_maps(" not in resources_source
     assert "runtime_cache_mapping(" not in resources_source
     assert "MutableMapping" not in run_context_source
     assert "runtime_cache: CompiledRuntimeCache" in run_context_source
@@ -182,25 +189,17 @@ def test_runtime_resources_hide_raw_resource_dictionaries() -> None:
 @pytest.mark.fast_always
 def test_runtime_compilation_cache_has_narrow_context_boundary() -> None:
     compilation_path = Path("vercor/runtime/compilation.py")
-    assert compilation_path.exists()
+    assert not compilation_path.exists()
 
-    compilation_source = source_for("vercor/runtime/compilation.py")
     cache_source = source_for("vercor/runtime/cache.py")
     run_context_source = source_for("vercor/runtime/run_context.py")
     resources_source = source_for("vercor/runtime/resources.py")
 
-    assert "CompiledRuntime = Callable[" in compilation_source
-    assert "RuntimeCompilationKey: TypeAlias" in compilation_source
-    assert "from vercor.runtime.compilation import CompiledRuntime" in cache_source
-    assert "from vercor.runtime.compilation import CompiledRuntime" in (
-        run_context_source
-    )
-    assert "from vercor.runtime.compilation import CompiledRuntime" in (
-        resources_source
-    )
-    assert "from vercor.runtime.run_context import CompiledRuntime" not in (
-        resources_source
-    )
+    assert "CompiledRuntime = Callable[" in cache_source
+    assert "RuntimeCompilationKey: TypeAlias" in cache_source
+    assert "from vercor.runtime.compilation import" not in cache_source
+    assert "from vercor.runtime.compilation import" not in run_context_source
+    assert "from vercor.runtime.compilation import" not in resources_source
     assert "RuntimeRunContext" not in cache_source
     assert "def get_or_compile_for_context(" not in cache_source
     assert "compiled_runtime_cache_key(" not in cache_source
@@ -226,8 +225,13 @@ def test_runtime_state_validation_module_owns_runtime_topology_validation() -> N
 
 def test_runtime_facade_reexports_preparation_without_owning_it() -> None:
     facade_source = source_for("vercor/runtime/facade.py")
+    preparation_source = source_for("vercor/runtime/preparation.py")
 
     assert "from vercor.runtime.preparation import" in facade_source
+    assert "Protocol" not in preparation_source
+    assert "RuntimePreparationInputs" not in preparation_source
+    assert "if TYPE_CHECKING:" in preparation_source
+    assert "from vercor.runtime.facade import RuntimeFacadeInputs" in preparation_source
     assert "class PreparedRuntimeState" not in facade_source
     assert "def runtime_state_from_components(" not in facade_source
     assert "def validate_runtime_state(" not in facade_source

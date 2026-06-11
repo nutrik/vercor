@@ -14,17 +14,17 @@ from vercor.components._contracts import (
     normalize_author_field_values,
 )
 from vercor.components._field_names import unique_field_names
-from vercor.components._protocols import ComponentRuntimeProtocol
 from vercor.dtypes import PrecisionPolicy, jax_zeros
 from vercor.exceptions import ComponentError
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
+    from vercor.components.base import Component
     from vercor.runtime.state import RuntimeComponentState
 
 
 def runtime_fields(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     component_state: "RuntimeComponentState",
 ) -> dict[str, RuntimeArray]:
     """Return runtime data fields as a plain name-to-array mapping."""
@@ -34,7 +34,7 @@ def runtime_fields(
 
 
 def runtime_field(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     component_state: "RuntimeComponentState",
     name: str,
 ) -> RuntimeArray:
@@ -49,7 +49,7 @@ def runtime_field(
 
 
 def has_runtime_field(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     component_state: "RuntimeComponentState",
     name: str,
 ) -> bool:
@@ -60,7 +60,7 @@ def has_runtime_field(
 
 
 def runtime_field_or(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     component_state: "RuntimeComponentState",
     name: str,
     default: object,
@@ -85,7 +85,7 @@ def runtime_field_or(
 
 
 def runtime_field_or_zeros_like(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     component_state: "RuntimeComponentState",
     name: str,
     like: str | RuntimeArray,
@@ -103,7 +103,7 @@ def runtime_field_or_zeros_like(
 
 
 def with_runtime_fields(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     component_state: "RuntimeComponentState",
     fields: Mapping[str, RuntimeArray],
 ) -> "RuntimeComponentState":
@@ -126,7 +126,7 @@ def with_runtime_fields(
 
 
 def apply_step_result(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     component_state: "RuntimeComponentState",
     result: ComponentStepReturn,
 ) -> "RuntimeComponentState":
@@ -140,7 +140,7 @@ def apply_step_result(
 
 
 def prefill_runtime_fields(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     data: dict[str, RuntimeArray],
     field_spec: ComponentFieldSpec | None = None,
     *,
@@ -172,7 +172,7 @@ def prefill_runtime_fields(
 
 
 def prefill_declared_runtime_fields(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     data: dict[str, RuntimeArray],
 ) -> None:
     """Prefill component data from the component's declared runtime fields."""

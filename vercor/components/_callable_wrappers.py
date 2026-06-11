@@ -20,13 +20,13 @@ from vercor.components._lifecycle import (
     ComponentLifecycleHooks,
     install_lifecycle_hooks,
 )
-from vercor.components._protocols import ComponentAuthoringProtocol
 from vercor.components._runtime_fields import apply_step_result
 from vercor.exceptions import ComponentError
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
+    from vercor.components.base import Component
     from vercor.components.contexts import ComponentStepContext
     from vercor.runtime.state import RuntimeComponentState
 
@@ -203,7 +203,7 @@ class _CallableRuntimeMixin:
         field_spec: ComponentFieldSpec,
         lifecycle_hooks: ComponentLifecycleHooks,
     ) -> None:
-        component = cast(ComponentAuthoringProtocol, self)
+        component = cast("Component", self)
         self._step = normalize_component_step_callable(step)
         self._payload = payload
         component.declare_fields(field_spec)
@@ -225,7 +225,7 @@ class _CallableRuntimeMixin:
     ) -> "RuntimeComponentState":
         """Advance callable-backed runtime state using the normalized step."""
 
-        component = cast(ComponentAuthoringProtocol, self)
+        component = cast("Component", self)
         return apply_step_result(
             component,
             component_state,

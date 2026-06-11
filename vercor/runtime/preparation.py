@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
-from vercor.clock import Clock
-from vercor.exchange import Exchange
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.coupler_state import (
     refresh_runtime_contracts,
@@ -13,45 +10,14 @@ from vercor.runtime.coupler_state import (
 )
 from vercor.runtime.dispatch_context import build_runtime_dispatch_context
 from vercor.runtime.driver import prime_runtime_outgoing
-from vercor.runtime.resources import CouplerRuntimeResources
 from vercor.runtime.state_validation import (
     validate_runtime_state as _validate_runtime_state,
 )
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.time import initial_runtime_step_info
-from vercor.run_sequence import RunSequence
-from vercor.settings import VercorSettings
 
 if TYPE_CHECKING:
-    from vercor.components.base import Component
-
-
-class RuntimePreparationInputs(Protocol):
-    """Static coupler inputs required to prepare immutable runtime state."""
-
-    @property
-    def components(self) -> Mapping[str, "Component"]:
-        """Return configured setup components by name."""
-
-    @property
-    def exchanges(self) -> Sequence[Exchange]:
-        """Return configured exchange declarations."""
-
-    @property
-    def runtime_resources(self) -> CouplerRuntimeResources:
-        """Return mutable runtime resources for this coupler."""
-
-    @property
-    def run_sequence(self) -> RunSequence:
-        """Return the configured runtime component order."""
-
-    @property
-    def clock(self) -> Clock:
-        """Return the configured coupler clock."""
-
-    @property
-    def settings(self) -> VercorSettings:
-        """Return the configured coupler settings."""
+    from vercor.runtime.facade import RuntimeFacadeInputs
 
 
 @dataclass(frozen=True)
@@ -64,7 +30,7 @@ class PreparedRuntimeState:
 
 def runtime_state_from_components(
     *,
-    inputs: RuntimePreparationInputs,
+    inputs: "RuntimeFacadeInputs",
     prefill_missing: bool,
 ) -> PreparedRuntimeState:
     """Build immutable runtime state from setup components and exchanges."""
@@ -74,7 +40,7 @@ def runtime_state_from_components(
         inputs.exchanges,
         validate_endpoints=False,
     )
-    inputs.runtime_resources.replace_contracts(runtime_contracts)
+    inputs.runtime_resources.runtime_contracts = runtime_contracts
     topology_maps = inputs.runtime_resources.topology_maps
     runtime_state = _runtime_state_from_components(
         inputs.components,
@@ -92,7 +58,7 @@ def runtime_state_from_components(
 def validate_runtime_state(
     runtime_state: RuntimeCouplerState,
     *,
-    inputs: RuntimePreparationInputs,
+    inputs: "RuntimeFacadeInputs",
 ) -> dict[str, RuntimeComponentContract]:
     """Validate runtime state and return the contracts used for validation."""
 
@@ -101,7 +67,7 @@ def validate_runtime_state(
         inputs.exchanges,
         validate_endpoints=False,
     )
-    inputs.runtime_resources.replace_contracts(runtime_contracts)
+    inputs.runtime_resources.runtime_contracts = runtime_contracts
     _validate_runtime_state(
         runtime_state,
         components=inputs.components,
@@ -115,7 +81,7 @@ def validate_runtime_state(
 
 def create_runtime_state(
     *,
-    inputs: RuntimePreparationInputs,
+    inputs: "RuntimeFacadeInputs",
     prefill_missing: bool,
 ) -> PreparedRuntimeState:
     """Create, prime, and validate immutable runtime state."""
@@ -150,7 +116,7 @@ def create_runtime_state(
 def prepare_runtime_state(
     initial_state: RuntimeCouplerState | None,
     *,
-    inputs: RuntimePreparationInputs,
+    inputs: "RuntimeFacadeInputs",
     validate_state: bool = True,
 ) -> PreparedRuntimeState:
     """Return a runtime state ready for execution."""
@@ -174,7 +140,6 @@ def prepare_runtime_state(
 
 __all__ = [
     "PreparedRuntimeState",
-    "RuntimePreparationInputs",
     "create_runtime_state",
     "prepare_runtime_state",
     "runtime_state_from_components",

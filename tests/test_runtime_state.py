@@ -101,7 +101,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert runtime_dispatch_context_path.exists()
     assert runtime_run_context_path.exists()
     assert runtime_resources_path.exists()
-    assert runtime_compilation_path.exists()
+    assert not runtime_compilation_path.exists()
     assert runtime_cache_path.exists()
     assert runtime_progress_path.exists()
     assert runtime_component_state_path.exists()
@@ -123,7 +123,6 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     )
     runtime_run_context_source = runtime_run_context_path.read_text(encoding="utf-8")
     runtime_resources_source = runtime_resources_path.read_text(encoding="utf-8")
-    runtime_compilation_source = runtime_compilation_path.read_text(encoding="utf-8")
     runtime_cache_source = runtime_cache_path.read_text(encoding="utf-8")
     runtime_progress_source = runtime_progress_path.read_text(encoding="utf-8")
     runtime_component_state_source = runtime_component_state_path.read_text(
@@ -217,7 +216,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "from vercor.components._protocols import" in (
         component_runtime_execution_source
     )
-    assert "from vercor.components.base import Component" not in (
+    assert "if TYPE_CHECKING:" in component_runtime_execution_source
+    assert "from vercor.components.base import Component" in (
         component_runtime_execution_source
     )
     assert "from vercor.components.host import HostRuntimeComponent" not in (
@@ -299,8 +299,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "class RuntimeRunContext" not in runtime_runner_source
     assert "class RuntimeRunContext" in runtime_run_context_source
     assert "class CouplerRuntimeResources" in runtime_resources_source
-    assert "CompiledRuntime = Callable[" in runtime_compilation_source
-    assert "RuntimeCompilationKey: TypeAlias" in runtime_compilation_source
+    assert not Path("vercor/runtime/compilation.py").exists()
+    assert "CompiledRuntime = Callable[" in runtime_cache_source
+    assert "RuntimeCompilationKey: TypeAlias" in runtime_cache_source
     assert "class CompiledRuntimeCache" in runtime_cache_source
     assert "components:" not in runtime_run_context_source
     assert "exchanges:" not in runtime_run_context_source
@@ -310,9 +311,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "MutableMapping" not in runtime_run_context_source
     assert "compiled_runtime_cache:" not in runtime_run_context_source
     assert "runtime_cache: CompiledRuntimeCache" in runtime_run_context_source
-    assert "from vercor.runtime.compilation import" in runtime_run_context_source
-    assert "from vercor.runtime.compilation import" in runtime_resources_source
-    assert "from vercor.runtime.compilation import" in runtime_cache_source
+    assert "from vercor.runtime.compilation import" not in runtime_run_context_source
+    assert "from vercor.runtime.compilation import" not in runtime_resources_source
+    assert "from vercor.runtime.compilation import" not in runtime_cache_source
     assert "context: RuntimeRunContext" in runtime_runner_source
     assert "from vercor.runtime.run_context import" not in coupler_source
     assert "from vercor.runtime.run_context import" in runtime_facade_source
@@ -607,8 +608,8 @@ def test_coupler_runtime_resources_store_runtime_state() -> None:
         fractional_masks=fractional_masks,
     )
 
-    coupler._runtime_resources.replace_topology_maps(topology_maps)
-    coupler._runtime_resources.replace_contracts(contracts)
+    coupler._runtime_resources.topology_maps = topology_maps
+    coupler._runtime_resources.runtime_contracts = contracts
 
     assert coupler._runtime_resources.topology_maps is topology_maps
     assert coupler._runtime_resources.runtime_contracts is contracts
@@ -674,7 +675,7 @@ def test_compiled_runtime_cache_owns_compilation_and_inspection() -> None:
 
 
 @pytest.mark.fast_always
-def test_runtime_resources_replace_contracts_and_topology_through_methods() -> None:
+def test_runtime_resources_use_public_fields_and_cache_owner_directly() -> None:
     cache_module = importlib.import_module("vercor.runtime.cache")
     compiled_runtime_cache_type = getattr(cache_module, "CompiledRuntimeCache")
     from vercor.runtime.resources import CouplerRuntimeResources
@@ -694,11 +695,13 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
         fractional_masks=fractional_masks,
     )
 
-    resources.replace_contracts(contracts)
-    resources.replace_topology_maps(topology_maps)
+    resources.runtime_contracts = contracts
+    resources.topology_maps = topology_maps
 
     assert resources.runtime_contracts is contracts
     assert resources.topology_maps is topology_maps
+    assert not hasattr(resources, "replace_contracts")
+    assert not hasattr(resources, "replace_topology_maps")
     assert not hasattr(resources, "replace_topology")
 
     assert isinstance(resources.runtime_cache, compiled_runtime_cache_type)
@@ -708,12 +711,12 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
         cache_key=("unit-test",),
         donate_state=False,
     )
-    assert resources.compiled_runtime_cache_entry_count() == 1
-    assert len(resources.compiled_runtime_cache_values()) == 1
+    assert cache.entry_count() == 1
+    assert len(cache.values()) == 1
 
-    resources.clear_compiled_runtime_cache()
+    cache.clear()
 
-    assert resources.compiled_runtime_cache_entry_count() == 0
+    assert cache.entry_count() == 0
 
     replacement_regridders = cast(Any, {("OCN", "ATM", "bilinear"): object()})
     replacement_binary_masks: dict[tuple[str, str, str], RuntimeArray] = {
@@ -727,20 +730,18 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
         binary_masks=replacement_binary_masks,
         fractional_masks=replacement_fractional_masks,
     )
-    resources.replace_topology_maps(replacement_topology_maps)
+    resources.topology_maps = replacement_topology_maps
 
     assert resources.topology_maps is replacement_topology_maps
 
     resources_source = Path("vercor/runtime/resources.py").read_text(encoding="utf-8")
+    assert "def replace_contracts(" not in resources_source
+    assert "def replace_topology_maps(" not in resources_source
     assert "def replace_topology(" not in resources_source
 
     runtime_facade_source = Path("vercor/runtime/facade.py").read_text(encoding="utf-8")
     assert ".replace_topology(" not in runtime_facade_source
     for direct_assignment in (
-        "runtime_resources.contracts =",
-        "runtime_resources.regridders =",
-        "runtime_resources.binary_masks =",
-        "runtime_resources.fractional_masks =",
         "runtime_resources.compiled_runtime_cache =",
         "runtime_resources.runtime_cache_mapping",
         "runtime_resources.interrupts =",

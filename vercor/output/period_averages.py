@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any
+from typing import Any, TypeAlias
 
 import jax
 import jax.numpy as jnp
@@ -14,14 +14,7 @@ from vercor.dtypes import as_jax_real_array, jax_index_dtype
 from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
 
-
-@dataclass(frozen=True)
-class PeriodAverageSample:
-    """One JAX-backed output variable sample with dimension metadata."""
-
-    dims: tuple[str, ...]
-    values: Any
-    attrs: Mapping[str, Any] = field(default_factory=dict)
+PeriodAverageSample: TypeAlias = OutputVariable
 
 
 @dataclass(frozen=True)

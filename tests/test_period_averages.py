@@ -19,6 +19,10 @@ from vercor.output.period_averages import (
 )
 
 
+def test_period_average_sample_reuses_shared_output_variable_container() -> None:
+    assert PeriodAverageSample is OutputVariable
+
+
 def test_period_average_accumulator_preserves_nanmean_counts() -> None:
     accumulator = PeriodAverageAccumulator()
 

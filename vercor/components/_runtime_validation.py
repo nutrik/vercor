@@ -3,16 +3,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from vercor.components._contracts import declared_runtime_field_names
-from vercor.components._protocols import ComponentRuntimeProtocol
 from vercor.exceptions import CouplerError
 from vercor.field_layout import validate_canonical_grid_field_shape
 
 if TYPE_CHECKING:
+    from vercor.components.base import Component
     from vercor.runtime.state import RuntimeComponentState
 
 
 def require_runtime_fields(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     component_state: "RuntimeComponentState",
     *names: str,
 ) -> None:
@@ -37,7 +37,7 @@ def require_runtime_fields(
 
 
 def validate_declared_runtime_fields(
-    component: ComponentRuntimeProtocol,
+    component: "Component",
     component_state: "RuntimeComponentState",
 ) -> None:
     """Validate fields required by the component's declared field contract."""

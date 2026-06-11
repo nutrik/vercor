@@ -5,8 +5,7 @@ from dataclasses import dataclass
 
 from vercor.clock import Clock
 from vercor.jax_logging import LoggerLike, effective_log_level
-from vercor.runtime.cache import CompiledRuntimeCache
-from vercor.runtime.compilation import CompiledRuntime, RuntimeCompilationKey
+from vercor.runtime.cache import CompiledRuntimeCache, RuntimeCompilationKey
 from vercor.runtime.dispatch_context import RuntimeDispatchContext
 from vercor.runtime.interrupts import RuntimeInterruptController
 
@@ -69,4 +68,4 @@ class RuntimeRunContext:
         )
 
 
-__all__ = ["CompiledRuntime", "RuntimeRunContext"]
+__all__ = ["RuntimeRunContext"]

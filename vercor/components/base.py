@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -11,6 +12,7 @@ from vercor.components.contracts import (
     ComponentFieldSpec as _ComponentFieldSpec,
     ComponentInitializeHook,
     ComponentPrefillHook,
+    ComponentStepReturn as _ComponentStepReturn,
     ComponentValidateHook,
     FieldNames as _FieldNames,
 )
@@ -22,7 +24,9 @@ from vercor.components._callable_wrappers import (
 from vercor.components._field_authoring import ComponentFieldAuthoringMixin
 from vercor.components._lifecycle import ComponentLifecycleHooks
 from vercor.components._lifecycle_api import ComponentLifecycleMixin
-from vercor.components._runtime_access import ComponentRuntimeAccessMixin
+import vercor.components._runtime_fields as _runtime_field_adapters
+import vercor.components._runtime_validation as _runtime_field_validation
+from vercor.dtypes import PrecisionPolicy
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
@@ -40,7 +44,6 @@ __all__ = [
 @dataclass
 class Component(
     ComponentFieldAuthoringMixin,
-    ComponentRuntimeAccessMixin,
     ComponentLifecycleMixin,
     ABC,
 ):
@@ -138,6 +141,123 @@ class Component(
         context: ComponentStepContext,
     ) -> "RuntimeComponentState":
         """Return this differentiable component advanced by one runtime step."""
+
+    def runtime_fields(
+        self,
+        component_state: "RuntimeComponentState",
+    ) -> dict[str, RuntimeArray]:
+        """Return runtime data fields as a plain name-to-array mapping."""
+
+        return _runtime_field_adapters.runtime_fields(self, component_state)
+
+    def runtime_field(
+        self,
+        component_state: "RuntimeComponentState",
+        name: str,
+    ) -> RuntimeArray:
+        """Return one runtime data field with a component-oriented error."""
+
+        return _runtime_field_adapters.runtime_field(self, component_state, name)
+
+    def has_runtime_field(
+        self,
+        component_state: "RuntimeComponentState",
+        name: str,
+    ) -> bool:
+        """Return whether one runtime data field exists."""
+
+        return _runtime_field_adapters.has_runtime_field(self, component_state, name)
+
+    def runtime_field_or(
+        self,
+        component_state: "RuntimeComponentState",
+        name: str,
+        default: object,
+        policy: PrecisionPolicy = None,
+    ) -> RuntimeArray:
+        """Return one runtime field or a grid-shaped/default array fallback."""
+
+        return _runtime_field_adapters.runtime_field_or(
+            self,
+            component_state,
+            name,
+            default,
+            policy,
+        )
+
+    def runtime_field_or_zeros_like(
+        self,
+        component_state: "RuntimeComponentState",
+        name: str,
+        like: str | RuntimeArray,
+    ) -> RuntimeArray:
+        """Return one runtime field or zeros matching another field/array."""
+
+        return _runtime_field_adapters.runtime_field_or_zeros_like(
+            self,
+            component_state,
+            name,
+            like,
+        )
+
+    def with_runtime_fields(
+        self,
+        component_state: "RuntimeComponentState",
+        fields: Mapping[str, RuntimeArray],
+    ) -> "RuntimeComponentState":
+        """Return ``component_state`` with existing runtime data fields updated."""
+
+        return _runtime_field_adapters.with_runtime_fields(
+            self,
+            component_state,
+            fields,
+        )
+
+    def apply_step_result(
+        self,
+        component_state: "RuntimeComponentState",
+        result: _ComponentStepReturn,
+    ) -> "RuntimeComponentState":
+        """Apply a field mapping or ``ComponentStepResult`` to runtime state."""
+
+        return _runtime_field_adapters.apply_step_result(
+            self,
+            component_state,
+            result,
+        )
+
+    def require_runtime_fields(
+        self,
+        component_state: "RuntimeComponentState",
+        *names: str,
+    ) -> None:
+        """Validate that named runtime data fields use canonical grid layout."""
+
+        _runtime_field_validation.require_runtime_fields(
+            self,
+            component_state,
+            *names,
+        )
+
+    def prefill_runtime_fields(
+        self,
+        data: dict[str, RuntimeArray],
+        field_spec: _ComponentFieldSpec | None = None,
+        *,
+        outputs: _FieldNames = (),
+        default_fields: _AuthorFieldValues = None,
+        policy: PrecisionPolicy = None,
+    ) -> None:
+        """Prefill a mutable runtime data mapping with declared fields."""
+
+        _runtime_field_adapters.prefill_runtime_fields(
+            self,
+            data,
+            field_spec,
+            outputs=outputs,
+            default_fields=default_fields,
+            policy=policy,
+        )
 
     def __str__(self) -> str:
         return (

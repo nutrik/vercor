@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import jax.numpy as jnp
 import torch
@@ -16,31 +16,8 @@ import vercor.setups.external.camulator_output as _camulator_output
 import vercor.setups.external.camulator_tensors as _camulator_tensors
 from vercor.types import RuntimeArray
 
-
-class _CAMulatorRuntimeState(Protocol):
-    """Private protocol for the CAMulator setup state consumed by runtime hooks."""
-
-    dynamic_ds: Any
-    device: str
-    forecast_hour: int
-    stepper: Any
-    state: torch.Tensor
-    static_forcing: torch.Tensor
-    LANDM_COSLAT: Any
-    accessor_input: Any
-    accessor_output: Any
-    latlons: Any
-    runtime_cursor: Any
-    lead_time_periods: int
-    metadata: dict[str, Any]
-    conf: dict[str, Any]
-    state_transformer: Any
-    P0: float
-    hyai: torch.Tensor
-    hybi: torch.Tensor
-    hyam: torch.Tensor
-    hybm: torch.Tensor
-    model_substeps: int
+if TYPE_CHECKING:
+    from vercor.setups.external.camulator_gcm_state import CAMulatorGCMSetupState
 
 
 def coerce_camulator_datetime(time_obj: Any) -> datetime:
@@ -63,7 +40,7 @@ def coerce_camulator_datetime(time_obj: Any) -> datetime:
 
 
 def run_camulator_prediction_block(
-    state: _CAMulatorRuntimeState,
+    state: "CAMulatorGCMSetupState",
     fields: Mapping[str, Any],
     *,
     block_start: int,
@@ -164,7 +141,7 @@ def run_camulator_prediction_block(
 
 
 def step_camulator_runtime(
-    state: _CAMulatorRuntimeState,
+    state: "CAMulatorGCMSetupState",
     fields: Mapping[str, Any],
     context: ComponentStepContext,
     payload: Any | None,

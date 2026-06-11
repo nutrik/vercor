@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Any, TypeAlias, cast
 
 import jax
 
-from vercor.runtime.compilation import CompiledRuntime, RuntimeCompilationKey
+from vercor.runtime.state import RuntimeCouplerState
+
+CompiledRuntime = Callable[[RuntimeCouplerState], RuntimeCouplerState]
+RuntimeCompilationKey: TypeAlias = tuple[Any, ...]
 
 
 @dataclass(slots=True)
@@ -57,4 +61,4 @@ class CompiledRuntimeCache:
         return tuple(self._compiled_runtime_cache.values())
 
 
-__all__ = ["CompiledRuntime", "CompiledRuntimeCache"]
+__all__ = ["CompiledRuntime", "CompiledRuntimeCache", "RuntimeCompilationKey"]

@@ -176,12 +176,12 @@ class Coupler:
     def clear_runtime_cache(self) -> None:
         """Clear compiled runtime entries cached for this coupler instance."""
 
-        self._runtime_resources.clear_compiled_runtime_cache()
+        self._runtime_resources.runtime_cache.clear()
 
     def runtime_cache_entry_count(self) -> int:
         """Return the number of compiled runtime entries cached by this coupler."""
 
-        return self._runtime_resources.compiled_runtime_cache_entry_count()
+        return self._runtime_resources.runtime_cache.entry_count()
 
     def runtime_component_view(
         self,

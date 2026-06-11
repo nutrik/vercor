@@ -178,6 +178,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local over-engineering helper-layer cleanup validation: focused
   red/green pytest, focused affected pytest, Black, git diff whitespace check,
   flake8, mypy, full fast pytest, and full pytest passed as of 2026-06-11.
+- Latest local runtime/component over-engineering sweep validation: focused
+  red/green pytest, Black, git diff whitespace check, flake8, mypy, full fast
+  pytest, full pytest, and coverage pytest passed as of 2026-06-11.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -206,10 +209,33 @@ historical commands, failure messages, or detailed validation notes.
 
 - Keep public simplification candidates review-only unless a compatibility
   decision is made: `RunSequence`, `Grid`, component authoring mixins, calendar
-  compatibility delegates, and `PeriodAverageSample` are still public or
+  compatibility delegates, and setup helper APIs are still public or
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-11: Runtime and Component Over-Engineering Sweep
+
+- Inlined compiled-runtime aliases into `vercor.runtime.cache` and removed the
+  alias-only `vercor.runtime.compilation` module.
+- Simplified `CouplerRuntimeResources` to public dataclass fields and moved
+  cache clearing/counting call sites to the cache owner.
+- Removed the private runtime-preparation input protocol, the time-selection
+  lookup protocols, and adapter-local runtime-state protocols in favor of the
+  existing facade/setup-state types.
+- Moved component runtime-field convenience methods onto `Component`, deleted
+  `_runtime_access.py`, and trimmed `_protocols.py` to the runtime-checkable
+  host execution protocol.
+- Reused `OutputVariable` for period-average samples through the
+  `PeriodAverageSample` compatibility alias.
+- Red/green notes: focused boundary tests first failed on the old alias module,
+  private resource fields/wrappers, annotation-only protocols, runtime-access
+  mixin, and duplicate sample dataclass; after implementation the same focused
+  suite passed.
+- Validation run for this change: focused red/green pytest, Black, `git diff
+  --check`, flake8, mypy, full fast pytest, full pytest, and coverage pytest
+  passed. Coverage reported 90% total. The existing Black Python 3.13/target
+  3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-11: Over-Engineering Helper-Layer Cleanup
 
@@ -220,8 +246,8 @@ historical commands, failure messages, or detailed validation notes.
   return an empty bundle or copy an existing topology-map bundle. Removed the
   unused keyword-construction branches.
 - Removed the one-line `CouplerRuntimeResources.replace_topology(...)` wrapper;
-  the runtime facade now replaces topology maps directly with
-  `replace_topology_maps(...)`.
+  the runtime facade now assigns the grouped topology maps directly on runtime
+  resources.
 - Removed the unused `vercor.output.veros.VerosOutputVariable` alias so Veros
   output uses the shared `OutputVariable` container directly.
 - Red/green notes: the focused cleanup tests first failed on the old identity
@@ -229,7 +255,7 @@ historical commands, failure messages, or detailed validation notes.
   alias; after implementation the same focused suite passed.
 - Deferred broader simplifications for public/boundary-tested surfaces:
   `RunSequence`, `Grid`, component authoring mixins, calendar compatibility
-  delegates, and `PeriodAverageSample`.
+  delegates, and setup helper APIs.
 - Validation run for this change: focused affected pytest, Black, `git diff
   --check`, flake8, mypy, full fast pytest, and full pytest passed. The existing
   Black Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.

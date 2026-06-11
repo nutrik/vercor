@@ -192,20 +192,15 @@ immutable runtime containers used during traced integration.
   the lifecycle mixin. The concrete callable-backed
   differentiable wrapper is owned by `vercor.components.base`, and the concrete
   callable-backed host wrapper is owned by `vercor.components.host`, keeping
-  each runtime kind beside its public abstract base. Private helper modules
-  share component-owned structural protocols from
-  `vercor.components._protocols` instead of importing the public
-  `Component` class for helper annotations, so helper boundaries stay decoupled
-  from the concrete base implementation. Runtime-oriented component protocols
-  expose only name, grid, settings, and declared field contracts; setup data
-  storage stays on concrete component classes. Execution protocols in the same
-  private module expose only runtime step methods, and host-runtime detection is
-  a runtime-checkable structural protocol rather than a concrete component class
-  check. Component-facing
-  runtime-field adapters live in private `vercor.components._runtime_fields`,
-  component-facing runtime-field convenience methods live in private
-  `vercor.components._runtime_access`, and component-facing required-field
-  validation lives in private `vercor.components._runtime_validation`.
+  each runtime kind beside its public abstract base. Private helper modules use
+  type-only `Component` annotations where they need concrete component shape.
+  `vercor.components._protocols` is reserved for the runtime-checkable
+  `HostRuntimeExecutionProtocol`, so host-runtime detection remains structural
+  rather than a concrete component class check. Component-facing runtime-field
+  adapters live in private `vercor.components._runtime_fields`, runtime-field
+  convenience methods live directly on `Component`, and component-facing
+  required-field validation lives in private
+  `vercor.components._runtime_validation`.
   Component host/scanned execution policy lives in internal
   `vercor.components.runtime_execution`, and setup validation lives in internal
   `vercor.components.setup_validation`, giving runtime modules explicit
@@ -303,7 +298,8 @@ immutable runtime containers used during traced integration.
   validation, and initial outgoing-store priming live in
   `vercor.runtime.preparation`; `vercor.runtime.facade` reexports these helpers
   for the coupler-facing runtime boundary but does not own their implementation.
-  Shared compiled-runtime aliases live in `vercor.runtime.compilation`. Frozen
+  Shared compiled-runtime aliases live with `CompiledRuntimeCache` in
+  `vercor.runtime.cache`. Frozen
   `RuntimeRunContext` execution inputs live in `vercor.runtime.run_context`,
   which also owns context-derived compiled-runtime cache keys.
   `CompiledRuntimeCache` storage and JIT wrapping live in
@@ -313,14 +309,12 @@ immutable runtime containers used during traced integration.
   Shared host/scanned progress messages plus traced callbacks live in
   `vercor.runtime.progress`, and the interrupt controller lives in
   `vercor.runtime.interrupts`. Mutable per-coupler runtime resources live in
-  `vercor.runtime.resources.CouplerRuntimeResources`, which owns private
-  exchange topology maps, refreshed runtime contracts, a compiled-runtime cache
-  owner, and the interrupt controller. Runtime facade and preparation code use
-  explicit holder accessors and replacement methods rather than raw resource
-  dictionaries, and focused tests install synthetic topology through the same
-  grouped topology-map replacement helper. Compiled-runtime cache clearing,
-  counting, and test inspection delegate through the cache owner rather than
-  exposing its dictionary. `Coupler` passes repeated
+  `vercor.runtime.resources.CouplerRuntimeResources`, a small public-field
+  dataclass holding exchange topology maps, refreshed runtime contracts, a
+  compiled-runtime cache owner, and the interrupt controller. Runtime facade
+  and preparation code update those grouped resources directly, while compiled
+  runtime cache clearing, counting, and test inspection stay on the cache owner
+  rather than exposing its dictionary. `Coupler` passes repeated
   runtime inputs through the internal
   `vercor.runtime.facade.RuntimeFacadeInputs` bundle and exposes only
   `clear_runtime_cache()` plus `runtime_cache_entry_count()` as a small public
@@ -389,7 +383,7 @@ remain local implementation details and are not listed in external adapter
 `__all__` exports. JAXGCM runtime payload, prefill, validation, stepping, and
 host recording live in
 `vercor.setups.external.jax_gcm_runtime`, which consumes the setup object through
-a private protocol rather than an unbounded state object.
+concrete setup-state annotations rather than a duplicate local protocol.
 `vercor.setups.external.jax_gcm_state` owns JAXGCM setup-time model resources,
 spinup policy, initialization, and the canonical `JCMState` bundle.
 `vercor.setups.external.jax_gcm` remains a thin public factory that constructs
@@ -406,8 +400,8 @@ period-sample/output conversion, period-average file orchestration, and direct
 `vercor.output.netcdf`.
 Surface-temperature cleanup and output-field mapping live in
 `vercor.setups.external.jax_gcm_fields`. Veros host-runtime flux application and
-substep orchestration live in
-`vercor.setups.external.veros_runtime` behind a private runtime-state protocol.
+substep orchestration live in `vercor.setups.external.veros_runtime` with
+concrete setup-state annotations.
 `vercor.setups.external.veros_gcm_state` owns Veros setup-time model resources,
 spinup policy, grid derivation, and lifecycle callbacks, while
 `vercor.setups.external.veros_gcm` remains the thin public factory.
@@ -429,9 +423,10 @@ Veros host-state mutation helpers and the named tuple-compatible
 Veros backend settings are imported only inside the explicit configuration
 function so setup modules preserve lazy optional-dependency boundaries. CAMulator
 prediction-block and runtime step orchestration live in
-`vercor.setups.external.camulator_runtime` behind a private runtime-state
-protocol, with tensor staging in `vercor.setups.external.camulator_tensors` and
-field mapping in `vercor.setups.external.camulator_fields`. CAMulator wind
+`vercor.setups.external.camulator_runtime` with concrete setup-state
+annotations, with tensor staging in
+`vercor.setups.external.camulator_tensors` and field mapping in
+`vercor.setups.external.camulator_fields`. CAMulator wind
 artifact filtering keeps public configuration and log-and-skip failure policy in
 `vercor.setups.external.camulator_wind_filter`, while private PyTorch
 mask/kernel construction and selected tensor mutation live in

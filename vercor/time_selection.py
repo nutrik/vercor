@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Mapping, Protocol
+from typing import Any
 
 import jax.numpy as jnp
 
@@ -12,24 +13,6 @@ from vercor.calendar import (
 )
 from vercor.forcing_index import daily_forcing_day_of_year
 from vercor.types import RuntimeArray
-
-
-class _ClockWithStart(Protocol):
-    @property
-    def start(self) -> datetime: ...
-
-
-class _SettingsWithYearInSeconds(Protocol):
-    @property
-    def year_in_seconds(self) -> float: ...
-
-
-class SupportsFieldTimeLookup(Protocol):
-    @property
-    def clock(self) -> _ClockWithStart: ...
-
-    @property
-    def settings(self) -> _SettingsWithYearInSeconds: ...
 
 
 def get_periodic_interval(
@@ -100,7 +83,7 @@ def get_field_time_slice(
 def get_field_at_specific_time(
     field_name: str,
     data: Mapping[str, RuntimeArray],
-    coupler: SupportsFieldTimeLookup,
+    coupler: Any,
     current_time: datetime | ModelDateTime | None = None,
 ) -> RuntimeArray:
     """Return a monthly field interpolated to a specific model time."""

@@ -76,8 +76,8 @@ def initialize_coupler_runtime(
         logger=logger,
         enable_x64_computations=enable_x64_computations,
     )
-    inputs.runtime_resources.replace_contracts(initialized.runtime_contracts)
-    inputs.runtime_resources.replace_topology_maps(initialized.topology.topology_maps)
+    inputs.runtime_resources.runtime_contracts = initialized.runtime_contracts
+    inputs.runtime_resources.topology_maps = initialized.topology.topology_maps
     return initialized
 
 

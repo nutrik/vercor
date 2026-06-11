@@ -38,7 +38,7 @@ def runtime_cache_entry_count(coupler: Coupler) -> int:
 def compiled_runtime_cache_values(coupler: Coupler) -> tuple[Any, ...]:
     """Return compiled runtime cache values for focused cache tests."""
 
-    return coupler._runtime_resources.compiled_runtime_cache_values()
+    return coupler._runtime_resources.runtime_cache.values()
 
 
 def replace_runtime_topology_maps(
@@ -50,14 +50,10 @@ def replace_runtime_topology_maps(
 ) -> None:
     """Install synthetic topology maps for focused runtime tests."""
 
-    coupler._runtime_resources.replace_topology_maps(
-        RuntimeTopologyMaps(
-            regridders=dict(regridders),
-            binary_masks={} if binary_masks is None else dict(binary_masks),
-            fractional_masks=(
-                {} if fractional_masks is None else dict(fractional_masks)
-            ),
-        )
+    coupler._runtime_resources.topology_maps = RuntimeTopologyMaps(
+        regridders=dict(regridders),
+        binary_masks={} if binary_masks is None else dict(binary_masks),
+        fractional_masks={} if fractional_masks is None else dict(fractional_masks),
     )
 
 
