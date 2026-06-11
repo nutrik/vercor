@@ -391,10 +391,10 @@ host recording live in
 `vercor.setups.external.jax_gcm_runtime`, which consumes the setup object through
 a private protocol rather than an unbounded state object.
 `vercor.setups.external.jax_gcm_state` owns JAXGCM setup-time model resources,
-spinup policy, lifecycle callbacks, and the canonical `JCMState` bundle.
+spinup policy, initialization, and the canonical `JCMState` bundle.
 `vercor.setups.external.jax_gcm` remains a thin public factory that constructs
-setup state and binds named lifecycle callbacks without reexporting state
-bundles or owning runtime payload/setup-state internals. JAXGCM output
+setup state and binds runtime-owned lifecycle hooks directly without
+reexporting state bundles or owning runtime payload/setup-state internals. JAXGCM output
 extraction and mean-variable shaping live in `vercor.output.jax_gcm`, which
 streams prediction objects into the shared JAX-backed sum/count period
 accumulator instead of retaining all period samples or calling xarray adapters.

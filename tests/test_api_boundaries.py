@@ -316,6 +316,9 @@ def test_component_base_internals_are_private_modules() -> None:
     runtime_validation_source = Path(
         "vercor/components/_runtime_validation.py"
     ).read_text(encoding="utf-8")
+    core_runtime_validation_source = Path("vercor/runtime/validation.py").read_text(
+        encoding="utf-8"
+    )
     runtime_execution_source = Path("vercor/components/runtime_execution.py").read_text(
         encoding="utf-8"
     )
@@ -355,6 +358,10 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def validate_declared_runtime_fields(" not in runtime_fields_source
     assert "def require_runtime_fields(" in runtime_validation_source
     assert "def validate_declared_runtime_fields(" in runtime_validation_source
+    assert (
+        "def validate_runtime_component_data_field("
+        not in core_runtime_validation_source
+    )
     assert "def component_requires_host_runtime(" in runtime_execution_source
     assert "def host_component_names(" in runtime_execution_source
     assert "def step_component_runtime_state(" in runtime_execution_source
@@ -1118,10 +1125,10 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def create_jax_gcm_runtime_payload_callback(" not in jax_gcm_source
     assert "def prefill_jax_gcm_runtime_fields_callback(" not in jax_gcm_source
     assert "def validate_jax_gcm_runtime_state_callback(" not in jax_gcm_source
-    assert "def step_jax_gcm_runtime_callback(" in jax_gcm_state_source
-    assert "def create_jax_gcm_runtime_payload_callback(" in jax_gcm_state_source
-    assert "def prefill_jax_gcm_runtime_fields_callback(" in jax_gcm_state_source
-    assert "def validate_jax_gcm_runtime_state_callback(" in jax_gcm_state_source
+    assert "def step_jax_gcm_runtime_callback(" not in jax_gcm_state_source
+    assert "def create_jax_gcm_runtime_payload_callback(" not in jax_gcm_state_source
+    assert "def prefill_jax_gcm_runtime_fields_callback(" not in jax_gcm_state_source
+    assert "def validate_jax_gcm_runtime_state_callback(" not in jax_gcm_state_source
     assert "def _step_jax_gcm_component_state(" not in jax_gcm_source
     assert "def _record_jax_gcm_host_step(" not in jax_gcm_source
     assert "def asfloat(" not in jax_gcm_source
@@ -1297,7 +1304,7 @@ def test_external_runtime_helpers_use_private_state_protocols() -> None:
 
 
 @pytest.mark.fast_always
-def test_jax_gcm_factory_uses_named_runtime_callbacks() -> None:
+def test_jax_gcm_factory_binds_runtime_hooks_directly() -> None:
     source = Path("vercor/setups/external/jax_gcm.py").read_text(encoding="utf-8")
     state_source = Path("vercor/setups/external/jax_gcm_state.py").read_text(
         encoding="utf-8"
@@ -1305,14 +1312,26 @@ def test_jax_gcm_factory_uses_named_runtime_callbacks() -> None:
     factory_source = source.split("def make_jax_gcm(", 1)[1]
 
     assert "from functools import partial" in source
-    assert "def step_jax_gcm_runtime_callback(" in state_source
-    assert "def create_jax_gcm_runtime_payload_callback(" in state_source
-    assert "def prefill_jax_gcm_runtime_fields_callback(" in state_source
-    assert "def validate_jax_gcm_runtime_state_callback(" in state_source
-    assert "_jax_gcm_state.step_jax_gcm_runtime_callback" in factory_source
-    assert "_jax_gcm_state.create_jax_gcm_runtime_payload_callback" in factory_source
-    assert "_jax_gcm_state.prefill_jax_gcm_runtime_fields_callback" in factory_source
-    assert "_jax_gcm_state.validate_jax_gcm_runtime_state_callback" in factory_source
+    assert "def step_jax_gcm_runtime_callback(" not in state_source
+    assert "def create_jax_gcm_runtime_payload_callback(" not in state_source
+    assert "def prefill_jax_gcm_runtime_fields_callback(" not in state_source
+    assert "def validate_jax_gcm_runtime_state_callback(" not in state_source
+    assert "step=partial(_jax_gcm_runtime.step_jax_gcm_component, state)" in (
+        factory_source
+    )
+    assert "_jax_gcm_runtime.create_jax_gcm_runtime_payload" in factory_source
+    assert "_jax_gcm_runtime.prefill_jax_gcm_runtime_fields" in factory_source
+    assert "_jax_gcm_runtime.validate_jax_gcm_runtime_state" in factory_source
+    assert "_jax_gcm_state.step_jax_gcm_runtime_callback" not in factory_source
+    assert "_jax_gcm_state.create_jax_gcm_runtime_payload_callback" not in (
+        factory_source
+    )
+    assert "_jax_gcm_state.prefill_jax_gcm_runtime_fields_callback" not in (
+        factory_source
+    )
+    assert "_jax_gcm_state.validate_jax_gcm_runtime_state_callback" not in (
+        factory_source
+    )
     assert "lambda fields" not in factory_source
     assert "lambda component" not in factory_source
 
@@ -1440,6 +1459,10 @@ def test_camulator_state_facade_is_removed() -> None:
         assert path.exists(), path
 
     assert not Path("vercor/setups/external/camulator_state.py").exists()
+    gcm_state_source = Path("vercor/setups/external/camulator_gcm_state.py").read_text(
+        encoding="utf-8"
+    )
+    assert "accessor_state" not in gcm_state_source
 
 
 @pytest.mark.fast_always
@@ -1457,6 +1480,8 @@ def test_bilinear_interpolator_removes_unused_cartesian_helper() -> None:
     )
 
     assert "def _geo_to_cart(" not in source
+    assert "_lon_src_2d" not in source
+    assert "_lat_src_2d" not in source
 
 
 @pytest.mark.fast_always

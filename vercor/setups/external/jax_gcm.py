@@ -12,7 +12,6 @@ from jcm.physics_interface import TerrainData
 from vercor.components import Component, differentiable_component
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
 import vercor.setups.external.jax_gcm_runtime as _jax_gcm_runtime
-import vercor.setups.external.jax_gcm_state as _jax_gcm_state
 from vercor.setups.external.jax_gcm_state import JAXGCMSetupState
 
 try:
@@ -55,7 +54,7 @@ def make_jax_gcm(
     component = differentiable_component(
         name=name,
         grid=state.grid,
-        step=partial(_jax_gcm_state.step_jax_gcm_runtime_callback, state),
+        step=partial(_jax_gcm_runtime.step_jax_gcm_component, state),
         inputs=("land_surface_temperature", "sea_surface_temperature"),
         outputs=(
             "land_surface_temperature",
@@ -67,15 +66,15 @@ def make_jax_gcm(
         default_fields=_jax_gcm_runtime.jax_gcm_default_fields(),
         initialize=state.initialize,
         create_runtime_payload=partial(
-            _jax_gcm_state.create_jax_gcm_runtime_payload_callback,
+            _jax_gcm_runtime.create_jax_gcm_runtime_payload,
             state,
         ),
         prefill_runtime_state_fields=partial(
-            _jax_gcm_state.prefill_jax_gcm_runtime_fields_callback,
+            _jax_gcm_runtime.prefill_jax_gcm_runtime_fields,
             state,
         ),
         validate_runtime_state=partial(
-            _jax_gcm_state.validate_jax_gcm_runtime_state_callback,
+            _jax_gcm_runtime.validate_jax_gcm_runtime_state,
             state,
         ),
     )

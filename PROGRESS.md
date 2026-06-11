@@ -171,6 +171,10 @@ historical commands, failure messages, or detailed validation notes.
   red/green pytest, focused output/API pytest, Black, git diff whitespace
   check, flake8, mypy, full fast pytest, full pytest, and coverage pytest
   passed as of 2026-06-11.
+- Latest local over-engineering quick-win cleanup validation: focused red/green
+  pytest, focused affected pytest, Black, git diff whitespace check, flake8,
+  mypy, full fast pytest, full pytest, and coverage pytest passed as of
+  2026-06-11.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -200,6 +204,30 @@ historical commands, failure messages, or detailed validation notes.
 - No current follow-up candidate is recorded.
 
 ## Recent Work
+
+### 2026-06-11: Over-Engineering Quick-Win Cleanup
+
+- Removed unused PyTree payload from the bilinear interpolator and conservative
+  remapper by dropping cached source meshgrids, unused `fracarea_norm`, and the
+  unused source-cell count while preserving interpolation/remapping behavior.
+- Removed the dead core runtime data-field validator now superseded by the
+  component-owned canonical runtime-field validation path.
+- Simplified JAXGCM factory wiring so setup state binds runtime-owned lifecycle
+  hooks directly, and removed the one-line callback delegate layer from
+  `jax_gcm_state`.
+- Removed the unused CAMulator `accessor_state` setup attribute while keeping
+  the runtime-used input/output accessors.
+- Updated `DESIGN.md`, `DEPENDENCIES.md`, and architecture/PyTree tests to
+  document and enforce the simplified boundaries.
+- Red/green notes: the focused cleanup tests first failed on the old cached
+  fields, dead validator, callback delegates, and CAMulator accessor; after the
+  cleanup the same focused suite passed.
+- Validation run for this change: the focused red cleanup tests failed for the
+  expected old symbols, then the same focused suite passed after
+  implementation. Focused affected pytest, Black, `git diff --check`, flake8,
+  mypy, full fast pytest, full pytest, and coverage pytest also passed.
+  Coverage remained source-focused at 90% total. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-11: Shared Period-Average Output Writer
 

@@ -168,9 +168,6 @@ class CAMulatorGCMSetupState:
             logger=logger,
         )
 
-        self.accessor_state = _camulator_tensors.StateVariableAccessor(
-            self.conf, tensor_type="state"
-        )
         self.accessor_input = _camulator_tensors.StateVariableAccessor(
             self.conf, tensor_type="input"
         )

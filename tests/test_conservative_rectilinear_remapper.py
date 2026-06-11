@@ -68,7 +68,7 @@ def test_constant_field_preserved_on_refinement_conservation_mode() -> None:
     assert_allclose_compact(out, np.full((4, 4), 7.0), rtol=0.0, atol=1e-14)
 
 
-def test_remapper_pytree_round_trip_preserves_precomputed_arrays() -> None:
+def test_remapper_pytree_round_trip_preserves_runtime_arrays_only() -> None:
     remapper = _make_remapper(
         src_lon_edges=np.array([0.0, 1.0, 2.0]),
         src_lat_edges=np.array([0.0, 1.0, 2.0]),
@@ -88,7 +88,8 @@ def test_remapper_pytree_round_trip_preserves_precomputed_arrays() -> None:
     assert_allclose_compact(restored.dst_lon_b, remapper.dst_lon_b)
     assert_allclose_compact(restored.dst_lat_b, remapper.dst_lat_b)
     assert_allclose_compact(restored.dst_areas, remapper.dst_areas)
-    assert_allclose_compact(restored.fracarea_norm, remapper.fracarea_norm)
+    assert not hasattr(restored, "fracarea_norm")
+    assert not hasattr(restored, "_n_src_cells")
 
 
 def test_remapper_accepts_jax_backed_constructor_inputs() -> None:

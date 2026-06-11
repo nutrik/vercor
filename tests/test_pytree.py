@@ -95,8 +95,8 @@ def test_remapper_post_unflatten_restores_derived_static_state() -> None:
     assert restored._normalize_fracarea is True
     assert restored._s_lat_flip is True
     assert restored._d_lat_flip is True
-    assert restored._n_src_cells == 4
     assert restored._n_dst_cells == 16
+    assert not hasattr(restored, "_n_src_cells")
     assert_allclose_compact(
         restored.apply_scalar(jnp.ones((2, 2))),
         remapper.apply_scalar(jnp.ones((2, 2))),

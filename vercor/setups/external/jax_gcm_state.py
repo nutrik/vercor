@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -28,8 +28,6 @@ from jcm.physics_interface import (
 from vercor.components import (
     Component,
     ComponentSetupContext,
-    ComponentStepContext,
-    ComponentStepResult,
 )
 from vercor.dtypes import as_jax_real_array, jax_ones
 from vercor.grid import RectilinearGrid
@@ -236,73 +234,7 @@ class JAXGCMSetupState:
             )
 
 
-def step_jax_gcm_runtime_callback(
-    state: JAXGCMSetupState,
-    fields: Mapping[str, Any],
-    context: ComponentStepContext,
-    payload: Any | None,
-) -> ComponentStepResult:
-    """Delegate callable component stepping to the JAXGCM runtime owner."""
-
-    return _jax_gcm_runtime.step_jax_gcm_component(
-        state,
-        fields,
-        context,
-        payload,
-    )
-
-
-def create_jax_gcm_runtime_payload_callback(
-    state: JAXGCMSetupState,
-    component: Component,
-) -> _jax_gcm_runtime.JAXGCMRuntimePayload:
-    """Delegate runtime-payload creation to the JAXGCM runtime owner."""
-
-    _ = component
-    return _jax_gcm_runtime.create_jax_gcm_runtime_payload(state)
-
-
-def prefill_jax_gcm_runtime_fields_callback(
-    state: JAXGCMSetupState,
-    component: Component,
-    data: dict[str, RuntimeArray],
-    incoming: dict[str, RuntimeArray],
-    outgoing: dict[str, RuntimeArray],
-    contract: Any,
-) -> None:
-    """Delegate runtime field prefill to the JAXGCM runtime owner."""
-
-    _jax_gcm_runtime.prefill_jax_gcm_runtime_fields(
-        state,
-        component,
-        data,
-        incoming,
-        outgoing,
-        contract,
-    )
-
-
-def validate_jax_gcm_runtime_state_callback(
-    state: JAXGCMSetupState,
-    component: Component,
-    component_state: Any,
-    contract: Any,
-) -> None:
-    """Delegate runtime-state validation to the JAXGCM runtime owner."""
-
-    _jax_gcm_runtime.validate_jax_gcm_runtime_state(
-        state,
-        component,
-        component_state,
-        contract,
-    )
-
-
 __all__ = [
     "JAXGCMSetupState",
     "JCMState",
-    "create_jax_gcm_runtime_payload_callback",
-    "prefill_jax_gcm_runtime_fields_callback",
-    "step_jax_gcm_runtime_callback",
-    "validate_jax_gcm_runtime_state_callback",
 ]

@@ -31,7 +31,6 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
         "dst_indices",
         "src_indices",
         "overlap_weights",
-        "fracarea_norm",
     )
     pytree_aux_data = (
         "radius",
@@ -89,7 +88,6 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
         self.n_src_lat = self.src_lat_b.shape[0] - 1
         self.n_dst_lon = self.dst_lon_b.shape[0] - 1
         self.n_dst_lat = self.dst_lat_b.shape[0] - 1
-        self._n_src_cells = self.n_src_lat * self.n_src_lon
         self._n_dst_cells = self.n_dst_lat * self.n_dst_lon
 
         # 2. Compute 1D overlaps
@@ -135,17 +133,11 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
             (self.radius**2) * jnp.outer(dst_lat_diff, dst_lon_diff)
         ).reshape(-1)
         self.dst_areas = jnp.where(dst_areas <= 1e-15, jnp.inf, dst_areas)
-        self.fracarea_norm = self._segment_sum(
-            self.overlap_weights,
-            self.dst_indices,
-            self._n_dst_cells,
-        )
 
     def _pytree_post_unflatten(self) -> None:
         """Restore derived static remapping state after PyTree unflattening."""
 
         self._normalize_fracarea = self.normalize == "fracarea"
-        self._n_src_cells = self.n_src_lon * self.n_src_lat
         self._n_dst_cells = self.n_dst_lon * self.n_dst_lat
 
     @staticmethod

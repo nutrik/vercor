@@ -54,8 +54,6 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         "_e_north_t",
         "_e_east_src",
         "_e_north_src",
-        "_lon_src_2d",
-        "_lat_src_2d",
         "_lon_src_flat",
         "_lat_src_flat",
     )
@@ -167,15 +165,15 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         self._e_east_t, self._e_north_t = _geometry.unit_east_north(
             self.lon_tgt_rad, self.lat_tgt_rad
         )
-        lon_src_2d, lat_src_2d = jnp.meshgrid(self.lon_src_rad, self.lat_src_rad)
-        self._e_east_src, self._e_north_src = _geometry.unit_east_north(
-            lon_src_2d,
-            lat_src_2d,
+        source_lon_mesh, source_lat_mesh = jnp.meshgrid(
+            self.lon_src_rad, self.lat_src_rad
         )
-        self._lon_src_2d = lon_src_2d
-        self._lat_src_2d = lat_src_2d
-        self._lon_src_flat = lon_src_2d.reshape(-1)
-        self._lat_src_flat = lat_src_2d.reshape(-1)
+        self._e_east_src, self._e_north_src = _geometry.unit_east_north(
+            source_lon_mesh,
+            source_lat_mesh,
+        )
+        self._lon_src_flat = source_lon_mesh.reshape(-1)
+        self._lat_src_flat = source_lat_mesh.reshape(-1)
 
     def _precompute_cells_and_weights(self) -> None:
         weights = _weights.compute_bilinear_cell_weights(

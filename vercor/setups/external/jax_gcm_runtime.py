@@ -85,9 +85,11 @@ def jax_gcm_default_fields() -> dict[str, float]:
 
 def create_jax_gcm_runtime_payload(
     state: _JAXGCMRuntimeState,
+    component: Component | None = None,
 ) -> JAXGCMRuntimePayload:
     """Return immutable JCM state and forcing for runtime execution."""
 
+    _ = component
     missing = [
         name
         for name in ("_state", "forcing", "_step_function")
