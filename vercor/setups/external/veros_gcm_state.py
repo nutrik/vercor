@@ -41,17 +41,6 @@ VEROS_INPUT_FIELD_NAMES = (
 VEROS_FIELD_DEFAULTS = {"sea_surface_temperature": 283.15}
 
 
-def advance_veros_model_step(
-    veros_state: Any,
-    *,
-    step: Callable[[Any], Any],
-    jitted: bool,
-) -> Any:
-    """Advance a Veros state through the configured host step boundary."""
-
-    return _veros_state.pure(veros_state, jitted=jitted, step=step)
-
-
 class VerosGCMSetupState:
     """Mutable setup-time owner for a host-backed Veros ocean adapter."""
 
@@ -86,9 +75,9 @@ class VerosGCMSetupState:
         self._step_function = cast(
             Callable[[Any], Any],
             partial(
-                advance_veros_model_step,
-                step=self.model.step,
+                _veros_state.pure,
                 jitted=jitted,
+                step=self.model.step,
             ),
         )
 
@@ -185,6 +174,5 @@ __all__ = [
     "VEROS_FIELD_DEFAULTS",
     "VEROS_INPUT_FIELD_NAMES",
     "VerosGCMSetupState",
-    "advance_veros_model_step",
     "veros_default_fields",
 ]

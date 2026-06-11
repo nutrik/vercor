@@ -1419,7 +1419,21 @@ def test_assets_and_diagnostics_have_focused_ownership_boundaries() -> None:
     )
     assert ".data.get(" not in diagnostics_fields_source
     assert "getattr(" not in diagnostics_fields_source
+    assert "def view_field_candidates(" not in diagnostics_fields_source
+    assert "def view_field(" not in diagnostics_fields_source
     assert "runtime_field(" in diagnostics_fields_source
+
+
+@pytest.mark.fast_always
+def test_veros_setup_state_does_not_keep_one_line_step_wrapper() -> None:
+    source = Path("vercor/setups/external/veros_gcm_state.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def advance_veros_model_step(" not in source
+    assert '"advance_veros_model_step"' not in source
+    assert "partial(" in source
+    assert "_veros_state.pure," in source
 
 
 @pytest.mark.fast_always

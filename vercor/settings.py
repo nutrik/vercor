@@ -42,15 +42,6 @@ DEFAULT_SETTINGS: dict[str, Settings] = {
 }
 
 
-def _copy_settings(settings: dict[str, Settings]) -> dict[str, Settings]:
-    """Return independent settings records for a new settings container."""
-
-    return {
-        name: Settings(record.value, record.description, record.units)
-        for name, record in settings.items()
-    }
-
-
 class VercorSettings:
     """Mutable metadata-backed settings container for couplers and components.
 
@@ -94,7 +85,7 @@ class VercorSettings:
     def __init__(self, **kwargs: Any) -> None:
         """Create settings from VerCOR defaults plus optional overrides."""
 
-        object.__setattr__(self, "_settings", _copy_settings(DEFAULT_SETTINGS))
+        object.__setattr__(self, "_settings", dict(DEFAULT_SETTINGS))
         for name, value in kwargs.items():
             if isinstance(value, Settings):
                 self._settings[name] = Settings(

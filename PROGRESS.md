@@ -181,6 +181,10 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local runtime/component over-engineering sweep validation: focused
   red/green pytest, Black, git diff whitespace check, flake8, mypy, full fast
   pytest, full pytest, and coverage pytest passed as of 2026-06-11.
+- Latest local over-engineering audit quick-win cleanup validation: focused
+  red/green pytest, focused external/diagnostics pytest, Black, git diff
+  whitespace check, flake8, mypy, full fast pytest, and full pytest passed as
+  of 2026-06-11.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -213,6 +217,39 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-11: Over-Engineering Audit Quick-Win Cleanup
+
+- Completed a whole-codebase over-engineering sweep focused on unnecessary
+  internal wrappers, single-use helpers, speculative extension points, and
+  public surfaces whose complexity is either justified or compatibility-bound.
+- Removed three low-risk internal helper layers:
+  private diagnostics `view_field*` delegates now call the runtime view lookup
+  owner directly, Veros setup binds `_veros_state.pure` directly instead of a
+  one-line `advance_veros_model_step()` wrapper, and `VercorSettings` copies
+  immutable default records with `dict(DEFAULT_SETTINGS)` instead of rebuilding
+  each `Settings` tuple.
+- Added boundary tests preventing those helper shapes from returning while
+  preserving existing behavior coverage for settings isolation, diagnostics,
+  and external adapter boundaries.
+- Audit findings deferred as not quick wins: `RuntimeTopologyMaps.from_mappings`
+  is internal but has explicit boundary tests and can wait; component
+  authoring/lifecycle mixins and callable wrappers protect documented public
+  extension APIs; calendar forcing-index delegates remain active compatibility
+  imports.
+- Red/green notes: focused boundary/settings tests first failed on the old
+  diagnostics wrappers, Veros wrapper, and settings copy helper, then passed
+  after the cleanup. Focused external component/diagnostics tests also passed.
+- Validation run for this change:
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_settings.py -q --tb=short`
+  failed first on the expected old helper shapes, then passed after the
+  cleanup. `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_tools_components_and_plotting.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`, `git diff --check`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short` passed. The existing Black
+  Python 3.13/target 3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-11: Runtime and Component Over-Engineering Sweep
 

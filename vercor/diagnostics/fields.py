@@ -46,8 +46,8 @@ def total_surface_temperature(component: RuntimeComponentView) -> RuntimeArray:
     """Return combined land and sea surface temperature for diagnostics."""
 
     return combine_surface_temperatures(
-        view_field(component, "land_surface_temperature"),
-        view_field(component, "sea_surface_temperature"),
+        runtime_field(component, "land_surface_temperature"),
+        runtime_field(component, "sea_surface_temperature"),
     )
 
 
@@ -55,24 +55,9 @@ def safe_component_nanmean(component: RuntimeComponentView, field_name: str) -> 
     """Return a robust NaN-aware mean for a runtime component view field."""
 
     try:
-        return float(jnp.nanmean(jnp.asarray(view_field(component, field_name))))
+        return float(jnp.nanmean(jnp.asarray(runtime_field(component, field_name))))
     except Exception:
         return float("nan")
-
-
-def view_field_candidates(
-    component: RuntimeComponentView,
-    field_name: str,
-) -> list[RuntimeArray]:
-    """Return matching fields from an explicit runtime component view."""
-
-    return runtime_field_candidates(component, field_name)
-
-
-def view_field(component: RuntimeComponentView, field_name: str) -> RuntimeArray:
-    """Return a field from an explicit runtime component view."""
-
-    return runtime_field(component, field_name)
 
 
 def component_plot_field(
@@ -81,7 +66,7 @@ def component_plot_field(
 ) -> RuntimeArray:
     """Return a 2D field suitable for plotting when one is available."""
 
-    candidates = view_field_candidates(component, field_name)
+    candidates = runtime_field_candidates(component, field_name)
     for candidate in candidates:
         if jnp.asarray(candidate).ndim == 2:
             return candidate

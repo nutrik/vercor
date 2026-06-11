@@ -76,6 +76,12 @@ def test_default_settings_are_copied_per_instance() -> None:
     assert "local_only" not in right.as_values()
 
 
+def test_settings_container_uses_direct_default_mapping_copy() -> None:
+    import vercor.settings as settings_module
+
+    assert not hasattr(settings_module, "_copy_settings")
+
+
 def test_attribute_access_and_assignment_are_compatible() -> None:
     settings = VercorSettings()
 
