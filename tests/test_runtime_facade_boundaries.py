@@ -86,7 +86,7 @@ def test_runtime_topology_state_groups_mutable_maps() -> None:
     assert "topology_maps: RuntimeTopologyMaps" in topology_state_source
     assert "class RuntimeTopologyMaps" not in topology_source
     assert "topology.regridders" not in resources_source
-    assert "topology.topology_maps" in resources_source
+    assert "def replace_topology(" not in resources_source
 
 
 @pytest.mark.fast_always

@@ -997,6 +997,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert callable(period_files_module.write_period_average_netcdf)
     assert callable(veros_fluxes_module.compute_fluxes)
     assert callable(veros_output_module.write_veros_averages_output)
+    assert not hasattr(veros_output_module, "VerosOutputVariable")
     assert callable(veros_state_module.copy_state)
     assert hasattr(veros_setup_module, "CustomGlobalFourDegree")
     assert not hasattr(jax_gcm_module, "_map_jcm_output_fields")

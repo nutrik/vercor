@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 
 from vercor.regridders import (
@@ -34,28 +33,15 @@ class RuntimeTopologyMaps:
     def from_mappings(
         cls,
         topology_maps: "RuntimeTopologyMaps | None" = None,
-        *,
-        regridders: Mapping[tuple[str, str, str], RuntimeRegridder] | None = None,
-        binary_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
-        fractional_masks: Mapping[tuple[str, str, str], RuntimeArray] | None = None,
     ) -> "RuntimeTopologyMaps":
-        """Return a grouped topology-map bundle copied from existing mappings."""
+        """Return an empty bundle or a copy of an existing topology-map bundle."""
 
-        source_regridders = (
-            topology_maps.regridders if topology_maps is not None else regridders
-        )
-        source_binary_masks = (
-            topology_maps.binary_masks if topology_maps is not None else binary_masks
-        )
-        source_fractional_masks = (
-            topology_maps.fractional_masks
-            if topology_maps is not None
-            else fractional_masks
-        )
+        if topology_maps is None:
+            return cls.empty()
         return cls(
-            regridders=dict(source_regridders or {}),
-            binary_masks=dict(source_binary_masks or {}),
-            fractional_masks=dict(source_fractional_masks or {}),
+            regridders=dict(topology_maps.regridders),
+            binary_masks=dict(topology_maps.binary_masks),
+            fractional_masks=dict(topology_maps.fractional_masks),
         )
 
 

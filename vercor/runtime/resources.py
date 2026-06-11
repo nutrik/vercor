@@ -6,7 +6,7 @@ from vercor.runtime.cache import CompiledRuntimeCache
 from vercor.runtime.compilation import CompiledRuntime
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.interrupts import RuntimeInterruptController
-from vercor.runtime.topology_state import ExchangeTopologyState, RuntimeTopologyMaps
+from vercor.runtime.topology_state import RuntimeTopologyMaps
 
 
 @dataclass(slots=True)
@@ -55,14 +55,6 @@ class CouplerRuntimeResources:
         """Replace refreshed runtime contracts as one resource update."""
 
         self._runtime_contracts = contracts
-
-    def replace_topology(
-        self,
-        topology: ExchangeTopologyState,
-    ) -> None:
-        """Replace exchange topology maps from an initialized topology state."""
-
-        self.replace_topology_maps(topology.topology_maps)
 
     def replace_topology_maps(
         self,

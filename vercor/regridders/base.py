@@ -17,20 +17,6 @@ class SupportsScalarVectorInterpolation(Protocol):
         ...
 
 
-class _IdentityInterpolator:
-    """Return source fields unchanged for identical-grid regridders."""
-
-    def apply_scalar(self, src: Any) -> Any:
-        """Return the source scalar field unchanged."""
-
-        return src
-
-    def apply_vector(self, u_src: Any, v_src: Any) -> tuple[Any, Any]:
-        """Return source vector fields unchanged."""
-
-        return u_src, v_src
-
-
 class Regridder:
     def __init__(
         self, source_grid: RectilinearGrid, destination_grid: RectilinearGrid
@@ -54,8 +40,6 @@ class Regridder:
         Checks if the interpolator is initialized and if the correct number of arguments
         are provided (either one for scalar fields or two for vector fields)."""
 
-        if self.interpolator is None:
-            raise RegridderError("Regridder not properly set up")
         if len(args) not in (1, 2):
             raise TypeError("Provide scalar_src or (u_src, v_src) as positional args")
 
@@ -76,7 +60,8 @@ class Regridder:
         if self.has_identical_grids:
             return args if len(args) == 2 else args[0]
 
-        assert self.interpolator is not None
+        if self.interpolator is None:
+            raise RegridderError("Regridder not properly set up")
         if len(args) == 1:
             return self.interpolator.apply_scalar(args[0])
         return cast(tuple[Any, Any], self.interpolator.apply_vector(args[0], args[1]))

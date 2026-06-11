@@ -31,8 +31,6 @@ _TIME_NAME = TIME_NAME
 _TIMESTEP_DIM = "timesteps"
 _GHOST_DIMS = ("xt", "yt", "xu", "yu")
 
-VerosOutputVariable = OutputVariable
-
 
 def normalize_veros_output_variables(
     output_variables: Sequence[str] | None,
@@ -251,7 +249,6 @@ def _coordinate_variables(
 
 
 __all__ = [
-    "VerosOutputVariable",
     "accumulate_veros_output_snapshot",
     "accumulate_veros_period_state",
     "extract_veros_output_snapshot",

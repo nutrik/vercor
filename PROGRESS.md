@@ -175,6 +175,9 @@ historical commands, failure messages, or detailed validation notes.
   pytest, focused affected pytest, Black, git diff whitespace check, flake8,
   mypy, full fast pytest, full pytest, and coverage pytest passed as of
   2026-06-11.
+- Latest local over-engineering helper-layer cleanup validation: focused
+  red/green pytest, focused affected pytest, Black, git diff whitespace check,
+  flake8, mypy, full fast pytest, and full pytest passed as of 2026-06-11.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -201,9 +204,35 @@ historical commands, failure messages, or detailed validation notes.
 
 ## Follow-Up Candidates
 
-- No current follow-up candidate is recorded.
+- Keep public simplification candidates review-only unless a compatibility
+  decision is made: `RunSequence`, `Grid`, component authoring mixins, calendar
+  compatibility delegates, and `PeriodAverageSample` are still public or
+  boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-11: Over-Engineering Helper-Layer Cleanup
+
+- Removed the private `_IdentityInterpolator` helper and let the base regridder
+  handle identical-grid scalar/vector passthrough directly before requiring a
+  concrete interpolator.
+- Narrowed `RuntimeTopologyMaps.from_mappings()` to the only used behavior:
+  return an empty bundle or copy an existing topology-map bundle. Removed the
+  unused keyword-construction branches.
+- Removed the one-line `CouplerRuntimeResources.replace_topology(...)` wrapper;
+  the runtime facade now replaces topology maps directly with
+  `replace_topology_maps(...)`.
+- Removed the unused `vercor.output.veros.VerosOutputVariable` alias so Veros
+  output uses the shared `OutputVariable` container directly.
+- Red/green notes: the focused cleanup tests first failed on the old identity
+  helper, resource topology wrapper, broad topology-map constructor, and Veros
+  alias; after implementation the same focused suite passed.
+- Deferred broader simplifications for public/boundary-tested surfaces:
+  `RunSequence`, `Grid`, component authoring mixins, calendar compatibility
+  delegates, and `PeriodAverageSample`.
+- Validation run for this change: focused affected pytest, Black, `git diff
+  --check`, flake8, mypy, full fast pytest, and full pytest passed. The existing
+  Black Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-11: Over-Engineering Quick-Win Cleanup
 

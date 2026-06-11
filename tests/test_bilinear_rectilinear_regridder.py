@@ -1,4 +1,5 @@
 import importlib
+from pathlib import Path
 from typing import Any
 
 import jax.numpy as jnp
@@ -144,7 +145,14 @@ def test_regridder_identical_grid_skips_interpolator_construction(
     regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
 
     assert regridder.has_identical_grids is True
-    assert regridder.interpolator is not None
+    assert regridder.interpolator is None
+
+
+def test_regridder_identical_grid_passthrough_does_not_use_identity_helper() -> None:
+    base_source = Path("vercor/regridders/base.py").read_text(encoding="utf-8")
+    bilinear_source = Path("vercor/regridders/bilinear.py").read_text(encoding="utf-8")
+    assert "_IdentityInterpolator" not in base_source
+    assert "_IdentityInterpolator" not in bilinear_source
 
 
 def test_regridder_non_identical_grid_constructs_interpolator(

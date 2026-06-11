@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from inspect import signature
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -26,7 +27,7 @@ from vercor.runtime.field_transfer import send_runtime_fields
 from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.runtime.time import RuntimeStepInfo
-from vercor.runtime.topology_state import RuntimeTopologyMaps, SurfaceExchangeMasks
+from vercor.runtime.topology_state import RuntimeTopologyMaps
 from vercor.types import RuntimeArray
 
 
@@ -465,7 +466,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def get_component(" in runtime_component_topology_source
     assert "from vercor.runtime.topology import" not in coupler_source
     assert "from vercor.runtime.topology_state import" in runtime_resources_source
-    assert "ExchangeTopologyState" in runtime_resources_source
+    assert "ExchangeTopologyState" not in runtime_resources_source
     assert "RuntimeTopologyMaps" in runtime_resources_source
     assert "def _create_exchange_masks(" not in coupler_source
     assert "def _validate_land_mask_consistency(" not in coupler_source
@@ -677,7 +678,6 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
     cache_module = importlib.import_module("vercor.runtime.cache")
     compiled_runtime_cache_type = getattr(cache_module, "CompiledRuntimeCache")
     from vercor.runtime.resources import CouplerRuntimeResources
-    from vercor.runtime.topology_state import ExchangeTopologyState
 
     resources = CouplerRuntimeResources()
     contracts = {"ATM": RuntimeComponentContract(imports=("x",), exports=("y",))}
@@ -693,20 +693,13 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
         binary_masks=binary_masks,
         fractional_masks=fractional_masks,
     )
-    topology = ExchangeTopologyState(
-        topology_maps=topology_maps,
-        surface_masks=SurfaceExchangeMasks(
-            ocn_fmask_on_atm_grid=jnp.full((2, 2), 0.25),
-            lnd_fmask_on_atm_grid=jnp.full((2, 2), 0.75),
-            lnd_bmask_on_atm_grid=jnp.ones((2, 2)),
-        ),
-    )
 
     resources.replace_contracts(contracts)
-    resources.replace_topology(topology)
+    resources.replace_topology_maps(topology_maps)
 
     assert resources.runtime_contracts is contracts
     assert resources.topology_maps is topology_maps
+    assert not hasattr(resources, "replace_topology")
 
     assert isinstance(resources.runtime_cache, compiled_runtime_cache_type)
     cache = resources.runtime_cache
@@ -738,7 +731,11 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
 
     assert resources.topology_maps is replacement_topology_maps
 
+    resources_source = Path("vercor/runtime/resources.py").read_text(encoding="utf-8")
+    assert "def replace_topology(" not in resources_source
+
     runtime_facade_source = Path("vercor/runtime/facade.py").read_text(encoding="utf-8")
+    assert ".replace_topology(" not in runtime_facade_source
     for direct_assignment in (
         "runtime_resources.contracts =",
         "runtime_resources.regridders =",
@@ -752,6 +749,39 @@ def test_runtime_resources_replace_contracts_and_topology_through_methods() -> N
 
     profile_source = Path("examples/profile_runtime.py").read_text(encoding="utf-8")
     assert "coupler._runtime_resources" not in profile_source
+
+
+@pytest.mark.fast_always
+def test_runtime_topology_maps_from_mappings_only_copies_existing_bundle() -> None:
+    parameters = signature(RuntimeTopologyMaps.from_mappings).parameters
+    assert tuple(parameters) == ("topology_maps",)
+
+    empty_maps = RuntimeTopologyMaps.from_mappings()
+    assert empty_maps.regridders == {}
+    assert empty_maps.binary_masks == {}
+    assert empty_maps.fractional_masks == {}
+
+    regridders = cast(Any, {("ATM", "OCN", "bilinear"): object()})
+    binary_masks: dict[tuple[str, str, str], RuntimeArray] = {
+        ("ATM", "OCN", "bilinear"): jnp.ones((2, 2))
+    }
+    fractional_masks: dict[tuple[str, str, str], RuntimeArray] = {
+        ("ATM", "OCN", "bilinear"): jnp.full((2, 2), 0.5)
+    }
+    topology_maps = RuntimeTopologyMaps(
+        regridders=regridders,
+        binary_masks=binary_masks,
+        fractional_masks=fractional_masks,
+    )
+
+    copied = RuntimeTopologyMaps.from_mappings(topology_maps)
+
+    assert copied.regridders == topology_maps.regridders
+    assert copied.binary_masks == topology_maps.binary_masks
+    assert copied.fractional_masks == topology_maps.fractional_masks
+    assert copied.regridders is not topology_maps.regridders
+    assert copied.binary_masks is not topology_maps.binary_masks
+    assert copied.fractional_masks is not topology_maps.fractional_masks
 
 
 def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:

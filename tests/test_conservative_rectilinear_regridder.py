@@ -1,5 +1,6 @@
 import importlib
 from inspect import signature
+from pathlib import Path
 from typing import Any
 
 import jax.numpy as jnp
@@ -35,7 +36,7 @@ def _grid(
 
 def test_regridder_constructor_sets_interpolator_and_grids() -> None:
     src = _grid("src", np.array([0.0, 1.0]), np.array([0.0, 1.0]))
-    dst = _grid("dst", np.array([0.0, 1.0]), np.array([0.0, 1.0]))
+    dst = _grid("dst", np.array([0.5, 1.5]), np.array([0.0, 1.0]))
 
     regridder = ConservativeRectilinearRegridder(src, dst)
 
@@ -166,7 +167,16 @@ def test_regridder_identical_grid_skips_remapper_construction(
     regridder = ConservativeRectilinearRegridder(src, dst)
 
     assert regridder.has_identical_grids is True
-    assert regridder.interpolator is not None
+    assert regridder.interpolator is None
+
+
+def test_regridder_identical_grid_passthrough_does_not_use_identity_helper() -> None:
+    base_source = Path("vercor/regridders/base.py").read_text(encoding="utf-8")
+    conservative_source = Path("vercor/regridders/conservative.py").read_text(
+        encoding="utf-8"
+    )
+    assert "_IdentityInterpolator" not in base_source
+    assert "_IdentityInterpolator" not in conservative_source
 
 
 def test_regridder_non_identical_grid_constructs_remapper(
