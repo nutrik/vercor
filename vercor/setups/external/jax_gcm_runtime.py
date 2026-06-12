@@ -11,7 +11,7 @@ import jax.numpy as jnp
 from vercor.components import Component, ComponentStepContext, ComponentStepResult
 from vercor.dtypes import as_jax_real_array, jax_zeros
 from vercor.exceptions import ComponentError, CouplerError
-from vercor.output.jax_gcm import (
+from vercor.setups.external.jax_gcm_output import (
     accumulate_jax_gcm_period_prediction,
     write_jax_gcm_averages_output,
 )

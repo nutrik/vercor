@@ -87,8 +87,9 @@ VerCOR calendar timestamps, shape-derived JCM coordinates, native Veros
 metadata, and runtime field attrs. Shared period-output cadence, calendar time
 encoding, dataset coordinate helpers, accumulation, variable containers,
 mean-output conversion, period-file write lifecycle, and NetCDF writing live in
-`vercor.output`; model-specific JAXGCM and Veros modules only adapt native
-model objects into that shared output boundary.
+`vercor.output`; model-specific JAXGCM and Veros output adapters live beside
+their setup adapters in `vercor.setups.external` and adapt native model objects
+into that shared output boundary.
 VerCOR-owned period output samples, accumulators, extracted variables, mean
 variables, and runtime-view fields stay JAX-backed until the file boundary;
 `vercor.host_arrays` owns the final host transfer. NetCDF time-coordinate
@@ -389,8 +390,9 @@ concrete setup-state annotations rather than a duplicate local protocol.
 spinup policy, initialization, and the canonical `JCMState` bundle.
 `vercor.setups.external.jax_gcm` remains a thin public factory that constructs
 setup state and binds runtime-owned lifecycle hooks directly without
-reexporting state bundles or owning runtime payload/setup-state internals. JAXGCM output
-extraction and mean-variable shaping live in `vercor.output.jax_gcm`, which
+reexporting state bundles or owning runtime payload/setup-state internals.
+JAXGCM output extraction and mean-variable shaping live in
+`vercor.setups.external.jax_gcm_output`, which
 streams prediction objects into the shared JAX-backed sum/count period
 accumulator instead of retaining all period samples or calling xarray adapters.
 Shared cadence, calendar time metadata, dataset coordinate discovery,
@@ -411,8 +413,8 @@ finite-value count array per variable as JAX arrays, preserving current
 `nanmean` semantics without retaining every timestep. Opt-in Veros period-output
 extraction, native Veros variable metadata handling, ghost-cell removal, and
 write-time native Veros spatial-axis transposition live in
-`vercor.output.veros`; `vercor.setups.external.veros_runtime` streams selected
-snapshots into the shared accumulator and flushes them with the same
+`vercor.setups.external.veros_output`; `vercor.setups.external.veros_runtime`
+streams selected snapshots into the shared accumulator and flushes them with the same
 day/month/year cadence policy used by JAXGCM. Veros average files keep VerCOR's
 lowercase `time` dimension while matching native Veros spatial NetCDF dimension
 order, and the accumulator averages only across recorded runtime samples rather

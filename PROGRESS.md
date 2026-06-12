@@ -188,6 +188,9 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local no-break over-engineering cleanup campaign validation: focused
   red/green pytest, Black, git diff whitespace check, flake8, mypy, full fast
   pytest, full pytest, and coverage pytest passed as of 2026-06-12.
+- Latest local external output ownership validation: focused red/green pytest,
+  focused output pytest, Black, git diff whitespace check, flake8, mypy, full
+  fast pytest, and full pytest passed as of 2026-06-12.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -220,6 +223,28 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-12: External Output Adapter Ownership Boundary
+
+- Moved JAXGCM and Veros-specific period-output adapters from `vercor.output`
+  to `vercor.setups.external`, leaving `vercor.output` as the shared
+  setup-agnostic output primitive package.
+- Updated JAXGCM/Veros runtime and setup-state imports, boundary tests,
+  functional output tests, `DESIGN.md`, and `DEPENDENCIES.md` for the clean
+  break from `vercor.output.jax_gcm` and `vercor.output.veros`.
+- Red/green notes: focused external/API tests first failed with missing
+  `vercor.setups.external.jax_gcm_output` before the move, then passed after
+  moving modules and rewiring imports. A pre-existing period-file log-message
+  test drift on this branch was aligned with the current
+  `Writing output file:  ...` message.
+- Validation run for this change: `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_external_components_coverage.py -q --tb=short`,
+  `conda run -n scipy pytest tests/test_output_datasets.py tests/test_output_netcdf.py tests/test_period_averages.py tests/test_period_files.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`, `git diff --check`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
+  `conda run -n scipy pytest tests/ -q --tb=short` passed. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-12: No-Break Over-Engineering Cleanup Campaign
 

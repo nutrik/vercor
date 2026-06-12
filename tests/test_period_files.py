@@ -80,7 +80,7 @@ def test_write_period_average_netcdf_logs_writes_and_clears(
         assert_allclose_compact(np.asarray(actual.variables["x"]), [10.0, 20.0])
         assert actual.variables["time"].attrs["calendar"] == "proleptic_gregorian"
     assert accumulator.empty
-    assert f"Output file: {output}" in stream.getvalue()
+    assert f"Writing output file:  {output}" in stream.getvalue()
 
 
 def test_write_period_average_netcdf_applies_data_variable_builder(

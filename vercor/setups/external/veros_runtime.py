@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from vercor.components import ComponentStepContext
 from vercor.output.time import should_write_period_output
-from vercor.output.veros import (
+from vercor.setups.external.veros_output import (
     accumulate_veros_period_state,
     write_veros_averages_output,
 )

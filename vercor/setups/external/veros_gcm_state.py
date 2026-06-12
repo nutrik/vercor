@@ -16,13 +16,13 @@ from vercor.components import (
 )
 from vercor.grid import RectilinearGrid
 from vercor.output.period_averages import PeriodAverageAccumulator
-import vercor.output.veros as _veros_output
 from vercor.settings import VercorSettings
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
     run_logged_spinup,
 )
 import vercor.setups.external.veros_runtime as _veros_runtime
+import vercor.setups.external.veros_output as _veros_output
 import vercor.setups.external.veros_setup as _veros_setup
 import vercor.setups.external.veros_state as _veros_state
 from vercor.types import RuntimeArray

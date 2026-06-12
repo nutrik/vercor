@@ -17,7 +17,7 @@ import xarray as xr
 
 import vercor.setups.external.jax_gcm as jax_gcm_module
 import vercor.setups.external.jax_gcm_fields as jax_gcm_fields_module
-import vercor.output.jax_gcm as jax_gcm_output_module
+import vercor.setups.external.jax_gcm_output as jax_gcm_output_module
 import vercor.setups.external.jax_gcm_runtime as jax_gcm_runtime_module
 import vercor.setups.external.jax_gcm_state as jax_gcm_state_module
 import vercor.setups.external.veros_fluxes as veros_fluxes_module
@@ -1036,7 +1036,7 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
         assert actual.variables["time"].attrs["calendar"] == "proleptic_gregorian"
     assert accumulator.empty
     assert physics_module.cached_coords is coords
-    assert f"Output file: {output}" in stream.getvalue()
+    assert f"Writing output file:  {output}" in stream.getvalue()
 
 
 @pytest.mark.parametrize(
@@ -1364,7 +1364,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
 
 
 def test_veros_output_snapshot_uses_variable_metadata_and_current_timestep() -> None:
-    import vercor.output.veros as veros_output_module
+    import vercor.setups.external.veros_output as veros_output_module
 
     state = _make_veros_output_state()
 
@@ -1404,7 +1404,7 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
     tmp_path: Path,
 ) -> None:
     from vercor.output.period_averages import PeriodAverageAccumulator
-    import vercor.output.veros as veros_output_module
+    import vercor.setups.external.veros_output as veros_output_module
 
     state = _make_veros_output_state()
     snapshots = [
@@ -1483,7 +1483,7 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
 
 
 def test_veros_output_variables_rejects_bare_string() -> None:
-    import vercor.output.veros as veros_output_module
+    import vercor.setups.external.veros_output as veros_output_module
 
     with pytest.raises(ValueError, match="output_variables"):
         veros_output_module.normalize_veros_output_variables(
