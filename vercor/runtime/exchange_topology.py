@@ -23,7 +23,14 @@ def build_exchange_topology_maps(
 ) -> RuntimeTopologyMaps:
     """Build exchange regridders and identity masks for configured topology."""
 
-    initialized_maps = RuntimeTopologyMaps.from_mappings(topology_maps)
+    if topology_maps is None:
+        initialized_maps = RuntimeTopologyMaps.empty()
+    else:
+        initialized_maps = RuntimeTopologyMaps(
+            regridders=dict(topology_maps.regridders),
+            binary_masks=dict(topology_maps.binary_masks),
+            fractional_masks=dict(topology_maps.fractional_masks),
+        )
 
     for exchange in exchanges:
         key = (exchange.source, exchange.destination, exchange.interpolation_type)

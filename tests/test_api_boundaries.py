@@ -1208,6 +1208,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def accumulate_output_variables(" in period_averages_source
     assert "def period_mean_output_variables(" in period_averages_source
     assert "def write_period_average_netcdf(" in period_files_source
+    assert "MeanVariablesBuilder" not in period_files_source
+    assert "CoordinateVariablesBuilder" not in period_files_source
+    assert "DataVariablesBuilder" not in period_files_source
     assert "accumulate_output_variables(" in jax_gcm_output_source
     assert "period_mean_output_variables(" in jax_gcm_output_source
     assert "write_period_average_netcdf(" in jax_gcm_output_source
@@ -1217,8 +1220,12 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "write_period_average_netcdf(" in veros_output_source
     assert "time_coordinate_variable(" in veros_output_source
     assert "used_dimension_names(" in veros_output_source
-    assert "def __getattr__(" in output_init_source
-    assert "from vercor.output import runtime as _runtime" in output_init_source
+    assert "def __getattr__(" not in output_init_source
+    assert "def __dir__(" not in output_init_source
+    assert "_RUNTIME_EXPORTS" not in output_init_source
+    assert "from vercor.output.runtime import (" in output_init_source
+    assert "write_coupler_runtime_outputs" in output_init_source
+    assert "write_runtime_component_view_to_netcdf" in output_init_source
     assert "def array_to_host(" in host_arrays_source
     assert "def host_int64_array(" in host_arrays_source
     assert "from vercor.setups.external.camulator_wind_filter import" in (

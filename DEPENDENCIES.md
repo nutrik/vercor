@@ -73,7 +73,7 @@
 73. `vercor/runtime/resources.py` - public-field per-coupler runtime resource holder for topology maps, refreshed contracts, compiled-runtime cache owner, and interrupts built on (63, 64, 69, 72)
 74. `vercor/runtime/preparation.py` - runtime state preparation, prepared-state bundle ownership, refreshed contract validation, and initial outgoing-store priming built on (24, 63, 64, 65, 67, 69, 73)
 75. `vercor/runtime/runner.py` - host/scanned runtime loops, run-mode selection, cache-owner delegated compiled scanned dispatch, donation checks, and interrupt translation built on (65, 67, 72)
-76. `vercor/output/runtime.py` and `vercor/output/__init__.py` - runtime-view output mask selection/naming, coupler-final-output direct h5netcdf boundary through (31), and lazy top-level runtime-output reexports built on (10, 12, 31, 60, 64)
+76. `vercor/output/runtime.py` and `vercor/output/__init__.py` - runtime-view output mask selection/naming, coupler-final-output direct h5netcdf boundary through (31), and direct top-level runtime-output reexports built on (10, 12, 31, 60, 64)
 77. `vercor/runtime/facade.py` - high-level runtime orchestration boundary and internal repeated-input bundle for the public coupler facade and runtime resource holder built on (24, 25, 59, 60, 63, 64, 67, 69, 71, 72, 73, 74, 75, 76)
 78. `vercor/coupler.py` - public setup/finalization facade for `run()`, `create_runtime_state()`, runtime views, and minimal runtime-cache profiling helpers built on (25, 59, 62, 64, 73, 77)
 79. `examples/` - runnable setup scripts that assemble packaged adapters from `vercor.setups`

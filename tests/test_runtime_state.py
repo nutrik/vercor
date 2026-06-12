@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-from inspect import signature
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -753,14 +752,17 @@ def test_runtime_resources_use_public_fields_and_cache_owner_directly() -> None:
 
 
 @pytest.mark.fast_always
-def test_runtime_topology_maps_from_mappings_only_copies_existing_bundle() -> None:
-    parameters = signature(RuntimeTopologyMaps.from_mappings).parameters
-    assert tuple(parameters) == ("topology_maps",)
+def test_runtime_topology_maps_copying_stays_at_exchange_topology_boundary() -> None:
+    topology_state_source = Path("vercor/runtime/topology_state.py").read_text(
+        encoding="utf-8"
+    )
+    exchange_topology_source = Path("vercor/runtime/exchange_topology.py").read_text(
+        encoding="utf-8"
+    )
 
-    empty_maps = RuntimeTopologyMaps.from_mappings()
-    assert empty_maps.regridders == {}
-    assert empty_maps.binary_masks == {}
-    assert empty_maps.fractional_masks == {}
+    assert "def from_mappings(" not in topology_state_source
+    assert "RuntimeTopologyMaps.from_mappings" not in exchange_topology_source
+    assert "RuntimeTopologyMaps.empty()" in exchange_topology_source
 
     regridders = cast(Any, {("ATM", "OCN", "bilinear"): object()})
     binary_masks: dict[tuple[str, str, str], RuntimeArray] = {
@@ -775,7 +777,11 @@ def test_runtime_topology_maps_from_mappings_only_copies_existing_bundle() -> No
         fractional_masks=fractional_masks,
     )
 
-    copied = RuntimeTopologyMaps.from_mappings(topology_maps)
+    copied = RuntimeTopologyMaps(
+        regridders=dict(topology_maps.regridders),
+        binary_masks=dict(topology_maps.binary_masks),
+        fractional_masks=dict(topology_maps.fractional_masks),
+    )
 
     assert copied.regridders == topology_maps.regridders
     assert copied.binary_masks == topology_maps.binary_masks

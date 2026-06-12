@@ -9,27 +9,26 @@ from vercor.output.netcdf import write_netcdf_dataset
 from vercor.output.period_averages import PeriodAverageAccumulator
 from vercor.output.variables import OutputVariable
 
-MeanVariablesBuilder = Callable[
-    [PeriodAverageAccumulator],
-    Mapping[str, OutputVariable],
-]
-CoordinateVariablesBuilder = Callable[
-    [Mapping[str, OutputVariable]],
-    Mapping[str, OutputVariable],
-]
-DataVariablesBuilder = Callable[
-    [Mapping[str, OutputVariable]],
-    Mapping[str, OutputVariable],
-]
-
 
 def write_period_average_netcdf(
     accumulator: PeriodAverageAccumulator,
     output: str,
     *,
-    build_mean_variables: MeanVariablesBuilder,
-    build_coordinate_variables: CoordinateVariablesBuilder,
-    build_data_variables: DataVariablesBuilder | None = None,
+    build_mean_variables: Callable[
+        [PeriodAverageAccumulator],
+        Mapping[str, OutputVariable],
+    ],
+    build_coordinate_variables: Callable[
+        [Mapping[str, OutputVariable]],
+        Mapping[str, OutputVariable],
+    ],
+    build_data_variables: (
+        Callable[
+            [Mapping[str, OutputVariable]],
+            Mapping[str, OutputVariable],
+        ]
+        | None
+    ) = None,
     logger: LoggerLike | None = None,
 ) -> None:
     """Write one period-average NetCDF file and clear accumulated samples."""

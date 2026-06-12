@@ -29,21 +29,6 @@ class RuntimeTopologyMaps:
             fractional_masks={},
         )
 
-    @classmethod
-    def from_mappings(
-        cls,
-        topology_maps: "RuntimeTopologyMaps | None" = None,
-    ) -> "RuntimeTopologyMaps":
-        """Return an empty bundle or a copy of an existing topology-map bundle."""
-
-        if topology_maps is None:
-            return cls.empty()
-        return cls(
-            regridders=dict(topology_maps.regridders),
-            binary_masks=dict(topology_maps.binary_masks),
-            fractional_masks=dict(topology_maps.fractional_masks),
-        )
-
 
 @dataclass(frozen=True)
 class SurfaceExchangeMasks:

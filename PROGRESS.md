@@ -185,6 +185,9 @@ historical commands, failure messages, or detailed validation notes.
   red/green pytest, focused external/diagnostics pytest, Black, git diff
   whitespace check, flake8, mypy, full fast pytest, and full pytest passed as
   of 2026-06-11.
+- Latest local no-break over-engineering cleanup campaign validation: focused
+  red/green pytest, Black, git diff whitespace check, flake8, mypy, full fast
+  pytest, full pytest, and coverage pytest passed as of 2026-06-12.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -217,6 +220,34 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-12: No-Break Over-Engineering Cleanup Campaign
+
+- Added `docs/over-engineering-audit-2026-06-12.md` with the requested
+  executive summary, findings table, and recommended refactor plan.
+- Removed three no-break internal simplification targets from the audit:
+  `RuntimeTopologyMaps.from_mappings()` is gone and copy semantics now live at
+  the exchange-topology boundary, `vercor.output` directly reexports its three
+  runtime-output helpers, and one-use period-file builder aliases are inlined
+  into `write_period_average_netcdf()`.
+- Left public or compatibility-bound simplification candidates as follow-up
+  only: `Grid`, `RunSequence`, component authoring/lifecycle layers, calendar
+  compatibility delegates, and optional-dependency setup facades.
+- Red/green notes: focused runtime tests first failed on the old
+  `from_mappings()` helper, and focused API/period-file tests first failed on
+  the old period-file alias layer. The same focused suites passed after the
+  cleanup.
+- Validation run for this change: baseline fast pytest passed before edits.
+  After implementation, `conda run -n scipy pytest tests/test_runtime_state.py tests/test_runtime_facade_boundaries.py -q --tb=short`,
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_period_files.py -q --tb=short`,
+  `conda run -n scipy black vercor examples tests`, `git diff --check`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`, and
+  `conda run -n scipy pytest --cov=vercor tests/ -q` passed. Coverage remained
+  at 90% total. The existing Black Python 3.13/target-3.14 warning and JAX
+  dtype-promotion warning remain.
 
 ### 2026-06-11: Over-Engineering Audit Quick-Win Cleanup
 
