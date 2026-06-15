@@ -21,13 +21,24 @@ from vercor.regridders import bilinear
 if __name__ == "__main__":
     ocn = make_veros_gcm(
         do_spinup=True,
+        output_frequency="month",
+        output_variables=(
+            "temp",
+            "salt",
+            "u",
+            "v",
+            "w",
+            "surface_taux",
+            "surface_tauy",
+            "psi",
+        ),
         custom_parameters={"dt_tracer": timedelta(hours=6).total_seconds()},
     )
 
     atm = make_camulator_gcm(
         config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",
         model_weights_path="/glade/u/home/rnuterman/veros_coupling/climate/checkpoint.pt00091.pt",
-        output_subfolder_name="test_veros_00091",
+        output_subfolder_name="camulator_veros_v2_00091",
     )
 
     lnd = make_camulator_land(
@@ -39,7 +50,7 @@ if __name__ == "__main__":
     clock = Clock(
         start=datetime(1981, 1, 3, 0, 0, 0),
         dt_seconds=86400.0 // 4,
-        steps=100 - 2 * 4,
+        steps=365 - 2 * 4,
         year_type="noleap",
     )
     run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
