@@ -11,6 +11,7 @@ ALLOWED_NUMPY_BOUNDARIES = {
     "vercor/dtypes.py",
     "vercor/forcing_data.py",
     "vercor/host_arrays.py",
+    "vercor/setups/external/camulator_output.py",
     "vercor/types.py",
 }
 

@@ -123,6 +123,8 @@ def run_camulator_prediction_block(
             forecast_hour=state.forecast_hour,
             metadata=state.metadata,
             conf=state.conf,
+            state_transformer=state.state_transformer,
+            logger=logger,
         )
 
         state.state = state.stepper.state_manager.shift_state_forward(

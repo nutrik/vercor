@@ -191,6 +191,10 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local external output ownership validation: focused red/green pytest,
   focused output pytest, Black, git diff whitespace check, flake8, mypy, full
   fast pytest, and full pytest passed as of 2026-06-12.
+- Latest local CAMulator direct h5netcdf output validation: focused red/green
+  pytest, focused output pytest, Black, git diff whitespace check, flake8,
+  mypy, full fast pytest, full pytest, and coverage pytest passed as of
+  2026-06-16.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -223,6 +227,27 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-16: CAMulator Direct h5netcdf Output
+
+- Replaced CAMulator forecast-increment output delegation to CREDIT
+  `make_xarray`/NetCDF helpers with VerCOR-owned tensor shaping and direct
+  `h5netcdf` writing through the shared output variable boundary.
+- Moved CAMulator output metadata loading into `camulator_output.py`, kept
+  model/parser/transform CREDIT imports in `camulator_imports.py`, and wired
+  runtime output to use the setup state's existing tensor transformer for
+  `predict.climate_rescale_output`.
+- Added unsupported-option validation for xarray-only CREDIT output features
+  such as pressure interpolation, ptype, and CREDIT-specific encoding dicts.
+- Red/green notes: new output tests first failed because direct helper APIs and
+  the `state_transformer` writer argument were missing; after implementation,
+  the fast suite exposed the new NumPy import as an explicit host-output
+  boundary, so `tests/test_production_numpy_boundaries.py` now lists
+  `camulator_output.py`.
+- Validation run for this change: focused CAMulator/output pytest, Black,
+  `git diff --check`, flake8, mypy, full fast pytest, full pytest, and coverage
+  pytest passed. The existing Black Python 3.13/target-3.14 warning and JAX
+  dtype-promotion warning remain.
 
 ### 2026-06-12: External Output Adapter Ownership Boundary
 

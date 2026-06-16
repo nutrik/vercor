@@ -11,6 +11,7 @@ import yaml
 
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.setups.external import camulator_imports
+import vercor.setups.external.camulator_output as _camulator_output
 from vercor.setups.external.camulator_stepper import CAMulatorStepper
 from vercor.setups.external.camulator_tensors import prepare_static_forcing_tensor
 
@@ -118,7 +119,7 @@ def initialize_camulator(
 
     log.info("Loading metadata and coordinates...")
     latlons = xr.open_dataset(conf["loss"]["latitude_weights"])
-    metadata = camulator_imports.load_metadata(conf)
+    metadata = _camulator_output.load_camulator_output_metadata(conf)
 
     log.info("Creating CAMulatorStepper with conservation fixers...")
     stepper = CAMulatorStepper(model, conf, current_device)

@@ -41,9 +41,9 @@
 41. `vercor/setups/external/camulator_contracts.py` and `camulator_fields.py` - lightweight CAMulator runtime field contract ownership, public package-internal runtime field initialization, forcing prep, and prediction-field mapping built on (1, 7, 10, 40)
 42. `vercor/setups/external/_camulator_wind_filtering.py` and `camulator_wind_filter.py` - private CAMulator wind-mask/kernel/tensor filtering mechanics plus the public configuration and log-and-skip post-processing facade built on (25)
 43. `vercor/setups/external/camulator_stepper.py` - CAMulator state shifting, forcing concatenation, stepping, and optional post-processing built on (38, 40, 42)
-44. `vercor/setups/external/camulator_init.py` - CAMulator model, transform, forcing, metadata, init-noise, and stepper initialization built on (38, 40, 43)
-45. `vercor/setups/external/camulator_runtime_settings.py` - CAMulator TensorFlow/OpenMP/MKL import-time environment settings boundary
-46. `vercor/setups/external/camulator_output.py` - CAMulator CREDIT output writing helpers
+44. `vercor/setups/external/camulator_output.py` - CAMulator tensor-to-output-variable shaping, metadata loading, unsupported CREDIT-output option validation, and direct h5netcdf forecast-increment writing through shared VerCOR output helpers built on (25, 31)
+45. `vercor/setups/external/camulator_init.py` - CAMulator model, transform, forcing, output metadata, init-noise, and stepper initialization built on (38, 40, 43, 44)
+46. `vercor/setups/external/camulator_runtime_settings.py` - CAMulator TensorFlow/OpenMP/MKL import-time environment settings boundary
 47. `vercor/setups/external/camulator_land.py` - CAMulator land host-runtime adapter with shared timestep/cursor setup built on (1, 12, 20, 26, 39)
 48. `vercor/setups/external/camulator_runtime.py`, `camulator_gcm_state.py`, and `camulator.py` - CAMulator public package-internal host-runtime prediction-block/step helpers with concrete setup-state annotations, atmosphere setup-state/lifecycle ownership, and thin adapter factory boundary built on (7, 10, 26, 39, 40, 41, 44, 45, 46)
 49. `vercor/setups/data/assets.py` - concrete ERA/ECMWF setup forcing asset registry built on (21)

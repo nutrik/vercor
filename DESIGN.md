@@ -81,15 +81,15 @@ The output is done in a structured format, such as NetCDF, HDF5, that can be eas
 Model restart files are supported and written in compact HDF5 format using `h5py`.
 
 Current example output snapshots are also written in HDF5. JAXGCM and Veros
-averaged period outputs and final runtime-view NetCDF files are written
-directly with `h5netcdf`, bypassing xarray conversion so adapters can preserve
-VerCOR calendar timestamps, shape-derived JCM coordinates, native Veros
-metadata, and runtime field attrs. Shared period-output cadence, calendar time
-encoding, dataset coordinate helpers, accumulation, variable containers,
-mean-output conversion, period-file write lifecycle, and NetCDF writing live in
-`vercor.output`; model-specific JAXGCM and Veros output adapters live beside
-their setup adapters in `vercor.setups.external` and adapt native model objects
-into that shared output boundary.
+averaged period outputs, CAMulator forecast increments, and final runtime-view
+NetCDF files are written directly with `h5netcdf`, bypassing xarray conversion
+so adapters can preserve VerCOR calendar timestamps, shape-derived JCM
+coordinates, native Veros/CAMulator metadata, and runtime field attrs. Shared
+period-output cadence, calendar time encoding, dataset coordinate helpers,
+accumulation, variable containers, mean-output conversion, period-file write
+lifecycle, and NetCDF writing live in `vercor.output`; model-specific output
+adapters live beside their setup adapters in `vercor.setups.external` and adapt
+native model objects into that shared output boundary.
 VerCOR-owned period output samples, accumulators, extracted variables, mean
 variables, and runtime-view fields stay JAX-backed until the file boundary;
 `vercor.host_arrays` owns the final host transfer. NetCDF time-coordinate
@@ -437,7 +437,8 @@ mask/kernel construction and selected tensor mutation live in
 `vercor.setups.external.camulator_gcm_state` owns CAMulator atmosphere
 setup-time model resources, timestep alignment, field seeding, and lifecycle
 callbacks, while `vercor.setups.external.camulator` remains the thin public
-factory. CAMulator CREDIT output writing lives in
+factory. CAMulator forecast-increment output reshapes native prediction tensors
+and writes through the shared VerCOR h5netcdf boundary in
 `vercor.setups.external.camulator_output`.
 
 `vercor.assets` owns generic cache, download, and checksum validation only, with

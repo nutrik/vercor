@@ -15,7 +15,6 @@ Normalize_ERA5_and_Forcing: Any = None
 distributed_model_wrapper: Any = None
 load_model_state: Any = None
 credit_main_parser: Any = None
-load_metadata: Any = None
 
 GlobalMassFixer: Any = None
 GlobalWaterFixer: Any = None
@@ -29,7 +28,6 @@ def load_credit_modules() -> None:
     global CREDIT_AVAILABLE
     global load_model, load_model_name, load_transforms, Normalize_ERA5_and_Forcing
     global distributed_model_wrapper, load_model_state, credit_main_parser
-    global load_metadata
 
     if CREDIT_AVAILABLE:
         return
@@ -46,9 +44,6 @@ def load_credit_modules() -> None:
         )
         from credit.models.checkpoint import (  # type: ignore[import-not-found]
             load_model_state as credit_load_model_state,
-        )
-        from credit.output import (  # type: ignore[import-not-found]
-            load_metadata as credit_load_metadata,
         )
         from credit.parser import (  # type: ignore[import-not-found]
             credit_main_parser as credit_credit_main_parser,
@@ -72,7 +67,6 @@ def load_credit_modules() -> None:
     distributed_model_wrapper = credit_distributed_model_wrapper
     load_model_state = credit_load_model_state
     credit_main_parser = credit_credit_main_parser
-    load_metadata = credit_load_metadata
     CREDIT_AVAILABLE = True
 
 
@@ -138,7 +132,6 @@ __all__ = [
     "load_windpp_module",
     "credit_main_parser",
     "distributed_model_wrapper",
-    "load_metadata",
     "load_model",
     "load_model_name",
     "load_model_state",

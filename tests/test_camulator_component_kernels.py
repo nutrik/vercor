@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
+import h5netcdf
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -270,63 +271,238 @@ def test_torch_tensor_from_jax_array_uses_copied_host_boundary() -> None:
     assert_allclose_compact(np.asarray(source), np.asarray([[1.0, 2.0], [3.0, 4.0]]))
 
 
-def test_camulator_output_helper_delegates_to_credit_boundary(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: dict[str, Any] = {}
+def _camulator_output_conf(
+    *,
+    save_forecast: str = "/tmp/camulator-output",
+    surface_variables: list[str] | None = None,
+    diagnostic_variables: list[str] | None = None,
+    save_vars: list[str] | None = None,
+    climate_rescale_output: bool = False,
+) -> dict[str, Any]:
+    predict: dict[str, Any] = {"save_forecast": save_forecast}
+    if save_vars is not None:
+        predict["save_vars"] = save_vars
+    if climate_rescale_output:
+        predict["climate_rescale_output"] = True
+    return {
+        "model": {"levels": 3},
+        "data": {
+            "variables": ["U", "T"],
+            "surface_variables": (
+                ["PS"] if surface_variables is None else surface_variables
+            ),
+            "diagnostic_variables": (
+                ["FSNS"] if diagnostic_variables is None else diagnostic_variables
+            ),
+            "level_ids": [10, 20, 30],
+        },
+        "predict": predict,
+    }
 
-    def fake_make_xarray(
-        prediction: torch.Tensor,
-        utc_datetime: datetime,
-        latitude: object,
-        longitude: object,
-        conf: dict[str, Any],
-    ) -> tuple[xr.Dataset, xr.Dataset]:
-        calls["make_xarray"] = (prediction, utc_datetime, latitude, longitude, conf)
-        return xr.Dataset(), xr.Dataset()
 
-    def fake_save_netcdf_increment(
-        upper_air: xr.Dataset,
-        single_level: xr.Dataset,
-        init_str: str,
-        forecast_hour: int,
-        metadata: dict[str, Any],
-        conf: dict[str, Any],
-    ) -> None:
-        calls["save"] = (
-            upper_air,
-            single_level,
-            init_str,
-            forecast_hour,
-            metadata,
-            conf,
-        )
+def _camulator_prediction(
+    total_channels: int, height: int = 2, width: int = 2
+) -> torch.Tensor:
+    return torch.arange(
+        total_channels * height * width,
+        dtype=torch.float32,
+    ).reshape(1, total_channels, 1, height, width)
 
-    monkeypatch.setattr(
-        camulator_output_module,
-        "_credit_output_functions",
-        lambda: (fake_make_xarray, fake_save_netcdf_increment),
+
+def test_build_camulator_output_variables_preserves_credit_channel_order() -> None:
+    prediction = _camulator_prediction(total_channels=7)
+    coords, data_vars = camulator_output_module.build_camulator_output_variables(
+        prediction,
+        datetime(2000, 1, 1, 6, 0, 0),
+        latitude=np.asarray([-45.0, 45.0]),
+        longitude=np.asarray([0.0, 90.0]),
+        forecast_hour=12,
+        metadata={
+            "T": {"units": "K"},
+            "latitude": {"units": "degrees_north"},
+        },
+        conf=_camulator_output_conf(diagnostic_variables=[]),
     )
 
-    prediction = torch.ones((1, 1))
-    utc_datetime = datetime(2000, 1, 1)
-    metadata: dict[str, Any] = {"source": "test"}
-    conf: dict[str, Any] = {"data": {}}
+    assert coords["level"].dims == ("level",)
+    assert_allclose_compact(coords["level"].values, np.asarray([10, 20, 30]))
+    assert coords["latitude"].attrs["units"] == "degrees_north"
+    assert data_vars["U"].dims == ("time", "level", "latitude", "longitude")
+    assert data_vars["T"].dims == ("time", "level", "latitude", "longitude")
+    assert data_vars["PS"].dims == ("time", "latitude", "longitude")
+    assert data_vars["forecast_hour"].dims == ()
+    assert data_vars["T"].attrs["units"] == "K"
+    assert int(np.asarray(data_vars["forecast_hour"].values)) == 12
+    assert_allclose_compact(
+        data_vars["U"].values,
+        prediction[:, 0:3, 0].reshape(1, 3, 2, 2).numpy(),
+    )
+    assert_allclose_compact(
+        data_vars["T"].values,
+        prediction[:, 3:6, 0].reshape(1, 3, 2, 2).numpy(),
+    )
+    assert_allclose_compact(data_vars["PS"].values, prediction[:, 6, 0].numpy())
+
+
+def test_build_camulator_output_variables_supports_upper_air_only() -> None:
+    prediction = _camulator_prediction(total_channels=6)
+
+    _, data_vars = camulator_output_module.build_camulator_output_variables(
+        prediction,
+        datetime(2000, 1, 1),
+        latitude=np.asarray([-45.0, 45.0]),
+        longitude=np.asarray([0.0, 90.0]),
+        forecast_hour=6,
+        metadata={},
+        conf=_camulator_output_conf(surface_variables=[], diagnostic_variables=[]),
+    )
+
+    assert tuple(data_vars) == ("U", "T", "forecast_hour")
+
+
+def test_write_camulator_prediction_output_uses_vercor_h5netcdf_boundary(
+    tmp_path: Path,
+) -> None:
+    class _Transformer:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def inverse_transform(self, prediction: torch.Tensor) -> torch.Tensor:
+            self.calls += 1
+            return prediction + 100.0
+
+    transformer = _Transformer()
+    prediction = _camulator_prediction(total_channels=8)
+    conf = _camulator_output_conf(
+        save_forecast=str(tmp_path),
+        save_vars=["T", "FSNS"],
+        climate_rescale_output=True,
+    )
 
     camulator_output_module.write_camulator_prediction_output(
         prediction,
-        utc_datetime,
-        latitude=[0.0],
-        longitude=[1.0],
-        init_str="2000010100",
+        datetime(2000, 1, 1, 6, 0, 0),
+        latitude=np.asarray([-45.0, 45.0]),
+        longitude=np.asarray([0.0, 90.0]),
+        init_str="2000-01-01T00Z",
         lead_time_periods=6,
         forecast_hour=2,
-        metadata=metadata,
+        metadata={
+            "T": {"units": "K"},
+            "FSNS": {"long_name": "surface net shortwave flux"},
+        },
         conf=conf,
+        state_transformer=transformer,
+        logger=cast(Any, _RecordingLogger()),
     )
 
-    assert calls["make_xarray"][0].shape == prediction.shape
-    assert calls["save"][2:] == ("2000010100", 12, metadata, conf)
+    output = tmp_path / "2000-01-01T00Z" / "pred_2000-01-01T00Z_012.nc"
+    assert transformer.calls == 1
+    with h5netcdf.File(output, "r") as actual:
+        assert "U" not in actual.variables
+        assert "PS" not in actual.variables
+        assert actual.variables["T"].dimensions == (
+            "time",
+            "level",
+            "latitude",
+            "longitude",
+        )
+        assert actual.variables["FSNS"].dimensions == (
+            "time",
+            "latitude",
+            "longitude",
+        )
+        assert actual.variables["T"].attrs["units"] == "K"
+        assert (
+            actual.variables["FSNS"].attrs["long_name"] == "surface net shortwave flux"
+        )
+        assert int(actual.variables["forecast_hour"][()]) == 12
+        assert_allclose_compact(
+            actual.variables["level"][:],
+            np.asarray([10, 20, 30]),
+        )
+        assert_allclose_compact(
+            actual.variables["T"][:],
+            (prediction[:, 3:6, 0] + 100.0).reshape(1, 3, 2, 2).numpy(),
+        )
+        assert_allclose_compact(
+            actual.variables["FSNS"][:],
+            (prediction[:, 7, 0] + 100.0).numpy(),
+        )
+
+
+@pytest.mark.parametrize(
+    "config_update, message",
+    [
+        (
+            {"predict": {"interp_pressure": {"pressure_levels": [500.0]}}},
+            "interp_pressure",
+        ),
+        ({"use_ptype": True}, "use_ptype"),
+        ({"predict": {"ua_var_encoding": {"zlib": True}}}, "ua_var_encoding"),
+        (
+            {"predict": {"surface_var_encoding": {"zlib": True}}},
+            "surface_var_encoding",
+        ),
+        (
+            {"predict": {"pressure_var_encoding": {"zlib": True}}},
+            "pressure_var_encoding",
+        ),
+        (
+            {"predict": {"height_var_encoding": {"zlib": True}}},
+            "height_var_encoding",
+        ),
+    ],
+)
+def test_camulator_output_rejects_unsupported_credit_only_options(
+    config_update: dict[str, Any],
+    message: str,
+    tmp_path: Path,
+) -> None:
+    conf = _camulator_output_conf(save_forecast=str(tmp_path))
+    for section, value in config_update.items():
+        if isinstance(value, dict) and isinstance(conf.get(section), dict):
+            conf[section].update(value)
+        else:
+            conf[section] = value
+
+    with pytest.raises(ValueError, match=message):
+        camulator_output_module.write_camulator_prediction_output(
+            _camulator_prediction(total_channels=8),
+            datetime(2000, 1, 1),
+            latitude=np.asarray([-45.0, 45.0]),
+            longitude=np.asarray([0.0, 90.0]),
+            init_str="2000-01-01T00Z",
+            lead_time_periods=6,
+            forecast_hour=1,
+            metadata={},
+            conf=conf,
+            state_transformer=None,
+        )
+
+
+def test_camulator_output_wrappers_do_not_import_xarray_or_credit_output() -> None:
+    camulator_output_source = Path(
+        "vercor/setups/external/camulator_output.py"
+    ).read_text(encoding="utf-8")
+    camulator_imports_source = Path(
+        "vercor/setups/external/camulator_imports.py"
+    ).read_text(encoding="utf-8")
+
+    assert "import xarray" not in camulator_output_source
+    assert "credit.output" not in camulator_output_source
+    assert "credit.output" not in camulator_imports_source
+
+
+def test_load_camulator_output_metadata_reads_explicit_yaml(tmp_path: Path) -> None:
+    metadata_file = tmp_path / "metadata.yaml"
+    metadata_file.write_text("T:\n  units: K\n", encoding="utf-8")
+
+    metadata = camulator_output_module.load_camulator_output_metadata(
+        {"predict": {"metadata": str(metadata_file)}}
+    )
+
+    assert metadata == {"T": {"units": "K"}}
 
 
 def test_prepare_static_forcing_tensor_preserves_order_and_shape() -> None:
@@ -748,7 +924,9 @@ def test_initialize_camulator_logs_lifecycle_through_injected_logger(
         lambda forcing_ds, static_variables, device: torch.zeros((1, 1)),
     )
     monkeypatch.setattr(
-        camulator_imports_module, "load_metadata", lambda conf: {}, raising=False
+        camulator_output_module,
+        "load_camulator_output_metadata",
+        lambda conf: {},
     )
     monkeypatch.setattr(
         camulator_init_module, "CAMulatorStepper", lambda model, conf, device: stepper
@@ -974,10 +1152,16 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     component.hyam = torch.ones((1, 2, 1, 1))
     component.hybm = torch.ones((1, 2, 1, 1))
 
+    output_calls: dict[str, Any] = {}
+
+    def fake_write_camulator_prediction_output(*args: Any, **kwargs: Any) -> None:
+        output_calls["args"] = args
+        output_calls["kwargs"] = kwargs
+
     monkeypatch.setattr(
         camulator_output_module,
         "write_camulator_prediction_output",
-        lambda *args, **kwargs: None,
+        fake_write_camulator_prediction_output,
     )
     monkeypatch.setattr(
         camulator_fields_module,
@@ -1020,3 +1204,4 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
         component_state.data.get("temperature"), np.full((2, 2), 9.0)
     )
     assert component.runtime_cursor.timestep_counter == 1
+    assert output_calls["kwargs"]["state_transformer"] is component.state_transformer
