@@ -38,7 +38,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-jcm = ["jcm"]
+jcm = ["jcm=1.1.1"]
 veros = ["veros"]
 
 [build-system]
