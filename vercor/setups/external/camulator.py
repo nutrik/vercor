@@ -21,6 +21,7 @@ def make_camulator_gcm(
     do_spinup: bool = False,
     device: str = "cuda",
     output_cpus_number: int = 8,
+    output_frequency: str | None = None,
     logger: LoggerLike | None = None,
 ) -> HostRuntimeComponent:
     """Return a host-backed CAMulator atmosphere component."""
@@ -35,6 +36,7 @@ def make_camulator_gcm(
         do_spinup=do_spinup,
         device=device,
         output_cpus_number=output_cpus_number,
+        output_frequency=output_frequency,
         logger=logger,
     )
     return host_component(

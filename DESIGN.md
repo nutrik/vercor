@@ -80,11 +80,12 @@ The output is done in a structured format, such as NetCDF, HDF5, that can be eas
 
 Model restart files are supported and written in compact HDF5 format using `h5py`.
 
-Current example output snapshots are also written in HDF5. JAXGCM and Veros
-averaged period outputs, CAMulator forecast increments, and final runtime-view
-NetCDF files are written directly with `h5netcdf`, bypassing xarray conversion
-so adapters can preserve VerCOR calendar timestamps, shape-derived JCM
-coordinates, native Veros/CAMulator metadata, and runtime field attrs. Shared
+Current example output snapshots are also written in HDF5. JAXGCM, Veros, and
+configured CAMulator averaged period outputs, CAMulator forecast increments,
+and final runtime-view NetCDF files are written directly with `h5netcdf`,
+bypassing xarray conversion so adapters can preserve VerCOR calendar
+timestamps, shape-derived JCM coordinates, native Veros/CAMulator metadata, and
+runtime field attrs. Shared
 period-output cadence, calendar time encoding, dataset coordinate helpers,
 accumulation, variable containers, mean-output conversion, period-file write
 lifecycle, and NetCDF writing live in `vercor.output`; model-specific output
@@ -437,9 +438,13 @@ mask/kernel construction and selected tensor mutation live in
 `vercor.setups.external.camulator_gcm_state` owns CAMulator atmosphere
 setup-time model resources, timestep alignment, field seeding, and lifecycle
 callbacks, while `vercor.setups.external.camulator` remains the thin public
-factory. CAMulator forecast-increment output reshapes native prediction tensors
-and writes through the shared VerCOR h5netcdf boundary in
-`vercor.setups.external.camulator_output`.
+factory. CAMulator forecast-increment output remains the default when
+`output_frequency` is unset; when `output_frequency` is `day`, `month`, or
+`year`, `vercor.setups.external.camulator_runtime` streams native prediction
+tensors into the same shared period-average accumulator and cadence policy used
+by JAXGCM and Veros. CAMulator tensor reshaping, metadata handling, output
+filtering from `predict.save_vars`, average-file coordinate adaptation, and
+forecast-increment writing live in `vercor.setups.external.camulator_output`.
 
 `vercor.assets` owns generic cache, download, and checksum validation only, with
 asset-specific registries and product vocabulary kept outside the generic cache

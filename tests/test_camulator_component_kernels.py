@@ -431,6 +431,126 @@ def test_write_camulator_prediction_output_uses_vercor_h5netcdf_boundary(
         )
 
 
+def test_accumulate_camulator_period_prediction_reduces_time_axis() -> None:
+    from vercor.output.period_averages import PeriodAverageAccumulator
+
+    prediction = torch.arange(2 * 8 * 2 * 2, dtype=torch.float32).reshape(2, 8, 1, 2, 2)
+    accumulator = PeriodAverageAccumulator()
+
+    camulator_output_module.accumulate_camulator_period_prediction(
+        accumulator,
+        prediction,
+        metadata={
+            "T": {"units": "K"},
+            "FSNS": {"long_name": "surface net shortwave flux"},
+        },
+        conf=_camulator_output_conf(save_vars=["T", "FSNS"]),
+        state_transformer=None,
+    )
+
+    assert tuple(accumulator.variables) == ("T", "FSNS")
+    assert accumulator.variables["T"].dims == ("level", "latitude", "longitude")
+    assert accumulator.variables["T"].attrs["units"] == "K"
+    assert (
+        accumulator.variables["FSNS"].attrs["long_name"] == "surface net shortwave flux"
+    )
+    assert_allclose_compact(
+        accumulator.variables["T"].counts,
+        np.full((3, 2, 2), 2),
+    )
+    assert_allclose_compact(
+        accumulator.mean_samples()["T"].values,
+        np.mean(prediction[:, 3:6, 0].numpy(), axis=0),
+    )
+
+
+def test_write_camulator_averages_output_persists_mean_dataset(
+    tmp_path: Path,
+) -> None:
+    from vercor.output.period_averages import PeriodAverageAccumulator
+
+    accumulator = PeriodAverageAccumulator()
+    first_prediction = _camulator_prediction(total_channels=8)
+    second_prediction = first_prediction + 80.0
+    conf = _camulator_output_conf(save_forecast=str(tmp_path), save_vars=["T", "FSNS"])
+    for prediction in (first_prediction, second_prediction):
+        camulator_output_module.accumulate_camulator_period_prediction(
+            accumulator,
+            prediction,
+            metadata={
+                "T": {"units": "K"},
+                "FSNS": {"long_name": "surface net shortwave flux"},
+            },
+            conf=conf,
+            state_transformer=None,
+        )
+
+    output = camulator_output_module.write_camulator_averages_output(
+        accumulator,
+        output_time=datetime(2000, 1, 2, 0, 0, 0),
+        latitude=np.asarray([-45.0, 45.0]),
+        longitude=np.asarray([0.0, 90.0]),
+        init_str="2000-01-01T00Z",
+        metadata={
+            "T": {"units": "K"},
+            "FSNS": {"long_name": "surface net shortwave flux"},
+            "latitude": {"units": "degrees_north"},
+        },
+        conf=conf,
+        logger=cast(Any, _RecordingLogger()),
+    )
+
+    assert output == str(
+        tmp_path / "2000-01-01T00Z" / "camulator.averages.2000-01-02.nc"
+    )
+    with h5netcdf.File(output, "r") as actual:
+        assert "U" not in actual.variables
+        assert "PS" not in actual.variables
+        assert actual.variables["T"].dimensions == (
+            "time",
+            "level",
+            "latitude",
+            "longitude",
+        )
+        assert actual.variables["FSNS"].dimensions == (
+            "time",
+            "latitude",
+            "longitude",
+        )
+        assert actual.variables["T"].attrs["units"] == "K"
+        assert (
+            actual.variables["FSNS"].attrs["long_name"] == "surface net shortwave flux"
+        )
+        assert actual.variables["latitude"].attrs["units"] == "degrees_north"
+        assert actual.variables["time"].attrs["calendar"] == "proleptic_gregorian"
+        assert_allclose_compact(actual.variables["level"][:], np.asarray([10, 20, 30]))
+        assert_allclose_compact(
+            actual.variables["T"][:],
+            np.mean(
+                np.stack(
+                    [
+                        first_prediction[:, 3:6, 0].reshape(1, 3, 2, 2).numpy(),
+                        second_prediction[:, 3:6, 0].reshape(1, 3, 2, 2).numpy(),
+                    ]
+                ),
+                axis=0,
+            ),
+        )
+        assert_allclose_compact(
+            actual.variables["FSNS"][:],
+            np.mean(
+                np.stack(
+                    [
+                        first_prediction[:, 7, 0].numpy(),
+                        second_prediction[:, 7, 0].numpy(),
+                    ]
+                ),
+                axis=0,
+            ),
+        )
+    assert accumulator.empty
+
+
 @pytest.mark.parametrize(
     "config_update, message",
     [
@@ -485,6 +605,9 @@ def test_camulator_output_wrappers_do_not_import_xarray_or_credit_output() -> No
     camulator_output_source = Path(
         "vercor/setups/external/camulator_output.py"
     ).read_text(encoding="utf-8")
+    camulator_runtime_source = Path(
+        "vercor/setups/external/camulator_runtime.py"
+    ).read_text(encoding="utf-8")
     camulator_imports_source = Path(
         "vercor/setups/external/camulator_imports.py"
     ).read_text(encoding="utf-8")
@@ -492,6 +615,10 @@ def test_camulator_output_wrappers_do_not_import_xarray_or_credit_output() -> No
     assert "import xarray" not in camulator_output_source
     assert "credit.output" not in camulator_output_source
     assert "credit.output" not in camulator_imports_source
+    assert "accumulate_output_variables(" in camulator_output_source
+    assert "period_mean_output_variables(" in camulator_output_source
+    assert "write_period_average_netcdf(" in camulator_output_source
+    assert "should_write_period_output(" in camulator_runtime_source
 
 
 def test_load_camulator_output_metadata_reads_explicit_yaml(tmp_path: Path) -> None:
@@ -769,7 +896,11 @@ def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
         },
     )
 
-    component = make_camulator_gcm(config_path="dummy.yaml", device="cpu")
+    component = make_camulator_gcm(
+        config_path="dummy.yaml",
+        device="cpu",
+        output_frequency="month",
+    )
 
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component.grid.latitude, jax.Array)
@@ -1141,6 +1272,7 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     )
     component.conf = {}
     component.lead_time_periods = 6
+    component.output_frequency = None
     component.forecast_hour = 1
     component.metadata = {}
     component.state_transformer = SimpleNamespace(
@@ -1205,3 +1337,116 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     )
     assert component.runtime_cursor.timestep_counter == 1
     assert output_calls["kwargs"]["state_transformer"] is component.state_transformer
+
+
+def test_record_camulator_output_averages_when_frequency_is_configured(
+    monkeypatch: Any,
+) -> None:
+    from vercor.output.period_averages import (
+        PeriodAverageAccumulator,
+        PeriodAverageSample,
+    )
+
+    component = cast(
+        Any,
+        camulator_gcm_state_module.CAMulatorGCMSetupState.__new__(
+            camulator_gcm_state_module.CAMulatorGCMSetupState
+        ),
+    )
+    component.runtime_cursor = camulator_forcing_module.CamulatorRuntimeCursor(
+        start_ix=0,
+        init_str="2000-01-01T00Z",
+        model_substeps=1,
+        timestep_counter=0,
+    )
+    component.output_frequency = "day"
+    component._period_average_accumulator = PeriodAverageAccumulator()
+    component.latlons = SimpleNamespace(
+        latitude=SimpleNamespace(values=np.asarray([0.0, 1.0])),
+        longitude=SimpleNamespace(values=np.asarray([0.0, 1.0])),
+    )
+    component.metadata = {"T": {"units": "K"}}
+    component.conf = _camulator_output_conf(save_forecast="/tmp/camulator-output")
+    component.state_transformer = object()
+    component.lead_time_periods = 6
+    prediction = torch.ones((1, 8, 1, 2, 2), dtype=torch.float32)
+
+    accumulated: dict[str, Any] = {}
+    written: dict[str, Any] = {}
+
+    def fake_accumulate(
+        accumulator: PeriodAverageAccumulator,
+        prediction_arg: torch.Tensor,
+        *,
+        metadata: dict[str, Any],
+        conf: dict[str, Any],
+        state_transformer: Any | None,
+    ) -> None:
+        accumulated["prediction"] = prediction_arg
+        accumulated["metadata"] = metadata
+        accumulated["conf"] = conf
+        accumulated["state_transformer"] = state_transformer
+        accumulator.add_samples({"T": PeriodAverageSample(("x",), np.asarray([1.0]))})
+
+    def fake_write_average(
+        accumulator: PeriodAverageAccumulator,
+        *,
+        output_time: datetime,
+        latitude: Any,
+        longitude: Any,
+        init_str: str,
+        metadata: dict[str, Any],
+        conf: dict[str, Any],
+        logger: Any | None = None,
+    ) -> str:
+        _ = logger
+        written["counts"] = accumulator.variables["T"].counts.copy()
+        written["output_time"] = output_time
+        written["latitude"] = latitude
+        written["longitude"] = longitude
+        written["init_str"] = init_str
+        written["metadata"] = metadata
+        written["conf"] = conf
+        accumulator.clear()
+        return "unused.nc"
+
+    monkeypatch.setattr(
+        camulator_output_module,
+        "write_camulator_prediction_output",
+        lambda *args, **kwargs: pytest.fail("frequency mode must not write increments"),
+    )
+    monkeypatch.setattr(
+        camulator_runtime_module,
+        "should_write_period_output",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(
+        camulator_output_module,
+        "accumulate_camulator_period_prediction",
+        fake_accumulate,
+    )
+    monkeypatch.setattr(
+        camulator_output_module,
+        "write_camulator_averages_output",
+        fake_write_average,
+    )
+
+    camulator_runtime_module.record_camulator_prediction_output(
+        component,
+        prediction=prediction,
+        utc_datetime=datetime(2000, 1, 2),
+        logger=cast(Any, _RecordingLogger()),
+    )
+
+    assert accumulated["prediction"] is prediction
+    assert accumulated["metadata"] is component.metadata
+    assert accumulated["conf"] is component.conf
+    assert accumulated["state_transformer"] is component.state_transformer
+    assert_allclose_compact(written["counts"], np.asarray([1]))
+    assert written["output_time"] == datetime(2000, 1, 2)
+    assert_allclose_compact(written["latitude"], np.asarray([0.0, 1.0]))
+    assert_allclose_compact(written["longitude"], np.asarray([0.0, 1.0]))
+    assert written["init_str"] == "2000-01-01T00Z"
+    assert written["metadata"] is component.metadata
+    assert written["conf"] is component.conf
+    assert component._period_average_accumulator.empty

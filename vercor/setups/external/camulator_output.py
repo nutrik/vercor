@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from importlib import resources
 from os.path import expandvars
@@ -15,8 +15,14 @@ import torch
 import yaml
 
 from vercor.jax_logging import LoggerLike, get_default_logger
-from vercor.output.datasets import time_coordinate_variable
+from vercor.output.datasets import time_coordinate_variable, used_dimension_names
 from vercor.output.netcdf import write_netcdf_dataset
+from vercor.output.period_averages import (
+    PeriodAverageAccumulator,
+    accumulate_output_variables,
+    period_mean_output_variables,
+)
+from vercor.output.period_files import write_period_average_netcdf
 from vercor.output.variables import OutputVariable
 
 _TIME_NAME = "time"
@@ -66,25 +72,11 @@ def build_camulator_output_variables(
 ) -> tuple[dict[str, OutputVariable], dict[str, OutputVariable]]:
     """Return coordinate and data variables for one CAMulator forecast increment."""
 
-    data_conf = _mapping(conf.get("data", {}), name="data")
-    model_conf = _mapping(conf.get("model", {}), name="model")
-    levels = _configured_levels(data_conf, model_conf)
-    upper_names = _string_sequence(data_conf.get("variables", ()), "data.variables")
-    surface_names = _string_sequence(
-        data_conf.get("surface_variables", ()),
-        "data.surface_variables",
-    )
-    diagnostic_names = _string_sequence(
-        data_conf.get("diagnostic_variables", ()),
-        "data.diagnostic_variables",
-    )
-
-    values = _prediction_values(prediction)
-    _validate_prediction_shape(
-        values,
-        levels=levels,
-        n_upper_variables=len(upper_names),
-        n_single_level_variables=len(surface_names) + len(diagnostic_names),
+    values, levels, data_conf, data_variables = _data_variables_from_prediction(
+        prediction,
+        metadata=metadata,
+        conf=conf,
+        require_single_time=True,
     )
     latitude_values = np.asarray(latitude)
     longitude_values = np.asarray(longitude)
@@ -116,18 +108,11 @@ def build_camulator_output_variables(
         ),
     }
 
-    data_variables = _prediction_data_variables(
-        values,
-        upper_names=upper_names,
-        single_level_names=surface_names + diagnostic_names,
-        levels=levels,
-        metadata=metadata,
-    )
     data_variables[_FORECAST_HOUR_NAME] = OutputVariable(
         (),
         np.asarray(forecast_hour, dtype=np.int32),
     )
-    return coordinate_variables, _filtered_data_variables(data_variables, conf)
+    return coordinate_variables, data_variables
 
 
 def write_camulator_netcdf_increment(
@@ -203,6 +188,139 @@ def write_camulator_prediction_output(
     )
 
 
+def accumulate_camulator_period_prediction(
+    accumulator: PeriodAverageAccumulator,
+    prediction: torch.Tensor,
+    *,
+    metadata: Mapping[str, Any],
+    conf: Mapping[str, Any],
+    state_transformer: Any | None,
+) -> None:
+    """Accumulate one CAMulator prediction tensor for period-average output."""
+
+    _validate_supported_output_options(conf)
+    output_prediction = _prediction_for_output(
+        prediction,
+        conf=conf,
+        state_transformer=state_transformer,
+    )
+    _, _, _, data_variables = _data_variables_from_prediction(
+        output_prediction,
+        metadata=metadata,
+        conf=conf,
+        require_single_time=False,
+    )
+    accumulate_output_variables(
+        accumulator,
+        data_variables,
+        summation_dim=_TIME_NAME,
+    )
+
+
+def write_camulator_averages_output(
+    accumulator: PeriodAverageAccumulator,
+    *,
+    output_time: datetime,
+    latitude: object,
+    longitude: object,
+    init_str: str,
+    metadata: Mapping[str, Any],
+    conf: Mapping[str, Any],
+    logger: LoggerLike | None = None,
+) -> str:
+    """Write CAMulator period-average output and clear accumulated samples."""
+
+    output = _camulator_average_output_path(
+        output_time=output_time,
+        init_str=init_str,
+        conf=conf,
+    )
+    level_values = _configured_level_values(conf)
+    latitude_values = np.asarray(latitude)
+    longitude_values = np.asarray(longitude)
+
+    def build_coordinate_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return _camulator_average_coordinate_variables(
+            variables,
+            output_time=output_time,
+            level_values=level_values,
+            latitude_values=latitude_values,
+            longitude_values=longitude_values,
+            metadata=metadata,
+        )
+
+    def build_data_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return {
+            name: _with_metadata(variable, name, metadata)
+            for name, variable in variables.items()
+        }
+
+    write_period_average_netcdf(
+        accumulator,
+        output,
+        build_mean_variables=_mean_accumulated_variables,
+        build_coordinate_variables=build_coordinate_variables,
+        build_data_variables=build_data_variables,
+        logger=logger,
+    )
+    return output
+
+
+def _camulator_average_output_path(
+    *,
+    output_time: datetime,
+    init_str: str,
+    conf: Mapping[str, Any],
+) -> str:
+    predict_conf = _mapping(conf.get("predict", {}), name="predict")
+    save_forecast = predict_conf.get("save_forecast")
+    if not save_forecast:
+        raise KeyError("'save_forecast' missing in CAMulator config")
+
+    save_location = os.path.join(str(save_forecast), init_str)
+    os.makedirs(save_location, exist_ok=True)
+    date_time = output_time.strftime("%Y-%m-%d")
+    return os.path.join(save_location, f"camulator.averages.{date_time}.nc")
+
+
+def _mean_accumulated_variables(
+    accumulator: PeriodAverageAccumulator,
+) -> dict[str, OutputVariable]:
+    return period_mean_output_variables(
+        accumulator,
+        empty_error_message="CAMulator average output requires at least one prediction.",
+        time_dim=_TIME_NAME,
+    )
+
+
+def _camulator_average_coordinate_variables(
+    variables: Mapping[str, OutputVariable],
+    *,
+    output_time: datetime,
+    level_values: np.ndarray,
+    latitude_values: np.ndarray,
+    longitude_values: np.ndarray,
+    metadata: Mapping[str, Any],
+) -> dict[str, OutputVariable]:
+    coordinate_builders: dict[str, Callable[[], OutputVariable]] = {
+        _LEVEL_NAME: lambda: OutputVariable((_LEVEL_NAME,), level_values),
+        _LATITUDE_NAME: lambda: OutputVariable((_LATITUDE_NAME,), latitude_values),
+        _LONGITUDE_NAME: lambda: OutputVariable((_LONGITUDE_NAME,), longitude_values),
+    }
+    coordinate_variables = {
+        _TIME_NAME: time_coordinate_variable(output_time, time_dim=_TIME_NAME)
+    }
+    for dim in used_dimension_names(variables, excluded_dims=(_TIME_NAME,)):
+        builder = coordinate_builders.get(dim)
+        if builder is not None:
+            coordinate_variables[dim] = _with_metadata(builder(), dim, metadata)
+    return coordinate_variables
+
+
 def _validate_supported_output_options(conf: Mapping[str, Any]) -> None:
     predict_conf = _mapping(conf.get("predict", {}), name="predict")
     for option in _UNSUPPORTED_PREDICT_OPTIONS:
@@ -239,7 +357,11 @@ def _prediction_for_output(
     return transformed.detach().cpu()
 
 
-def _prediction_values(prediction: torch.Tensor) -> np.ndarray:
+def _prediction_values(
+    prediction: torch.Tensor,
+    *,
+    require_single_time: bool = True,
+) -> np.ndarray:
     values = prediction.detach().cpu().numpy()
     if values.ndim == 5:
         if values.shape[2] != 1:
@@ -254,12 +376,49 @@ def _prediction_values(prediction: torch.Tensor) -> np.ndarray:
             "(time, channels, latitude, longitude) or "
             f"(time, channels, 1, latitude, longitude), got {values.shape}."
         )
-    if values.shape[0] != 1:
+    if require_single_time and values.shape[0] != 1:
         raise ValueError(
             "CAMulator output currently writes one forecast time per file, "
             f"got {values.shape[0]} times."
         )
     return values
+
+
+def _data_variables_from_prediction(
+    prediction: torch.Tensor,
+    *,
+    metadata: Mapping[str, Any],
+    conf: Mapping[str, Any],
+    require_single_time: bool,
+) -> tuple[np.ndarray, int, Mapping[str, Any], dict[str, OutputVariable]]:
+    data_conf = _mapping(conf.get("data", {}), name="data")
+    model_conf = _mapping(conf.get("model", {}), name="model")
+    levels = _configured_levels(data_conf, model_conf)
+    upper_names = _string_sequence(data_conf.get("variables", ()), "data.variables")
+    surface_names = _string_sequence(
+        data_conf.get("surface_variables", ()),
+        "data.surface_variables",
+    )
+    diagnostic_names = _string_sequence(
+        data_conf.get("diagnostic_variables", ()),
+        "data.diagnostic_variables",
+    )
+
+    values = _prediction_values(prediction, require_single_time=require_single_time)
+    _validate_prediction_shape(
+        values,
+        levels=levels,
+        n_upper_variables=len(upper_names),
+        n_single_level_variables=len(surface_names) + len(diagnostic_names),
+    )
+    data_variables = _prediction_data_variables(
+        values,
+        upper_names=upper_names,
+        single_level_names=surface_names + diagnostic_names,
+        levels=levels,
+        metadata=metadata,
+    )
+    return values, levels, data_conf, _filtered_data_variables(data_variables, conf)
 
 
 def _validate_prediction_shape(
@@ -380,6 +539,13 @@ def _level_values(data_conf: Mapping[str, Any], levels: int) -> np.ndarray:
     return level_values
 
 
+def _configured_level_values(conf: Mapping[str, Any]) -> np.ndarray:
+    data_conf = _mapping(conf.get("data", {}), name="data")
+    model_conf = _mapping(conf.get("model", {}), name="model")
+    levels = _configured_levels(data_conf, model_conf)
+    return _level_values(data_conf, levels)
+
+
 def _configured_levels(
     data_conf: Mapping[str, Any],
     model_conf: Mapping[str, Any],
@@ -414,8 +580,10 @@ def _string_sequence(value: Any, name: str) -> tuple[str, ...]:
 
 
 __all__ = [
+    "accumulate_camulator_period_prediction",
     "build_camulator_output_variables",
     "load_camulator_output_metadata",
+    "write_camulator_averages_output",
     "write_camulator_netcdf_increment",
     "write_camulator_prediction_output",
 ]

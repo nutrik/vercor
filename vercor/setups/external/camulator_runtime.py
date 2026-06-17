@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
 import jax.numpy as jnp
@@ -11,6 +11,7 @@ import torch
 
 from vercor.components import ComponentStepContext
 from vercor.jax_logging import LoggerLike
+from vercor.output.time import should_write_period_output
 import vercor.setups.external.camulator_fields as _camulator_fields
 import vercor.setups.external.camulator_output as _camulator_output
 import vercor.setups.external.camulator_tensors as _camulator_tensors
@@ -113,17 +114,10 @@ def run_camulator_prediction_block(
 
         prediction = state.stepper._apply_postprocessing(prediction, model_input)
 
-        _camulator_output.write_camulator_prediction_output(
-            prediction,
-            utc_datetime,
-            latitude=state.latlons.latitude.values,
-            longitude=state.latlons.longitude.values,
-            init_str=state.runtime_cursor.init_str,
-            lead_time_periods=state.lead_time_periods,
-            forecast_hour=state.forecast_hour,
-            metadata=state.metadata,
-            conf=state.conf,
-            state_transformer=state.state_transformer,
+        record_camulator_prediction_output(
+            state,
+            prediction=prediction,
+            utc_datetime=utc_datetime,
             logger=logger,
         )
 
@@ -140,6 +134,56 @@ def run_camulator_prediction_block(
         )
 
     return cast(torch.Tensor, prediction), last_total_surface_temperature
+
+
+def record_camulator_prediction_output(
+    state: "CAMulatorGCMSetupState",
+    *,
+    prediction: torch.Tensor,
+    utc_datetime: datetime,
+    logger: LoggerLike | None,
+) -> None:
+    """Write CAMulator increment output or record period-average output."""
+
+    output_frequency = getattr(state, "output_frequency", None)
+    if output_frequency is None:
+        _camulator_output.write_camulator_prediction_output(
+            prediction,
+            utc_datetime,
+            latitude=state.latlons.latitude.values,
+            longitude=state.latlons.longitude.values,
+            init_str=state.runtime_cursor.init_str,
+            lead_time_periods=state.lead_time_periods,
+            forecast_hour=state.forecast_hour,
+            metadata=state.metadata,
+            conf=state.conf,
+            state_transformer=state.state_transformer,
+            logger=logger,
+        )
+        return
+
+    _camulator_output.accumulate_camulator_period_prediction(
+        state._period_average_accumulator,
+        prediction,
+        metadata=state.metadata,
+        conf=state.conf,
+        state_transformer=state.state_transformer,
+    )
+    if should_write_period_output(
+        time=utc_datetime,
+        dt=timedelta(hours=state.lead_time_periods),
+        output_frequency=output_frequency,
+    ):
+        _camulator_output.write_camulator_averages_output(
+            state._period_average_accumulator,
+            output_time=utc_datetime,
+            latitude=state.latlons.latitude.values,
+            longitude=state.latlons.longitude.values,
+            init_str=state.runtime_cursor.init_str,
+            metadata=state.metadata,
+            conf=state.conf,
+            logger=logger,
+        )
 
 
 def step_camulator_runtime(
@@ -188,6 +232,7 @@ def step_camulator_runtime(
 
 __all__ = [
     "coerce_camulator_datetime",
+    "record_camulator_prediction_output",
     "run_camulator_prediction_block",
     "step_camulator_runtime",
 ]

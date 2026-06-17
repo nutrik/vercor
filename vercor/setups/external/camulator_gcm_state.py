@@ -18,6 +18,7 @@ from vercor.components import (
 from vercor.dtypes import jax_ones
 from vercor.grid import RectilinearGrid
 from vercor.jax_logging import LoggerLike, get_default_logger
+from vercor.output.period_averages import PeriodAverageAccumulator
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
     seed_grid_field_defaults,
@@ -40,6 +41,7 @@ class CAMulatorGCMSetupState:
     coupling_timestep: timedelta
     model_timestep: timedelta
     model_substeps: int
+    _period_average_accumulator: PeriodAverageAccumulator
 
     def __init__(
         self,
@@ -52,6 +54,7 @@ class CAMulatorGCMSetupState:
         do_spinup: bool = False,
         device: str = "cuda",
         output_cpus_number: int = 8,
+        output_frequency: str | None = None,
         logger: LoggerLike | None = None,
     ) -> None:
         """Build CAMulator model resources and the VerCOR atmosphere grid."""
@@ -63,9 +66,11 @@ class CAMulatorGCMSetupState:
         self.save_append = output_subfolder_name
         self.init_noise = init_noise
         self.output_cpus_number = output_cpus_number
+        self.output_frequency = output_frequency
         self.spinup_time = spinup_time
         self.do_spinup = do_spinup
         self.runtime_cursor = CamulatorRuntimeCursor()
+        self._period_average_accumulator = PeriodAverageAccumulator()
 
         context = _camulator_init.initialize_camulator(
             config_path=self.config_path,
@@ -174,6 +179,7 @@ class CAMulatorGCMSetupState:
         self.accessor_output = _camulator_tensors.StateVariableAccessor(
             self.conf, tensor_type="output"
         )
+        self._period_average_accumulator = PeriodAverageAccumulator()
 
         self.forecast_hour = 1
         seed_grid_field_defaults(

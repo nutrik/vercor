@@ -195,6 +195,10 @@ historical commands, failure messages, or detailed validation notes.
   pytest, focused output pytest, Black, git diff whitespace check, flake8,
   mypy, full fast pytest, full pytest, and coverage pytest passed as of
   2026-06-16.
+- Latest local CAMulator period-average output-frequency validation: focused
+  red/green pytest, focused CAMulator/shared-output pytest, Black, flake8,
+  mypy, full fast pytest, full pytest, coverage pytest, and git diff
+  whitespace check passed as of 2026-06-17.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -227,6 +231,24 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-17: CAMulator Period-Average Output Frequency
+
+- Added `output_frequency` to the CAMulator GCM public factory and setup state.
+  `None` preserves per-forecast-increment output; configured `day`, `month`, or
+  `year` streams CAMulator prediction tensors into the shared period-average
+  accumulator and writes average files under the configured forecast output
+  folder.
+- Added CAMulator output helpers for period accumulation and average-file
+  writing through shared `vercor.output` primitives while keeping CAMulator
+  tensor metadata, `predict.save_vars` filtering, and forecast-increment output
+  in `camulator_output.py`.
+- Updated the CAMulator/Veros example and architecture/dependency docs for the
+  unified external output interface.
+- Validation run for this change: focused red/green pytest, focused
+  CAMulator/shared-output pytest, Black, flake8, mypy, full fast pytest, full
+  pytest, coverage pytest, and `git diff --check` passed. The existing Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-16: CAMulator Direct h5netcdf Output
 

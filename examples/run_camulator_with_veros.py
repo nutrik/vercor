@@ -39,6 +39,7 @@ if __name__ == "__main__":
         config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",
         model_weights_path="/glade/u/home/rnuterman/veros_coupling/climate/checkpoint.pt00091.pt",
         output_subfolder_name="camulator_veros_v2_00091",
+        output_frequency="month",
     )
 
     lnd = make_camulator_land(
