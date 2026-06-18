@@ -42,6 +42,8 @@ def write_netcdf_dataset(
                 name,
                 variable.dims,
                 data=array_to_host(variable.values),
+                compression="gzip",
+                compression_opts=5,
             )
             _write_attrs(output_variable.attrs, variable.attrs)
 
