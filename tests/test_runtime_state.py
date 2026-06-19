@@ -282,11 +282,12 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def output_masks_for_component(" not in runtime_coupler_state_source
     assert "def output_masks_for_component(" in output_source
     assert "from vercor.runtime.coupler_state import" not in output_source
-    assert "def refresh_runtime_contracts(" in runtime_coupler_state_source
+    assert "def refresh_runtime_contracts(" not in runtime_coupler_state_source
     assert "refresh_runtime_contracts(" not in coupler_source
-    assert "refresh_runtime_contracts(" in runtime_preparation_source
+    assert "refresh_runtime_contracts(" not in runtime_preparation_source
     assert "refresh_runtime_contracts(" not in runtime_facade_source
     assert "build_runtime_contracts(" not in coupler_source
+    assert "build_runtime_contracts(" in runtime_preparation_source
     assert "def prime_runtime_state(" not in runtime_coupler_state_source
     assert "prime_runtime_state(" not in coupler_source
     assert "prime_runtime_outgoing(" not in coupler_source
@@ -346,7 +347,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "_runtime_facade.run(" in run_body
     assert "_runtime_facade.run_scanned(" not in coupler_source
     assert "run_coupler_runtime(" in runtime_facade_source
-    assert "run_scanned_runtime(" in runtime_facade_source
+    assert "run_scanned_runtime(" not in runtime_facade_source
     assert "jax.lax.scan" not in coupler_source
     assert "jax.debug.callback" not in coupler_source
     assert "jax.debug.callback" not in runtime_runner_source

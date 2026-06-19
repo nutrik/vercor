@@ -30,7 +30,6 @@ from vercor.runtime.resources import CouplerRuntimeResources
 from vercor.runtime.run_context import RuntimeRunContext
 from vercor.runtime.runner import (
     run_coupler_runtime,
-    run_scanned_runtime,
 )
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.views import RuntimeComponentView
@@ -139,27 +138,6 @@ def run(
     )
 
 
-def run_scanned(
-    runtime_state: RuntimeCouplerState,
-    *,
-    inputs: RuntimeFacadeInputs,
-    logger: LoggerLike,
-) -> RuntimeCouplerState:
-    """Run the unified scanned runtime path and return final state."""
-
-    return run_scanned_runtime(
-        runtime_state,
-        run_sequence=tuple(inputs.run_sequence),
-        clock=inputs.clock,
-        settings=inputs.settings,
-        logger=logger,
-        dispatch_context=runtime_dispatch_context(
-            inputs=inputs,
-        ),
-        interrupts=inputs.runtime_resources.interrupt_controller,
-    )
-
-
 def runtime_component_view(
     *,
     components: Mapping[str, "Component"],
@@ -225,7 +203,6 @@ __all__ = [
     "initialize_coupler_runtime",
     "prepare_runtime_state",
     "run",
-    "run_scanned",
     "runtime_component_view",
     "runtime_component_views",
     "runtime_dispatch_context",

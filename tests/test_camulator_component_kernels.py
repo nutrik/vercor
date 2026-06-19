@@ -1348,8 +1348,8 @@ def test_record_camulator_output_averages_when_frequency_is_configured(
 ) -> None:
     from vercor.output.period_averages import (
         PeriodAverageAccumulator,
-        PeriodAverageSample,
     )
+    from vercor.output.variables import OutputVariable
 
     component = cast(
         Any,
@@ -1390,7 +1390,7 @@ def test_record_camulator_output_averages_when_frequency_is_configured(
         accumulated["metadata"] = metadata
         accumulated["conf"] = conf
         accumulated["state_transformer"] = state_transformer
-        accumulator.add_samples({"T": PeriodAverageSample(("x",), np.asarray([1.0]))})
+        accumulator.add_samples({"T": OutputVariable(("x",), np.asarray([1.0]))})
 
     def fake_write_average(
         accumulator: PeriodAverageAccumulator,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, TypeAlias
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -13,8 +13,6 @@ import jax.numpy as jnp
 from vercor.dtypes import as_jax_real_array, jax_index_dtype
 from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
-
-PeriodAverageSample: TypeAlias = OutputVariable
 
 
 @dataclass(frozen=True)
@@ -26,7 +24,7 @@ class AccumulatedPeriodVariable:
     counts: jax.Array
     attrs: Mapping[str, Any] = field(default_factory=dict)
 
-    def mean_sample(self) -> PeriodAverageSample:
+    def mean_sample(self) -> OutputVariable:
         """Return the current period mean, preserving ``nanmean`` semantics."""
 
         mean_dtype = jnp.result_type(self.sum_values.dtype, jnp.float32)
@@ -37,7 +35,7 @@ class AccumulatedPeriodVariable:
             finite_means,
             jnp.full(self.sum_values.shape, jnp.nan, dtype=mean_dtype),
         )
-        return PeriodAverageSample(
+        return OutputVariable(
             dims=self.dims,
             values=mean_values,
             attrs=dict(self.attrs),
@@ -71,7 +69,7 @@ class PeriodAverageAccumulator:
 
     def add_samples(
         self,
-        samples: Mapping[str, PeriodAverageSample],
+        samples: Mapping[str, OutputVariable],
         *,
         summation_dim: str | None = None,
     ) -> None:
@@ -89,7 +87,7 @@ class PeriodAverageAccumulator:
         for name, sample in samples.items():
             self._add_sample(name, sample, summation_dim=summation_dim)
 
-    def mean_samples(self) -> dict[str, PeriodAverageSample]:
+    def mean_samples(self) -> dict[str, OutputVariable]:
         """Return period means for all variables in insertion order."""
 
         if not self._variables:
@@ -101,7 +99,7 @@ class PeriodAverageAccumulator:
     def _add_sample(
         self,
         name: str,
-        sample: PeriodAverageSample,
+        sample: OutputVariable,
         *,
         summation_dim: str | None,
     ) -> None:
@@ -133,21 +131,6 @@ class PeriodAverageAccumulator:
         )
 
 
-def samples_from_output_variables(
-    variables: Mapping[str, OutputVariable],
-) -> dict[str, PeriodAverageSample]:
-    """Return period-average samples matching shared output variables."""
-
-    return {
-        name: PeriodAverageSample(
-            dims=variable.dims,
-            values=variable.values,
-            attrs=dict(variable.attrs),
-        )
-        for name, variable in variables.items()
-    }
-
-
 def accumulate_output_variables(
     accumulator: PeriodAverageAccumulator,
     variables: Mapping[str, OutputVariable],
@@ -157,21 +140,9 @@ def accumulate_output_variables(
     """Add shared output variables to a period-average accumulator."""
 
     accumulator.add_samples(
-        samples_from_output_variables(variables),
+        variables,
         summation_dim=summation_dim,
     )
-
-
-def mean_samples_or_raise(
-    accumulator: PeriodAverageAccumulator,
-    error_message: str,
-) -> dict[str, PeriodAverageSample]:
-    """Return accumulated period means with an adapter-specific error message."""
-
-    try:
-        return accumulator.mean_samples()
-    except ValueError as exc:
-        raise ValueError(error_message) from exc
 
 
 def period_mean_output_variables(
@@ -179,10 +150,15 @@ def period_mean_output_variables(
     *,
     empty_error_message: str,
     time_dim: str = TIME_NAME,
-    value_dims_for_sample: Callable[[PeriodAverageSample], Sequence[str]] | None = None,
+    value_dims_for_sample: Callable[[OutputVariable], Sequence[str]] | None = None,
     dimension_order: Sequence[str] | None = None,
 ) -> dict[str, OutputVariable]:
     """Return one-step output variables for all accumulated period means."""
+
+    try:
+        mean_samples = accumulator.mean_samples()
+    except ValueError as exc:
+        raise ValueError(empty_error_message) from exc
 
     return {
         name: period_mean_sample_to_output_variable(
@@ -195,15 +171,12 @@ def period_mean_output_variables(
             ),
             dimension_order=dimension_order,
         )
-        for name, sample in mean_samples_or_raise(
-            accumulator,
-            empty_error_message,
-        ).items()
+        for name, sample in mean_samples.items()
     }
 
 
 def period_mean_sample_to_output_variable(
-    sample: PeriodAverageSample,
+    sample: OutputVariable,
     *,
     time_dim: str,
     value_dims: Sequence[str] | None = None,
@@ -245,7 +218,7 @@ def _validate_output_dims(
 
 def _sample_sum_and_counts(
     name: str,
-    sample: PeriodAverageSample,
+    sample: OutputVariable,
     *,
     summation_dim: str | None,
 ) -> tuple[tuple[str, ...], jax.Array, jax.Array]:
@@ -296,10 +269,7 @@ def _sample_sum_and_counts(
 __all__ = [
     "AccumulatedPeriodVariable",
     "PeriodAverageAccumulator",
-    "PeriodAverageSample",
     "accumulate_output_variables",
-    "mean_samples_or_raise",
     "period_mean_output_variables",
     "period_mean_sample_to_output_variable",
-    "samples_from_output_variables",
 ]

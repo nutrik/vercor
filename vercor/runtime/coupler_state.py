@@ -58,18 +58,3 @@ def runtime_state_from_components(
         fractional_masks=RuntimeFieldStore.from_mapping(runtime_fractional_masks),
         binary_masks=RuntimeFieldStore.from_mapping(runtime_binary_masks),
     )
-
-
-def refresh_runtime_contracts(
-    components: Mapping[str, Component],
-    exchanges: Sequence[Exchange],
-    *,
-    validate_endpoints: bool = False,
-) -> dict[str, RuntimeComponentContract]:
-    """Return runtime contracts for the current component and exchange topology."""
-
-    return build_runtime_contracts(
-        tuple(components),
-        exchanges,
-        validate_endpoints=validate_endpoints,
-    )

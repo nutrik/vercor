@@ -6,31 +6,37 @@ import pytest
 import jax
 import jax.numpy as jnp
 
+import vercor.output.period_averages as period_averages_module
 from tests.assertions import assert_allclose_compact
 from vercor.output.variables import OutputVariable
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
-    PeriodAverageSample,
     accumulate_output_variables,
-    mean_samples_or_raise,
     period_mean_output_variables,
     period_mean_sample_to_output_variable,
-    samples_from_output_variables,
 )
 
 
-def test_period_average_sample_reuses_shared_output_variable_container() -> None:
-    assert PeriodAverageSample is OutputVariable
+def test_period_average_public_api_uses_output_variable_directly() -> None:
+    removed_names = {
+        "PeriodAverageSample",
+        "mean_samples_or_raise",
+        "samples_from_output_variables",
+    }
+
+    assert removed_names.isdisjoint(set(period_averages_module.__all__))
+    for name in removed_names:
+        assert not hasattr(period_averages_module, name)
 
 
 def test_period_average_accumulator_preserves_nanmean_counts() -> None:
     accumulator = PeriodAverageAccumulator()
 
     accumulator.add_samples(
-        {"temp": PeriodAverageSample(("x",), np.asarray([1.0, np.nan, np.nan]))}
+        {"temp": OutputVariable(("x",), np.asarray([1.0, np.nan, np.nan]))}
     )
     accumulator.add_samples(
-        {"temp": PeriodAverageSample(("x",), np.asarray([3.0, 5.0, np.nan]))}
+        {"temp": OutputVariable(("x",), np.asarray([3.0, 5.0, np.nan]))}
     )
 
     accumulated = accumulator.variables["temp"]
@@ -50,7 +56,7 @@ def test_period_average_accumulator_reduces_named_summation_dimension() -> None:
 
     accumulator.add_samples(
         {
-            "temp": PeriodAverageSample(
+            "temp": OutputVariable(
                 ("time", "x"),
                 np.asarray([[1.0, np.nan], [3.0, 5.0]]),
             )
@@ -70,29 +76,25 @@ def test_period_average_accumulator_reduces_named_summation_dimension() -> None:
 
 def test_period_average_accumulator_rejects_changed_variables() -> None:
     accumulator = PeriodAverageAccumulator()
-    accumulator.add_samples(
-        {"temp": PeriodAverageSample(("x",), np.asarray([1.0, 2.0]))}
-    )
+    accumulator.add_samples({"temp": OutputVariable(("x",), np.asarray([1.0, 2.0]))})
 
     with pytest.raises(ValueError, match="variables changed"):
         accumulator.add_samples(
-            {"salt": PeriodAverageSample(("x",), np.asarray([1.0, 2.0]))}
+            {"salt": OutputVariable(("x",), np.asarray([1.0, 2.0]))}
         )
 
 
 def test_period_average_accumulator_rejects_changed_dimensions_or_shape() -> None:
     accumulator = PeriodAverageAccumulator()
-    accumulator.add_samples(
-        {"temp": PeriodAverageSample(("x",), np.asarray([1.0, 2.0]))}
-    )
+    accumulator.add_samples({"temp": OutputVariable(("x",), np.asarray([1.0, 2.0]))})
 
     with pytest.raises(ValueError, match="dimensions changed"):
         accumulator.add_samples(
-            {"temp": PeriodAverageSample(("y",), np.asarray([1.0, 2.0]))}
+            {"temp": OutputVariable(("y",), np.asarray([1.0, 2.0]))}
         )
     with pytest.raises(ValueError, match="shape changed"):
         accumulator.add_samples(
-            {"temp": PeriodAverageSample(("x",), np.asarray([1.0, 2.0, 3.0]))}
+            {"temp": OutputVariable(("x",), np.asarray([1.0, 2.0, 3.0]))}
         )
 
 
@@ -102,31 +104,12 @@ def test_period_average_accumulator_reports_empty_and_clears() -> None:
     with pytest.raises(ValueError, match="requires at least one sample"):
         accumulator.mean_samples()
 
-    accumulator.add_samples(
-        {"temp": PeriodAverageSample(("x",), np.asarray([1.0, 2.0]))}
-    )
+    accumulator.add_samples({"temp": OutputVariable(("x",), np.asarray([1.0, 2.0]))})
     assert not accumulator.empty
 
     accumulator.clear()
 
     assert accumulator.empty
-
-
-def test_samples_from_output_variables_preserves_metadata() -> None:
-    values = np.asarray([1.0, 2.0])
-    samples = samples_from_output_variables(
-        {
-            "temp": OutputVariable(
-                ("x",),
-                values,
-                {"units": "K"},
-            )
-        }
-    )
-
-    assert samples["temp"].dims == ("x",)
-    assert samples["temp"].attrs == {"units": "K"}
-    assert_allclose_compact(samples["temp"].values, values)
 
 
 def test_accumulate_output_variables_preserves_attrs_and_reduces_dimension() -> None:
@@ -151,17 +134,20 @@ def test_accumulate_output_variables_preserves_attrs_and_reduces_dimension() -> 
     assert_allclose_compact(mean_sample.values, np.asarray([2.0, 5.0]))
 
 
-def test_mean_samples_or_raise_uses_adapter_error_message() -> None:
+def test_period_mean_output_variables_uses_adapter_error_message() -> None:
     accumulator = PeriodAverageAccumulator()
 
     with pytest.raises(ValueError, match="custom adapter message"):
-        mean_samples_or_raise(accumulator, "custom adapter message")
+        period_mean_output_variables(
+            accumulator,
+            empty_error_message="custom adapter message",
+        )
 
 
 def test_period_mean_sample_to_output_variable_orders_explicit_dimensions() -> None:
     values = np.arange(2 * 3 * 4, dtype=float).reshape((2, 3, 4))
     variable = period_mean_sample_to_output_variable(
-        PeriodAverageSample(("lat", "lon", "level"), values, {"units": "K"}),
+        OutputVariable(("lat", "lon", "level"), values, {"units": "K"}),
         time_dim="time",
         dimension_order=("time", "level", "lat", "lon"),
     )
@@ -174,7 +160,7 @@ def test_period_mean_sample_to_output_variable_orders_explicit_dimensions() -> N
 def test_period_mean_sample_to_output_variable_accepts_output_value_dims() -> None:
     values = np.arange(2 * 3 * 4, dtype=float).reshape((2, 3, 4))
     variable = period_mean_sample_to_output_variable(
-        PeriodAverageSample(("xt", "yt", "zt"), values),
+        OutputVariable(("xt", "yt", "zt"), values),
         time_dim="time",
         value_dims=("zt", "yt", "xt"),
     )
@@ -188,7 +174,7 @@ def test_period_mean_output_variables_applies_jcm_dimension_order() -> None:
     values = np.arange(2 * 3 * 4, dtype=float).reshape((2, 3, 4))
     accumulator.add_samples(
         {
-            "temp": PeriodAverageSample(
+            "temp": OutputVariable(
                 ("lat", "lon", "level"),
                 values,
                 {"units": "K"},
@@ -217,8 +203,8 @@ def test_period_mean_output_variables_applies_variable_specific_value_dims() -> 
     psi_values = np.arange(2 * 3, dtype=float).reshape((2, 3))
     accumulator.add_samples(
         {
-            "temp": PeriodAverageSample(("xt", "yt", "zt"), temp_values),
-            "psi": PeriodAverageSample(("xu", "yu"), psi_values),
+            "temp": OutputVariable(("xt", "yt", "zt"), temp_values),
+            "psi": OutputVariable(("xu", "yu"), psi_values),
         }
     )
 

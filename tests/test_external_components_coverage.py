@@ -544,8 +544,8 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
 ) -> None:
     from vercor.output.period_averages import (
         PeriodAverageAccumulator,
-        PeriodAverageSample,
     )
+    from vercor.output.variables import OutputVariable
 
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
@@ -603,9 +603,7 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     ) -> None:
         _ = coords, physics_module
         accumulated_predictions.append(prediction)
-        accumulator.add_samples(
-            {"spinup": PeriodAverageSample(("x",), np.asarray([1.0]))}
-        )
+        accumulator.add_samples({"spinup": OutputVariable(("x",), np.asarray([1.0]))})
 
     monkeypatch.setattr(
         jax_gcm_state_module._jax_gcm_output,
@@ -706,8 +704,8 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
 ) -> None:
     from vercor.output.period_averages import (
         PeriodAverageAccumulator,
-        PeriodAverageSample,
     )
+    from vercor.output.variables import OutputVariable
 
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
@@ -814,7 +812,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
         written["accumulated_coords"] = coords
         written["accumulated_physics_module"] = physics_module
         accumulator.add_samples(
-            {"temperature": PeriodAverageSample(("x",), np.asarray([1.0]))}
+            {"temperature": OutputVariable(("x",), np.asarray([1.0]))}
         )
 
     def fake_write_jax_gcm_averages_output(
@@ -1580,8 +1578,8 @@ def test_veros_initialize_spinup_accumulates_selected_outputs(
 ) -> None:
     from vercor.output.period_averages import (
         PeriodAverageAccumulator,
-        PeriodAverageSample,
     )
+    from vercor.output.variables import OutputVariable
 
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
@@ -1619,9 +1617,7 @@ def test_veros_initialize_spinup_accumulates_selected_outputs(
     ) -> None:
         accumulated_states.append(veros_state)
         accumulated_variables.append(output_variables)
-        accumulator.add_samples(
-            {"temp": PeriodAverageSample(("x",), np.asarray([1.0]))}
-        )
+        accumulator.add_samples({"temp": OutputVariable(("x",), np.asarray([1.0]))})
 
     component._step_function = fake_step_function
     monkeypatch.setattr(
@@ -1800,8 +1796,8 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
 ) -> None:
     from vercor.output.period_averages import (
         PeriodAverageAccumulator,
-        PeriodAverageSample,
     )
+    from vercor.output.variables import OutputVariable
 
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
@@ -1842,9 +1838,7 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
     ) -> None:
         extracted["state"] = veros_state
         extracted["variables"] = output_variables
-        accumulator.add_samples(
-            {"temp": PeriodAverageSample(("x",), np.asarray([1.0]))}
-        )
+        accumulator.add_samples({"temp": OutputVariable(("x",), np.asarray([1.0]))})
 
     def fake_write(
         accumulator: PeriodAverageAccumulator,

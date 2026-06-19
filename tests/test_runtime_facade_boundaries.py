@@ -78,6 +78,8 @@ def test_runtime_topology_state_groups_mutable_maps() -> None:
     assert hasattr(topology_state_module, "RuntimeTopologyMaps")
     RuntimeTopologyMaps = topology_state_module.RuntimeTopologyMaps
     assert is_dataclass(RuntimeTopologyMaps)
+    assert getattr(RuntimeTopologyMaps, "__dataclass_params__").frozen is False
+    assert hasattr(RuntimeTopologyMaps, "__slots__")
     assert [field.name for field in fields(RuntimeTopologyMaps)] == [
         "regridders",
         "binary_masks",

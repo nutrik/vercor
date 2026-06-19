@@ -6,6 +6,7 @@ from typing import Any
 from vercor.types import RuntimeArray
 import vercor.runtime.facade as runtime_facade
 from vercor.coupler import Coupler
+from vercor.runtime.runner import run_scanned_runtime
 from vercor.runtime.state import RuntimeCouplerState
 from vercor.runtime.topology_state import RuntimeTopologyMaps
 
@@ -70,10 +71,16 @@ def run_scanned_coupler(
         inputs=runtime_facade_inputs(coupler),
         validate_state=validate_state,
     )
-    return runtime_facade.run_scanned(
+    return run_scanned_runtime(
         prepared.runtime_state,
-        inputs=runtime_facade_inputs(coupler),
+        run_sequence=tuple(coupler.run_sequence),
+        clock=coupler.clock,
+        settings=coupler.settings,
         logger=coupler.logger,
+        dispatch_context=runtime_facade.runtime_dispatch_context(
+            inputs=runtime_facade_inputs(coupler),
+        ),
+        interrupts=coupler._runtime_resources.interrupt_controller,
     )
 
 

@@ -203,6 +203,10 @@ historical commands, failure messages, or detailed validation notes.
   red/green pytest, focused output pytest, Black, flake8, mypy, full fast
   pytest, full pytest, and `conda run -n scipy` fast pytest passed as of
   2026-06-19.
+- Latest local internal output/runtime helper simplification validation:
+  baseline fast pytest, focused red/green pytest, focused runtime/API pytest,
+  Black, flake8, mypy, full fast pytest, full pytest, coverage pytest, and git
+  diff whitespace check passed as of 2026-06-19.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -235,6 +239,26 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-19: Internal Output/Runtime Helper Simplification
+
+- Removed the redundant `PeriodAverageSample` alias plus
+  `samples_from_output_variables()` / `mean_samples_or_raise()` from
+  period-average output. Accumulators now accept `OutputVariable` samples
+  directly and `period_mean_output_variables()` owns adapter-specific empty
+  accumulator errors.
+- Removed the unused `runtime.facade.run_scanned()` shortcut and the thin
+  `refresh_runtime_contracts()` wrapper. Focused test helpers now call the
+  scanned runtime owner directly, and runtime preparation calls
+  `build_runtime_contracts()` at the point of use.
+- Made `RuntimeTopologyMaps` a mutable slotted dataclass, matching its actual
+  setup-time mutation model while leaving the surrounding topology-state
+  containers frozen.
+- Validation run for this change: baseline fast pytest, focused red/green
+  pytest, focused runtime/API pytest, Black, flake8, mypy, full fast pytest,
+  full pytest, coverage pytest, and git diff whitespace check passed. The
+  existing Black Python 3.13/target-3.14 warning and JAX dtype-promotion warning
+  remain.
 
 ### 2026-06-19: Centralized NetCDF Filename Logging
 

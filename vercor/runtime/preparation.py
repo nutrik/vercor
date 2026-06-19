@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from vercor.runtime.contracts import RuntimeComponentContract
+from vercor.runtime.contracts import RuntimeComponentContract, build_runtime_contracts
 from vercor.runtime.coupler_state import (
-    refresh_runtime_contracts,
     runtime_state_from_components as _runtime_state_from_components,
 )
 from vercor.runtime.dispatch_context import build_runtime_dispatch_context
@@ -35,8 +34,8 @@ def runtime_state_from_components(
 ) -> PreparedRuntimeState:
     """Build immutable runtime state from setup components and exchanges."""
 
-    runtime_contracts = refresh_runtime_contracts(
-        inputs.components,
+    runtime_contracts = build_runtime_contracts(
+        tuple(inputs.components),
         inputs.exchanges,
         validate_endpoints=False,
     )
@@ -62,8 +61,8 @@ def validate_runtime_state(
 ) -> dict[str, RuntimeComponentContract]:
     """Validate runtime state and return the contracts used for validation."""
 
-    runtime_contracts = refresh_runtime_contracts(
-        inputs.components,
+    runtime_contracts = build_runtime_contracts(
+        tuple(inputs.components),
         inputs.exchanges,
         validate_endpoints=False,
     )

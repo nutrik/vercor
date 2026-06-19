@@ -14,7 +14,6 @@ from tests.assertions import assert_allclose_compact
 from vercor.output.datasets import time_coordinate_variable
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
-    PeriodAverageSample,
     period_mean_output_variables,
 )
 from vercor.output.period_files import write_period_average_netcdf
@@ -25,7 +24,7 @@ def _accumulator_with_temperature() -> PeriodAverageAccumulator:
     accumulator = PeriodAverageAccumulator()
     accumulator.add_samples(
         {
-            "temperature": PeriodAverageSample(
+            "temperature": OutputVariable(
                 ("x",),
                 np.asarray([1.0, 3.0]),
                 {"units": "K"},

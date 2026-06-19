@@ -11,7 +11,7 @@ from vercor.types import RuntimeArray
 RuntimeRegridder = BilinearRectilinearRegridder | ConservativeRectilinearRegridder
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True)
 class RuntimeTopologyMaps:
     """Grouped exchange topology maps used by runtime setup and dispatch."""
 
