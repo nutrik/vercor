@@ -199,6 +199,10 @@ historical commands, failure messages, or detailed validation notes.
   red/green pytest, focused CAMulator/shared-output pytest, Black, flake8,
   mypy, full fast pytest, full pytest, coverage pytest, and git diff
   whitespace check passed as of 2026-06-17.
+- Latest local centralized NetCDF filename-logging validation: focused
+  red/green pytest, focused output pytest, Black, flake8, mypy, full fast
+  pytest, full pytest, and `conda run -n scipy` fast pytest passed as of
+  2026-06-19.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -231,6 +235,20 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-19: Centralized NetCDF Filename Logging
+
+- Moved NetCDF filename log emission into the shared `write_netcdf_dataset`
+  boundary and routed period-average and CAMulator forecast-increment writers
+  through that single logging path.
+- Added regression coverage for shared-writer logger injection, exact-once
+  period-file logging, CAMulator forecast/average filename logging, and scalar
+  data-variable writes. The scalar test covers the h5py rule that scalar
+  datasets cannot use gzip filter options.
+- Validation run for this change: focused red/green pytest, focused output
+  pytest, Black, flake8, mypy, full fast pytest, full pytest, and
+  `conda run -n scipy pytest tests/ -q --fast --tb=short` passed. The existing
+  Black Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-17: CAMulator Period-Average Output Frequency
 

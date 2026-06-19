@@ -378,6 +378,7 @@ def test_write_camulator_prediction_output_uses_vercor_h5netcdf_boundary(
         save_vars=["T", "FSNS"],
         climate_rescale_output=True,
     )
+    logger = _RecordingLogger()
 
     camulator_output_module.write_camulator_prediction_output(
         prediction,
@@ -393,10 +394,11 @@ def test_write_camulator_prediction_output_uses_vercor_h5netcdf_boundary(
         },
         conf=conf,
         state_transformer=transformer,
-        logger=cast(Any, _RecordingLogger()),
+        logger=cast(Any, logger),
     )
 
     output = tmp_path / "2000-01-01T00Z" / "pred_2000-01-01T00Z_012.nc"
+    assert logger.messages == [f"Writing output file:  {output}"]
     assert transformer.calls == 1
     with h5netcdf.File(output, "r") as actual:
         assert "U" not in actual.variables
@@ -473,6 +475,7 @@ def test_write_camulator_averages_output_persists_mean_dataset(
     first_prediction = _camulator_prediction(total_channels=8)
     second_prediction = first_prediction + 80.0
     conf = _camulator_output_conf(save_forecast=str(tmp_path), save_vars=["T", "FSNS"])
+    logger = _RecordingLogger()
     for prediction in (first_prediction, second_prediction):
         camulator_output_module.accumulate_camulator_period_prediction(
             accumulator,
@@ -497,12 +500,13 @@ def test_write_camulator_averages_output_persists_mean_dataset(
             "latitude": {"units": "degrees_north"},
         },
         conf=conf,
-        logger=cast(Any, _RecordingLogger()),
+        logger=cast(Any, logger),
     )
 
     assert output == str(
         tmp_path / "2000-01-01T00Z" / "camulator.averages.2000-01-02.nc"
     )
+    assert logger.messages == [f"Writing output file:  {output}"]
     with h5netcdf.File(output, "r") as actual:
         assert "U" not in actual.variables
         assert "PS" not in actual.variables

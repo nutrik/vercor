@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import h5netcdf
 
 from vercor.host_arrays import array_to_host
 from vercor.output.variables import OutputVariable
+
+if TYPE_CHECKING:
+    from vercor.jax_logging import LoggerLike
 
 
 def write_netcdf_dataset(
@@ -17,8 +20,12 @@ def write_netcdf_dataset(
     coordinate_variables: Mapping[str, OutputVariable],
     data_variables: Mapping[str, OutputVariable],
     global_attrs: Mapping[str, Any] | None = None,
+    logger: "LoggerLike | None" = None,
 ) -> None:
     """Write coordinate and data variables to one NetCDF file."""
+
+    if logger is not None:
+        logger.info(f"Writing output file:  {output:s}")
 
     with h5netcdf.File(output, "w") as outfile:
         for attr_name, attr_value in (
@@ -38,12 +45,14 @@ def write_netcdf_dataset(
 
         for name, variable in data_variables.items():
             _ensure_dimensions(outfile, variable)
+            values = array_to_host(variable.values)
+            create_kwargs: dict[str, Any] = {"data": values}
+            if values.shape != ():
+                create_kwargs.update(compression="gzip", compression_opts=5)
             output_variable = outfile.create_variable(
                 name,
                 variable.dims,
-                data=array_to_host(variable.values),
-                compression="gzip",
-                compression_opts=5,
+                **create_kwargs,
             )
             _write_attrs(output_variable.attrs, variable.attrs)
 

@@ -34,7 +34,6 @@ def write_period_average_netcdf(
     """Write one period-average NetCDF file and clear accumulated samples."""
 
     log = logger if logger is not None else get_default_logger()
-    log.info(f"Writing output file:  {output:s}")
 
     mean_variables = build_mean_variables(accumulator)
     data_variables = (
@@ -46,6 +45,7 @@ def write_period_average_netcdf(
         output=output,
         coordinate_variables=build_coordinate_variables(mean_variables),
         data_variables=data_variables,
+        logger=log,
     )
     accumulator.clear()
 

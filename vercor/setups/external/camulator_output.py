@@ -136,12 +136,12 @@ def write_camulator_netcdf_increment(
     output = os.path.join(save_location, f"pred_{init_str}_{forecast_hour:03d}.nc")
 
     log = logger if logger is not None else get_default_logger()
-    log.info(f"Writing output file:  {output:s}")
     write_netcdf_dataset(
         output=output,
         coordinate_variables=coordinate_variables,
         data_variables=data_variables,
         global_attrs={"Conventions": "CF-1.11"},
+        logger=log,
     )
     return output
 
