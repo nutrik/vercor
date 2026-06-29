@@ -211,6 +211,10 @@ historical commands, failure messages, or detailed validation notes.
   pytest via direct `scipy` env Python, focused adapter/external/API pytest,
   Black, flake8, mypy, full fast pytest, full pytest, and git diff whitespace
   check passed as of 2026-06-29.
+- Latest local unused helper API cleanup validation: focused red/green cleanup
+  pytest, focused affected pytest, Black, flake8, mypy, full fast pytest,
+  full pytest, coverage pytest, and git diff whitespace check passed as of
+  2026-06-29.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -243,6 +247,22 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-29: Unused Helper API Cleanup
+
+- Removed unused CAMulator stepper convenience methods and accessor attributes
+  so the runtime path owns model input assembly, postprocessing, and state
+  shifting directly.
+- Removed the one-line period-average accumulation wrapper; the shared output
+  adapter now calls its owned accumulator directly.
+- Removed the unused generic PyTree concatenation helper and its concat-only
+  test coverage while keeping the active PyTree helpers.
+- Validation run for this change: focused red cleanup tests failed before the
+  production edits for the expected remaining helper surfaces. Focused affected
+  pytest, Black, flake8, mypy, full fast pytest, full pytest, coverage pytest
+  at 90% total coverage, and `git diff --check` passed using the direct
+  `scipy` env Python path. The existing Black Python 3.13/target-3.14 warning
+  and JAX dtype-promotion warning remain.
 
 ### 2026-06-29: Component Output Adapter Refactor
 

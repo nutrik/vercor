@@ -11,7 +11,6 @@ from tests.assertions import assert_allclose_compact
 from vercor.output.variables import OutputVariable
 from vercor.output.period_averages import (
     PeriodAverageAccumulator,
-    accumulate_output_variables,
     period_mean_output_variables,
     period_mean_sample_to_output_variable,
 )
@@ -112,11 +111,10 @@ def test_period_average_accumulator_reports_empty_and_clears() -> None:
     assert accumulator.empty
 
 
-def test_accumulate_output_variables_preserves_attrs_and_reduces_dimension() -> None:
+def test_period_average_accumulator_preserves_attrs_and_reduces_dimension() -> None:
     accumulator = PeriodAverageAccumulator()
 
-    accumulate_output_variables(
-        accumulator,
+    accumulator.add_samples(
         {
             "temp": OutputVariable(
                 ("time", "x"),

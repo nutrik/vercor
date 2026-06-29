@@ -853,6 +853,7 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert callable(pytree_utils_module.mean_leaf)
     assert callable(pytree_utils_module.stack_objects)
     assert callable(pytree_utils_module.unwrap_leading_dims)
+    assert not hasattr(pytree_utils_module, "concat_objects")
     assert "gravity" in physical_constants_module.PHYSICAL_CONSTANT_SETTINGS
     assert not hasattr(exchange_module, "VALID_EXCHANGE_FIELD_NAMES")
     assert "sea_surface_temperature" in field_names_module.VALID_EXCHANGE_FIELD_NAMES
@@ -1215,11 +1216,12 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "import jax.numpy as jnp" in veros_output_source
     assert "def time_coordinate_variable(" in output_datasets_source
     assert "def used_dimension_names(" in output_datasets_source
-    assert "def accumulate_output_variables(" in period_averages_source
     assert "def period_mean_output_variables(" in period_averages_source
+    assert "def accumulate_output_variables(" not in period_averages_source
     assert "def write_period_average_netcdf(" in period_files_source
     assert "class ComponentOutputAdapter" in output_adapters_source
-    assert "accumulate_output_variables(" in output_adapters_source
+    assert "accumulate_output_variables(" not in output_adapters_source
+    assert "self._accumulator.add_samples(" in output_adapters_source
     assert "period_mean_output_variables(" in output_adapters_source
     assert "write_period_average_netcdf(" in output_adapters_source
     assert "should_write_period_output(" in output_adapters_source
@@ -1494,7 +1496,14 @@ def test_camulator_state_facade_is_removed() -> None:
     gcm_state_source = Path("vercor/setups/external/camulator_gcm_state.py").read_text(
         encoding="utf-8"
     )
+    stepper_source = Path("vercor/setups/external/camulator_stepper.py").read_text(
+        encoding="utf-8"
+    )
     assert "accessor_state" not in gcm_state_source
+    assert "StateVariableAccessor" not in stepper_source
+    assert "def step(" not in stepper_source
+    assert "def get_state_var(" not in stepper_source
+    assert "def set_state_var(" not in stepper_source
 
 
 @pytest.mark.fast_always

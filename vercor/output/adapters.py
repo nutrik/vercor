@@ -11,7 +11,6 @@ from vercor.jax_logging import LoggerLike
 from vercor.output.period_averages import (
     AccumulatedPeriodVariable,
     PeriodAverageAccumulator,
-    accumulate_output_variables,
     period_mean_output_variables,
 )
 from vercor.output.period_files import write_period_average_netcdf
@@ -71,8 +70,7 @@ class ComponentOutputAdapter:
     ) -> None:
         """Accumulate one component output snapshot or prediction block."""
 
-        accumulate_output_variables(
-            self._accumulator,
+        self._accumulator.add_samples(
             variables,
             summation_dim=summation_dim,
         )

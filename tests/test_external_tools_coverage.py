@@ -223,22 +223,6 @@ def test_tree_helpers_transform_pytrees() -> None:
     assert_allclose_compact(stacked["a"], np.asarray([[1.0, 2.0], [5.0, 6.0]]))
     assert_allclose_compact(stacked["b"], np.asarray([[3.0, 4.0], [7.0, 8.0]]))
 
-    concatenated = pytree_utils_module.concat_objects(
-        [
-            {"a": jnp.asarray([[1.0], [2.0]]), "b": jnp.asarray([[3.0], [4.0]])},
-            {"a": jnp.asarray([[5.0], [6.0]]), "b": jnp.asarray([[7.0], [8.0]])},
-        ],
-        axis=0,
-    )
-    assert_allclose_compact(
-        concatenated["a"],
-        np.asarray([[1.0], [2.0], [5.0], [6.0]]),
-    )
-    assert_allclose_compact(
-        concatenated["b"],
-        np.asarray([[3.0], [4.0], [7.0], [8.0]]),
-    )
-
 
 def test_veros_compute_fluxes_preserves_sign_conventions(
     monkeypatch: pytest.MonkeyPatch,

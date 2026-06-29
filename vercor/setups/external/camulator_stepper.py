@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Any
 
 import torch
 
 from vercor.jax_logging import get_default_logger
 from vercor.setups.external import camulator_imports
-from vercor.setups.external.camulator_tensors import StateVariableAccessor
 
 logger = get_default_logger()
 
@@ -81,9 +80,6 @@ class CAMulatorStepper:
         self.conf = conf
         self.device = device
         self.state_manager = StateManager(conf)
-        self.state_accessor = StateVariableAccessor(conf, tensor_type="state")
-        self.input_accessor = StateVariableAccessor(conf, tensor_type="input")
-        self.output_accessor = StateVariableAccessor(conf, tensor_type="output")
         self._setup_postprocessing()
 
     def _setup_postprocessing(self) -> None:
@@ -121,23 +117,6 @@ class CAMulatorStepper:
 
         self.enable_wind_filtering = windpp_available
 
-    def step(
-        self,
-        state: torch.Tensor,
-        dynamic_forcing: torch.Tensor,
-        static_forcing: torch.Tensor,
-    ) -> torch.Tensor:
-        """Advance the atmospheric state by one CAMulator model timestep."""
-
-        model_input = self.state_manager.build_input_with_forcing(
-            state,
-            dynamic_forcing,
-            static_forcing,
-        )
-        with torch.no_grad():
-            prediction = self.model(model_input.float())
-        return self._apply_postprocessing(prediction, model_input)
-
     def _apply_postprocessing(
         self,
         prediction: torch.Tensor,
@@ -165,39 +144,6 @@ class CAMulatorStepper:
                 "y_pred"
             ]
         return prediction
-
-    def get_state_var(
-        self,
-        tensor: torch.Tensor,
-        var_name: str,
-        tensor_type: Literal["state", "input", "output"] = "state",
-        time_idx: Optional[int] = None,
-    ) -> torch.Tensor:
-        """Return a named variable from a state, input, or output tensor."""
-
-        accessor = {
-            "state": self.state_accessor,
-            "input": self.input_accessor,
-            "output": self.output_accessor,
-        }[tensor_type]
-        return accessor.get_state_var(tensor, var_name, time_idx)
-
-    def set_state_var(
-        self,
-        tensor: torch.Tensor,
-        var_name: str,
-        var_data: torch.Tensor,
-        tensor_type: Literal["state", "input", "output"] = "state",
-        time_idx: Optional[int] = None,
-    ) -> None:
-        """Set a named variable in a state, input, or output tensor."""
-
-        accessor = {
-            "state": self.state_accessor,
-            "input": self.input_accessor,
-            "output": self.output_accessor,
-        }[tensor_type]
-        accessor.set_state_var(tensor, var_name, var_data, time_idx)
 
 
 __all__ = [

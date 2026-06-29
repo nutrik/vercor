@@ -131,20 +131,6 @@ class PeriodAverageAccumulator:
         )
 
 
-def accumulate_output_variables(
-    accumulator: PeriodAverageAccumulator,
-    variables: Mapping[str, OutputVariable],
-    *,
-    summation_dim: str | None = None,
-) -> None:
-    """Add shared output variables to a period-average accumulator."""
-
-    accumulator.add_samples(
-        variables,
-        summation_dim=summation_dim,
-    )
-
-
 def period_mean_output_variables(
     accumulator: PeriodAverageAccumulator,
     *,
@@ -269,7 +255,6 @@ def _sample_sum_and_counts(
 __all__ = [
     "AccumulatedPeriodVariable",
     "PeriodAverageAccumulator",
-    "accumulate_output_variables",
     "period_mean_output_variables",
     "period_mean_sample_to_output_variable",
 ]

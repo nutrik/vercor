@@ -34,9 +34,3 @@ def stack_objects(objs: list[Any]) -> Any:
     """Stack a list of same-structure PyTrees leafwise."""
 
     return jax.tree_util.tree_map(lambda *xs: jnp.stack(xs), *objs)
-
-
-def concat_objects(objs: list[Any], axis: int) -> Any:
-    """Concatenate a list of same-structure PyTrees leafwise."""
-
-    return jax.tree_util.tree_map(lambda *xs: jnp.concatenate(xs, axis=axis), *objs)
