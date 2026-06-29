@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from math import floor
-from typing import Callable, Iterator, Literal
+from typing import Iterator, Literal
 
 import vercor.calendar as _calendar
 
@@ -34,13 +34,7 @@ class Clock:
         if self.dt_seconds <= 0:
             raise ValueError("dt_seconds must be positive")
 
-        self._iter_impl: Callable[
-            [],
-            Iterator[tuple[int, datetime | _calendar.ModelDateTime, timedelta]],
-        ]
-
         if self.year_type in ("noleap", "360"):
-            self._iter_impl = self._iter_model_calendar
             self._datetime_class: (
                 type[_calendar.DateTime365] | type[_calendar.DateTime360]
             )
@@ -57,8 +51,6 @@ class Clock:
                 + self.start.second
                 + self.start.microsecond / 1_000_000.0
             )
-        else:
-            self._iter_impl = self._iter_gregorian
 
     def _day_of_year_for_start(self, start: datetime) -> int:
         if self.year_type == "360":
@@ -137,4 +129,7 @@ class Clock:
         self,
     ) -> Iterator[tuple[int, datetime | _calendar.ModelDateTime, timedelta]]:
         """Iterator over simulation steps using the configured stepping strategy."""
-        yield from self._iter_impl()
+        if self.year_type == "leap":
+            yield from self._iter_gregorian()
+            return
+        yield from self._iter_model_calendar()

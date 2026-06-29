@@ -215,6 +215,9 @@ historical commands, failure messages, or detailed validation notes.
   pytest, focused affected pytest, Black, flake8, mypy, full fast pytest,
   full pytest, coverage pytest, and git diff whitespace check passed as of
   2026-06-29.
+- Latest local remaining helper-surface over-engineering cleanup validation:
+  focused red/green pytest, Black, flake8, mypy, focused affected pytest, full
+  fast pytest, full pytest, and coverage pytest passed as of 2026-06-29.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -247,6 +250,30 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-29: Remaining Helper-Surface Over-Engineering Cleanup
+
+- Added `docs/over-engineering-audit-2026-06-29.md` with the requested
+  executive summary, findings table, and conservative refactor plan.
+- Removed the hidden `Clock._iter_impl` dispatch attribute; `Clock.iter()` now
+  branches directly between Gregorian and model-calendar iterators while
+  preserving existing calendar behavior.
+- Removed unused CAMulator wind-filter convenience exports
+  `wind_filter()` and `simple_wind_artifact_filter()` while keeping the
+  config-driven runtime post-processing facade and private tensor mechanics.
+- Removed the unused `jax_real_array_copy()` dtype helper and kept the active
+  dtype policy helpers used by production code.
+- Validation run for this change: focused red tests first failed on the old
+  clock dispatch attribute, CAMulator wind-filter wrappers, and dtype copy
+  helper, then the same focused suite passed after implementation. Black,
+  flake8, mypy, focused affected pytest, full fast pytest, full pytest, and
+  coverage pytest at 90% total coverage passed with `conda run -n scipy`. The
+  earlier orientation smoke check still recorded the existing Conda Rattler
+  plugin crash before pytest on one `conda run` invocation; the direct scipy
+  environment fallback
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/ -q --fast --tb=short`
+  passed. The existing Black Python 3.13/target-3.14 warning and JAX
+  dtype-promotion warning remain.
 
 ### 2026-06-29: Unused Helper API Cleanup
 

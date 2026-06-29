@@ -3,12 +3,12 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 
+import vercor.dtypes as dtypes_module
 from vercor.dtypes import (
     DTypePolicy,
     as_jax_index_array,
     as_jax_real_array,
     jax_arange,
-    jax_real_array_copy,
     jax_full,
     jax_index_dtype,
     jax_ones,
@@ -31,7 +31,6 @@ def test_settings_disable_x64_maps_real_arrays_to_float32() -> None:
     assert jax_ones((2, 3), settings).dtype == jnp.float32
     assert jax_full((2, 3), 1.5, settings).dtype == jnp.float32
     assert jax_arange(0.0, 3.0, 1.0, settings).dtype == jnp.float32
-    assert jax_real_array_copy([1.0, 2.0], settings).dtype == jnp.float32
 
 
 def test_settings_enable_x64_maps_real_arrays_to_float64() -> None:
@@ -45,7 +44,10 @@ def test_settings_enable_x64_maps_real_arrays_to_float64() -> None:
     assert jax_ones((2, 3), settings).dtype == jnp.float64
     assert jax_full((2, 3), 1.5, settings).dtype == jnp.float64
     assert jax_arange(0.0, 3.0, 1.0, settings).dtype == jnp.float64
-    assert jax_real_array_copy([1.0, 2.0], settings).dtype == jnp.float64
+
+
+def test_dtypes_module_does_not_export_unused_copy_helper() -> None:
+    assert not hasattr(dtypes_module, "jax_real_array_copy")
 
 
 def test_dtype_policy_reads_updated_settings_value() -> None:

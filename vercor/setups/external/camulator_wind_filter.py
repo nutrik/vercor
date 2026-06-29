@@ -58,22 +58,6 @@ def load_wind_filter_config(conf: dict[str, Any]) -> WindArtifactFilterConfig:
     return cfg
 
 
-def wind_filter(
-    field: torch.Tensor,
-    gaussian_2d: torch.Tensor,
-    kernel_size: int,
-    smooth_blend_mask: torch.Tensor,
-) -> torch.Tensor:
-    """Apply wind filtering to a 2D field or conv2d-compatible tensor."""
-
-    return _wind_filtering.filter_field(
-        field,
-        gaussian_2d,
-        kernel_size,
-        smooth_blend_mask,
-    )
-
-
 def post_process_wind_artifacts(
     x: torch.Tensor, conf: dict[str, Any], enable_filtering: bool = True
 ) -> None:
@@ -135,40 +119,9 @@ def apply_wind_artifact_filter_to_tensor(
     )
 
 
-def simple_wind_artifact_filter(
-    u_wind: torch.Tensor,
-    v_wind: torch.Tensor,
-    speed_threshold: float = 25.0,
-    smooth_sigma: float = 2.0,
-    dilation_zonal: int = 9,
-    dilation_meridional: int = 3,
-    falloff_sigma: float = 3.0,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int, torch.Tensor]:
-    """Return filtered winds plus reusable kernel and blend-mask artifacts."""
-
-    artifacts = _wind_filtering.build_wind_filter_artifacts(
-        u_wind,
-        v_wind,
-        speed_threshold=speed_threshold,
-        smooth_sigma=smooth_sigma,
-        dilation_zonal=dilation_zonal,
-        dilation_meridional=dilation_meridional,
-        falloff_sigma=falloff_sigma,
-    )
-    return (
-        artifacts.u_filtered,
-        artifacts.v_filtered,
-        artifacts.gaussian_2d,
-        artifacts.kernel_size,
-        artifacts.smooth_blend_mask,
-    )
-
-
 __all__ = [
     "WindArtifactFilterConfig",
     "apply_wind_artifact_filter_to_tensor",
     "load_wind_filter_config",
     "post_process_wind_artifacts",
-    "simple_wind_artifact_filter",
-    "wind_filter",
 ]

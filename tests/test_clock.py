@@ -392,3 +392,14 @@ def test_clock_calendar_properties(
 
     assert clock.days_per_year == expected_days_per_year
     assert clock.fixed_30_day_months is expected_fixed_30_day_months
+
+
+def test_clock_does_not_store_iterator_dispatch_callable() -> None:
+    clock = Clock(
+        start=datetime(2025, 1, 1),
+        dt_seconds=3600.0,
+        steps=1,
+        year_type="360",
+    )
+
+    assert not hasattr(clock, "_iter_impl")

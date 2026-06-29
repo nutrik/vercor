@@ -128,6 +128,14 @@ def test_wind_artifact_filter_config_raises_value_error_for_invalid_values() -> 
 
 
 @pytest.mark.fast_always
+def test_camulator_wind_filter_facade_exposes_only_runtime_entrypoints() -> None:
+    assert not hasattr(camulator_wind_filter_module, "wind_filter")
+    assert not hasattr(camulator_wind_filter_module, "simple_wind_artifact_filter")
+    assert "wind_filter" not in camulator_wind_filter_module.__all__
+    assert "simple_wind_artifact_filter" not in camulator_wind_filter_module.__all__
+
+
+@pytest.mark.fast_always
 def test_wind_filter_private_owner_returns_shape_stable_artifacts() -> None:
     import vercor.setups.external._camulator_wind_filtering as wind_filtering
 
