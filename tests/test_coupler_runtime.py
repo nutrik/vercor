@@ -24,8 +24,9 @@ from vercor.setups.data.erainterim_ocean import make_erainterim_ocean
 from vercor.setups.data.jcm_land import make_jcm_land
 from vercor.setups.external.jax_gcm_fields import JAXGCM_OUTPUT_GRID_FIELD_NAMES
 import vercor.setups.external.jax_gcm_runtime as jax_gcm_runtime_module
+import vercor.setups.external.jax_gcm_output as jax_gcm_output_module
 import vercor.setups.external.jax_gcm_state as jax_gcm_state_module
-from vercor.output.period_averages import PeriodAverageAccumulator
+from vercor.output.adapters import ComponentOutputAdapter
 from vercor.setups.external.jax_gcm_state import JCMState
 from vercor.setups.slab.atmosphere import make_slab_atmosphere
 from vercor.setups.slab.land import make_slab_land
@@ -223,7 +224,11 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
         ),
     )
     state._step_function = _fake_jcm_step
-    state._period_average_accumulator = PeriodAverageAccumulator()
+    state.output_adapter = ComponentOutputAdapter(
+        empty_error_message=jax_gcm_output_module.JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE,
+        time_dim=jax_gcm_output_module.JAX_GCM_TIME_DIM,
+        dimension_order=jax_gcm_output_module.JAX_GCM_OUTPUT_DIMENSION_ORDER,
+    )
     state.output_frequency = None
     component = differentiable_component(
         name="ATM",

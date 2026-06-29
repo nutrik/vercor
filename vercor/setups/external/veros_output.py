@@ -1,4 +1,4 @@
-"""Veros period-output extraction and average-file helpers."""
+"""Veros period-output extraction and coordinate helpers."""
 
 from __future__ import annotations
 
@@ -11,14 +11,7 @@ import jax.numpy as jnp
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor.host_arrays import array_to_host
-from vercor.jax_logging import LoggerLike
 from vercor.output.datasets import time_coordinate_variable, used_dimension_names
-from vercor.output.period_averages import (
-    PeriodAverageAccumulator,
-    accumulate_output_variables,
-    period_mean_output_variables,
-)
-from vercor.output.period_files import write_period_average_netcdf
 from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
 from vercor.setups.external.veros_runtime_settings import configure_veros_runtime
@@ -27,7 +20,10 @@ configure_veros_runtime()
 
 from veros import variables as veros_variables  # noqa: E402
 
-_TIME_NAME = TIME_NAME
+VEROS_TIME_DIM = TIME_NAME
+VEROS_AVERAGE_EMPTY_ERROR_MESSAGE = (
+    "Veros average output requires at least one prediction."
+)
 _TIMESTEP_DIM = "timesteps"
 _GHOST_DIMS = ("xt", "yt", "xu", "yu")
 
@@ -69,59 +65,6 @@ def extract_veros_output_snapshot(
         settings=veros_state.settings,
     )
     return {name: _extract_variable(veros_state, name) for name in selected_variables}
-
-
-def accumulate_veros_output_snapshot(
-    accumulator: PeriodAverageAccumulator,
-    snapshot: Mapping[str, OutputVariable],
-) -> None:
-    """Accumulate one selected Veros output snapshot for period averaging."""
-
-    accumulate_output_variables(accumulator, snapshot)
-
-
-def accumulate_veros_period_state(
-    accumulator: PeriodAverageAccumulator,
-    veros_state: Any,
-    output_variables: Sequence[str],
-) -> None:
-    """Extract and accumulate selected Veros state variables for a period."""
-
-    if not output_variables:
-        return
-
-    accumulate_veros_output_snapshot(
-        accumulator,
-        extract_veros_output_snapshot(veros_state, output_variables),
-    )
-
-
-def write_veros_averages_output(
-    accumulator: PeriodAverageAccumulator,
-    output: str,
-    *,
-    veros_state: Any,
-    output_time: datetime | ModelDateTime,
-    logger: LoggerLike | None = None,
-) -> None:
-    """Write mean Veros output snapshots to NetCDF and clear the accumulator."""
-
-    def build_coordinate_variables(
-        variables: Mapping[str, OutputVariable],
-    ) -> dict[str, OutputVariable]:
-        return _coordinate_variables(
-            veros_state=veros_state,
-            output_time=output_time,
-            variables=variables,
-        )
-
-    write_period_average_netcdf(
-        accumulator,
-        output,
-        build_mean_variables=_mean_accumulated_variables,
-        build_coordinate_variables=build_coordinate_variables,
-        logger=logger,
-    )
 
 
 def _resolve_metadata(value: Any, settings: Any) -> Any:
@@ -223,35 +166,33 @@ def _extract_coordinate_variable(veros_state: Any, dim: str) -> OutputVariable:
     )
 
 
-def _mean_accumulated_variables(
-    accumulator: PeriodAverageAccumulator,
-) -> dict[str, OutputVariable]:
-    return period_mean_output_variables(
-        accumulator,
-        empty_error_message="Veros average output requires at least one prediction.",
-        time_dim=_TIME_NAME,
-        value_dims_for_sample=lambda sample: tuple(reversed(sample.dims)),
-    )
+def veros_average_value_dims(sample: OutputVariable) -> tuple[str, ...]:
+    """Return Veros NetCDF value dimension order for one mean sample."""
+
+    return tuple(reversed(sample.dims))
 
 
-def _coordinate_variables(
+def veros_average_coordinate_variables(
     *,
     veros_state: Any,
     output_time: datetime | ModelDateTime,
     variables: Mapping[str, OutputVariable],
 ) -> dict[str, OutputVariable]:
+    """Return coordinates used by a Veros period-average dataset."""
+
     coordinate_variables = {
-        _TIME_NAME: time_coordinate_variable(output_time, time_dim=_TIME_NAME)
+        VEROS_TIME_DIM: time_coordinate_variable(output_time, time_dim=VEROS_TIME_DIM)
     }
-    for dim in used_dimension_names(variables, excluded_dims=(_TIME_NAME,)):
+    for dim in used_dimension_names(variables, excluded_dims=(VEROS_TIME_DIM,)):
         coordinate_variables[dim] = _extract_coordinate_variable(veros_state, dim)
     return coordinate_variables
 
 
 __all__ = [
-    "accumulate_veros_output_snapshot",
-    "accumulate_veros_period_state",
+    "VEROS_AVERAGE_EMPTY_ERROR_MESSAGE",
+    "VEROS_TIME_DIM",
     "extract_veros_output_snapshot",
     "normalize_veros_output_variables",
-    "write_veros_averages_output",
+    "veros_average_coordinate_variables",
+    "veros_average_value_dims",
 ]

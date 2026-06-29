@@ -976,6 +976,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     import vercor.setups.external.camulator_land as camulator_land_module
     import vercor.setups.external.camulator_runtime_settings as camulator_runtime_settings_module
     import vercor.setups.external.jax_gcm as jax_gcm_module
+    import vercor.output.adapters as output_adapters_module
     import vercor.output.period_averages as period_averages_module
     import vercor.output.period_files as period_files_module
     import vercor.setups.external.veros_output as veros_output_module
@@ -990,10 +991,11 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert camulator_contracts_module.CAMULATOR_RUNTIME_FIELD_NAMES
     assert callable(camulator_fields_module.prepare_camulator_surface_forcing)
     assert callable(camulator_runtime_settings_module.configure_camulator_runtime)
+    assert callable(output_adapters_module.ComponentOutputAdapter)
     assert callable(period_averages_module.PeriodAverageAccumulator)
     assert callable(period_files_module.write_period_average_netcdf)
     assert callable(veros_fluxes_module.compute_fluxes)
-    assert callable(veros_output_module.write_veros_averages_output)
+    assert callable(veros_output_module.extract_veros_output_snapshot)
     assert not hasattr(veros_output_module, "VerosOutputVariable")
     assert callable(veros_state_module.copy_state)
     assert hasattr(veros_setup_module, "CustomGlobalFourDegree")
@@ -1062,6 +1064,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     period_averages_source = Path("vercor/output/period_averages.py").read_text(
         encoding="utf-8"
     )
+    output_adapters_source = Path("vercor/output/adapters.py").read_text(
+        encoding="utf-8"
+    )
     output_datasets_source = Path("vercor/output/datasets.py").read_text(
         encoding="utf-8"
     )
@@ -1086,6 +1091,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert not Path("vercor/output/jax_gcm.py").exists()
     assert Path("vercor/output/netcdf.py").exists()
     assert Path("vercor/output/period_averages.py").exists()
+    assert Path("vercor/output/adapters.py").exists()
     assert Path("vercor/output/period_files.py").exists()
     assert Path("vercor/output/datasets.py").exists()
     assert Path("vercor/output/time.py").exists()
@@ -1212,16 +1218,21 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "def accumulate_output_variables(" in period_averages_source
     assert "def period_mean_output_variables(" in period_averages_source
     assert "def write_period_average_netcdf(" in period_files_source
+    assert "class ComponentOutputAdapter" in output_adapters_source
+    assert "accumulate_output_variables(" in output_adapters_source
+    assert "period_mean_output_variables(" in output_adapters_source
+    assert "write_period_average_netcdf(" in output_adapters_source
+    assert "should_write_period_output(" in output_adapters_source
     assert "MeanVariablesBuilder" not in period_files_source
     assert "CoordinateVariablesBuilder" not in period_files_source
     assert "DataVariablesBuilder" not in period_files_source
-    assert "accumulate_output_variables(" in jax_gcm_output_source
-    assert "period_mean_output_variables(" in jax_gcm_output_source
-    assert "write_period_average_netcdf(" in jax_gcm_output_source
+    assert "accumulate_output_variables(" not in jax_gcm_output_source
+    assert "period_mean_output_variables(" not in jax_gcm_output_source
+    assert "write_period_average_netcdf(" not in jax_gcm_output_source
     assert "time_coordinate_variable(" in jax_gcm_output_source
-    assert "accumulate_output_variables(" in veros_output_source
-    assert "period_mean_output_variables(" in veros_output_source
-    assert "write_period_average_netcdf(" in veros_output_source
+    assert "accumulate_output_variables(" not in veros_output_source
+    assert "period_mean_output_variables(" not in veros_output_source
+    assert "write_period_average_netcdf(" not in veros_output_source
     assert "time_coordinate_variable(" in veros_output_source
     assert "used_dimension_names(" in veros_output_source
     assert "def __getattr__(" not in output_init_source

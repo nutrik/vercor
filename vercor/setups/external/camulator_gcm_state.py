@@ -18,7 +18,7 @@ from vercor.components import (
 from vercor.dtypes import jax_ones
 from vercor.grid import RectilinearGrid
 from vercor.jax_logging import LoggerLike, get_default_logger
-from vercor.output.period_averages import PeriodAverageAccumulator
+from vercor.output.adapters import ComponentOutputAdapter
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
     seed_grid_field_defaults,
@@ -26,6 +26,7 @@ from vercor.setups._time_helpers import (
 import vercor.setups.external.camulator_contracts as _camulator_contracts
 from vercor.setups.external.camulator_forcing import CamulatorRuntimeCursor
 import vercor.setups.external.camulator_init as _camulator_init
+import vercor.setups.external.camulator_output as _camulator_output
 import vercor.setups.external.camulator_runtime as _camulator_runtime
 from vercor.setups.external.camulator_runtime_settings import (
     configure_camulator_runtime,
@@ -41,7 +42,7 @@ class CAMulatorGCMSetupState:
     coupling_timestep: timedelta
     model_timestep: timedelta
     model_substeps: int
-    _period_average_accumulator: PeriodAverageAccumulator
+    output_adapter: ComponentOutputAdapter
 
     def __init__(
         self,
@@ -70,7 +71,12 @@ class CAMulatorGCMSetupState:
         self.spinup_time = spinup_time
         self.do_spinup = do_spinup
         self.runtime_cursor = CamulatorRuntimeCursor()
-        self._period_average_accumulator = PeriodAverageAccumulator()
+        self.output_adapter = ComponentOutputAdapter(
+            empty_error_message=(
+                _camulator_output.CAMULATOR_AVERAGE_EMPTY_ERROR_MESSAGE
+            ),
+            time_dim=_camulator_output.CAMULATOR_TIME_DIM,
+        )
 
         context = _camulator_init.initialize_camulator(
             config_path=self.config_path,
@@ -179,7 +185,7 @@ class CAMulatorGCMSetupState:
         self.accessor_output = _camulator_tensors.StateVariableAccessor(
             self.conf, tensor_type="output"
         )
-        self._period_average_accumulator = PeriodAverageAccumulator()
+        self.output_adapter.reset()
 
         self.forecast_hour = 1
         seed_grid_field_defaults(

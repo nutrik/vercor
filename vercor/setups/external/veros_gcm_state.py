@@ -15,7 +15,7 @@ from vercor.components import (
     HostRuntimeComponent,
 )
 from vercor.grid import RectilinearGrid
-from vercor.output.period_averages import PeriodAverageAccumulator
+from vercor.output.adapters import ComponentOutputAdapter
 from vercor.settings import VercorSettings
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
@@ -51,7 +51,7 @@ class VerosGCMSetupState:
     model_timestep: timedelta
     model_substeps: int
     _step_function: Callable[[Any], Any]
-    _period_average_accumulator: PeriodAverageAccumulator
+    output_adapter: ComponentOutputAdapter
 
     def __init__(
         self,
@@ -90,7 +90,11 @@ class VerosGCMSetupState:
             output_variables,
             settings=self._veros_state.settings,
         )
-        self._period_average_accumulator = PeriodAverageAccumulator()
+        self.output_adapter = ComponentOutputAdapter(
+            empty_error_message=_veros_output.VEROS_AVERAGE_EMPTY_ERROR_MESSAGE,
+            time_dim=_veros_output.VEROS_TIME_DIM,
+            value_dims_for_sample=_veros_output.veros_average_value_dims,
+        )
 
         self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
         self.spinup_steps = int(self.spinup_time.total_seconds() // self.dt_tracer)
@@ -124,18 +128,21 @@ class VerosGCMSetupState:
             model_name="dt_tracer",
         )
 
-        self._period_average_accumulator = PeriodAverageAccumulator()
+        self.output_adapter.reset()
 
         if self.do_spinup and "ATM" in context.run_sequence.order:
 
             def spinup_step(step_number: int) -> None:
                 _ = step_number
                 self._veros_state = self._step_function(self._veros_state)
-                _veros_output.accumulate_veros_period_state(
-                    self._period_average_accumulator,
-                    self._veros_state,
-                    getattr(self, "output_variables", ()),
-                )
+                output_variables = getattr(self, "output_variables", ())
+                if output_variables:
+                    self.output_adapter.accumulate(
+                        _veros_output.extract_veros_output_snapshot(
+                            self._veros_state,
+                            output_variables,
+                        )
+                    )
 
             run_logged_spinup(
                 steps=self.spinup_steps,

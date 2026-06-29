@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from vercor.output.adapters import ComponentOutputAdapter
 from vercor.output.runtime import (
     output_masks_for_component,
     write_coupler_runtime_outputs,
@@ -9,6 +10,7 @@ from vercor.output.runtime import (
 )
 
 __all__ = [
+    "ComponentOutputAdapter",
     "output_masks_for_component",
     "write_coupler_runtime_outputs",
     "write_runtime_component_view_to_netcdf",

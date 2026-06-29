@@ -31,7 +31,7 @@ from vercor.components import (
 )
 from vercor.dtypes import as_jax_real_array, jax_ones
 from vercor.grid import RectilinearGrid
-from vercor.output.period_averages import PeriodAverageAccumulator
+from vercor.output.adapters import ComponentOutputAdapter
 from vercor.pytree_utils import asfloat, mean_leaf
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
@@ -58,7 +58,7 @@ class JCMState:
 class JAXGCMSetupState:
     """Mutable setup-time owner for a JAXGCM/JCM atmosphere adapter."""
 
-    _period_average_accumulator: PeriodAverageAccumulator
+    output_adapter: ComponentOutputAdapter
     _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, Predictions]]
     _state: JCMState
     forcing: ForcingData
@@ -122,7 +122,11 @@ class JAXGCMSetupState:
         self.name = name
         self.grid = grid
         self.settings: Any | None = None
-        self._period_average_accumulator = PeriodAverageAccumulator()
+        self.output_adapter = ComponentOutputAdapter(
+            empty_error_message=_jax_gcm_output.JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE,
+            time_dim=_jax_gcm_output.JAX_GCM_TIME_DIM,
+            dimension_order=_jax_gcm_output.JAX_GCM_OUTPUT_DIMENSION_ORDER,
+        )
 
     def _generate_step_function(
         self, jitted: bool = True
@@ -207,7 +211,7 @@ class JAXGCMSetupState:
             },
         )
 
-        self._period_average_accumulator = PeriodAverageAccumulator()
+        self.output_adapter.reset()
 
         if self.do_spinup and "OCN" in context.run_sequence.order:
 
@@ -218,11 +222,13 @@ class JAXGCMSetupState:
                     self.forcing,
                 )
                 self._state = _new_state
-                _jax_gcm_output.accumulate_jax_gcm_period_prediction(
-                    self._period_average_accumulator,
-                    _predictions,
-                    coords=self.model.coords,
-                    physics_module=getattr(self.model, "physics", None),
+                self.output_adapter.accumulate(
+                    _jax_gcm_output.jax_gcm_prediction_output_variables(
+                        _predictions,
+                        coords=self.model.coords,
+                        physics_module=getattr(self.model, "physics", None),
+                    ),
+                    summation_dim=_jax_gcm_output.JAX_GCM_TIME_DIM,
                 )
 
             run_logged_spinup(

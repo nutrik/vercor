@@ -207,6 +207,10 @@ historical commands, failure messages, or detailed validation notes.
   baseline fast pytest, focused red/green pytest, focused runtime/API pytest,
   Black, flake8, mypy, full fast pytest, full pytest, coverage pytest, and git
   diff whitespace check passed as of 2026-06-19.
+- Latest local component output adapter refactor validation: baseline fast
+  pytest via direct `scipy` env Python, focused adapter/external/API pytest,
+  Black, flake8, mypy, full fast pytest, full pytest, and git diff whitespace
+  check passed as of 2026-06-29.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -239,6 +243,26 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-29: Component Output Adapter Refactor
+
+- Added `vercor.output.ComponentOutputAdapter` as the shared owner for
+  external component period-average accumulation, mean conversion, cadence, and
+  NetCDF write lifecycle.
+- Replaced model-specific period-output wrapper routines in JAXGCM, Veros, and
+  CAMulator with small extraction, coordinate, path, and metadata helpers that
+  runtimes compose through the adapter. CAMulator immediate forecast-increment
+  output remains model-specific.
+- Updated architecture/dependency docs and boundary tests so shared
+  period-output helper calls live in `vercor.output.adapters`, not in each
+  external component output module.
+- Validation run for this change: `conda run -n scipy pytest tests/ -v
+  --fast` failed before pytest due to the existing Conda rattler plugin
+  `PanicException`; `/Users/romannuterman/miniforge3/envs/scipy/bin/python -m
+  pytest tests/ -q --fast --tb=short` passed. Focused
+  adapter/external/API pytest, Black, flake8, mypy, full fast pytest, full
+  pytest, and `git diff --check` passed. The existing Black Python
+  3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-06-19: Internal Output/Runtime Helper Simplification
 

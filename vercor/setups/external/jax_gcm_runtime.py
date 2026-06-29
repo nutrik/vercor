@@ -11,15 +11,12 @@ import jax.numpy as jnp
 from vercor.components import Component, ComponentStepContext, ComponentStepResult
 from vercor.dtypes import as_jax_real_array, jax_zeros
 from vercor.exceptions import ComponentError, CouplerError
-from vercor.setups.external.jax_gcm_output import (
-    accumulate_jax_gcm_period_prediction,
-    write_jax_gcm_averages_output,
-)
-from vercor.output.time import should_write_period_output
+from vercor.output.variables import OutputVariable
 from vercor.pytree import PyTreeNodeMixin
 from vercor.pytree_utils import mean_leaf, stack_objects, unwrap_leading_dims
 from vercor.settings import VercorSettings
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
+import vercor.setups.external.jax_gcm_output as _jax_gcm_output
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
@@ -256,11 +253,13 @@ def record_jax_gcm_host_step(
     if isinstance(step_result.payload, JAXGCMRuntimePayload):
         state._state = step_result.payload.jcm_state
         state.forcing = applied_forcing
-    accumulate_jax_gcm_period_prediction(
-        state._period_average_accumulator,
-        prediction,
-        coords=state.model.coords,
-        physics_module=getattr(state.model, "physics", None),
+    state.output_adapter.accumulate(
+        _jax_gcm_output.jax_gcm_prediction_output_variables(
+            prediction,
+            coords=state.model.coords,
+            physics_module=getattr(state.model, "physics", None),
+        ),
+        summation_dim=_jax_gcm_output.JAX_GCM_TIME_DIM,
     )
 
     _, _, _, cold_surface_cells = _jax_gcm_fields.cleanup_surface_temperature_fields(
@@ -274,18 +273,37 @@ def record_jax_gcm_host_step(
         )
 
     time = context.time
-    if time is not None and should_write_period_output(
-        time=time,
-        dt=timedelta(seconds=context.dt_seconds),
-        output_frequency=state.output_frequency,
-    ):
-        date_time = time.strftime("%Y-%m-%d")
-        write_jax_gcm_averages_output(
-            state._period_average_accumulator,
-            output=f"jcm.averages.{date_time}.nc",
-            coords=state.model.coords,
-            output_time=time,
-            physics_module=getattr(state.model, "physics", None),
+    if time is not None:
+
+        def build_coordinate_variables(
+            variables: Mapping[str, OutputVariable],
+        ) -> dict[str, OutputVariable]:
+            _ = variables
+            return _jax_gcm_output.jax_gcm_coordinate_variables(
+                coords=state.model.coords,
+                output_time=time,
+            )
+
+        def build_data_variables(
+            variables: Mapping[str, OutputVariable],
+        ) -> dict[str, OutputVariable]:
+            unit_metadata = _jax_gcm_output.jax_gcm_unit_metadata(
+                getattr(state.model, "physics", None)
+            )
+            return _jax_gcm_output.jax_gcm_data_variables_with_unit_metadata(
+                variables,
+                unit_metadata,
+            )
+
+        state.output_adapter.write_period_average_if_due(
+            time=time,
+            dt=timedelta(seconds=context.dt_seconds),
+            output_frequency=state.output_frequency,
+            output=lambda output_time: (
+                f"jcm.averages.{output_time.strftime('%Y-%m-%d')}.nc"
+            ),
+            build_coordinate_variables=build_coordinate_variables,
+            build_data_variables=build_data_variables,
             logger=logger,
         )
 

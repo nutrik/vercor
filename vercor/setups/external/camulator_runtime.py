@@ -11,7 +11,7 @@ import torch
 
 from vercor.components import ComponentStepContext
 from vercor.jax_logging import LoggerLike
-from vercor.output.time import should_write_period_output
+from vercor.output.variables import OutputVariable
 import vercor.setups.external.camulator_fields as _camulator_fields
 import vercor.setups.external.camulator_output as _camulator_output
 import vercor.setups.external.camulator_tensors as _camulator_tensors
@@ -162,28 +162,49 @@ def record_camulator_prediction_output(
         )
         return
 
-    _camulator_output.accumulate_camulator_period_prediction(
-        state._period_average_accumulator,
-        prediction,
-        metadata=state.metadata,
-        conf=state.conf,
-        state_transformer=state.state_transformer,
+    state.output_adapter.accumulate(
+        _camulator_output.camulator_period_output_variables(
+            prediction,
+            metadata=state.metadata,
+            conf=state.conf,
+            state_transformer=state.state_transformer,
+        ),
+        summation_dim=_camulator_output.CAMULATOR_TIME_DIM,
     )
-    if should_write_period_output(
-        time=utc_datetime,
-        dt=timedelta(hours=state.lead_time_periods),
-        output_frequency=output_frequency,
-    ):
-        _camulator_output.write_camulator_averages_output(
-            state._period_average_accumulator,
+
+    def build_coordinate_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return _camulator_output.camulator_average_coordinate_variables(
+            variables,
             output_time=utc_datetime,
             latitude=state.latlons.latitude.values,
             longitude=state.latlons.longitude.values,
-            init_str=state.runtime_cursor.init_str,
             metadata=state.metadata,
             conf=state.conf,
-            logger=logger,
         )
+
+    def build_data_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return _camulator_output.camulator_average_data_variables(
+            variables,
+            metadata=state.metadata,
+        )
+
+    state.output_adapter.write_period_average_if_due(
+        time=utc_datetime,
+        dt=timedelta(hours=state.lead_time_periods),
+        output_frequency=output_frequency,
+        output=lambda output_time: _camulator_output.camulator_average_output_path(
+            output_time=output_time,
+            init_str=state.runtime_cursor.init_str,
+            conf=state.conf,
+        ),
+        build_coordinate_variables=build_coordinate_variables,
+        build_data_variables=build_data_variables,
+        logger=logger,
+    )
 
 
 def step_camulator_runtime(

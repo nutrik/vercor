@@ -1,4 +1,4 @@
-"""JAXGCM output extraction and period-average writing helpers."""
+"""JAXGCM output extraction and metadata helpers."""
 
 from __future__ import annotations
 
@@ -14,19 +14,12 @@ import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array, jax_index_dtype
-from vercor.jax_logging import LoggerLike
 from vercor.output.datasets import time_coordinate_variable
-from vercor.output.period_averages import (
-    PeriodAverageAccumulator,
-    accumulate_output_variables,
-    period_mean_output_variables,
-)
-from vercor.output.period_files import write_period_average_netcdf
 from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
 from vercor.types import RuntimeArray
 
-_TIME_NAME = TIME_NAME
+JAX_GCM_TIME_DIM = TIME_NAME
 _LEVEL_NAME = "level"
 _LON_NAME = "lon"
 _LAT_NAME = "lat"
@@ -35,8 +28,11 @@ _LAT_MODE_NAME = "total_wavenumber"
 _WVI_NAME = "wvi_id"
 _HSG_LEVEL_NAME = "hsg_level"
 _SURFACE_NAME = "surface"
-_CANONICAL_DIM_ORDER = (
-    _TIME_NAME,
+JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE = (
+    "JAXGCM average output requires at least one prediction."
+)
+JAX_GCM_OUTPUT_DIMENSION_ORDER = (
+    JAX_GCM_TIME_DIM,
     _WVI_NAME,
     _HSG_LEVEL_NAME,
     _SURFACE_NAME,
@@ -88,18 +84,23 @@ def _float0s_to_nans(pytree: Any) -> Any:
     return jax.tree_util.tree_map(_float0_leaf_to_nan, pytree)
 
 
-def _coordinate_variables(
+def jax_gcm_coordinate_variables(
     *,
     coords: Any,
     output_time: datetime | ModelDateTime,
 ) -> dict[str, OutputVariable]:
+    """Return NetCDF coordinate variables for JAXGCM period output."""
+
     lon, sin_lat = coords.horizontal.nodal_axes
     lon_k, lat_k = coords.horizontal.modal_axes
     level = as_jax_real_array(coords.vertical.centers)
     layers = _vertical_layers(coords)
 
     coordinate_variables = {
-        _TIME_NAME: time_coordinate_variable(output_time, time_dim=_TIME_NAME),
+        JAX_GCM_TIME_DIM: time_coordinate_variable(
+            output_time,
+            time_dim=JAX_GCM_TIME_DIM,
+        ),
         _LON_NAME: OutputVariable(
             (_LON_NAME,),
             as_jax_real_array(lon) * 180.0 / jnp.pi,
@@ -191,7 +192,7 @@ def _infer_shape_to_dims(
         basic_shape_to_dims[(layers,) + value_shape] = (_LEVEL_NAME, dim)
 
     return {
-        time_shape + shape: (_TIME_NAME,) + dims
+        time_shape + shape: (JAX_GCM_TIME_DIM,) + dims
         for shape, dims in basic_shape_to_dims.items()
     }
 
@@ -242,15 +243,19 @@ def _default_physics_module() -> _PhysicsModuleLike:
     return cast(_PhysicsModuleLike, SpeedyPhysics())
 
 
-def _prediction_to_variables(
-    prediction: _PredictionLike,
+def jax_gcm_prediction_output_variables(
+    prediction: Any,
     *,
     coords: Any,
-    physics_module: _PhysicsModuleLike,
+    physics_module: _PhysicsModuleLike | None = None,
 ) -> dict[str, OutputVariable]:
-    dynamics_predictions = _float0s_to_nans(prediction.dynamics)
-    physics_predictions = _float0s_to_nans(prediction.physics)
-    time_values = as_jax_real_array(prediction.times)
+    """Return JAXGCM prediction variables ready for period accumulation."""
+
+    selected_physics_module = physics_module or _default_physics_module()
+    prediction_values = cast(_PredictionLike, prediction)
+    dynamics_predictions = _float0s_to_nans(prediction_values.dynamics)
+    physics_predictions = _float0s_to_nans(prediction_values.physics)
+    time_values = as_jax_real_array(prediction_values.times)
     time_shape = tuple(time_values.shape)
     shape_to_dims = _infer_shape_to_dims(coords=coords, time_shape=time_shape)
 
@@ -258,10 +263,10 @@ def _prediction_to_variables(
         _vertical_layers(coords),
         *tuple(coords.horizontal.nodal_shape),
     )
-    physics_module.cache_coords(coords)
+    selected_physics_module.cache_coords(coords)
     data = _mapping_from_struct(dynamics_predictions)
     data.update(
-        physics_module.data_struct_to_dict(
+        selected_physics_module.data_struct_to_dict(
             physics_predictions,
             nodal_shape=nodal_shape,
         )
@@ -276,32 +281,10 @@ def _prediction_to_variables(
                 f"Value of shape {values.shape} for variable {name!r} "
                 "is not recognized."
             )
-        if _TIME_NAME not in dims:
+        if JAX_GCM_TIME_DIM not in dims:
             raise ValueError(f"Variable {name!r} does not include a time dimension.")
         variables[name] = OutputVariable(dims=dims, values=values)
     return variables
-
-
-def accumulate_jax_gcm_period_prediction(
-    accumulator: PeriodAverageAccumulator,
-    prediction: Any,
-    *,
-    coords: Any,
-    physics_module: _PhysicsModuleLike | None = None,
-) -> None:
-    """Accumulate one JAXGCM prediction block into period running sums."""
-
-    selected_physics_module = physics_module or _default_physics_module()
-    variables = _prediction_to_variables(
-        cast(_PredictionLike, prediction),
-        coords=coords,
-        physics_module=selected_physics_module,
-    )
-    accumulate_output_variables(
-        accumulator,
-        variables,
-        summation_dim=_TIME_NAME,
-    )
 
 
 def _read_units_table(path: Path) -> dict[str, dict[str, str]]:
@@ -318,32 +301,28 @@ def _read_units_table(path: Path) -> dict[str, dict[str, str]]:
     return metadata
 
 
-def _unit_metadata(physics_module: _PhysicsModuleLike) -> dict[str, dict[str, str]]:
+def jax_gcm_unit_metadata(
+    physics_module: _PhysicsModuleLike | None = None,
+) -> dict[str, dict[str, str]]:
+    """Return JAXGCM unit metadata from bundled dynamics and physics tables."""
+
+    selected_physics_module = physics_module or _default_physics_module()
     dynamics_resource = resources.files("jcm").joinpath("dynamics_units_table.csv")
     with resources.as_file(dynamics_resource) as dynamics_path:
         metadata = _read_units_table(dynamics_path)
 
-    physics_units_path = physics_module.UNITS_TABLE_CSV_PATH
+    physics_units_path = selected_physics_module.UNITS_TABLE_CSV_PATH
     if physics_units_path is not None:
         metadata.update(_read_units_table(Path(physics_units_path)))
     return metadata
 
 
-def _mean_accumulated_variables(
-    accumulator: PeriodAverageAccumulator,
-) -> dict[str, OutputVariable]:
-    return period_mean_output_variables(
-        accumulator,
-        empty_error_message="JAXGCM average output requires at least one prediction.",
-        time_dim=_TIME_NAME,
-        dimension_order=_CANONICAL_DIM_ORDER,
-    )
-
-
-def _data_variables_with_unit_metadata(
+def jax_gcm_data_variables_with_unit_metadata(
     variables: Mapping[str, OutputVariable],
     unit_metadata: Mapping[str, Mapping[str, str]],
 ) -> dict[str, OutputVariable]:
+    """Return JAXGCM data variables with unit metadata attached."""
+
     return {
         name: OutputVariable(
             dims=variable_data.dims,
@@ -361,45 +340,12 @@ def _data_variables_with_unit_metadata(
     }
 
 
-def write_jax_gcm_averages_output(
-    accumulator: PeriodAverageAccumulator,
-    output: str,
-    *,
-    coords: Any,
-    output_time: datetime | ModelDateTime,
-    physics_module: _PhysicsModuleLike | None = None,
-    logger: LoggerLike | None = None,
-) -> None:
-    """Write mean JAXGCM predictions to NetCDF and clear the accumulator."""
-
-    selected_physics_module = physics_module or _default_physics_module()
-    unit_metadata = _unit_metadata(selected_physics_module)
-
-    def build_coordinate_variables(
-        variables: Mapping[str, OutputVariable],
-    ) -> dict[str, OutputVariable]:
-        _ = variables
-        return _coordinate_variables(
-            coords=coords,
-            output_time=output_time,
-        )
-
-    def build_data_variables(
-        variables: Mapping[str, OutputVariable],
-    ) -> dict[str, OutputVariable]:
-        return _data_variables_with_unit_metadata(variables, unit_metadata)
-
-    write_period_average_netcdf(
-        accumulator,
-        output,
-        build_mean_variables=_mean_accumulated_variables,
-        build_coordinate_variables=build_coordinate_variables,
-        build_data_variables=build_data_variables,
-        logger=logger,
-    )
-
-
 __all__ = [
-    "accumulate_jax_gcm_period_prediction",
-    "write_jax_gcm_averages_output",
+    "JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE",
+    "JAX_GCM_OUTPUT_DIMENSION_ORDER",
+    "JAX_GCM_TIME_DIM",
+    "jax_gcm_coordinate_variables",
+    "jax_gcm_data_variables_with_unit_metadata",
+    "jax_gcm_prediction_output_variables",
+    "jax_gcm_unit_metadata",
 ]

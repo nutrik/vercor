@@ -7,12 +7,9 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from vercor.components import ComponentStepContext
-from vercor.output.time import should_write_period_output
-from vercor.setups.external.veros_output import (
-    accumulate_veros_period_state,
-    write_veros_averages_output,
-)
+from vercor.output.variables import OutputVariable
 import vercor.setups.external.veros_fluxes as _veros_fluxes
+import vercor.setups.external.veros_output as _veros_output
 import vercor.setups.external.veros_state as _veros_state
 
 if TYPE_CHECKING:
@@ -76,24 +73,30 @@ def record_veros_output(
     if time is None:
         return
 
-    accumulate_veros_period_state(
-        state._period_average_accumulator,
-        state._veros_state,
-        output_variables,
+    state.output_adapter.accumulate(
+        _veros_output.extract_veros_output_snapshot(
+            state._veros_state,
+            output_variables,
+        )
     )
-    if should_write_period_output(
+
+    def build_coordinate_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return _veros_output.veros_average_coordinate_variables(
+            veros_state=state._veros_state,
+            output_time=time,
+            variables=variables,
+        )
+
+    state.output_adapter.write_period_average_if_due(
         time=time,
         dt=timedelta(seconds=context.dt_seconds),
         output_frequency=state.output_frequency,
-    ):
-        date_time = time.strftime("%Y-%m-%d")
-        write_veros_averages_output(
-            state._period_average_accumulator,
-            output=f"veros.averages.{date_time}.nc",
-            veros_state=state._veros_state,
-            output_time=time,
-            logger=context.logger,
-        )
+        output=lambda output_time: f"veros.averages.{output_time.strftime('%Y-%m-%d')}.nc",
+        build_coordinate_variables=build_coordinate_variables,
+        logger=context.logger,
+    )
 
 
 __all__ = ["record_veros_output", "step_veros_runtime"]

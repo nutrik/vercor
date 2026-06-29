@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -23,6 +24,7 @@ import vercor.setups.external.jax_gcm_state as jax_gcm_state_module
 import vercor.setups.external.veros_fluxes as veros_fluxes_module
 import vercor.setups.external.veros_gcm as veros_gcm_module
 import vercor.setups.external.veros_gcm_state as veros_gcm_state_module
+import vercor.setups.external.veros_output as veros_output_module
 import vercor.setups.external.veros_runtime as veros_runtime_module
 import vercor.setups.external.veros_runtime_settings as veros_runtime_settings_module
 import vercor.setups.external.veros_setup as veros_setup_module
@@ -33,6 +35,8 @@ from tests.assertions import assert_allclose_compact
 from vercor.calendar import DateTime360, DateTime365
 from vercor.components.data import DataComponent
 from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
+from vercor.output.adapters import ComponentOutputAdapter
+from vercor.output.variables import OutputVariable
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.state import RuntimeComponentState
 from vercor.runtime.stores import RuntimeFieldStore
@@ -84,7 +88,7 @@ class _PredictionValues:
     times: np.ndarray
 
     def to_xarray(self) -> xr.Dataset:
-        raise AssertionError("write_jax_gcm_averages_output must not call to_xarray()")
+        raise AssertionError("JAXGCM output adapter path must not call to_xarray()")
 
 
 class _FakePhysicsModule:
@@ -188,6 +192,58 @@ class _ConstructedVerosState:
         self._variables: dict[str, Any] = {}
         self.timers: dict[str, Any] = {}
         self.profile_timers: dict[str, Any] = {}
+
+
+def _make_jax_gcm_output_adapter() -> ComponentOutputAdapter:
+    return ComponentOutputAdapter(
+        empty_error_message=jax_gcm_output_module.JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE,
+        time_dim=jax_gcm_output_module.JAX_GCM_TIME_DIM,
+        dimension_order=jax_gcm_output_module.JAX_GCM_OUTPUT_DIMENSION_ORDER,
+    )
+
+
+def _write_jax_gcm_average_output(
+    adapter: ComponentOutputAdapter,
+    output: str,
+    *,
+    coords: Any,
+    output_time: Any,
+    physics_module: Any,
+    logger: Any | None = None,
+) -> None:
+    unit_metadata = jax_gcm_output_module.jax_gcm_unit_metadata(physics_module)
+
+    def build_coordinate_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        _ = variables
+        return jax_gcm_output_module.jax_gcm_coordinate_variables(
+            coords=coords,
+            output_time=output_time,
+        )
+
+    def build_data_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return jax_gcm_output_module.jax_gcm_data_variables_with_unit_metadata(
+            variables,
+            unit_metadata,
+        )
+
+    adapter.write_period_average(
+        output,
+        build_coordinate_variables=build_coordinate_variables,
+        build_data_variables=build_data_variables,
+        logger=logger,
+    )
+
+
+def _make_veros_output_adapter() -> ComponentOutputAdapter:
+    return ComponentOutputAdapter(
+        empty_error_message=veros_output_module.VEROS_AVERAGE_EMPTY_ERROR_MESSAGE,
+        time_dim=veros_output_module.VEROS_TIME_DIM,
+        value_dims_for_sample=veros_output_module.veros_average_value_dims,
+    )
 
 
 def _make_coupler(
@@ -542,11 +598,6 @@ def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
 def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.output.period_averages import (
-        PeriodAverageAccumulator,
-    )
-    from vercor.output.variables import OutputVariable
-
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
@@ -561,6 +612,7 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     component.save_interval = timedelta(days=1)
     component.output_frequency = None
     component.forcing_data = "provided-forcing"
+    component.output_adapter = _make_jax_gcm_output_adapter()
     component.model = SimpleNamespace(
         coords=SimpleNamespace(
             horizontal=SimpleNamespace(nodal_shape=(2, 3)),
@@ -594,21 +646,20 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     )
     accumulated_predictions: list[Any] = []
 
-    def fake_accumulate_spinup_prediction(
-        accumulator: PeriodAverageAccumulator,
+    def fake_jax_gcm_prediction_output_variables(
         prediction: Any,
         *,
         coords: Any,
         physics_module: Any | None = None,
-    ) -> None:
+    ) -> dict[str, OutputVariable]:
         _ = coords, physics_module
         accumulated_predictions.append(prediction)
-        accumulator.add_samples({"spinup": OutputVariable(("x",), np.asarray([1.0]))})
+        return {"spinup": OutputVariable(("time", "x"), np.asarray([[1.0]]))}
 
     monkeypatch.setattr(
         jax_gcm_state_module._jax_gcm_output,
-        "accumulate_jax_gcm_period_prediction",
-        fake_accumulate_spinup_prediction,
+        "jax_gcm_prediction_output_variables",
+        fake_jax_gcm_prediction_output_variables,
     )
 
     hook_component = DataComponent.from_fields(
@@ -625,7 +676,7 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     assert component.forcing == "provided-forcing"
     assert accumulated_predictions == ["unused", "unused"]
     assert_allclose_compact(
-        component._period_average_accumulator.variables["spinup"].counts,
+        component.output_adapter.variables["spinup"].counts,
         np.asarray([2]),
     )
     assert isinstance(hook_component.data["sea_surface_temperature"], jax.Array)
@@ -649,6 +700,7 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
     component.save_interval = timedelta(days=1)
     component.output_frequency = None
     component.forcing_data = None
+    component.output_adapter = _make_jax_gcm_output_adapter()
     component.model = SimpleNamespace(
         coords=SimpleNamespace(
             horizontal=SimpleNamespace(nodal_shape=(2, 3)),
@@ -702,11 +754,6 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
 def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.output.period_averages import (
-        PeriodAverageAccumulator,
-    )
-    from vercor.output.variables import OutputVariable
-
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
@@ -727,7 +774,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     component.forcing = _FakeForcing()
     cast(Any, component).sigma_levels = np.asarray([0.2, 1.0], dtype=float)
     component._state = cast(Any, SimpleNamespace(metadata=jnp.asarray(0.0)))
-    component._period_average_accumulator = PeriodAverageAccumulator()
+    component.output_adapter = _make_jax_gcm_output_adapter()
     component.output_frequency = "day"
 
     written: dict[str, Any] = {}
@@ -801,51 +848,35 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     )
     cast(Any, jax_gcm_fields_module.map_jcm_output_fields).clear_cache()
 
-    def fake_accumulate_jax_gcm_period_prediction(
-        accumulator: PeriodAverageAccumulator,
-        prediction: Any,
+    def fake_jax_gcm_prediction_output_variables(
+        prediction_arg: Any,
         *,
         coords: Any,
         physics_module: Any | None = None,
-    ) -> None:
-        written["accumulated_prediction"] = prediction
+    ) -> dict[str, OutputVariable]:
+        written["accumulated_prediction"] = prediction_arg
         written["accumulated_coords"] = coords
         written["accumulated_physics_module"] = physics_module
-        accumulator.add_samples(
-            {"temperature": OutputVariable(("x",), np.asarray([1.0]))}
-        )
-
-    def fake_write_jax_gcm_averages_output(
-        accumulator: PeriodAverageAccumulator,
-        output: str,
-        *,
-        coords: Any,
-        output_time: datetime | DateTime360 | DateTime365,
-        physics_module: Any | None = None,
-        logger: Any | None = None,
-    ) -> None:
-        _ = logger
-        written["path"] = output
-        written["coords"] = coords
-        written["output_time"] = output_time
-        written["physics_module"] = physics_module
-        written["counts"] = accumulator.variables["temperature"].counts.copy()
-        accumulator.clear()
+        return {"temperature": OutputVariable(("time", "x"), np.asarray([[1.0]]))}
 
     monkeypatch.setattr(
-        jax_gcm_runtime_module,
-        "should_write_period_output",
-        lambda time, dt, output_frequency: True,
+        jax_gcm_output_module,
+        "jax_gcm_prediction_output_variables",
+        fake_jax_gcm_prediction_output_variables,
     )
-    monkeypatch.setattr(
-        jax_gcm_runtime_module,
-        "accumulate_jax_gcm_period_prediction",
-        fake_accumulate_jax_gcm_period_prediction,
-    )
-    monkeypatch.setattr(
-        jax_gcm_runtime_module,
-        "write_jax_gcm_averages_output",
-        fake_write_jax_gcm_averages_output,
+
+    def fake_write_period_average_if_due(**kwargs: Any) -> bool:
+        written["path"] = kwargs["output"](kwargs["time"])
+        written["output_time"] = kwargs["time"]
+        written["output_frequency"] = kwargs["output_frequency"]
+        written["counts"] = component.output_adapter.variables[
+            "temperature"
+        ].counts.copy()
+        component.output_adapter.reset()
+        return True
+
+    component.output_adapter.write_period_average_if_due = (  # type: ignore[method-assign]
+        fake_write_period_average_if_due
     )
 
     coupler = _make_coupler(
@@ -952,15 +983,12 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     assert written["accumulated_physics_module"] is component.model.physics
     assert_allclose_compact(written["counts"], np.asarray([1]))
     assert written["path"] == "jcm.averages.2000-01-02.nc"
-    assert written["coords"] is component.model.coords
     assert written["output_time"] == datetime(2000, 1, 2)
-    assert written["physics_module"] is component.model.physics
-    assert component._period_average_accumulator.empty
+    assert written["output_frequency"] == "day"
+    assert component.output_adapter.empty
 
 
 def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
-    from vercor.output.period_averages import PeriodAverageAccumulator
-
     coords = _make_jax_gcm_output_coords()
     first_temperature = np.arange(18.0).reshape(3, 2, 3)
     second_temperature = first_temperature + 18.0
@@ -985,15 +1013,17 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
             times=np.asarray([1.0]),
         ),
     ]
-    accumulator = PeriodAverageAccumulator()
+    adapter = _make_jax_gcm_output_adapter()
     for prediction in predictions:
-        jax_gcm_output_module.accumulate_jax_gcm_period_prediction(
-            accumulator,
-            prediction,
-            coords=coords,
-            physics_module=physics_module,
+        adapter.accumulate(
+            jax_gcm_output_module.jax_gcm_prediction_output_variables(
+                prediction,
+                coords=coords,
+                physics_module=physics_module,
+            ),
+            summation_dim=jax_gcm_output_module.JAX_GCM_TIME_DIM,
         )
-    accumulated_temperature = accumulator.variables["temperature"]
+    accumulated_temperature = adapter.variables["temperature"]
     assert isinstance(accumulated_temperature.sum_values, jax.Array)
     assert isinstance(accumulated_temperature.counts, jax.Array)
 
@@ -1002,8 +1032,8 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
     logger = logging.getLogger(logger_name)
 
     with capture_logger_output(logger_name) as stream:
-        jax_gcm_output_module.write_jax_gcm_averages_output(
-            accumulator,
+        _write_jax_gcm_average_output(
+            adapter,
             str(output),
             coords=coords,
             output_time=datetime(2000, 1, 2),
@@ -1032,7 +1062,7 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
         )
         assert actual.variables["time"].shape == (1,)
         assert actual.variables["time"].attrs["calendar"] == "proleptic_gregorian"
-    assert accumulator.empty
+    assert adapter.empty
     assert physics_module.cached_coords is coords
     assert f"Writing output file:  {output}" in stream.getvalue()
 
@@ -1051,8 +1081,6 @@ def test_jax_gcm_write_output_preserves_model_calendar_attrs(
     expected_day_of_year: int,
     days_per_year: int,
 ) -> None:
-    from vercor.output.period_averages import PeriodAverageAccumulator
-
     coords = _make_jax_gcm_output_coords()
     physics_module = _FakePhysicsModule()
     predictions = [
@@ -1064,17 +1092,19 @@ def test_jax_gcm_write_output_preserves_model_calendar_attrs(
             times=np.asarray([0.0]),
         )
     ]
-    accumulator = PeriodAverageAccumulator()
-    jax_gcm_output_module.accumulate_jax_gcm_period_prediction(
-        accumulator,
-        predictions[0],
-        coords=coords,
-        physics_module=physics_module,
+    adapter = _make_jax_gcm_output_adapter()
+    adapter.accumulate(
+        jax_gcm_output_module.jax_gcm_prediction_output_variables(
+            predictions[0],
+            coords=coords,
+            physics_module=physics_module,
+        ),
+        summation_dim=jax_gcm_output_module.JAX_GCM_TIME_DIM,
     )
     output = tmp_path / "jcm_model_calendar_output.nc"
 
-    jax_gcm_output_module.write_jax_gcm_averages_output(
-        accumulator,
+    _write_jax_gcm_average_output(
+        adapter,
         str(output),
         coords=coords,
         output_time=output_time,
@@ -1401,7 +1431,6 @@ def test_veros_output_snapshot_uses_variable_metadata_and_current_timestep() -> 
 def test_veros_write_output_persists_period_mean_and_coordinates(
     tmp_path: Path,
 ) -> None:
-    from vercor.output.period_averages import PeriodAverageAccumulator
     import vercor.setups.external.veros_output as veros_output_module
 
     state = _make_veros_output_state()
@@ -1415,19 +1444,23 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
             ("temp", "salt", "u", "surface_taux", "psi"),
         ),
     ]
-    accumulator = PeriodAverageAccumulator()
+    adapter = _make_veros_output_adapter()
     for snapshot in snapshots:
-        veros_output_module.accumulate_veros_output_snapshot(accumulator, snapshot)
-    accumulated_temperature = accumulator.variables["temp"]
+        adapter.accumulate(snapshot)
+    accumulated_temperature = adapter.variables["temp"]
     assert isinstance(accumulated_temperature.sum_values, jax.Array)
     assert isinstance(accumulated_temperature.counts, jax.Array)
     output = tmp_path / "veros_output.nc"
 
-    veros_output_module.write_veros_averages_output(
-        accumulator,
+    adapter.write_period_average(
         str(output),
-        veros_state=state,
-        output_time=datetime(2000, 1, 2),
+        build_coordinate_variables=lambda variables: (
+            veros_output_module.veros_average_coordinate_variables(
+                veros_state=state,
+                output_time=datetime(2000, 1, 2),
+                variables=variables,
+            )
+        ),
     )
 
     with h5netcdf.File(output, "r") as actual:
@@ -1477,7 +1510,7 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
             np.transpose(expected_psi),
         )
         assert actual.variables["psi"].attrs["units"] == "m^3/s"
-    assert accumulator.empty
+    assert adapter.empty
 
 
 def test_veros_output_variables_rejects_bare_string() -> None:
@@ -1547,6 +1580,7 @@ def test_veros_initialize_can_spin_up_and_extract_surface_temperature() -> None:
     )
     component.data = {}
     component.settings = VercorSettings()
+    component.output_adapter = _make_veros_output_adapter()
 
     step_calls = {"count": 0}
 
@@ -1576,11 +1610,6 @@ def test_veros_initialize_can_spin_up_and_extract_surface_temperature() -> None:
 def test_veros_initialize_spinup_accumulates_selected_outputs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.output.period_averages import (
-        PeriodAverageAccumulator,
-    )
-    from vercor.output.variables import OutputVariable
-
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
@@ -1598,6 +1627,7 @@ def test_veros_initialize_spinup_accumulates_selected_outputs(
     )
     component.data = {}
     component.settings = VercorSettings()
+    component.output_adapter = _make_veros_output_adapter()
 
     accumulated_states: list[Any] = []
     accumulated_variables: list[tuple[str, ...]] = []
@@ -1610,26 +1640,19 @@ def test_veros_initialize_spinup_accumulates_selected_outputs(
         next_state.variables.step_id = step_calls["count"]
         return next_state
 
-    def fake_accumulate_veros_period_state(
-        accumulator: PeriodAverageAccumulator,
+    def fake_extract_veros_output_snapshot(
         veros_state: Any,
         output_variables: tuple[str, ...],
-    ) -> None:
+    ) -> dict[str, OutputVariable]:
         accumulated_states.append(veros_state)
         accumulated_variables.append(output_variables)
-        accumulator.add_samples({"temp": OutputVariable(("x",), np.asarray([1.0]))})
+        return {"temp": OutputVariable(("x",), np.asarray([1.0]))}
 
     component._step_function = fake_step_function
     monkeypatch.setattr(
         veros_gcm_state_module._veros_output,
-        "accumulate_veros_period_state",
-        fake_accumulate_veros_period_state,
-        raising=False,
-    )
-    monkeypatch.setattr(
-        veros_gcm_state_module._veros_output,
-        "write_veros_averages_output",
-        lambda *args, **kwargs: pytest.fail("spinup must not write Veros output"),
+        "extract_veros_output_snapshot",
+        fake_extract_veros_output_snapshot,
     )
 
     hook_component = DataComponent.from_fields(
@@ -1643,7 +1666,7 @@ def test_veros_initialize_spinup_accumulates_selected_outputs(
     assert [state.variables.step_id for state in accumulated_states] == [1, 2]
     assert accumulated_variables == [("temp",), ("temp",)]
     assert_allclose_compact(
-        component._period_average_accumulator.variables["temp"].counts,
+        component.output_adapter.variables["temp"].counts,
         np.asarray([2]),
     )
     assert isinstance(hook_component.data["sea_surface_temperature"], jax.Array)
@@ -1794,11 +1817,6 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
 def test_veros_step_records_selected_outputs_and_writes_on_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.output.period_averages import (
-        PeriodAverageAccumulator,
-    )
-    from vercor.output.variables import OutputVariable
-
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
@@ -1809,7 +1827,7 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
     component.name = "OCN"
     component.output_variables = ("temp",)
     component.output_frequency = "day"
-    component._period_average_accumulator = PeriodAverageAccumulator()
+    component.output_adapter = _make_veros_output_adapter()
     component._step_function = lambda state: state
 
     monkeypatch.setattr(
@@ -1831,44 +1849,30 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
     extracted: dict[str, Any] = {}
     written: dict[str, Any] = {}
 
-    def fake_accumulate_period_state(
-        accumulator: PeriodAverageAccumulator,
+    def fake_extract_veros_output_snapshot(
         veros_state: Any,
         output_variables: tuple[str, ...],
-    ) -> None:
+    ) -> dict[str, OutputVariable]:
         extracted["state"] = veros_state
         extracted["variables"] = output_variables
-        accumulator.add_samples({"temp": OutputVariable(("x",), np.asarray([1.0]))})
-
-    def fake_write(
-        accumulator: PeriodAverageAccumulator,
-        output: str,
-        *,
-        veros_state: Any,
-        output_time: datetime | DateTime360 | DateTime365,
-        logger: Any | None = None,
-    ) -> None:
-        _ = logger
-        written["counts"] = accumulator.variables["temp"].counts.copy()
-        written["path"] = output
-        written["state"] = veros_state
-        written["output_time"] = output_time
-        accumulator.clear()
+        return {"temp": OutputVariable(("x",), np.asarray([1.0]))}
 
     monkeypatch.setattr(
-        veros_runtime_module,
-        "should_write_period_output",
-        lambda **kwargs: True,
+        veros_runtime_module._veros_output,
+        "extract_veros_output_snapshot",
+        fake_extract_veros_output_snapshot,
     )
-    monkeypatch.setattr(
-        veros_runtime_module,
-        "accumulate_veros_period_state",
-        fake_accumulate_period_state,
-    )
-    monkeypatch.setattr(
-        veros_runtime_module,
-        "write_veros_averages_output",
-        fake_write,
+
+    def fake_write_period_average_if_due(**kwargs: Any) -> bool:
+        written["counts"] = component.output_adapter.variables["temp"].counts.copy()
+        written["path"] = kwargs["output"](kwargs["time"])
+        written["output_time"] = kwargs["time"]
+        written["output_frequency"] = kwargs["output_frequency"]
+        component.output_adapter.reset()
+        return True
+
+    component.output_adapter.write_period_average_if_due = (  # type: ignore[method-assign]
+        fake_write_period_average_if_due
     )
 
     context = ComponentStepContext(
@@ -1884,16 +1888,14 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
     assert extracted["variables"] == ("temp",)
     assert_allclose_compact(written["counts"], np.asarray([1]))
     assert written["path"] == "veros.averages.2000-01-02.nc"
-    assert written["state"] is component._veros_state
     assert written["output_time"] == datetime(2000, 1, 2)
-    assert component._period_average_accumulator.empty
+    assert written["output_frequency"] == "day"
+    assert component.output_adapter.empty
 
 
 def test_veros_step_skips_output_when_no_variables_selected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.output.period_averages import PeriodAverageAccumulator
-
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
@@ -1904,7 +1906,7 @@ def test_veros_step_skips_output_when_no_variables_selected(
     component.name = "OCN"
     component.output_variables = ()
     component.output_frequency = None
-    component._period_average_accumulator = PeriodAverageAccumulator()
+    component.output_adapter = _make_veros_output_adapter()
     component._step_function = lambda state: state
 
     monkeypatch.setattr(
@@ -1923,10 +1925,9 @@ def test_veros_step_skips_output_when_no_variables_selected(
         lambda *args, **kwargs: args[0],
     )
     monkeypatch.setattr(
-        veros_runtime_module,
+        veros_runtime_module._veros_output,
         "extract_veros_output_snapshot",
         lambda *args, **kwargs: pytest.fail("unexpected Veros output extraction"),
-        raising=False,
     )
 
     context = ComponentStepContext(
@@ -1938,7 +1939,7 @@ def test_veros_step_skips_output_when_no_variables_selected(
 
     veros_runtime_module.step_veros_runtime(component, {}, context, None)
 
-    assert component._period_average_accumulator.empty
+    assert component.output_adapter.empty
 
 
 def test_veros_step_nan_cleans_forcing_fields_before_set_variable(

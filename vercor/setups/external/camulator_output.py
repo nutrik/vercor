@@ -17,15 +17,12 @@ import yaml
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.output.datasets import time_coordinate_variable, used_dimension_names
 from vercor.output.netcdf import write_netcdf_dataset
-from vercor.output.period_averages import (
-    PeriodAverageAccumulator,
-    accumulate_output_variables,
-    period_mean_output_variables,
-)
-from vercor.output.period_files import write_period_average_netcdf
 from vercor.output.variables import OutputVariable
 
-_TIME_NAME = "time"
+CAMULATOR_TIME_DIM = "time"
+CAMULATOR_AVERAGE_EMPTY_ERROR_MESSAGE = (
+    "CAMulator average output requires at least one prediction."
+)
 _LEVEL_NAME = "level"
 _LATITUDE_NAME = "latitude"
 _LONGITUDE_NAME = "longitude"
@@ -83,9 +80,9 @@ def build_camulator_output_variables(
     _validate_grid_coordinates(values, latitude_values, longitude_values)
 
     coordinate_variables = {
-        _TIME_NAME: _with_metadata(
-            time_coordinate_variable(forecast_datetime, time_dim=_TIME_NAME),
-            _TIME_NAME,
+        CAMULATOR_TIME_DIM: _with_metadata(
+            time_coordinate_variable(forecast_datetime, time_dim=CAMULATOR_TIME_DIM),
+            CAMULATOR_TIME_DIM,
             metadata,
         ),
         _LEVEL_NAME: _with_metadata(
@@ -188,15 +185,14 @@ def write_camulator_prediction_output(
     )
 
 
-def accumulate_camulator_period_prediction(
-    accumulator: PeriodAverageAccumulator,
+def camulator_period_output_variables(
     prediction: torch.Tensor,
     *,
     metadata: Mapping[str, Any],
     conf: Mapping[str, Any],
     state_transformer: Any | None,
-) -> None:
-    """Accumulate one CAMulator prediction tensor for period-average output."""
+) -> dict[str, OutputVariable]:
+    """Return CAMulator prediction variables ready for period accumulation."""
 
     _validate_supported_output_options(conf)
     output_prediction = _prediction_for_output(
@@ -210,72 +206,17 @@ def accumulate_camulator_period_prediction(
         conf=conf,
         require_single_time=False,
     )
-    accumulate_output_variables(
-        accumulator,
-        data_variables,
-        summation_dim=_TIME_NAME,
-    )
+    return data_variables
 
 
-def write_camulator_averages_output(
-    accumulator: PeriodAverageAccumulator,
-    *,
-    output_time: datetime,
-    latitude: object,
-    longitude: object,
-    init_str: str,
-    metadata: Mapping[str, Any],
-    conf: Mapping[str, Any],
-    logger: LoggerLike | None = None,
-) -> str:
-    """Write CAMulator period-average output and clear accumulated samples."""
-
-    output = _camulator_average_output_path(
-        output_time=output_time,
-        init_str=init_str,
-        conf=conf,
-    )
-    level_values = _configured_level_values(conf)
-    latitude_values = np.asarray(latitude)
-    longitude_values = np.asarray(longitude)
-
-    def build_coordinate_variables(
-        variables: Mapping[str, OutputVariable],
-    ) -> dict[str, OutputVariable]:
-        return _camulator_average_coordinate_variables(
-            variables,
-            output_time=output_time,
-            level_values=level_values,
-            latitude_values=latitude_values,
-            longitude_values=longitude_values,
-            metadata=metadata,
-        )
-
-    def build_data_variables(
-        variables: Mapping[str, OutputVariable],
-    ) -> dict[str, OutputVariable]:
-        return {
-            name: _with_metadata(variable, name, metadata)
-            for name, variable in variables.items()
-        }
-
-    write_period_average_netcdf(
-        accumulator,
-        output,
-        build_mean_variables=_mean_accumulated_variables,
-        build_coordinate_variables=build_coordinate_variables,
-        build_data_variables=build_data_variables,
-        logger=logger,
-    )
-    return output
-
-
-def _camulator_average_output_path(
+def camulator_average_output_path(
     *,
     output_time: datetime,
     init_str: str,
     conf: Mapping[str, Any],
 ) -> str:
+    """Return the CAMulator period-average output path for one period."""
+
     predict_conf = _mapping(conf.get("predict", {}), name="predict")
     save_forecast = predict_conf.get("save_forecast")
     if not save_forecast:
@@ -287,38 +228,49 @@ def _camulator_average_output_path(
     return os.path.join(save_location, f"camulator.averages.{date_time}.nc")
 
 
-def _mean_accumulated_variables(
-    accumulator: PeriodAverageAccumulator,
-) -> dict[str, OutputVariable]:
-    return period_mean_output_variables(
-        accumulator,
-        empty_error_message="CAMulator average output requires at least one prediction.",
-        time_dim=_TIME_NAME,
-    )
-
-
-def _camulator_average_coordinate_variables(
+def camulator_average_coordinate_variables(
     variables: Mapping[str, OutputVariable],
     *,
     output_time: datetime,
-    level_values: np.ndarray,
-    latitude_values: np.ndarray,
-    longitude_values: np.ndarray,
+    latitude: object,
+    longitude: object,
     metadata: Mapping[str, Any],
+    conf: Mapping[str, Any],
 ) -> dict[str, OutputVariable]:
+    """Return coordinates used by a CAMulator period-average dataset."""
+
+    level_values = _configured_level_values(conf)
+    latitude_values = np.asarray(latitude)
+    longitude_values = np.asarray(longitude)
     coordinate_builders: dict[str, Callable[[], OutputVariable]] = {
         _LEVEL_NAME: lambda: OutputVariable((_LEVEL_NAME,), level_values),
         _LATITUDE_NAME: lambda: OutputVariable((_LATITUDE_NAME,), latitude_values),
         _LONGITUDE_NAME: lambda: OutputVariable((_LONGITUDE_NAME,), longitude_values),
     }
     coordinate_variables = {
-        _TIME_NAME: time_coordinate_variable(output_time, time_dim=_TIME_NAME)
+        CAMULATOR_TIME_DIM: time_coordinate_variable(
+            output_time,
+            time_dim=CAMULATOR_TIME_DIM,
+        )
     }
-    for dim in used_dimension_names(variables, excluded_dims=(_TIME_NAME,)):
+    for dim in used_dimension_names(variables, excluded_dims=(CAMULATOR_TIME_DIM,)):
         builder = coordinate_builders.get(dim)
         if builder is not None:
             coordinate_variables[dim] = _with_metadata(builder(), dim, metadata)
     return coordinate_variables
+
+
+def camulator_average_data_variables(
+    variables: Mapping[str, OutputVariable],
+    *,
+    metadata: Mapping[str, Any],
+) -> dict[str, OutputVariable]:
+    """Return CAMulator data variables with configured metadata attached."""
+
+    return {
+        name: _with_metadata(variable, name, metadata)
+        for name, variable in variables.items()
+    }
 
 
 def _validate_supported_output_options(conf: Mapping[str, Any]) -> None:
@@ -469,7 +421,7 @@ def _prediction_data_variables(
         stop = start + levels
         variables[name] = _with_metadata(
             OutputVariable(
-                (_TIME_NAME, _LEVEL_NAME, _LATITUDE_NAME, _LONGITUDE_NAME),
+                (CAMULATOR_TIME_DIM, _LEVEL_NAME, _LATITUDE_NAME, _LONGITUDE_NAME),
                 values[:, start:stop, :, :],
             ),
             name,
@@ -480,7 +432,7 @@ def _prediction_data_variables(
     for index, name in enumerate(single_level_names):
         variables[name] = _with_metadata(
             OutputVariable(
-                (_TIME_NAME, _LATITUDE_NAME, _LONGITUDE_NAME),
+                (CAMULATOR_TIME_DIM, _LATITUDE_NAME, _LONGITUDE_NAME),
                 values[:, single_level_start + index, :, :],
             ),
             name,
@@ -511,7 +463,7 @@ def _with_metadata(
     name: str,
     metadata: Mapping[str, Any],
 ) -> OutputVariable:
-    if name == _TIME_NAME or name not in metadata:
+    if name == CAMULATOR_TIME_DIM or name not in metadata:
         return variable
     attrs = metadata[name]
     if not isinstance(attrs, Mapping):
@@ -580,10 +532,14 @@ def _string_sequence(value: Any, name: str) -> tuple[str, ...]:
 
 
 __all__ = [
-    "accumulate_camulator_period_prediction",
+    "CAMULATOR_AVERAGE_EMPTY_ERROR_MESSAGE",
+    "CAMULATOR_TIME_DIM",
     "build_camulator_output_variables",
+    "camulator_average_coordinate_variables",
+    "camulator_average_data_variables",
+    "camulator_average_output_path",
+    "camulator_period_output_variables",
     "load_camulator_output_metadata",
-    "write_camulator_averages_output",
     "write_camulator_netcdf_increment",
     "write_camulator_prediction_output",
 ]
