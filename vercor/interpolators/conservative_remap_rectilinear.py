@@ -256,11 +256,6 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
 
         return result_grid
 
-    def apply_vector(self, u_src: Any, v_src: Any) -> tuple[Any, Any]:
-        # To satisfy the interface
-        # Avoid errors from MyPy static type checking
-        raise RuntimeError("Conservative remapping for vectors not implemented.")
-
     def get_src_total_mass(self, field_on_src: Any) -> float:
         """Calculate total mass on source grid given field values."""
 

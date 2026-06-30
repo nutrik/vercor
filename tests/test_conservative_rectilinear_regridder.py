@@ -122,7 +122,7 @@ def test_regridder_scalar_call_dispatches_and_returns_destination_shape() -> Non
     assert np.shape(out) == dst.shape
 
 
-def test_regridder_vector_call_raises_runtime_error_from_remapper() -> None:
+def test_regridder_vector_call_raises_scalar_only_type_error() -> None:
     src = _grid("src", np.array([0.5, 1.5]), np.array([0.5, 1.5]))
     dst = _grid(
         "dst",
@@ -132,7 +132,19 @@ def test_regridder_vector_call_raises_runtime_error_from_remapper() -> None:
 
     regridder = ConservativeRectilinearRegridder(src, dst)
 
-    with pytest.raises(RuntimeError, match="not implemented"):
+    with pytest.raises(TypeError, match="Conservative regridding supports scalar"):
+        regridder(np.ones((2, 2), dtype=float), np.ones((2, 2), dtype=float))
+
+
+def test_regridder_identical_grid_vector_call_still_raises_scalar_only_type_error() -> (
+    None
+):
+    src = _grid("src", np.array([0.5, 1.5]), np.array([0.5, 1.5]))
+    dst = _grid("dst", np.array([0.5, 1.5]), np.array([0.5, 1.5]))
+
+    regridder = ConservativeRectilinearRegridder(src, dst)
+
+    with pytest.raises(TypeError, match="Conservative regridding supports scalar"):
         regridder(np.ones((2, 2), dtype=float), np.ones((2, 2), dtype=float))
 
 

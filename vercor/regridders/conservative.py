@@ -60,6 +60,16 @@ class ConservativeRectilinearRegridder(Regridder):
             has_identical_grids=has_identical_grids,
         )
 
+    def _ensure_ready(self, args: tuple[object, ...]) -> None:
+        """Reject vector calls before the shared identity-grid fast path."""
+
+        super()._ensure_ready(args)
+        if len(args) == 2:
+            raise TypeError(
+                "Conservative regridding supports scalar fields only; use bilinear "
+                "regridding for vector fields."
+            )
+
 
 def conservative(
     source_grid: RectilinearGrid,

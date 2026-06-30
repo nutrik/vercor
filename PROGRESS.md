@@ -226,6 +226,10 @@ historical commands, failure messages, or detailed validation notes.
   focused red/green pytest, focused affected pytest, Black, flake8, mypy, full
   fast pytest, full pytest, and git diff whitespace check passed as of
   2026-06-30 using the direct `scipy` environment executable.
+- Latest local conservative scalar-only regridder validation: baseline fast
+  pytest, focused red/green pytest, focused affected pytest, Black, flake8,
+  mypy, full fast pytest, full pytest, and git diff whitespace check passed as
+  of 2026-06-30 using the direct `scipy` environment executable.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -259,6 +263,23 @@ historical commands, failure messages, or detailed validation notes.
   sequence support, but the wrapper remains public API.
 
 ## Recent Work
+
+### 2026-06-30: Conservative Scalar-Only Regridder Cleanup
+
+- Removed the unsupported `ConservativeRectilinearRemapper.apply_vector()`
+  stub so conservative remapping exposes only the scalar operation it
+  implements.
+- Added a conservative regridder argument guard that rejects vector calls before
+  the shared identical-grid fast path, so both identical and non-identical
+  conservative vector calls fail with the same scalar-only `TypeError`.
+- Validation run for this change: baseline fast pytest passed; focused red
+  tests first failed on the existing remapper vector stub, old remapper-origin
+  `RuntimeError`, and identical-grid vector passthrough. After implementation,
+  focused red/green pytest, affected conservative pytest, Black, flake8, mypy,
+  full fast pytest, full pytest, and `git diff --check` passed using direct
+  `scipy` environment executables. Black emitted the existing Python
+  3.13/target-3.14 safety-check warning, and full pytest emitted the existing
+  JAX dtype-promotion warning.
 
 ### 2026-06-30: Simplification Plan Quick Wins
 

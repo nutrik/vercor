@@ -39,7 +39,7 @@ def test_apply_scalar_shape_mismatch_raises_value_error() -> None:
         remapper.apply_scalar(np.ones((3, 3), dtype=float))
 
 
-def test_apply_vector_not_implemented_raises_runtime_error() -> None:
+def test_remapper_does_not_expose_vector_api() -> None:
     remapper = _make_remapper(
         src_lon_edges=np.array([0.0, 1.0, 2.0]),
         src_lat_edges=np.array([0.0, 1.0, 2.0]),
@@ -47,10 +47,7 @@ def test_apply_vector_not_implemented_raises_runtime_error() -> None:
         dst_lat_edges=np.array([0.0, 1.0, 2.0]),
     )
 
-    with pytest.raises(RuntimeError, match="not implemented"):
-        remapper.apply_vector(
-            np.ones((2, 2), dtype=float), np.ones((2, 2), dtype=float)
-        )
+    assert not hasattr(remapper, "apply_vector")
 
 
 def test_constant_field_preserved_on_refinement_conservation_mode() -> None:
