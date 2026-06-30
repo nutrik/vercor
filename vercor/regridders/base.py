@@ -1,11 +1,16 @@
-from typing import Any, cast
+from typing import Any
 
-from vercor.exceptions import RegridderError
 from vercor.grid import RectilinearGrid
 from vercor.grid_geometry import grids_identical
 
 
 class Regridder:
+    """Shared grid, interpolator, and display state for concrete regridders.
+
+    Concrete subclasses own their call contracts because scalar/vector support
+    differs by regridding method.
+    """
+
     def __init__(
         self,
         source_grid: RectilinearGrid,
@@ -34,40 +39,6 @@ class Regridder:
         """Return the concrete interpolator, or ``None`` for identity grids."""
 
         return self._interpolator
-
-    def _ensure_ready(self, args: tuple[Any, ...]) -> None:
-        """
-        Ensure that the Regridder is properly set up before applying interpolation.
-        Checks if the correct number of arguments are provided (either one for
-        scalar fields or two for vector fields).
-        """
-
-        if len(args) not in (1, 2):
-            raise TypeError("Provide scalar_src or (u_src, v_src) as positional args")
-
-    def __call__(
-        self,
-        *args: Any,
-    ) -> Any:
-        """
-        Supported calls:
-          - apply(scalar_src) -> scalar interpolation
-        """
-
-        self._ensure_ready(args)
-
-        # Check if components have identical grids internally and
-        # returns fields as-is (from source to destination) if so,
-        # avoiding unnecessary computation
-        if self.has_identical_grids:
-            return args if len(args) == 2 else args[0]
-
-        interpolator = self.interpolator
-        if interpolator is None:
-            raise RegridderError("Regridder not properly set up")
-        if len(args) == 1:
-            return interpolator.apply_scalar(args[0])
-        return cast(tuple[Any, Any], interpolator.apply_vector(args[0], args[1]))
 
     def __str__(self) -> str:
         return (

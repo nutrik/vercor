@@ -253,6 +253,10 @@ historical commands, failure messages, or detailed validation notes.
   flake8, mypy, full fast pytest, full pytest, and `conda run -n scipy`
   smoke pytest passed as of 2026-06-30. The earlier planning-time
   Conda/Rattler panic was not reproduced during final validation.
+- Latest local concrete regridder call-ownership validation: baseline fast
+  pytest, focused red/green boundary tests, focused affected pytest, Black,
+  flake8, mypy, full fast pytest, full pytest, and git diff whitespace check
+  passed as of 2026-06-30 using `conda run -n scipy`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -286,6 +290,23 @@ historical commands, failure messages, or detailed validation notes.
   sequence support, but the wrapper remains public API.
 
 ## Recent Work
+
+### 2026-06-30: Concrete Regridder Call Ownership
+
+- Moved regridder call dispatch out of the shared `Regridder` base and into
+  the concrete bilinear and conservative classes. The base now owns only shared
+  grid/interpolator/display state.
+- Preserved bilinear scalar/vector behavior, conservative scalar-only errors,
+  and identical-grid passthrough while removing the conservative `_ensure_ready`
+  override pattern.
+- Added boundary coverage for the new ownership split and updated dependency
+  wording plus stale test comments.
+- Validation run for this change: baseline fast pytest passed; the focused
+  red boundary test first failed on the existing base `__call__`; after
+  implementation, focused affected pytest, Black, flake8, mypy, full fast
+  pytest, full pytest, and `git diff --check` passed using
+  `conda run -n scipy`. Black emitted the existing Python 3.13/target-3.14
+  warning, and full pytest emitted the existing JAX dtype-promotion warning.
 
 ### 2026-06-30: Exchange Create Wrapper Removal
 

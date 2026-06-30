@@ -1,3 +1,6 @@
+from typing import Any
+
+from vercor.exceptions import RegridderError
 from vercor.grid import RectilinearGrid
 from vercor.grid_geometry import grids_identical
 from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
@@ -43,6 +46,22 @@ class BilinearRectilinearRegridder(Regridder):
             interpolator=interpolator,
             has_identical_grids=has_identical_grids,
         )
+
+    def __call__(self, *args: Any) -> Any:
+        """Apply bilinear scalar or vector regridding."""
+
+        if len(args) not in (1, 2):
+            raise TypeError("Provide scalar_src or (u_src, v_src) as positional args")
+
+        if self.has_identical_grids:
+            return args if len(args) == 2 else args[0]
+
+        interpolator = self.interpolator
+        if interpolator is None:
+            raise RegridderError("Regridder not properly set up")
+        if len(args) == 1:
+            return interpolator.apply_scalar(args[0])
+        return interpolator.apply_vector(args[0], args[1])
 
 
 def bilinear(

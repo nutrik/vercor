@@ -267,8 +267,8 @@ def test_regridder_call_with_invalid_arg_count_raises_type_error() -> None:
 )
 def test_regridder_source_mask_excludes_masked_cells_in_fracarea_mode() -> None:
     src = _grid("src", np.array([0.5, 1.5]), np.array([0.5, 1.5]))
-    # Use a different destination grid so Regridder.__call__ does not short-circuit
-    # on has_identical_grids=True.
+    # Use a different destination grid so conservative regridding does not
+    # short-circuit on has_identical_grids=True.
     dst = _grid(
         "dst",
         np.array([0.25, 0.75, 1.25, 1.75]),

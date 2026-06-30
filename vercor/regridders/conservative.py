@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import Any, Optional
 
+from vercor.exceptions import RegridderError
 from vercor.grid import RectilinearGrid
 from vercor.grid_geometry import centers_to_edges, grids_identical
 from vercor.interpolators.conservative_remap_rectilinear import (
@@ -60,15 +61,24 @@ class ConservativeRectilinearRegridder(Regridder):
             has_identical_grids=has_identical_grids,
         )
 
-    def _ensure_ready(self, args: tuple[object, ...]) -> None:
-        """Reject vector calls before the shared identity-grid fast path."""
+    def __call__(self, *args: Any) -> Any:
+        """Apply conservative scalar regridding."""
 
-        super()._ensure_ready(args)
+        if len(args) not in (1, 2):
+            raise TypeError("Provide scalar_src or (u_src, v_src) as positional args")
         if len(args) == 2:
             raise TypeError(
                 "Conservative regridding supports scalar fields only; use bilinear "
                 "regridding for vector fields."
             )
+
+        if self.has_identical_grids:
+            return args[0]
+
+        interpolator = self.interpolator
+        if interpolator is None:
+            raise RegridderError("Regridder not properly set up")
+        return interpolator.apply_scalar(args[0])
 
 
 def conservative(

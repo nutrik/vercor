@@ -1035,6 +1035,25 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
 
 
 @pytest.mark.fast_always
+def test_concrete_regridders_own_call_dispatch() -> None:
+    regridder_base_source = Path("vercor/regridders/base.py").read_text(
+        encoding="utf-8"
+    )
+    bilinear_source = Path("vercor/regridders/bilinear.py").read_text(encoding="utf-8")
+    conservative_source = Path("vercor/regridders/conservative.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def __call__(" not in regridder_base_source
+    assert "def _ensure_ready(" not in regridder_base_source
+    assert "def __call__(" in bilinear_source
+    assert "apply_vector" in bilinear_source
+    assert "def __call__(" in conservative_source
+    assert "def _ensure_ready(" not in conservative_source
+    assert "apply_vector" not in conservative_source
+
+
+@pytest.mark.fast_always
 def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     import vercor.diagnostics as diagnostics_module
     import vercor.host_arrays as host_arrays_module

@@ -14,7 +14,7 @@
 14. `vercor/field_layout.py` - shared canonical grid-field shape validation, component data-field layout validation, and time-last forcing normalization helpers built on (12)
 15. `vercor/interpolators/_bilinear_geometry.py`, `_bilinear_weights.py`, `_bilinear_extrapolation.py`, and `bilinear_rectilinear.py` - private spherical geometry, cell-weight, and extrapolation helper owners behind the public JAX-native bilinear scalar/vector interpolation facade built on (1, 3)
 16. `vercor/interpolators/conservative_remap_rectilinear.py` - JAX-native conservative scalar remapping runtime with eager overlap preprocessing built on (1, 3, 12, 13)
-17. `vercor/regridders/base.py` - abstract regridder wrapper and scalar/vector interpolator protocol built on (12, 13)
+17. `vercor/regridders/base.py` - shared regridder grid/interpolator/display state built on (12, 13)
 18. `vercor/regridders/bilinear.py` - bilinear regridder wrapper over (15, 17)
 19. `vercor/regridders/conservative.py` - conservative regridder wrapper over (13, 16, 17)
 20. `vercor/grid_masks.py` - land/ocean mask construction and remap-conservation checks built on (1, 12, 13, 19)
