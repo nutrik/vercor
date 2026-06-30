@@ -37,7 +37,6 @@ from vercor.exceptions import ComponentError, CouplerError
 from vercor.exchange import Exchange
 from vercor.grid import RectilinearGrid
 from vercor.regridders import bilinear, conservative
-from vercor.run_sequence import RunSequence
 from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.settings import VercorSettings
@@ -328,7 +327,12 @@ def _make_coupler(steps: int) -> Coupler:
         "LND": make_slab_land(grid),
         "ICE": make_slab_seaice(grid),
     }
-    coupler.run_sequence = RunSequence(order=["ATM", "OCN", "LND", "ICE"])
+    coupler.run_sequence = (
+        "ATM",
+        "OCN",
+        "LND",
+        "ICE",
+    )
     coupler.exchanges = [
         Exchange(
             source="OCN",
@@ -457,7 +461,14 @@ def _make_initialized_slab_coupler(steps: int) -> Coupler:
             regridder_factory=bilinear,
         )
     )
-    coupler.set_components_run_sequence(RunSequence(order=["ATM", "OCN", "LND", "ICE"]))
+    coupler.set_components_run_sequence(
+        (
+            "ATM",
+            "OCN",
+            "LND",
+            "ICE",
+        )
+    )
     coupler.initialize()
     return coupler
 
@@ -573,7 +584,14 @@ def _make_initialized_mixed_grid_slab_coupler(steps: int) -> Coupler:
             regridder_factory=bilinear,
         )
     )
-    coupler.set_components_run_sequence(RunSequence(order=["ATM", "OCN", "LND", "ICE"]))
+    coupler.set_components_run_sequence(
+        (
+            "ATM",
+            "OCN",
+            "LND",
+            "ICE",
+        )
+    )
     coupler.initialize()
     return coupler
 
@@ -870,7 +888,11 @@ def test_data_forcing_components_run_inside_runtime() -> None:
             imports=("sea_surface_temperature", "land_surface_temperature"),
         ),
     }
-    coupler.run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
+    coupler.run_sequence = (
+        "OCN",
+        "LND",
+        "ATM",
+    )
     coupler.exchanges = [
         Exchange(
             source="OCN",
@@ -957,7 +979,10 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
     )
     coupler.settings.year_in_seconds = 12.0
     coupler.components = {"OCN": ocean, "ATM": atmosphere}
-    coupler.run_sequence = RunSequence(order=["OCN", "ATM"])
+    coupler.run_sequence = (
+        "OCN",
+        "ATM",
+    )
     coupler.exchanges = [
         Exchange(
             source="OCN",
@@ -1012,7 +1037,10 @@ def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridd
         clock=Clock(start=datetime(2000, 1, 2), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"OCN": ocean, "ATM": atmosphere}
-    coupler.run_sequence = RunSequence(order=["OCN", "ATM"])
+    coupler.run_sequence = (
+        "OCN",
+        "ATM",
+    )
     coupler.exchanges = [
         Exchange(
             source="OCN",
@@ -1083,7 +1111,10 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
     )
     coupler.settings.year_in_seconds = 12.0
     coupler.components = {"OCN": ocean, "ATM": atmosphere}
-    coupler.run_sequence = RunSequence(order=["OCN", "ATM"])
+    coupler.run_sequence = (
+        "OCN",
+        "ATM",
+    )
     coupler.exchanges = [
         Exchange(
             source="OCN",
@@ -1170,7 +1201,10 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
         clock=Clock(start=datetime(2000, 1, 3), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"LND": land, "ATM": atmosphere}
-    coupler.run_sequence = RunSequence(order=["LND", "ATM"])
+    coupler.run_sequence = (
+        "LND",
+        "ATM",
+    )
     coupler.exchanges = [
         Exchange(
             source="LND",
@@ -1248,7 +1282,10 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
         )
     )
     coupler.components = {"LND": land, "ATM": atmosphere}
-    coupler.run_sequence = RunSequence(order=["LND", "ATM"])
+    coupler.run_sequence = (
+        "LND",
+        "ATM",
+    )
     coupler.exchanges = [
         Exchange(
             source="LND",
@@ -1325,7 +1362,10 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
         )
     )
     coupler.components = {"LND": land, "ATM": atmosphere}
-    coupler.run_sequence = RunSequence(order=["LND", "ATM"])
+    coupler.run_sequence = (
+        "LND",
+        "ATM",
+    )
     coupler.exchanges = [
         Exchange(
             source="LND",
@@ -1406,7 +1446,10 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
         clock=Clock(start=datetime(2001, 12, 31, 12), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"OCN": ocean, "ATM": atmosphere}
-    coupler.run_sequence = RunSequence(order=["OCN", "ATM"])
+    coupler.run_sequence = (
+        "OCN",
+        "ATM",
+    )
     coupler.exchanges = [
         Exchange(
             source="OCN",
@@ -1473,7 +1516,7 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"ATM": component}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     initial_state = coupler.create_runtime_state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1526,7 +1569,7 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"ATM": component}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     initial_state = coupler.create_runtime_state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1561,7 +1604,10 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"OCN": ocean, "ATM": atmosphere}
-    coupler.run_sequence = RunSequence(order=["OCN", "ATM"])
+    coupler.run_sequence = (
+        "OCN",
+        "ATM",
+    )
     coupler.exchanges = [
         Exchange(
             source="OCN",
@@ -1625,7 +1671,7 @@ def test_jax_gcm_runtime_requires_initialized_payload() -> None:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"ATM": component}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     with pytest.raises(ComponentError, match="component initialization"):
         run_scanned_coupler(coupler)
@@ -1655,7 +1701,7 @@ def test_run_accepts_default_runtime_component() -> None:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"ATM": cast(Any, DummyComponent("ATM", grid))}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     final_state = run_scanned_coupler(coupler)
 
@@ -1678,7 +1724,7 @@ def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"LND": cast(Any, camulator_land)}
-    coupler.run_sequence = RunSequence(order=["LND"])
+    coupler.run_sequence = ("LND",)
 
     assert isinstance(camulator_land.data["land_surface_temperature"], jax.Array)
     state = coupler.create_runtime_state()
@@ -1701,7 +1747,7 @@ def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"ATM": cast(Any, camulator)}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     assert isinstance(camulator.data["temperature"], jax.Array)
     state = coupler.create_runtime_state()
@@ -1726,7 +1772,7 @@ def test_scanned_runtime_rejects_veros_runtime_boundary() -> None:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"OCN": cast(Any, veros)}
-    coupler.run_sequence = RunSequence(order=["OCN"])
+    coupler.run_sequence = ("OCN",)
 
     assert isinstance(veros.data["sea_surface_temperature"], jax.Array)
     state = coupler.create_runtime_state()
@@ -1813,7 +1859,7 @@ def test_run_validates_missing_jax_gcm_preseed_before_scan() -> None:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"ATM": component}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
     state = coupler.create_runtime_state()
     atmosphere = state.get_component_state("ATM")
     atmosphere = atmosphere.with_data(_without_store_field(atmosphere.data, "pressure"))

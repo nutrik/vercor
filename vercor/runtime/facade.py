@@ -9,7 +9,7 @@ import vercor.output as _output
 from vercor.clock import Clock
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike
-from vercor.run_sequence import RunSequence, normalize_run_sequence
+from vercor.run_sequence import normalize_run_sequence
 from vercor.runtime.dispatch_context import (
     RuntimeDispatchContext,
     build_runtime_dispatch_context,
@@ -46,7 +46,7 @@ class RuntimeFacadeInputs:
     components: Mapping[str, "Component"]
     exchanges: Sequence[Exchange]
     runtime_resources: CouplerRuntimeResources
-    run_sequence: RunSequence | Sequence[str]
+    run_sequence: Sequence[str]
     clock: Clock
     settings: VercorSettings
 

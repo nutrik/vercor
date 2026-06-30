@@ -139,11 +139,12 @@ class RectilinearGrid(PyTreeNodeMixin):
 VerCOR intentionally separates user-facing orchestration objects from the
 immutable runtime containers used during traced integration.
 
-- Public orchestration API: `Coupler`, `Exchange`, `RunSequence`, `Clock`,
-  grids, regridders, and bundled concrete components are the objects users
-  compose when configuring a coupled run. `Coupler` and setup helpers also
-  accept plain component-name sequences for run order and normalize them to the
-  compatibility `RunSequence` wrapper internally.
+- Public orchestration API: `Coupler`, `Exchange`, `Clock`, grids, regridders,
+  and bundled concrete components are the objects users compose when
+  configuring a coupled run. `Coupler` and setup helpers accept plain
+  component-name sequences for run order and normalize them internally to
+  immutable tuples. `RunSequence` remains importable only as a deprecated
+  compatibility adapter; new code should pass lists or tuples directly.
 - Component-author API: `Component`, `DataComponent`, and
   `HostRuntimeComponent` are the stable extension points. Custom adapters should
   use the helper-first authoring layer where possible. The most concise public

@@ -31,7 +31,6 @@ from vercor.components.contexts import ComponentSetupContext, ComponentStepConte
 from vercor.coupler import Coupler
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.output import write_runtime_component_view_to_netcdf
-from vercor.run_sequence import RunSequence
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.component_state import create_runtime_component_state
 from vercor.runtime.field_transfer import (
@@ -559,7 +558,7 @@ def test_base_initialize_seeds_declared_defaults() -> None:
             dt_seconds=60.0,
             logger=cast(Any, None),
             settings=VercorSettings(),
-            run_sequence=RunSequence(order=["ATM"]),
+            run_sequence=("ATM",),
         )
     )
 
@@ -763,7 +762,7 @@ def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> Non
                 dt_seconds=60.0,
                 logger=cast(Any, None),
                 settings=VercorSettings(),
-                run_sequence=RunSequence(order=[component.name]),
+                run_sequence=(component.name,),
             )
         )
         state = create_runtime_component_state(
@@ -1393,7 +1392,7 @@ def test_host_component_runs_through_coupler_host_runtime() -> None:
     )
     coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=5.0, steps=1))
     coupler.register(component)
-    coupler.set_components_run_sequence(RunSequence(order=["HOST"]))
+    coupler.set_components_run_sequence(("HOST",))
 
     final_state = coupler.run()
 
@@ -1514,7 +1513,7 @@ def test_host_component_rejects_scanned_runtime_with_clear_error() -> None:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1)
     )
     coupler.components = {"ATM": component}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
     state = coupler.create_runtime_state()
 
     with pytest.raises(ComponentError, match="host-backed.*Coupler.run"):

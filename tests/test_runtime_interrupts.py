@@ -20,7 +20,6 @@ from vercor.clock import Clock
 from vercor.components.base import Component
 from vercor.components.host import HostRuntimeComponent
 from vercor.coupler import Coupler
-from vercor.run_sequence import RunSequence
 from vercor.components.contexts import ComponentStepContext
 from vercor.runtime.interrupts import (
     RuntimeInterruptController,
@@ -63,7 +62,7 @@ def _make_pure_coupler(steps: int = 2) -> Coupler:
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=steps)
     )
     coupler.components = {"ATM": cast(Any, _NoopRuntimeComponent("ATM"))}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
     return coupler
 
 
@@ -174,7 +173,7 @@ def test_unrelated_jax_runtime_errors_are_preserved() -> None:
 def test_host_runtime_signal_aborts_through_shared_controller() -> None:
     coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
     coupler.components = {"ATM": cast(Any, _InterruptingHostComponent("ATM"))}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     with pytest.raises(RuntimeInterrupted, match="SIGINT") as excinfo:
         coupler.run()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -13,7 +13,6 @@ from numpy.typing import NDArray
 from vercor.clock import Clock
 from vercor.components import DataComponent
 from vercor.grid import RectilinearGrid
-from vercor.run_sequence import RunSequence
 from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
@@ -78,7 +77,7 @@ class CoverageCouplerStub:
     logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger("coverage-tests")
     )
-    run_sequence: RunSequence = field(default_factory=lambda: RunSequence(order=[]))
+    run_sequence: Sequence[str] = field(default_factory=tuple)
 
     def init_context(self) -> ComponentSetupContext:
         return ComponentSetupContext(

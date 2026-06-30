@@ -10,7 +10,6 @@ from vercor.components.contexts import ComponentSetupContext
 from vercor.dtypes import as_jax_real_array
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike
-from vercor.run_sequence import RunSequence
 from vercor.runtime.component_topology import validate_component_topology_names
 from vercor.runtime.contracts import RuntimeComponentContract, build_runtime_contracts
 from vercor.runtime.topology import build_exchange_topology
@@ -68,7 +67,7 @@ def initialize_coupler_runtime(
     clock: Clock,
     components: dict[str, Component],
     exchanges: Sequence[Exchange],
-    run_sequence: RunSequence,
+    run_sequence: Sequence[str],
     settings: VercorSettings,
     logger: LoggerLike,
     enable_x64_computations: bool | None = None,

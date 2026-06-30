@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
 from vercor.calendar import ModelDateTime
 from vercor.jax_logging import LoggerLike
-from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
 
 
@@ -15,7 +15,7 @@ class ComponentSetupContext:
 
     start: datetime | ModelDateTime
     dt_seconds: float
-    run_sequence: RunSequence
+    run_sequence: Sequence[str]
     settings: VercorSettings
     logger: LoggerLike
 

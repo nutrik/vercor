@@ -45,7 +45,6 @@ from vercor.jax_logging import (
 )
 from vercor.regridders.bilinear import bilinear
 from vercor.regridders.conservative import conservative
-from vercor.run_sequence import RunSequence
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.exchange_dispatch import dispatch_component_exchanges
 from vercor.output import output_masks_for_component
@@ -269,7 +268,13 @@ def test_coupler_runtime_component_views_returns_ordered_named_views() -> None:
                 grid=make_test_grid(name=component_name.lower()),
             )
         )
-    coupler.set_components_run_sequence(RunSequence(order=["ATM", "OCN", "LND"]))
+    coupler.set_components_run_sequence(
+        (
+            "ATM",
+            "OCN",
+            "LND",
+        )
+    )
 
     runtime_state = coupler.create_runtime_state(prefill_missing=True)
 
@@ -334,7 +339,7 @@ def test_coupler_wraps_injected_python_logger_for_scanned_runtime() -> None:
         log_level="INFO",
     )
     coupler.components = {"ATM": cast(Any, _LoggingRunComponent("ATM"))}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     with capture_logger_output(logger_name, set_logger_level=False) as stream:
         final_state = jax.jit(lambda: run_scanned_coupler(coupler))()
@@ -374,7 +379,7 @@ def test_scanned_runtime_passes_callback_logger_to_components() -> None:
     )
     coupler.logger = setup_logger(level="INFO", name=logger_name)
     coupler.components = {"ATM": cast(Any, _LoggingRunComponent("ATM"))}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     with capture_logger_output(logger_name) as stream:
         final_state = jax.jit(lambda: run_scanned_coupler(coupler))()
@@ -395,7 +400,10 @@ def test_scanned_runtime_logs_host_equivalent_progress_messages() -> None:
         "ATM": cast(Any, _LoggingRunComponent("ATM")),
         "OCN": cast(Any, _LoggingRunComponent("OCN")),
     }
-    coupler.run_sequence = RunSequence(order=["ATM", "OCN"])
+    coupler.run_sequence = (
+        "ATM",
+        "OCN",
+    )
 
     with capture_logger_output(logger_name) as stream:
         final_state = jax.jit(lambda: run_scanned_coupler(coupler))()
@@ -423,7 +431,7 @@ def test_scanned_runtime_suppresses_info_below_log_level() -> None:
     )
     coupler.logger = setup_logger(level="WARNING", name=logger_name)
     coupler.components = {"ATM": cast(Any, _LoggingRunComponent("ATM"))}
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     with capture_logger_output(logger_name, set_logger_level=False) as stream:
         final_state = jax.jit(lambda: run_scanned_coupler(coupler))()
@@ -446,7 +454,12 @@ def test_coupler_register_and_run_sequence_validation() -> None:
         coupler.register(cast(Any, atmosphere))
 
     with pytest.raises(CouplerError, match="not registered in coupler"):
-        coupler.set_components_run_sequence(RunSequence(order=["ATM", "OCN"]))
+        coupler.set_components_run_sequence(
+            (
+                "ATM",
+                "OCN",
+            )
+        )
 
 
 @pytest.mark.parametrize(
@@ -1230,7 +1243,12 @@ def test_coupler_string_representations_include_registered_state() -> None:
             regridder_factory=bilinear,
         )
     )
-    coupler.set_components_run_sequence(RunSequence(order=["ATM", "OCN"]))
+    coupler.set_components_run_sequence(
+        (
+            "ATM",
+            "OCN",
+        )
+    )
 
     rendered = str(coupler)
     representation = repr(coupler)
@@ -1251,7 +1269,10 @@ def test_coupler_run_happy_path_dispatches_and_steps_in_sequence(
     atmosphere = _HostRunComponent("ATM", events)
     ocean = _HostRunComponent("OCN", events)
     coupler.components = cast(Any, {"ATM": atmosphere, "OCN": ocean})
-    coupler.run_sequence = RunSequence(order=["ATM", "OCN"])
+    coupler.run_sequence = (
+        "ATM",
+        "OCN",
+    )
 
     def fake_dispatch(state: Any, component_name: str, *args: Any) -> Any:
         _ = args
@@ -1299,7 +1320,7 @@ def test_host_runtime_components_use_explicit_host_contract() -> None:
     coupler = make_coupler()
     host_component = _HostRunComponent("ATM")
     coupler.components = cast(Any, {"ATM": host_component})
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     final_state = coupler.run()
     final_component = final_state.get_component_state("ATM")
@@ -1315,7 +1336,7 @@ def test_host_runtime_components_use_explicit_host_contract() -> None:
 def test_run_rejects_state_donation_for_host_backed_components() -> None:
     coupler = make_coupler()
     coupler.components = cast(Any, {"ATM": _HostRunComponent("ATM")})
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
 
     with pytest.raises(CouplerError, match="donation"):
         coupler.run(donate_state=True)
@@ -1351,7 +1372,7 @@ def test_host_and_scanned_run_use_runtime_component_helper(
     )
 
     coupler.components = cast(Any, {"ATM": _HostRunComponent("ATM")})
-    coupler.run_sequence = RunSequence(order=["ATM"])
+    coupler.run_sequence = ("ATM",)
     coupler.run()
     run_events = list(events)
     events.clear()
@@ -1360,7 +1381,10 @@ def test_host_and_scanned_run_use_runtime_component_helper(
     atmosphere = _RunComponent("ATM", [], timestamp)
     ocean = _RunComponent("OCN", [], timestamp)
     coupler.components = cast(Any, {"ATM": atmosphere, "OCN": ocean})
-    coupler.run_sequence = RunSequence(order=["ATM", "OCN"])
+    coupler.run_sequence = (
+        "ATM",
+        "OCN",
+    )
     run_scanned_coupler(coupler)
 
     assert run_events == ["run:ATM"]

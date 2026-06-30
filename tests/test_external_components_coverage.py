@@ -40,7 +40,6 @@ from vercor.output.variables import OutputVariable
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.state import RuntimeComponentState
 from vercor.runtime.stores import RuntimeFieldStore
-from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
 
 
@@ -249,7 +248,7 @@ def _make_coupler(
         dt_seconds=dt_seconds,
         logger=cast(Any, _RecordingLogger()),
         settings=settings or VercorSettings(),
-        run_sequence=RunSequence(order=run_order),
+        run_sequence=tuple(run_order),
     )
 
 

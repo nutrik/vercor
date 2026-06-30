@@ -36,7 +36,6 @@ from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.component_state import create_runtime_component_state
 from vercor.runtime.state import RuntimeComponentState
 from vercor.runtime.stores import RuntimeFieldStore
-from vercor.run_sequence import RunSequence
 from vercor.settings import VercorSettings
 from vercor.jax_logging import DEFAULT_LOGGER_NAME
 
@@ -90,7 +89,7 @@ def _make_coupler(start: datetime) -> ComponentSetupContext:
     return ComponentSetupContext(
         start=start,
         dt_seconds=21600,
-        run_sequence=RunSequence(order=[]),
+        run_sequence=(),
         settings=VercorSettings(),
         logger=cast(Any, _RecordingLogger()),
     )

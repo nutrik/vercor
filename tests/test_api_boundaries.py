@@ -27,7 +27,7 @@ from vercor.components.host import HostRuntimeComponent
 from vercor.clock import Clock
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
-from vercor.run_sequence import RunSequence
+from vercor.run_sequence import RunSequence, normalize_run_sequence
 from vercor.runtime.state import RuntimeComponentState
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.regridders import bilinear
@@ -625,7 +625,7 @@ def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
     ocean = DataComponent(name="OCN", grid=grid)
     atmosphere = DataComponent(name="ATM", grid=grid)
     clock = Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1)
-    run_sequence = RunSequence(order=["OCN", "ATM"])
+    run_sequence = ("OCN", "ATM")
     exchange = Exchange(
         source="OCN",
         destination="ATM",
@@ -642,7 +642,7 @@ def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
 
     assert coupler.clock is clock
     assert tuple(coupler.components) == ("OCN", "ATM")
-    assert coupler.run_sequence is run_sequence
+    assert coupler.run_sequence == run_sequence
     assert coupler.exchanges == [exchange]
 
     specs = (
@@ -676,8 +676,7 @@ def test_coupler_run_sequence_is_explicit_empty_schedule_by_default() -> None:
         Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1)
     )
 
-    assert isinstance(coupler.run_sequence, RunSequence)
-    assert coupler.run_sequence.order == []
+    assert coupler.run_sequence == ()
 
     coupler_source = Path("vercor/coupler.py").read_text(encoding="utf-8")
     assert 'hasattr(self, "run_sequence")' not in coupler_source
@@ -711,11 +710,37 @@ def test_coupler_accepts_plain_component_name_sequences() -> None:
         run_sequence=["OCN", "ATM"],
     )
 
-    assert isinstance(coupler.run_sequence, RunSequence)
-    assert coupler.run_sequence.order == ["OCN", "ATM"]
+    assert coupler.run_sequence == ("OCN", "ATM")
 
     coupler.set_components_run_sequence(("ATM", "OCN"))
-    assert coupler.run_sequence.order == ["ATM", "OCN"]
+    assert coupler.run_sequence == ("ATM", "OCN")
+
+
+@pytest.mark.fast_always
+def test_run_sequence_adapter_is_deprecated_tuple_compatibility() -> None:
+    with pytest.warns(DeprecationWarning, match="RunSequence is deprecated"):
+        sequence = RunSequence(order=["OCN", "ATM"])
+
+    assert sequence.order == ("OCN", "ATM")
+    assert list(sequence) == ["OCN", "ATM"]
+    assert normalize_run_sequence(sequence) == ("OCN", "ATM")
+
+    with pytest.raises(
+        TypeError,
+        match="run_sequence must be a sequence of component names, not str",
+    ):
+        normalize_run_sequence("ATM")
+
+
+@pytest.mark.fast_always
+def test_setup_state_reads_run_sequence_as_plain_sequence() -> None:
+    setup_state_paths = (
+        Path("vercor/setups/external/jax_gcm_state.py"),
+        Path("vercor/setups/external/veros_gcm_state.py"),
+    )
+
+    for path in setup_state_paths:
+        assert ".run_sequence.order" not in path.read_text(encoding="utf-8")
 
 
 @pytest.mark.fast_always

@@ -238,6 +238,11 @@ historical commands, failure messages, or detailed validation notes.
   validation: baseline fast pytest, focused red/green pytest, focused affected
   pytest, Black, flake8, mypy, full fast pytest, full pytest, and git diff
   whitespace check passed as of 2026-06-30 using `conda run -n scipy`.
+- Latest local RunSequence deprecation and tuple run-order validation: focused
+  red/green API tests, focused affected fast runtime/external/helper/component
+  tests, Black, flake8, mypy, full fast pytest, full pytest, coverage pytest,
+  and git diff whitespace check passed as of 2026-06-30 using the `scipy`
+  environment through `conda run`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus

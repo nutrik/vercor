@@ -22,7 +22,6 @@ from vercor.setups.slab.ocean import make_slab_ocean
 from vercor.setups.slab.seaice import make_slab_seaice
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
-from vercor.run_sequence import RunSequence
 from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
 from vercor.runtime.stores import RuntimeFieldStore
 
@@ -74,7 +73,12 @@ def _make_coupler(steps: int) -> Coupler:
         "LND": make_slab_land(grid),
         "ICE": make_slab_seaice(grid),
     }
-    coupler.run_sequence = RunSequence(order=["ATM", "OCN", "LND", "ICE"])
+    coupler.run_sequence = (
+        "ATM",
+        "OCN",
+        "LND",
+        "ICE",
+    )
     coupler.exchanges = [
         Exchange(
             source="OCN",

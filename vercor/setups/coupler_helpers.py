@@ -8,7 +8,6 @@ from vercor.components import Component
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
 from vercor.exchange import ExchangeField, RegridderFactory
-from vercor.run_sequence import RunSequence
 
 
 @dataclass(frozen=True)
@@ -25,7 +24,7 @@ def build_coupler(
     *,
     clock: Clock,
     components: Iterable[Component],
-    run_sequence: RunSequence | Sequence[str],
+    run_sequence: Sequence[str],
 ) -> Coupler:
     """Build a coupler with components registered and run order configured."""
 

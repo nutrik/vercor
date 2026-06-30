@@ -17,7 +17,6 @@ from vercor.grid_geometry import centers_to_edges
 from vercor.grid_masks import compute_land_mask
 from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 from vercor.regridders.bilinear import bilinear
-from vercor.run_sequence import RunSequence
 
 
 @dataclass(frozen=True)
@@ -133,7 +132,7 @@ def test_helper_kernels_support_jax_jit() -> None:
     assert_allclose_compact(land_mask, np.asarray([[1, 0], [1, 0]]))
 
 
-def test_exchange_create_and_run_sequence_iteration() -> None:
+def test_exchange_create_uses_factory_and_formatting() -> None:
     source_grid = RectilinearGrid(
         name="src",
         longitude=np.asarray([0.0, 180.0]),
@@ -168,9 +167,6 @@ def test_exchange_create_and_run_sequence_iteration() -> None:
     assert "fields=['temperature', ('u_velocity', 'v_velocity')]" in repr(exchange)
     assert created == {"source": "src", "destination": "dst"}
     assert calls == [(source_grid, destination_grid)]
-
-    sequence = RunSequence(order=["OCN", "ATM", "LND"])
-    assert list(sequence) == ["OCN", "ATM", "LND"]
 
 
 def test_exchange_uses_wrapped_factory_name_and_create_keeps_partial_options() -> None:

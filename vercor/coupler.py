@@ -15,7 +15,7 @@ from vercor.jax_logging import (
     configure_python_logger,
     setup_logger as _setup_logger,
 )
-from vercor.run_sequence import RunSequence, normalize_run_sequence
+from vercor.run_sequence import normalize_run_sequence
 import vercor.runtime.facade as _runtime_facade
 from vercor.runtime.resources import CouplerRuntimeResources
 from vercor.settings import VercorSettings
@@ -55,7 +55,7 @@ class Coupler:
     clock: Clock
     log_level: int | str = "INFO"
     logger: LoggerLike = field(default_factory=_setup_logger)
-    run_sequence: RunSequence | Sequence[str] = field(default_factory=RunSequence)
+    run_sequence: Sequence[str] = field(default_factory=tuple)
     components: dict[str, Component] = field(default_factory=dict)
     exchanges: list[Exchange] = field(default_factory=list)
     settings: VercorSettings = field(default_factory=VercorSettings)
@@ -121,7 +121,7 @@ class Coupler:
 
     def set_components_run_sequence(
         self,
-        run_sequence: RunSequence | Sequence[str],
+        run_sequence: Sequence[str],
     ) -> None:
         """
         Set the run sequence for the coupler components.
