@@ -30,7 +30,6 @@ ComponentStepCallable: TypeAlias = Callable[
 ]
 AuthorStepCallable: TypeAlias = Callable[..., ComponentStepReturn]
 FieldNames: TypeAlias = Iterable[str]
-FieldDefaults: TypeAlias = Mapping[str, RuntimeArray] | None
 AuthorFieldValues: TypeAlias = Mapping[str, object] | None
 ComponentInitializeHook = Callable[[Any, ComponentSetupContext], None]
 ComponentCreatePayloadHook = Callable[[Any], Any | None]
@@ -83,6 +82,5 @@ __all__ = [
     "ComponentStepResult",
     "ComponentStepReturn",
     "ComponentValidateHook",
-    "FieldDefaults",
     "FieldNames",
 ]

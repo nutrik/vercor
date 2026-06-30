@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
-from vercor.regridders import (
-    BilinearRectilinearRegridder,
-    ConservativeRectilinearRegridder,
-)
 from vercor.types import RuntimeArray
-
-RuntimeRegridder = BilinearRectilinearRegridder | ConservativeRectilinearRegridder
 
 
 @dataclass(slots=True)
 class RuntimeTopologyMaps:
     """Grouped exchange topology maps used by runtime setup and dispatch."""
 
-    regridders: dict[tuple[str, str, str], RuntimeRegridder]
+    regridders: dict[tuple[str, str, str], Any]
     binary_masks: dict[tuple[str, str, str], RuntimeArray]
     fractional_masks: dict[tuple[str, str, str], RuntimeArray]
 
@@ -49,7 +44,6 @@ class ExchangeTopologyState:
 
 __all__ = [
     "ExchangeTopologyState",
-    "RuntimeRegridder",
     "RuntimeTopologyMaps",
     "SurfaceExchangeMasks",
 ]

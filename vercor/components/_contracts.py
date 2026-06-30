@@ -9,7 +9,6 @@ from vercor.components.contracts import (
     ComponentStepCallable,
     ComponentStepResult,
     ComponentStepReturn,
-    FieldDefaults,
     FieldNames,
 )
 from vercor.components._field_names import unique_field_names
@@ -85,7 +84,6 @@ __all__ = [
     "ComponentStepCallable",
     "ComponentStepResult",
     "ComponentStepReturn",
-    "FieldDefaults",
     "FieldNames",
     "declared_runtime_field_names",
     "merge_component_outputs",

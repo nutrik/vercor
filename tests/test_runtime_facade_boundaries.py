@@ -116,7 +116,9 @@ def test_runtime_topology_policy_boundaries_are_focused() -> None:
         "surface_masks",
     ]
 
-    assert "RuntimeRegridder =" in topology_state_source
+    assert "RuntimeRegridder =" not in topology_state_source
+    assert "BilinearRectilinearRegridder" not in topology_state_source
+    assert "ConservativeRectilinearRegridder" not in topology_state_source
     assert "def build_exchange_topology_maps(" in exchange_topology_source
     assert "def create_surface_exchange_masks(" in surface_masks_source
     assert "def validate_land_mask_consistency(" in surface_masks_source

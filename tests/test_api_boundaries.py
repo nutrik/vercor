@@ -113,6 +113,7 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
 @pytest.mark.fast_always
 def test_components_package_exports_only_component_author_contracts() -> None:
     contracts_module = importlib.import_module("vercor.components.contracts")
+    private_contracts_module = importlib.import_module("vercor.components._contracts")
     imported_data_module = importlib.import_module("vercor.components.data")
     imported_host_module = importlib.import_module("vercor.components.host")
 
@@ -177,6 +178,10 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     )
     assert components_module.host_component is factories_module.host_component
     assert setup_validation_module.validate_component_setup is not None
+    assert "FieldDefaults" not in contracts_module.__all__
+    assert "FieldDefaults" not in private_contracts_module.__all__
+    assert not hasattr(contracts_module, "FieldDefaults")
+    assert not hasattr(private_contracts_module, "FieldDefaults")
     assert not hasattr(base_module, "validate_component_setup")
     assert not hasattr(components_module, "validate_component_setup")
     assert not hasattr(base_module, "data_component")

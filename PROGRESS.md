@@ -230,6 +230,10 @@ historical commands, failure messages, or detailed validation notes.
   pytest, focused red/green pytest, focused affected pytest, Black, flake8,
   mypy, full fast pytest, full pytest, and git diff whitespace check passed as
   of 2026-06-30 using the direct `scipy` environment executable.
+- Latest local internal helper type-surface simplification validation: focused
+  red/green pytest, Black, flake8, mypy, full fast pytest, full pytest, and
+  git diff whitespace check passed as of 2026-06-30 using the direct `scipy`
+  environment executable.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -263,6 +267,25 @@ historical commands, failure messages, or detailed validation notes.
   sequence support, but the wrapper remains public API.
 
 ## Recent Work
+
+### 2026-06-30: Internal Helper Type-Surface Simplification
+
+- Removed the unused `FieldDefaults` type alias from component contracts and
+  the private component-contract reexport layer. Boundary tests now assert that
+  the alias stays absent from both surfaces.
+- Removed the `RuntimeRegridder` concrete union from
+  `vercor.runtime.topology_state`; grouped runtime topology maps now avoid
+  importing bilinear/conservative regridder implementations and type the
+  regridder map as an internal object container.
+- Updated `DEPENDENCIES.md` so runtime topology state no longer lists direct
+  bilinear/conservative regridder dependencies.
+- Validation run for this change: focused red tests first failed on the
+  existing `FieldDefaults` export and `RuntimeRegridder` topology alias. After
+  implementation, focused boundary pytest, Black, flake8, mypy, full fast
+  pytest, full pytest, and `git diff --check` passed using direct `scipy`
+  environment executables. Black emitted the existing Python 3.13/target-3.14
+  safety-check warning, and full pytest emitted the existing JAX
+  dtype-promotion warning.
 
 ### 2026-06-30: Conservative Scalar-Only Regridder Cleanup
 
@@ -1423,9 +1446,8 @@ historical commands, failure messages, or detailed validation notes.
 
 ### 2026-06-01: Runtime Topology Policy Boundary Refactor
 
-- Added `vercor.runtime.topology_state` as the neutral owner for
-  `RuntimeRegridder`, grouped `RuntimeTopologyMaps`, `SurfaceExchangeMasks`,
-  and `ExchangeTopologyState`.
+- Added `vercor.runtime.topology_state` as the neutral owner for grouped
+  `RuntimeTopologyMaps`, `SurfaceExchangeMasks`, and `ExchangeTopologyState`.
 - Split generic exchange regridder/identity-mask map construction into
   `vercor.runtime.exchange_topology`, and moved ATM/OCN/LND surface-mask
   creation, validation, and bilinear mask patching into
@@ -1740,7 +1762,7 @@ historical commands, failure messages, or detailed validation notes.
   `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
   3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 - Failed approach recorded: the first full pytest run exposed an overly exact
-  existing source-boundary assertion for the `RuntimeRegridder` topology import;
+  existing source-boundary assertion for the former topology regridder import;
   the assertion now checks topology-owner imports without depending on one-line
   import formatting.
 
