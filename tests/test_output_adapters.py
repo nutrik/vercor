@@ -85,6 +85,36 @@ def test_component_output_adapter_writes_when_period_is_due(
         assert_allclose_compact(np.asarray(actual.variables["x"]), [10.0, 20.0])
 
 
+def test_component_output_adapter_records_and_writes_when_period_is_due(
+    tmp_path: Path,
+) -> None:
+    adapter = ComponentOutputAdapter(empty_error_message="missing samples")
+
+    written = adapter.record_period_average_if_due(
+        {
+            "temperature": OutputVariable(
+                ("sample", "x"),
+                np.asarray([[1.0, 3.0], [5.0, np.nan]]),
+                {"units": "K"},
+            )
+        },
+        summation_dim="sample",
+        time=datetime(2000, 1, 1),
+        dt=timedelta(days=1),
+        output_frequency="day",
+        output=str(tmp_path / "period-average.nc"),
+        build_coordinate_variables=_coordinate_variables,
+    )
+
+    assert written
+    assert adapter.empty
+    with h5netcdf.File(tmp_path / "period-average.nc", "r") as actual:
+        temperature = actual.variables["temperature"]
+        assert temperature.dimensions == ("time", "x")
+        assert temperature.attrs["units"] == "K"
+        assert_allclose_compact(np.asarray(temperature), np.asarray([[3.0, 3.0]]))
+
+
 def test_component_output_adapter_skips_when_period_is_not_due(
     tmp_path: Path,
 ) -> None:
@@ -108,6 +138,33 @@ def test_component_output_adapter_skips_when_period_is_not_due(
     assert not (tmp_path / "period-average.nc").exists()
 
 
+def test_component_output_adapter_records_and_retains_when_period_is_not_due(
+    tmp_path: Path,
+) -> None:
+    adapter = ComponentOutputAdapter(empty_error_message="missing samples")
+
+    def output_for_time(output_time: datetime) -> str:
+        _ = output_time
+        raise AssertionError("output path should not be built when period is not due")
+
+    written = adapter.record_period_average_if_due(
+        {"temperature": OutputVariable(("x",), np.asarray([1.0, 3.0]))},
+        time=datetime(2000, 1, 1),
+        dt=timedelta(hours=1),
+        output_frequency="day",
+        output=output_for_time,
+        build_coordinate_variables=_coordinate_variables,
+    )
+
+    assert not written
+    assert not adapter.empty
+    assert not (tmp_path / "period-average.nc").exists()
+    assert_allclose_compact(
+        adapter.accumulator.mean_samples()["temperature"].values,
+        np.asarray([1.0, 3.0]),
+    )
+
+
 def test_component_output_adapter_keeps_samples_when_write_fails(
     tmp_path: Path,
 ) -> None:
@@ -128,6 +185,36 @@ def test_component_output_adapter_keeps_samples_when_write_fails(
     with pytest.raises(ValueError, match="dimension 'x'.*existing size 2.*new size 3"):
         adapter.write_period_average(
             str(tmp_path / "conflicting-dimensions.nc"),
+            build_coordinate_variables=_coordinate_variables,
+            build_data_variables=conflicting_data_variables,
+        )
+
+    assert not adapter.empty
+
+
+def test_component_output_adapter_record_keeps_samples_when_write_fails(
+    tmp_path: Path,
+) -> None:
+    adapter = ComponentOutputAdapter(empty_error_message="missing samples")
+
+    def conflicting_data_variables(
+        variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        _ = variables
+        return {
+            "temperature": OutputVariable(
+                ("time", "x"),
+                np.asarray([[1.0, 2.0, 3.0]]),
+            )
+        }
+
+    with pytest.raises(ValueError, match="dimension 'x'.*existing size 2.*new size 3"):
+        adapter.record_period_average_if_due(
+            {"temperature": OutputVariable(("x",), np.asarray([1.0, 3.0]))},
+            time=datetime(2000, 1, 1),
+            dt=timedelta(days=1),
+            output_frequency="day",
+            output=str(tmp_path / "conflicting-dimensions.nc"),
             build_coordinate_variables=_coordinate_variables,
             build_data_variables=conflicting_data_variables,
         )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from importlib import resources
 from os.path import expandvars
 from pathlib import Path
@@ -15,6 +15,7 @@ import torch
 import yaml
 
 from vercor.jax_logging import LoggerLike, get_default_logger
+from vercor.output.adapters import ComponentOutputAdapter
 from vercor.output.datasets import time_coordinate_variable, used_dimension_names
 from vercor.output.netcdf import write_netcdf_dataset
 from vercor.output.variables import OutputVariable
@@ -34,6 +35,15 @@ _UNSUPPORTED_PREDICT_OPTIONS = (
     "pressure_var_encoding",
     "height_var_encoding",
 )
+
+
+def make_camulator_output_adapter() -> ComponentOutputAdapter:
+    """Return the configured period-output adapter for CAMulator predictions."""
+
+    return ComponentOutputAdapter(
+        empty_error_message=CAMULATOR_AVERAGE_EMPTY_ERROR_MESSAGE,
+        time_dim=CAMULATOR_TIME_DIM,
+    )
 
 
 def load_camulator_output_metadata(conf: Mapping[str, Any]) -> dict[str, Any]:
@@ -271,6 +281,67 @@ def camulator_average_data_variables(
         name: _with_metadata(variable, name, metadata)
         for name, variable in variables.items()
     }
+
+
+def record_camulator_period_output(
+    adapter: ComponentOutputAdapter,
+    prediction: torch.Tensor,
+    *,
+    output_time: datetime,
+    dt: timedelta,
+    output_frequency: str | None,
+    latitude: object,
+    longitude: object,
+    init_str: str,
+    metadata: Mapping[str, Any],
+    conf: Mapping[str, Any],
+    state_transformer: Any | None,
+    logger: LoggerLike | None = None,
+) -> bool:
+    """Record one CAMulator prediction and write a period average when due."""
+
+    variables = camulator_period_output_variables(
+        prediction,
+        metadata=metadata,
+        conf=conf,
+        state_transformer=state_transformer,
+    )
+
+    def build_coordinate_variables(
+        mean_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return camulator_average_coordinate_variables(
+            mean_variables,
+            output_time=output_time,
+            latitude=latitude,
+            longitude=longitude,
+            metadata=metadata,
+            conf=conf,
+        )
+
+    def build_data_variables(
+        mean_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return camulator_average_data_variables(
+            mean_variables,
+            metadata=metadata,
+        )
+
+    return adapter.record_period_average_if_due(
+        variables,
+        summation_dim=CAMULATOR_TIME_DIM,
+        time=output_time,
+        dt=dt,
+        output_frequency=output_frequency,
+        output=lambda time: camulator_average_output_path(
+            output_time=time,
+            init_str=init_str,
+            conf=conf,
+        ),
+        build_coordinate_variables=build_coordinate_variables,
+        build_data_variables=build_data_variables,
+        logger=logger,
+    )
 
 
 def _validate_supported_output_options(conf: Mapping[str, Any]) -> None:
@@ -540,6 +611,8 @@ __all__ = [
     "camulator_average_output_path",
     "camulator_period_output_variables",
     "load_camulator_output_metadata",
+    "make_camulator_output_adapter",
+    "record_camulator_period_output",
     "write_camulator_netcdf_increment",
     "write_camulator_prediction_output",
 ]

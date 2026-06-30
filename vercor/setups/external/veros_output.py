@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import jax.numpy as jnp
@@ -11,6 +11,8 @@ import jax.numpy as jnp
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor.host_arrays import array_to_host
+from vercor.jax_logging import LoggerLike
+from vercor.output.adapters import ComponentOutputAdapter
 from vercor.output.datasets import time_coordinate_variable, used_dimension_names
 from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
@@ -26,6 +28,16 @@ VEROS_AVERAGE_EMPTY_ERROR_MESSAGE = (
 )
 _TIMESTEP_DIM = "timesteps"
 _GHOST_DIMS = ("xt", "yt", "xu", "yu")
+
+
+def make_veros_output_adapter() -> ComponentOutputAdapter:
+    """Return the configured period-output adapter for Veros snapshots."""
+
+    return ComponentOutputAdapter(
+        empty_error_message=VEROS_AVERAGE_EMPTY_ERROR_MESSAGE,
+        time_dim=VEROS_TIME_DIM,
+        value_dims_for_sample=veros_average_value_dims,
+    )
 
 
 def normalize_veros_output_variables(
@@ -188,11 +200,47 @@ def veros_average_coordinate_variables(
     return coordinate_variables
 
 
+def record_veros_period_output(
+    adapter: ComponentOutputAdapter,
+    veros_state: Any,
+    *,
+    output_variables: Sequence[str],
+    output_time: datetime | ModelDateTime,
+    dt: timedelta,
+    output_frequency: str | None,
+    logger: LoggerLike | None = None,
+) -> bool:
+    """Record one Veros snapshot and write a period average when due."""
+
+    variables = extract_veros_output_snapshot(veros_state, output_variables)
+
+    def build_coordinate_variables(
+        mean_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return veros_average_coordinate_variables(
+            veros_state=veros_state,
+            output_time=output_time,
+            variables=mean_variables,
+        )
+
+    return adapter.record_period_average_if_due(
+        variables,
+        time=output_time,
+        dt=dt,
+        output_frequency=output_frequency,
+        output=lambda time: f"veros.averages.{time.strftime('%Y-%m-%d')}.nc",
+        build_coordinate_variables=build_coordinate_variables,
+        logger=logger,
+    )
+
+
 __all__ = [
     "VEROS_AVERAGE_EMPTY_ERROR_MESSAGE",
     "VEROS_TIME_DIM",
     "extract_veros_output_snapshot",
+    "make_veros_output_adapter",
     "normalize_veros_output_variables",
+    "record_veros_period_output",
     "veros_average_coordinate_variables",
     "veros_average_value_dims",
 ]

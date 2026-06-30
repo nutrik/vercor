@@ -90,11 +90,7 @@ class VerosGCMSetupState:
             output_variables,
             settings=self._veros_state.settings,
         )
-        self.output_adapter = ComponentOutputAdapter(
-            empty_error_message=_veros_output.VEROS_AVERAGE_EMPTY_ERROR_MESSAGE,
-            time_dim=_veros_output.VEROS_TIME_DIM,
-            value_dims_for_sample=_veros_output.veros_average_value_dims,
-        )
+        self.output_adapter = _veros_output.make_veros_output_adapter()
 
         self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
         self.spinup_steps = int(self.spinup_time.total_seconds() // self.dt_tracer)

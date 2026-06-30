@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from importlib import resources
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -14,6 +14,8 @@ import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array, jax_index_dtype
+from vercor.jax_logging import LoggerLike
+from vercor.output.adapters import ComponentOutputAdapter
 from vercor.output.datasets import time_coordinate_variable
 from vercor.output.time import TIME_NAME
 from vercor.output.variables import OutputVariable
@@ -64,6 +66,16 @@ class _PhysicsModuleLike(Protocol):
         struct: Any,
         nodal_shape: tuple[int, ...],
     ) -> dict[str, Any]: ...
+
+
+def make_jax_gcm_output_adapter() -> ComponentOutputAdapter:
+    """Return the configured period-output adapter for JAXGCM predictions."""
+
+    return ComponentOutputAdapter(
+        empty_error_message=JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE,
+        time_dim=JAX_GCM_TIME_DIM,
+        dimension_order=JAX_GCM_OUTPUT_DIMENSION_ORDER,
+    )
 
 
 def _vertical_layers(coords: Any) -> int:
@@ -340,6 +352,56 @@ def jax_gcm_data_variables_with_unit_metadata(
     }
 
 
+def record_jax_gcm_period_output(
+    adapter: ComponentOutputAdapter,
+    prediction: Any,
+    *,
+    coords: Any,
+    physics_module: _PhysicsModuleLike | None = None,
+    output_time: datetime | ModelDateTime,
+    dt: timedelta,
+    output_frequency: str | None,
+    logger: LoggerLike | None = None,
+) -> bool:
+    """Record one JAXGCM prediction and write a period average when due."""
+
+    variables = jax_gcm_prediction_output_variables(
+        prediction,
+        coords=coords,
+        physics_module=physics_module,
+    )
+
+    def build_coordinate_variables(
+        mean_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        _ = mean_variables
+        return jax_gcm_coordinate_variables(
+            coords=coords,
+            output_time=output_time,
+        )
+
+    def build_data_variables(
+        mean_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        unit_metadata = jax_gcm_unit_metadata(physics_module)
+        return jax_gcm_data_variables_with_unit_metadata(
+            mean_variables,
+            unit_metadata,
+        )
+
+    return adapter.record_period_average_if_due(
+        variables,
+        summation_dim=JAX_GCM_TIME_DIM,
+        time=output_time,
+        dt=dt,
+        output_frequency=output_frequency,
+        output=lambda time: f"jcm.averages.{time.strftime('%Y-%m-%d')}.nc",
+        build_coordinate_variables=build_coordinate_variables,
+        build_data_variables=build_data_variables,
+        logger=logger,
+    )
+
+
 __all__ = [
     "JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE",
     "JAX_GCM_OUTPUT_DIMENSION_ORDER",
@@ -348,4 +410,6 @@ __all__ = [
     "jax_gcm_data_variables_with_unit_metadata",
     "jax_gcm_prediction_output_variables",
     "jax_gcm_unit_metadata",
+    "make_jax_gcm_output_adapter",
+    "record_jax_gcm_period_output",
 ]

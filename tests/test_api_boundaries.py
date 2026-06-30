@@ -975,8 +975,10 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     import vercor.setups.external.camulator_contracts as camulator_contracts_module
     import vercor.setups.external.camulator_fields as camulator_fields_module
     import vercor.setups.external.camulator_land as camulator_land_module
+    import vercor.setups.external.camulator_output as camulator_output_module
     import vercor.setups.external.camulator_runtime_settings as camulator_runtime_settings_module
     import vercor.setups.external.jax_gcm as jax_gcm_module
+    import vercor.setups.external.jax_gcm_output as jax_gcm_output_module
     import vercor.output.adapters as output_adapters_module
     import vercor.output.period_averages as period_averages_module
     import vercor.output.period_files as period_files_module
@@ -995,6 +997,12 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert callable(output_adapters_module.ComponentOutputAdapter)
     assert callable(period_averages_module.PeriodAverageAccumulator)
     assert callable(period_files_module.write_period_average_netcdf)
+    assert callable(jax_gcm_output_module.make_jax_gcm_output_adapter)
+    assert callable(jax_gcm_output_module.record_jax_gcm_period_output)
+    assert callable(veros_output_module.make_veros_output_adapter)
+    assert callable(veros_output_module.record_veros_period_output)
+    assert callable(camulator_output_module.make_camulator_output_adapter)
+    assert callable(camulator_output_module.record_camulator_period_output)
     assert callable(veros_fluxes_module.compute_fluxes)
     assert callable(veros_output_module.extract_veros_output_snapshot)
     assert not hasattr(veros_output_module, "VerosOutputVariable")
@@ -1030,6 +1038,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     ).read_text(encoding="utf-8")
     camulator_fields_source = Path(
         "vercor/setups/external/camulator_fields.py"
+    ).read_text(encoding="utf-8")
+    camulator_output_source = Path(
+        "vercor/setups/external/camulator_output.py"
     ).read_text(encoding="utf-8")
     camulator_tensors_source = Path(
         "vercor/setups/external/camulator_tensors.py"
@@ -1222,6 +1233,7 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "class ComponentOutputAdapter" in output_adapters_source
     assert "accumulate_output_variables(" not in output_adapters_source
     assert "self._accumulator.add_samples(" in output_adapters_source
+    assert "def record_period_average_if_due(" in output_adapters_source
     assert "period_mean_output_variables(" in output_adapters_source
     assert "write_period_average_netcdf(" in output_adapters_source
     assert "should_write_period_output(" in output_adapters_source
@@ -1231,12 +1243,21 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "accumulate_output_variables(" not in jax_gcm_output_source
     assert "period_mean_output_variables(" not in jax_gcm_output_source
     assert "write_period_average_netcdf(" not in jax_gcm_output_source
+    assert "def make_jax_gcm_output_adapter(" in jax_gcm_output_source
+    assert "def record_jax_gcm_period_output(" in jax_gcm_output_source
     assert "time_coordinate_variable(" in jax_gcm_output_source
     assert "accumulate_output_variables(" not in veros_output_source
     assert "period_mean_output_variables(" not in veros_output_source
     assert "write_period_average_netcdf(" not in veros_output_source
+    assert "def make_veros_output_adapter(" in veros_output_source
+    assert "def record_veros_period_output(" in veros_output_source
     assert "time_coordinate_variable(" in veros_output_source
     assert "used_dimension_names(" in veros_output_source
+    assert "def make_camulator_output_adapter(" in camulator_output_source
+    assert "def record_camulator_period_output(" in camulator_output_source
+    assert "write_period_average_if_due(" not in jax_gcm_runtime_source
+    assert "write_period_average_if_due(" not in veros_runtime_source
+    assert "write_period_average_if_due(" not in camulator_runtime_source
     assert "def __getattr__(" not in output_init_source
     assert "def __dir__(" not in output_init_source
     assert "_RUNTIME_EXPORTS" not in output_init_source

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -83,12 +83,7 @@ def _runtime_component_state(
 
 
 def _make_camulator_output_adapter() -> ComponentOutputAdapter:
-    return ComponentOutputAdapter(
-        empty_error_message=(
-            camulator_output_module.CAMULATOR_AVERAGE_EMPTY_ERROR_MESSAGE
-        ),
-        time_dim=camulator_output_module.CAMULATOR_TIME_DIM,
-    )
+    return camulator_output_module.make_camulator_output_adapter()
 
 
 def _make_coupler(start: datetime) -> ComponentSetupContext:
@@ -587,6 +582,64 @@ def test_camulator_output_adapter_persists_mean_dataset(
             ),
         )
     assert adapter.empty
+
+
+def test_camulator_record_period_output_accumulates_and_writes_mean_dataset(
+    tmp_path: Path,
+) -> None:
+    adapter = _make_camulator_output_adapter()
+    first_prediction = _camulator_prediction(total_channels=8)
+    second_prediction = first_prediction + 80.0
+    conf = _camulator_output_conf(save_forecast=str(tmp_path), save_vars=["T", "FSNS"])
+    metadata = {
+        "T": {"units": "K"},
+        "FSNS": {"long_name": "surface net shortwave flux"},
+        "latitude": {"units": "degrees_north"},
+    }
+
+    first_written = camulator_output_module.record_camulator_period_output(
+        adapter,
+        first_prediction,
+        output_time=datetime(2000, 1, 1, 0, 0, 0),
+        dt=timedelta(hours=1),
+        output_frequency="day",
+        latitude=np.asarray([-45.0, 45.0]),
+        longitude=np.asarray([0.0, 90.0]),
+        init_str="2000-01-01T00Z",
+        metadata=metadata,
+        conf=conf,
+        state_transformer=None,
+    )
+    second_written = camulator_output_module.record_camulator_period_output(
+        adapter,
+        second_prediction,
+        output_time=datetime(2000, 1, 2, 0, 0, 0),
+        dt=timedelta(days=1),
+        output_frequency=None,
+        latitude=np.asarray([-45.0, 45.0]),
+        longitude=np.asarray([0.0, 90.0]),
+        init_str="2000-01-01T00Z",
+        metadata=metadata,
+        conf=conf,
+        state_transformer=None,
+    )
+
+    output = tmp_path / "2000-01-01T00Z" / "camulator.averages.2000-01-02.nc"
+    assert not first_written
+    assert second_written
+    assert adapter.empty
+    with h5netcdf.File(output, "r") as actual:
+        assert actual.variables["T"].dimensions == (
+            "time",
+            "level",
+            "latitude",
+            "longitude",
+        )
+        assert actual.variables["T"].attrs["units"] == "K"
+        assert (
+            actual.variables["FSNS"].attrs["long_name"] == "surface net shortwave flux"
+        )
+        assert_allclose_compact(actual.variables["latitude"][:], [-45.0, 45.0])
 
 
 @pytest.mark.parametrize(
@@ -1408,37 +1461,44 @@ def test_record_camulator_output_averages_when_frequency_is_configured(
     component.lead_time_periods = 6
     prediction = torch.ones((1, 8, 1, 2, 2), dtype=torch.float32)
 
-    accumulated: dict[str, Any] = {}
     written: dict[str, Any] = {}
 
-    def fake_camulator_period_output_variables(
+    def fake_record_camulator_period_output(
+        adapter: ComponentOutputAdapter,
         prediction_arg: torch.Tensor,
         *,
+        output_time: datetime,
+        dt: timedelta,
+        output_frequency: str | None,
+        latitude: object,
+        longitude: object,
+        init_str: str,
         metadata: dict[str, Any],
         conf: dict[str, Any],
         state_transformer: Any | None,
-    ) -> dict[str, OutputVariable]:
-        accumulated["prediction"] = prediction_arg
-        accumulated["metadata"] = metadata
-        accumulated["conf"] = conf
-        accumulated["state_transformer"] = state_transformer
-        return {"T": OutputVariable(("time", "x"), np.asarray([[1.0]]))}
-
-    def fake_write_period_average_if_due(**kwargs: Any) -> bool:
-        written["counts"] = component.output_adapter.variables["T"].counts.copy()
-        written["output_time"] = kwargs["time"]
-        written["output_frequency"] = kwargs["output_frequency"]
-        written["path"] = kwargs["output"](kwargs["time"])
-        coordinate_variables = kwargs["build_coordinate_variables"](
-            {"T": OutputVariable(("time", "latitude", "longitude"), np.ones((1, 2, 2)))}
+        logger: Any | None = None,
+    ) -> bool:
+        _ = logger
+        written["adapter"] = adapter
+        written["prediction"] = prediction_arg
+        written["metadata"] = metadata
+        written["conf"] = conf
+        written["state_transformer"] = state_transformer
+        written["output_time"] = output_time
+        written["dt"] = dt
+        written["output_frequency"] = output_frequency
+        written["latitude"] = latitude
+        written["longitude"] = longitude
+        written["path"] = (
+            f"/tmp/camulator-output/{init_str}/"
+            f"camulator.averages.{output_time.strftime('%Y-%m-%d')}.nc"
         )
-        data_variables = kwargs["build_data_variables"](
-            {"T": OutputVariable(("time", "latitude", "longitude"), np.ones((1, 2, 2)))}
+        adapter.accumulate(
+            {"T": OutputVariable(("time", "x"), np.asarray([[1.0]]))},
+            summation_dim=camulator_output_module.CAMULATOR_TIME_DIM,
         )
-        written["latitude"] = coordinate_variables["latitude"].values
-        written["longitude"] = coordinate_variables["longitude"].values
-        written["metadata"] = data_variables["T"].attrs
-        component.output_adapter.reset()
+        written["counts"] = adapter.variables["T"].counts.copy()
+        adapter.reset()
         return True
 
     monkeypatch.setattr(
@@ -1448,11 +1508,8 @@ def test_record_camulator_output_averages_when_frequency_is_configured(
     )
     monkeypatch.setattr(
         camulator_output_module,
-        "camulator_period_output_variables",
-        fake_camulator_period_output_variables,
-    )
-    component.output_adapter.write_period_average_if_due = (  # type: ignore[method-assign]
-        fake_write_period_average_if_due
+        "record_camulator_period_output",
+        fake_record_camulator_period_output,
     )
 
     camulator_runtime_module.record_camulator_prediction_output(
@@ -1462,15 +1519,16 @@ def test_record_camulator_output_averages_when_frequency_is_configured(
         logger=cast(Any, _RecordingLogger()),
     )
 
-    assert accumulated["prediction"] is prediction
-    assert accumulated["metadata"] is component.metadata
-    assert accumulated["conf"] is component.conf
-    assert accumulated["state_transformer"] is component.state_transformer
+    assert written["adapter"] is component.output_adapter
+    assert written["prediction"] is prediction
+    assert written["metadata"] is component.metadata
+    assert written["conf"] is component.conf
+    assert written["state_transformer"] is component.state_transformer
     assert_allclose_compact(written["counts"], np.asarray([1]))
     assert written["output_time"] == datetime(2000, 1, 2)
+    assert written["dt"] == timedelta(hours=6)
     assert written["output_frequency"] == "day"
     assert_allclose_compact(written["latitude"], np.asarray([0.0, 1.0]))
     assert_allclose_compact(written["longitude"], np.asarray([0.0, 1.0]))
     assert written["path"].endswith("/2000-01-01T00Z/camulator.averages.2000-01-02.nc")
-    assert written["metadata"] == {"units": "K"}
     assert component.output_adapter.empty

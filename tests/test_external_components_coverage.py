@@ -195,11 +195,7 @@ class _ConstructedVerosState:
 
 
 def _make_jax_gcm_output_adapter() -> ComponentOutputAdapter:
-    return ComponentOutputAdapter(
-        empty_error_message=jax_gcm_output_module.JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE,
-        time_dim=jax_gcm_output_module.JAX_GCM_TIME_DIM,
-        dimension_order=jax_gcm_output_module.JAX_GCM_OUTPUT_DIMENSION_ORDER,
-    )
+    return jax_gcm_output_module.make_jax_gcm_output_adapter()
 
 
 def _write_jax_gcm_average_output(
@@ -239,11 +235,7 @@ def _write_jax_gcm_average_output(
 
 
 def _make_veros_output_adapter() -> ComponentOutputAdapter:
-    return ComponentOutputAdapter(
-        empty_error_message=veros_output_module.VEROS_AVERAGE_EMPTY_ERROR_MESSAGE,
-        time_dim=veros_output_module.VEROS_TIME_DIM,
-        value_dims_for_sample=veros_output_module.veros_average_value_dims,
-    )
+    return veros_output_module.make_veros_output_adapter()
 
 
 def _make_coupler(
@@ -848,35 +840,38 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     )
     cast(Any, jax_gcm_fields_module.map_jcm_output_fields).clear_cache()
 
-    def fake_jax_gcm_prediction_output_variables(
+    def fake_record_jax_gcm_period_output(
+        adapter: ComponentOutputAdapter,
         prediction_arg: Any,
         *,
         coords: Any,
-        physics_module: Any | None = None,
-    ) -> dict[str, OutputVariable]:
+        physics_module: Any | None,
+        output_time: datetime,
+        dt: timedelta,
+        output_frequency: str | None,
+        logger: Any | None = None,
+    ) -> bool:
+        _ = logger
+        written["adapter"] = adapter
         written["accumulated_prediction"] = prediction_arg
         written["accumulated_coords"] = coords
         written["accumulated_physics_module"] = physics_module
-        return {"temperature": OutputVariable(("time", "x"), np.asarray([[1.0]]))}
+        written["output_time"] = output_time
+        written["dt"] = dt
+        written["output_frequency"] = output_frequency
+        written["path"] = f"jcm.averages.{output_time.strftime('%Y-%m-%d')}.nc"
+        adapter.accumulate(
+            {"temperature": OutputVariable(("time", "x"), np.asarray([[1.0]]))},
+            summation_dim=jax_gcm_output_module.JAX_GCM_TIME_DIM,
+        )
+        written["counts"] = adapter.variables["temperature"].counts.copy()
+        adapter.reset()
+        return True
 
     monkeypatch.setattr(
         jax_gcm_output_module,
-        "jax_gcm_prediction_output_variables",
-        fake_jax_gcm_prediction_output_variables,
-    )
-
-    def fake_write_period_average_if_due(**kwargs: Any) -> bool:
-        written["path"] = kwargs["output"](kwargs["time"])
-        written["output_time"] = kwargs["time"]
-        written["output_frequency"] = kwargs["output_frequency"]
-        written["counts"] = component.output_adapter.variables[
-            "temperature"
-        ].counts.copy()
-        component.output_adapter.reset()
-        return True
-
-    component.output_adapter.write_period_average_if_due = (  # type: ignore[method-assign]
-        fake_write_period_average_if_due
+        "record_jax_gcm_period_output",
+        fake_record_jax_gcm_period_output,
     )
 
     coupler = _make_coupler(
@@ -981,9 +976,11 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
     assert written["accumulated_prediction"] is prediction
     assert written["accumulated_coords"] is component.model.coords
     assert written["accumulated_physics_module"] is component.model.physics
+    assert written["adapter"] is component.output_adapter
     assert_allclose_compact(written["counts"], np.asarray([1]))
     assert written["path"] == "jcm.averages.2000-01-02.nc"
     assert written["output_time"] == datetime(2000, 1, 2)
+    assert written["dt"] == timedelta(days=1)
     assert written["output_frequency"] == "day"
     assert component.output_adapter.empty
 
@@ -1065,6 +1062,63 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
     assert adapter.empty
     assert physics_module.cached_coords is coords
     assert f"Writing output file:  {output}" in stream.getvalue()
+
+
+def test_jax_gcm_record_period_output_accumulates_and_writes_mean_dataset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coords = _make_jax_gcm_output_coords()
+    first_temperature = np.arange(18.0).reshape(3, 2, 3)
+    second_temperature = first_temperature + 18.0
+    physics_module = _FakePhysicsModule()
+    predictions = [
+        _PredictionValues(
+            dynamics=_FakeDynamicsPrediction(
+                temperature=first_temperature[np.newaxis, ...],
+            ),
+            physics=SimpleNamespace(),
+            times=np.asarray([0.0]),
+        ),
+        _PredictionValues(
+            dynamics=_FakeDynamicsPrediction(
+                temperature=second_temperature[np.newaxis, ...],
+            ),
+            physics=SimpleNamespace(),
+            times=np.asarray([1.0]),
+        ),
+    ]
+    adapter = _make_jax_gcm_output_adapter()
+    monkeypatch.chdir(tmp_path)
+
+    first_written = jax_gcm_output_module.record_jax_gcm_period_output(
+        adapter,
+        predictions[0],
+        coords=coords,
+        physics_module=physics_module,
+        output_time=datetime(2000, 1, 1),
+        dt=timedelta(hours=1),
+        output_frequency="day",
+    )
+    second_written = jax_gcm_output_module.record_jax_gcm_period_output(
+        adapter,
+        predictions[1],
+        coords=coords,
+        physics_module=physics_module,
+        output_time=datetime(2000, 1, 2),
+        dt=timedelta(days=1),
+        output_frequency=None,
+    )
+
+    assert not first_written
+    assert second_written
+    assert adapter.empty
+    with h5netcdf.File(tmp_path / "jcm.averages.2000-01-02.nc", "r") as actual:
+        temperature = actual.variables["temperature"]
+        assert temperature.dimensions == ("time", "level", "lat", "lon")
+        assert np.isclose(np.asarray(temperature)[0, 0, 0, 0], 9.0)
+        assert temperature.attrs["units"] == "K"
+        assert actual.variables["time"].attrs["calendar"] == "proleptic_gregorian"
 
 
 @pytest.mark.parametrize(
@@ -1513,6 +1567,43 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
     assert adapter.empty
 
 
+def test_veros_record_period_output_accumulates_and_writes_mean_dataset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = _make_veros_output_state()
+    adapter = _make_veros_output_adapter()
+    monkeypatch.chdir(tmp_path)
+
+    first_written = veros_output_module.record_veros_period_output(
+        adapter,
+        _make_veros_output_state(offset=0.0),
+        output_variables=("temp", "salt", "u", "surface_taux", "psi"),
+        output_time=datetime(2000, 1, 1),
+        dt=timedelta(hours=1),
+        output_frequency="day",
+    )
+    second_written = veros_output_module.record_veros_period_output(
+        adapter,
+        _make_veros_output_state(offset=20.0),
+        output_variables=("temp", "salt", "u", "surface_taux", "psi"),
+        output_time=datetime(2000, 1, 2),
+        dt=timedelta(days=1),
+        output_frequency=None,
+    )
+
+    assert not first_written
+    assert second_written
+    assert adapter.empty
+    with h5netcdf.File(tmp_path / "veros.averages.2000-01-02.nc", "r") as actual:
+        assert actual.variables["time"].attrs["calendar"] == "proleptic_gregorian"
+        assert_allclose_compact(
+            np.asarray(actual.variables["xt"]),
+            state.variables.xt[2:-2],
+        )
+        assert actual.variables["temp"].dimensions == ("time", "zt", "yt", "xt")
+
+
 def test_veros_output_variables_rejects_bare_string() -> None:
     import vercor.setups.external.veros_output as veros_output_module
 
@@ -1846,33 +1937,35 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
         lambda *args, **kwargs: args[0],
     )
 
-    extracted: dict[str, Any] = {}
     written: dict[str, Any] = {}
 
-    def fake_extract_veros_output_snapshot(
+    def fake_record_veros_period_output(
+        adapter: ComponentOutputAdapter,
         veros_state: Any,
+        *,
         output_variables: tuple[str, ...],
-    ) -> dict[str, OutputVariable]:
-        extracted["state"] = veros_state
-        extracted["variables"] = output_variables
-        return {"temp": OutputVariable(("x",), np.asarray([1.0]))}
+        output_time: datetime,
+        dt: timedelta,
+        output_frequency: str | None,
+        logger: Any | None = None,
+    ) -> bool:
+        _ = logger
+        written["adapter"] = adapter
+        written["state"] = veros_state
+        written["variables"] = output_variables
+        written["path"] = f"veros.averages.{output_time.strftime('%Y-%m-%d')}.nc"
+        written["output_time"] = output_time
+        written["dt"] = dt
+        written["output_frequency"] = output_frequency
+        adapter.accumulate({"temp": OutputVariable(("x",), np.asarray([1.0]))})
+        written["counts"] = adapter.variables["temp"].counts.copy()
+        adapter.reset()
+        return True
 
     monkeypatch.setattr(
         veros_runtime_module._veros_output,
-        "extract_veros_output_snapshot",
-        fake_extract_veros_output_snapshot,
-    )
-
-    def fake_write_period_average_if_due(**kwargs: Any) -> bool:
-        written["counts"] = component.output_adapter.variables["temp"].counts.copy()
-        written["path"] = kwargs["output"](kwargs["time"])
-        written["output_time"] = kwargs["time"]
-        written["output_frequency"] = kwargs["output_frequency"]
-        component.output_adapter.reset()
-        return True
-
-    component.output_adapter.write_period_average_if_due = (  # type: ignore[method-assign]
-        fake_write_period_average_if_due
+        "record_veros_period_output",
+        fake_record_veros_period_output,
     )
 
     context = ComponentStepContext(
@@ -1884,11 +1977,13 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
 
     veros_runtime_module.step_veros_runtime(component, {}, context, None)
 
-    assert extracted["state"] is component._veros_state
-    assert extracted["variables"] == ("temp",)
+    assert written["adapter"] is component.output_adapter
+    assert written["state"] is component._veros_state
+    assert written["variables"] == ("temp",)
     assert_allclose_compact(written["counts"], np.asarray([1]))
     assert written["path"] == "veros.averages.2000-01-02.nc"
     assert written["output_time"] == datetime(2000, 1, 2)
+    assert written["dt"] == timedelta(days=1)
     assert written["output_frequency"] == "day"
     assert component.output_adapter.empty
 

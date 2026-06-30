@@ -71,12 +71,7 @@ class CAMulatorGCMSetupState:
         self.spinup_time = spinup_time
         self.do_spinup = do_spinup
         self.runtime_cursor = CamulatorRuntimeCursor()
-        self.output_adapter = ComponentOutputAdapter(
-            empty_error_message=(
-                _camulator_output.CAMULATOR_AVERAGE_EMPTY_ERROR_MESSAGE
-            ),
-            time_dim=_camulator_output.CAMULATOR_TIME_DIM,
-        )
+        self.output_adapter = _camulator_output.make_camulator_output_adapter()
 
         context = _camulator_init.initialize_camulator(
             config_path=self.config_path,

@@ -122,11 +122,7 @@ class JAXGCMSetupState:
         self.name = name
         self.grid = grid
         self.settings: Any | None = None
-        self.output_adapter = ComponentOutputAdapter(
-            empty_error_message=_jax_gcm_output.JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE,
-            time_dim=_jax_gcm_output.JAX_GCM_TIME_DIM,
-            dimension_order=_jax_gcm_output.JAX_GCM_OUTPUT_DIMENSION_ORDER,
-        )
+        self.output_adapter = _jax_gcm_output.make_jax_gcm_output_adapter()
 
     def _generate_step_function(
         self, jitted: bool = True

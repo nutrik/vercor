@@ -75,6 +75,41 @@ class ComponentOutputAdapter:
             summation_dim=summation_dim,
         )
 
+    def record_period_average_if_due(
+        self,
+        variables: Mapping[str, OutputVariable],
+        *,
+        summation_dim: str | None = None,
+        time: datetime | ModelDateTime,
+        dt: timedelta,
+        output_frequency: str | None,
+        output: str | Callable[[Any], str],
+        build_coordinate_variables: Callable[
+            [Mapping[str, OutputVariable]],
+            Mapping[str, OutputVariable],
+        ],
+        build_data_variables: (
+            Callable[
+                [Mapping[str, OutputVariable]],
+                Mapping[str, OutputVariable],
+            ]
+            | None
+        ) = None,
+        logger: LoggerLike | None = None,
+    ) -> bool:
+        """Accumulate one sample and write a period file when due."""
+
+        self.accumulate(variables, summation_dim=summation_dim)
+        return self.write_period_average_if_due(
+            time=time,
+            dt=dt,
+            output_frequency=output_frequency,
+            output=output,
+            build_coordinate_variables=build_coordinate_variables,
+            build_data_variables=build_data_variables,
+            logger=logger,
+        )
+
     def write_period_average(
         self,
         output: str,

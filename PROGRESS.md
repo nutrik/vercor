@@ -218,6 +218,10 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local remaining helper-surface over-engineering cleanup validation:
   focused red/green pytest, Black, flake8, mypy, focused affected pytest, full
   fast pytest, full pytest, and coverage pytest passed as of 2026-06-29.
+- Latest local centralized output adapter record-logic validation: focused
+  red/green pytest, Black, flake8, mypy, focused post-format pytest, full fast
+  pytest, full pytest, and git diff whitespace check passed as of 2026-06-30
+  using the direct `scipy` environment executable.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -250,6 +254,33 @@ historical commands, failure messages, or detailed validation notes.
   boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-30: Centralized Output Adapter Record Logic
+
+- Added `ComponentOutputAdapter.record_period_average_if_due()` as the shared
+  output path for "accumulate sample, check cadence, write if due" behavior.
+- Added JAXGCM, Veros, and CAMulator package-internal output adapter factories
+  plus record helpers so model-specific extraction, coordinates, metadata, and
+  CAMulator forecast-increment output remain beside each external adapter while
+  period-average orchestration goes through the shared adapter boundary.
+- Rewired JAXGCM, Veros, and CAMulator setup states and runtime output paths to
+  use those helpers, and updated API-boundary and focused output tests to guard
+  against local write-closure duplication returning to runtime modules.
+- Validation run for this change: focused red tests first failed on the missing
+  generic adapter method and missing model-specific factory/record helpers.
+  After implementation,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/test_output_adapters.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py tests/test_api_boundaries.py -q --tb=short`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/black vercor examples tests`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/mypy vercor examples tests`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/ -q --fast --tb=short`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/ -q --tb=short`,
+  and `git diff --check` passed. Black emitted the existing Python
+  3.13/target-3.14 safety-check warning, and the full suite emitted the
+  existing JAX dtype-promotion warning. Earlier in this session, both
+  `conda run -n scipy ...` and `conda --no-plugins run -n scipy ...` hit the
+  existing Conda/Rattler `PanicException` before pytest, so validation used the
+  direct `scipy` environment executable.
 
 ### 2026-06-29: Remaining Helper-Surface Over-Engineering Cleanup
 
