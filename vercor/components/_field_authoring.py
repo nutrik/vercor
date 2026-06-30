@@ -12,7 +12,7 @@ from vercor.components._contracts import (
     normalize_author_field_values as _normalize_author_field_values,
 )
 from vercor.components._field_names import unique_field_names as _unique_field_names
-from vercor.dtypes import PrecisionPolicy, jax_full, jax_zeros
+from vercor.dtypes import PrecisionPolicy
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
@@ -140,49 +140,6 @@ class ComponentFieldAuthoringMixin:
         if default_fields:
             self.seed_fields(default_fields, policy=policy)
         return self
-
-    def seed_zero_field(
-        self: Self,
-        name: str,
-        policy: PrecisionPolicy = None,
-    ) -> Self:
-        """Seed one grid-shaped zero field and return this component."""
-
-        return self.seed_field(
-            name,
-            jax_zeros(
-                self.grid.shape,
-                self.settings if policy is None else policy,
-            ),
-        )
-
-    def seed_zero_fields(
-        self: Self,
-        names: _FieldNames,
-        policy: PrecisionPolicy = None,
-    ) -> Self:
-        """Seed multiple grid-shaped zero fields and return this component."""
-
-        for name in names:
-            self.seed_zero_field(name, policy)
-        return self
-
-    def seed_constant_field(
-        self: Self,
-        name: str,
-        value: object,
-        policy: PrecisionPolicy = None,
-    ) -> Self:
-        """Seed one grid-shaped constant field and return this component."""
-
-        return self.seed_field(
-            name,
-            jax_full(
-                self.grid.shape,
-                value,
-                self.settings if policy is None else policy,
-            ),
-        )
 
 
 __all__ = ["ComponentFieldAuthoringMixin"]

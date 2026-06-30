@@ -221,9 +221,8 @@ immutable runtime containers used during traced integration.
   `(nLat, nLon)`, `(nTime, nLat, nLon)`, `(nLev, nLat, nLon)`, or
   `(nTime, nLev, nLat, nLon)`. Setup and runtime-state creation validate this
   contract before traced execution. Subclasses should seed fields with
-  `seed_field()` or `seed_fields()` for scalar or array-like author values, or
-  with the explicit zero/constant helpers when that reads better, rather than
-  mutating `data` directly; step methods
+  `seed_field()` or `seed_fields()` for scalar or array-like author values
+  rather than mutating `data` directly; step methods
   should read fields with `runtime_field()`, `runtime_fields()`,
   `runtime_field_or()`, or `runtime_field_or_zeros_like()` and return updates
   with `with_runtime_fields()` where possible. These component helpers are

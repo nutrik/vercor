@@ -481,9 +481,6 @@ def test_component_base_owns_runtime_access_methods_directly() -> None:
         "seed_field",
         "seed_fields",
         "seed_declared_defaults",
-        "seed_zero_field",
-        "seed_zero_fields",
-        "seed_constant_field",
     }
     expected_runtime_methods = {
         "runtime_fields",
@@ -507,6 +504,9 @@ def test_component_base_owns_runtime_access_methods_directly() -> None:
         expected_author_methods | expected_runtime_methods | expected_lifecycle_methods
     ):
         assert hasattr(Component, method_name)
+    assert not hasattr(Component, "seed_zero_field")
+    assert not hasattr(Component, "seed_zero_fields")
+    assert not hasattr(Component, "seed_constant_field")
 
     source = Path("vercor/components/base.py").read_text(encoding="utf-8")
     tree = ast.parse(source)

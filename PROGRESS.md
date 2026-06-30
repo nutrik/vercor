@@ -243,6 +243,11 @@ historical commands, failure messages, or detailed validation notes.
   tests, Black, flake8, mypy, full fast pytest, full pytest, coverage pytest,
   and git diff whitespace check passed as of 2026-06-30 using the `scipy`
   environment through `conda run`.
+- Latest local legacy component seed helper removal validation: baseline fast
+  pytest, focused red/green API/component tests, Black, flake8, mypy, full fast
+  pytest, full pytest, git diff whitespace check, and `conda run -n scipy`
+  fast pytest passed as of 2026-06-30. The earlier planning-time Conda/Rattler
+  panic was not reproduced during final validation.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -276,6 +281,22 @@ historical commands, failure messages, or detailed validation notes.
   sequence support, but the wrapper remains public API.
 
 ## Recent Work
+
+### 2026-06-30: Legacy Component Seed Helper Removal
+
+- Removed the public `Component.seed_zero_field()`, `seed_zero_fields()`, and
+  `seed_constant_field()` helpers so component authors use the canonical
+  scalar-expanding `seed_field()` and `seed_fields()` path.
+- Updated API-boundary and component coverage tests to assert the collapsed
+  authoring surface and to validate zero/constant seeding through
+  `seed_field(s)`. Updated `DESIGN.md` component-authoring guidance to match.
+- Validation run for this change: baseline direct fast pytest passed; focused
+  red pytest failed on the existing `seed_zero_field` API, then focused green
+  pytest passed after implementation. Black, flake8, mypy, direct full fast
+  pytest, direct full pytest, `git diff --check`, and
+  `conda run -n scipy pytest tests/ -q --fast --tb=short` passed. Black emitted
+  the existing Python 3.13/target-3.14 safety-check warning, and full pytest
+  emitted the existing JAX dtype-promotion warning.
 
 ### 2026-06-30: External Setup-Step and Remapper Derived-State Simplification
 

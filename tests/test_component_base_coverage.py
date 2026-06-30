@@ -1107,13 +1107,13 @@ def test_callable_component_reports_missing_declared_inputs() -> None:
 
 
 @pytest.mark.fast_always
-def test_component_seed_default_helpers_and_required_field_validator() -> None:
+def test_component_seed_fields_and_required_field_validator() -> None:
     grid = make_test_grid(name="seed-defaults")
     component = _RuntimeOnlyComponent(name="ATM", grid=grid)
 
-    component.seed_zero_field("temperature")
-    component.seed_zero_fields(("u_velocity", "v_velocity"))
-    component.seed_constant_field("humidity", 0.5)
+    component.seed_field("temperature", 0.0)
+    component.seed_fields({"u_velocity": 0.0, "v_velocity": 0.0})
+    component.seed_field("humidity", 0.5)
     state = create_runtime_component_state(
         component,
         contract=RuntimeComponentContract(),
