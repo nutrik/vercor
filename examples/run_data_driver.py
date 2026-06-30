@@ -2,7 +2,7 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 
-from vercor import Clock, Component, RunSequence
+from vercor import Clock, Component
 from vercor.diagnostics import (
     ComponentMetric,
     component_vector_speed,
@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
     # Clock and sequence
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=3600, steps=10)
-    run_sequence = RunSequence(order=["OCN", "ATM", "LND"])
+    run_sequence = ["OCN", "ATM", "LND"]
 
     # Coupler
     components: list[Component] = [atm, ocn, lnd]

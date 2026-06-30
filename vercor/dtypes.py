@@ -94,18 +94,6 @@ def jax_index_dtype(policy: PrecisionPolicy = None) -> Any:
     return dtype_policy(policy).jax_index
 
 
-def numpy_real_dtype(policy: PrecisionPolicy = None) -> np.dtype[Any]:
-    """Return the canonical NumPy real dtype for ``policy``."""
-
-    return dtype_policy(policy).numpy_real
-
-
-def numpy_index_dtype(policy: PrecisionPolicy = None) -> np.dtype[Any]:
-    """Return the canonical NumPy index dtype for ``policy``."""
-
-    return dtype_policy(policy).numpy_index
-
-
 def as_jax_real_array(value: Any, policy: PrecisionPolicy = None) -> jax.Array:
     """Convert ``value`` to a JAX array using VerCOR's real dtype policy."""
 

@@ -105,18 +105,14 @@ def test_lifecycle_storage_uses_private_typed_owner_boundary() -> None:
 
 
 @pytest.mark.fast_always
-def test_callable_wrapper_module_owns_callable_component_definition() -> None:
+def test_callable_wrapper_module_does_not_need_request_dataclass() -> None:
     callable_source = source_for("vercor/components/_callable_wrappers.py")
     base_source = source_for("vercor/components/base.py")
     host_source = source_for("vercor/components/host.py")
 
-    assert "class _CallableComponentDefinition" in callable_source
-    assert "def _callable_component_definition(" in callable_source
+    assert "class _CallableComponentDefinition" not in callable_source
+    assert "def _callable_component_definition(" not in callable_source
     assert "lifecycle_hooks: ComponentLifecycleHooks" in callable_source
-    assert "initialize: ComponentInitializeHook | None" not in class_body_source(
-        "vercor/components/_callable_wrappers.py",
-        "_CallableComponentDefinition",
-    )
     assert "def create_runtime_payload(" not in callable_source
     assert "component._lifecycle_hooks.create_runtime_payload" not in callable_source
     assert "field_spec=_ComponentFieldSpec(" not in base_source

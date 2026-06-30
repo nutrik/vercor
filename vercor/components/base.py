@@ -17,9 +17,7 @@ from vercor.components.contracts import (
     FieldNames as _FieldNames,
 )
 from vercor.components._callable_wrappers import (
-    _CallableComponentDefinition,
     _CallableRuntimeMixin,
-    _callable_component_definition,
 )
 from vercor.components._field_authoring import ComponentFieldAuthoringMixin
 from vercor.components._lifecycle import ComponentLifecycleHooks
@@ -117,21 +115,25 @@ class Component(
         component's grid shape.
         """
 
+        field_spec = _ComponentFieldSpec(
+            inputs=inputs,
+            outputs=outputs,
+            default_fields=default_fields or {},
+        )
+        lifecycle_hooks = ComponentLifecycleHooks(
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
+        )
         return _CallableComponent(
             name=name,
             grid=grid,
-            definition=_callable_component_definition(
-                step=step,
-                payload=payload,
-                settings=settings,
-                inputs=inputs,
-                outputs=outputs,
-                default_fields=default_fields,
-                initialize=initialize,
-                create_runtime_payload=create_runtime_payload,
-                prefill_runtime_state_fields=prefill_runtime_state_fields,
-                validate_runtime_state=validate_runtime_state,
-            ),
+            step=step,
+            payload=payload,
+            settings=settings,
+            field_spec=field_spec,
+            lifecycle_hooks=lifecycle_hooks,
         )
 
     @abstractmethod
@@ -280,18 +282,27 @@ class _CallableComponent(_CallableRuntimeMixin, Component):
         name: str,
         grid: RectilinearGrid,
         *,
-        definition: _CallableComponentDefinition,
+        step: _AuthorStepCallable,
+        payload: Any | None,
+        settings: VercorSettings | None,
+        field_spec: _ComponentFieldSpec,
+        lifecycle_hooks: ComponentLifecycleHooks,
     ) -> None:
-        if definition.settings is None:
+        if settings is None:
             Component.__init__(self, name=name, grid=grid)
         else:
             Component.__init__(
                 self,
                 name=name,
                 grid=grid,
-                settings=definition.settings,
+                settings=settings,
             )
-        self._initialize_callable_runtime_from_definition(definition)
+        self._initialize_callable_runtime(
+            step=step,
+            payload=payload,
+            field_spec=field_spec,
+            lifecycle_hooks=lifecycle_hooks,
+        )
 
     def step_runtime_state(
         self,

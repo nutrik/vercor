@@ -8,7 +8,7 @@ from typing import Sequence
 
 import jax
 
-from vercor import Clock, Coupler, RunSequence
+from vercor import Clock, Coupler
 from vercor.setups.coupler_helpers import ExchangeSpec, add_exchange_specs
 from vercor.setups.slab.atmosphere import make_slab_atmosphere
 from vercor.setups.slab.land import make_slab_land
@@ -139,7 +139,7 @@ def build_slab_coupler(
         make_slab_seaice(ice_grid),
     ):
         coupler.register(component)
-    coupler.set_components_run_sequence(RunSequence(order=["OCN", "ATM", "LND", "ICE"]))
+    coupler.set_components_run_sequence(["OCN", "ATM", "LND", "ICE"])
     add_exchange_specs(
         coupler,
         (

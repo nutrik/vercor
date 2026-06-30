@@ -1,31 +1,26 @@
-from typing import Any, Protocol, Tuple, cast
+from typing import Any, cast
 
 from vercor.exceptions import RegridderError
 from vercor.grid import RectilinearGrid
 from vercor.grid_geometry import grids_identical
 
 
-class SupportsScalarVectorInterpolation(Protocol):
-    """Protocol for rectilinear interpolators used by regridder wrappers."""
-
-    def apply_scalar(self, src: Any) -> Any:
-        """Interpolate one scalar field."""
-        ...
-
-    def apply_vector(self, u_src: Any, v_src: Any) -> tuple[Any, Any]:
-        """Interpolate one vector field."""
-        ...
-
-
 class Regridder:
     def __init__(
-        self, source_grid: RectilinearGrid, destination_grid: RectilinearGrid
+        self,
+        source_grid: RectilinearGrid,
+        destination_grid: RectilinearGrid,
+        *,
+        interpolator: Any | None = None,
+        has_identical_grids: bool | None = None,
     ) -> None:
         self.source_grid = source_grid
         self.destination_grid = destination_grid
-        self.interpolator: SupportsScalarVectorInterpolation | None = None
-        self._has_identical_grids = grids_identical(
-            self.source_grid, self.destination_grid
+        self._interpolator = interpolator
+        self._has_identical_grids = (
+            grids_identical(self.source_grid, self.destination_grid)
+            if has_identical_grids is None
+            else has_identical_grids
         )
 
     @property
@@ -34,11 +29,18 @@ class Regridder:
 
         return self._has_identical_grids
 
-    def _ensure_ready(self, args: Tuple[Any, ...]) -> None:
+    @property
+    def interpolator(self) -> Any | None:
+        """Return the concrete interpolator, or ``None`` for identity grids."""
+
+        return self._interpolator
+
+    def _ensure_ready(self, args: tuple[Any, ...]) -> None:
         """
         Ensure that the Regridder is properly set up before applying interpolation.
-        Checks if the interpolator is initialized and if the correct number of arguments
-        are provided (either one for scalar fields or two for vector fields)."""
+        Checks if the correct number of arguments are provided (either one for
+        scalar fields or two for vector fields).
+        """
 
         if len(args) not in (1, 2):
             raise TypeError("Provide scalar_src or (u_src, v_src) as positional args")
@@ -60,11 +62,12 @@ class Regridder:
         if self.has_identical_grids:
             return args if len(args) == 2 else args[0]
 
-        if self.interpolator is None:
+        interpolator = self.interpolator
+        if interpolator is None:
             raise RegridderError("Regridder not properly set up")
         if len(args) == 1:
-            return self.interpolator.apply_scalar(args[0])
-        return cast(tuple[Any, Any], self.interpolator.apply_vector(args[0], args[1]))
+            return interpolator.apply_scalar(args[0])
+        return cast(tuple[Any, Any], interpolator.apply_vector(args[0], args[1]))
 
     def __str__(self) -> str:
         return (

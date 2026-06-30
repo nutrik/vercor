@@ -1,7 +1,7 @@
 from typing import Optional
 
 from vercor.grid import RectilinearGrid
-from vercor.grid_geometry import centers_to_edges
+from vercor.grid_geometry import centers_to_edges, grids_identical
 from vercor.interpolators.conservative_remap_rectilinear import (
     ConservativeRectilinearRemapper,
 )
@@ -19,38 +19,45 @@ class ConservativeRectilinearRegridder(Regridder):
         radius: float = 6371.0,
     ) -> None:
 
-        super().__init__(source_grid, destination_grid)
-        if self.has_identical_grids:
-            return
+        has_identical_grids = grids_identical(source_grid, destination_grid)
+        interpolator = None
 
-        if (
-            source_grid.longitude_edges is not None
-            and source_grid.latitude_edges is not None
-        ):
-            src_lon_edges = source_grid.longitude_edges
-            src_lat_edges = source_grid.latitude_edges
-        else:
-            src_lon_edges = centers_to_edges(self.source_grid.longitude, "lon")
-            src_lat_edges = centers_to_edges(self.source_grid.latitude, "lat")
+        if not has_identical_grids:
+            if (
+                source_grid.longitude_edges is not None
+                and source_grid.latitude_edges is not None
+            ):
+                src_lon_edges = source_grid.longitude_edges
+                src_lat_edges = source_grid.latitude_edges
+            else:
+                src_lon_edges = centers_to_edges(source_grid.longitude, "lon")
+                src_lat_edges = centers_to_edges(source_grid.latitude, "lat")
 
-        if (
-            destination_grid.longitude_edges is not None
-            and destination_grid.latitude_edges is not None
-        ):
-            dst_lon_edges = destination_grid.longitude_edges
-            dst_lat_edges = destination_grid.latitude_edges
-        else:
-            dst_lon_edges = centers_to_edges(self.destination_grid.longitude, "lon")
-            dst_lat_edges = centers_to_edges(self.destination_grid.latitude, "lat")
+            if (
+                destination_grid.longitude_edges is not None
+                and destination_grid.latitude_edges is not None
+            ):
+                dst_lon_edges = destination_grid.longitude_edges
+                dst_lat_edges = destination_grid.latitude_edges
+            else:
+                dst_lon_edges = centers_to_edges(destination_grid.longitude, "lon")
+                dst_lat_edges = centers_to_edges(destination_grid.latitude, "lat")
 
-        self.interpolator = ConservativeRectilinearRemapper(
-            src_lon_edges=src_lon_edges,
-            src_lat_edges=src_lat_edges,
-            dst_lon_edges=dst_lon_edges,
-            dst_lat_edges=dst_lat_edges,
-            src_mask=source_mask,
-            normalize=normalize,
-            radius=radius,
+            interpolator = ConservativeRectilinearRemapper(
+                src_lon_edges=src_lon_edges,
+                src_lat_edges=src_lat_edges,
+                dst_lon_edges=dst_lon_edges,
+                dst_lat_edges=dst_lat_edges,
+                src_mask=source_mask,
+                normalize=normalize,
+                radius=radius,
+            )
+
+        super().__init__(
+            source_grid,
+            destination_grid,
+            interpolator=interpolator,
+            has_identical_grids=has_identical_grids,
         )
 
 

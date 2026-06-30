@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from tests.assertions import assert_allclose_compact, assert_array_equal_compact
-from vercor.dtypes import numpy_index_dtype
+from vercor.dtypes import jax_index_dtype
 from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 
 
@@ -125,10 +125,10 @@ def test_scalar_periodic_longitude_wrap_uses_dateline_cell() -> None:
 
     assert_allclose_compact(out_359, out_minus1, rtol=0.0, atol=1e-14)
     assert_array_equal_compact(
-        interp_359.i0, np.array([[2]], dtype=numpy_index_dtype())
+        interp_359.i0, np.array([[2]], dtype=np.dtype(jax_index_dtype()))
     )
     assert_array_equal_compact(
-        interp_359.i1, np.array([[0]], dtype=numpy_index_dtype())
+        interp_359.i1, np.array([[0]], dtype=np.dtype(jax_index_dtype()))
     )
 
 

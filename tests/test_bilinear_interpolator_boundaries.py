@@ -9,7 +9,7 @@ import pytest
 
 from tests._architecture_support import package_import_cycles, source_for
 from tests.assertions import assert_allclose_compact, assert_array_equal_compact
-from vercor.dtypes import numpy_index_dtype
+from vercor.dtypes import jax_index_dtype
 
 
 @pytest.mark.fast_always
@@ -60,10 +60,12 @@ def test_private_bilinear_weight_helper_reproduces_periodic_dateline_indices() -
         lat_ascending=True,
     )
 
-    assert_array_equal_compact(weights.i0, np.array([[2]], dtype=numpy_index_dtype()))
-    assert_array_equal_compact(weights.i1, np.array([[0]], dtype=numpy_index_dtype()))
-    assert_array_equal_compact(weights.j0, np.array([[0]], dtype=numpy_index_dtype()))
-    assert_array_equal_compact(weights.j1, np.array([[1]], dtype=numpy_index_dtype()))
+    index_dtype = np.dtype(jax_index_dtype())
+
+    assert_array_equal_compact(weights.i0, np.array([[2]], dtype=index_dtype))
+    assert_array_equal_compact(weights.i1, np.array([[0]], dtype=index_dtype))
+    assert_array_equal_compact(weights.j0, np.array([[0]], dtype=index_dtype))
+    assert_array_equal_compact(weights.j1, np.array([[1]], dtype=index_dtype))
     assert_allclose_compact(weights.fx, np.array([[119.0 / 120.0]]))
     assert_allclose_compact(weights.fy, np.array([[0.5]]))
     assert_allclose_compact(

@@ -3,7 +3,7 @@ from datetime import datetime
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from vercor import Clock, RunSequence
+from vercor import Clock
 from vercor.setups.coupler_helpers import (
     ExchangeSpec,
     add_exchange_specs,
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     # Clock and sequence
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=86400.0, steps=10)
-    run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
+    run_sequence = ["OCN", "LND", "ATM"]
 
     # Coupler
     components = [atm, ocn, lnd]

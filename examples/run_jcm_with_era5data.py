@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from vercor import Clock, RunSequence
+from vercor import Clock
 from vercor.setups.coupler_helpers import (
     ExchangeSpec,
     add_exchange_specs,
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         steps=365 * 100 - 2,
         year_type="noleap",
     )
-    run_sequence = RunSequence(order=["OCN", "LND", "ATM"])
+    run_sequence = ["OCN", "LND", "ATM"]
 
     components = [ocn, lnd, atm]
     cpl = build_coupler(

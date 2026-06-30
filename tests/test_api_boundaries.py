@@ -409,6 +409,8 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def _callable_component_from_model(" not in factories_source
     assert "class CallableComponentRequest" not in factories_source
     assert "_create_callable_component(" not in factories_source
+    assert "class _CallableComponentDefinition" not in callable_source
+    assert "def _callable_component_definition(" not in callable_source
     assert "Component.from_model(" in factories_source
     assert "HostRuntimeComponent.from_model(" in factories_source
     assert "class _CallableComponent" in base_source
@@ -675,6 +677,40 @@ def test_coupler_run_sequence_is_explicit_empty_schedule_by_default() -> None:
     coupler_source = Path("vercor/coupler.py").read_text(encoding="utf-8")
     assert 'hasattr(self, "run_sequence")' not in coupler_source
     assert 'getattr(self, "run_sequence"' not in coupler_source
+
+
+@pytest.mark.fast_always
+def test_coupler_accepts_plain_component_name_sequences() -> None:
+    import numpy as np
+
+    from tests._coverage_support import make_test_grid as _make_grid
+    from vercor.components import data_component
+    from vercor.setups.coupler_helpers import build_coupler
+
+    clock = Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1)
+    grid = _make_grid("grid")
+    ocean = data_component(
+        "OCN",
+        grid,
+        fields={"sea_surface_temperature": np.zeros(grid.shape)},
+    )
+    atmosphere = data_component(
+        "ATM",
+        grid,
+        fields={"sea_surface_temperature": np.zeros(grid.shape)},
+    )
+
+    coupler = build_coupler(
+        clock=clock,
+        components=(ocean, atmosphere),
+        run_sequence=["OCN", "ATM"],
+    )
+
+    assert isinstance(coupler.run_sequence, RunSequence)
+    assert coupler.run_sequence.order == ["OCN", "ATM"]
+
+    coupler.set_components_run_sequence(("ATM", "OCN"))
+    assert coupler.run_sequence.order == ["ATM", "OCN"]
 
 
 @pytest.mark.fast_always
@@ -947,7 +983,8 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert "grids_identical(" in regridder_base_source
     assert "BilinearRectilinearInterpolator" not in regridder_base_source
     assert "ConservativeRectilinearRemapper" not in regridder_base_source
-    assert "class SupportsScalarVectorInterpolation" in regridder_base_source
+    assert "Protocol" not in regridder_base_source
+    assert "SupportsScalarVectorInterpolation" not in regridder_base_source
     assert '"gravity": Settings(' not in settings_source
     assert "PHYSICAL_CONSTANT_SETTINGS" in settings_source
     assert "Incorrect component name" not in coupler_source

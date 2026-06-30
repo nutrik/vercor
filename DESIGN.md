@@ -141,7 +141,9 @@ immutable runtime containers used during traced integration.
 
 - Public orchestration API: `Coupler`, `Exchange`, `RunSequence`, `Clock`,
   grids, regridders, and bundled concrete components are the objects users
-  compose when configuring a coupled run.
+  compose when configuring a coupled run. `Coupler` and setup helpers also
+  accept plain component-name sequences for run order and normalize them to the
+  compatibility `RunSequence` wrapper internally.
 - Component-author API: `Component`, `DataComponent`, and
   `HostRuntimeComponent` are the stable extension points. Custom adapters should
   use the helper-first authoring layer where possible. The most concise public
@@ -529,9 +531,11 @@ real-precision modes to keep sparse metadata and interpolation indices compact.
 
 Production kernels and adapters should use the dtype helpers rather than
 hard-coded `jnp.float64`, `jnp.float32`, `jnp.float_`, `jnp.int64`, or
-`jnp.int32` annotations. NumPy remains restricted to explicit host and dtype
-boundaries. File-output adapters should keep VerCOR-owned values JAX-backed and
-delegate external component period-average orchestration to
+`jnp.int32` annotations. At host boundaries that require NumPy dtype objects,
+derive them explicitly with `np.dtype(jax_real_dtype(policy))` or
+`np.dtype(jax_index_dtype(policy))`. NumPy remains restricted to explicit host
+and dtype boundaries. File-output adapters should keep VerCOR-owned values
+JAX-backed and delegate external component period-average orchestration to
 `vercor.output.adapters`, period-file writes to `vercor.output.period_files`,
 and final file-transfer conversion to `vercor.output.netcdf`, which calls
 `vercor.host_arrays` only when a non-JAX consumer, such as `h5netcdf` or a

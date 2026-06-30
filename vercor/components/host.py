@@ -7,17 +7,17 @@ from vercor.components.contracts import (
     AuthorFieldValues,
     AuthorStepCallable,
     ComponentCreatePayloadHook,
+    ComponentFieldSpec,
     ComponentInitializeHook,
     ComponentPrefillHook,
     ComponentValidateHook,
     FieldNames,
 )
 from vercor.components._callable_wrappers import (
-    _CallableComponentDefinition,
     _CallableRuntimeMixin,
-    _callable_component_definition,
 )
 from vercor.components.base import Component
+from vercor.components._lifecycle import ComponentLifecycleHooks
 from vercor.exceptions import ComponentError
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
@@ -49,21 +49,25 @@ class HostRuntimeComponent(Component):
     ) -> "HostRuntimeComponent":
         """Create a host-runtime component from a Python model callable."""
 
+        field_spec = ComponentFieldSpec(
+            inputs=inputs,
+            outputs=outputs,
+            default_fields=default_fields or {},
+        )
+        lifecycle_hooks = ComponentLifecycleHooks(
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
+        )
         return _CallableHostRuntimeComponent(
             name=name,
             grid=grid,
-            definition=_callable_component_definition(
-                step=step,
-                payload=payload,
-                settings=settings,
-                inputs=inputs,
-                outputs=outputs,
-                default_fields=default_fields,
-                initialize=initialize,
-                create_runtime_payload=create_runtime_payload,
-                prefill_runtime_state_fields=prefill_runtime_state_fields,
-                validate_runtime_state=validate_runtime_state,
-            ),
+            step=step,
+            payload=payload,
+            settings=settings,
+            field_spec=field_spec,
+            lifecycle_hooks=lifecycle_hooks,
         )
 
     @final
@@ -99,18 +103,27 @@ class _CallableHostRuntimeComponent(_CallableRuntimeMixin, HostRuntimeComponent)
         name: str,
         grid: RectilinearGrid,
         *,
-        definition: _CallableComponentDefinition,
+        step: AuthorStepCallable,
+        payload: Any | None,
+        settings: VercorSettings | None,
+        field_spec: ComponentFieldSpec,
+        lifecycle_hooks: ComponentLifecycleHooks,
     ) -> None:
-        if definition.settings is None:
+        if settings is None:
             Component.__init__(self, name=name, grid=grid)
         else:
             Component.__init__(
                 self,
                 name=name,
                 grid=grid,
-                settings=definition.settings,
+                settings=settings,
             )
-        self._initialize_callable_runtime_from_definition(definition)
+        self._initialize_callable_runtime(
+            step=step,
+            payload=payload,
+            field_spec=field_spec,
+            lifecycle_hooks=lifecycle_hooks,
+        )
 
     def step_host_runtime_state(
         self,

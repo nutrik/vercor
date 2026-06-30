@@ -1,4 +1,5 @@
 from vercor.grid import RectilinearGrid
+from vercor.grid_geometry import grids_identical
 from vercor.interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 from vercor.regridders.base import Regridder
 
@@ -18,23 +19,29 @@ class BilinearRectilinearRegridder(Regridder):
         fill_value: float = float("nan"),
     ) -> None:
 
-        super().__init__(source_grid, destination_grid)
-        if self.has_identical_grids:
-            return
+        has_identical_grids = grids_identical(source_grid, destination_grid)
+        interpolator = None
+        if not has_identical_grids:
+            interpolator = BilinearRectilinearInterpolator(
+                source_grid.longitude,
+                source_grid.latitude,
+                destination_grid.longitude,
+                destination_grid.latitude,
+                src_mask=source_grid.binary_mask,
+                tgt_mask=destination_grid.binary_mask,
+                periodic_longitude=periodic_longitude,
+                nan_renorm=nan_renorm,
+                extrapolation_mode=extrapolation_mode,
+                idw_k=idw_k,
+                idw_eps=idw_eps,
+                fill_value=fill_value,
+            )
 
-        self.interpolator = BilinearRectilinearInterpolator(
-            self.source_grid.longitude,
-            self.source_grid.latitude,
-            self.destination_grid.longitude,
-            self.destination_grid.latitude,
-            src_mask=self.source_grid.binary_mask,
-            tgt_mask=self.destination_grid.binary_mask,
-            periodic_longitude=periodic_longitude,
-            nan_renorm=nan_renorm,
-            extrapolation_mode=extrapolation_mode,
-            idw_k=idw_k,
-            idw_eps=idw_eps,
-            fill_value=fill_value,
+        super().__init__(
+            source_grid,
+            destination_grid,
+            interpolator=interpolator,
+            has_identical_grids=has_identical_grids,
         )
 
 

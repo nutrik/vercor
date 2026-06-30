@@ -4,7 +4,7 @@ from typing import Any, cast
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from vercor import Clock, RunSequence
+from vercor import Clock
 from vercor.setups.coupler_helpers import (
     ExchangeSpec,
     add_exchange_specs,
@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     # Clock and sequence
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=3600, steps=24)
-    run_sequence = RunSequence(order=["OCN", "ATM", "ICE", "LND"])
+    run_sequence = ["OCN", "ATM", "ICE", "LND"]
 
     # Coupler
     components: list[Any] = [atm, ocn, ice, lnd]

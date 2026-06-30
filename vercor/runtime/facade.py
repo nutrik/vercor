@@ -9,7 +9,7 @@ import vercor.output as _output
 from vercor.clock import Clock
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike
-from vercor.run_sequence import RunSequence
+from vercor.run_sequence import RunSequence, normalize_run_sequence
 from vercor.runtime.dispatch_context import (
     RuntimeDispatchContext,
     build_runtime_dispatch_context,
@@ -46,7 +46,7 @@ class RuntimeFacadeInputs:
     components: Mapping[str, "Component"]
     exchanges: Sequence[Exchange]
     runtime_resources: CouplerRuntimeResources
-    run_sequence: RunSequence
+    run_sequence: RunSequence | Sequence[str]
     clock: Clock
     settings: VercorSettings
 
@@ -70,7 +70,7 @@ def initialize_coupler_runtime(
         components=dict(inputs.components),
         exchanges=inputs.exchanges,
         topology_maps=inputs.runtime_resources.topology_maps,
-        run_sequence=inputs.run_sequence,
+        run_sequence=normalize_run_sequence(inputs.run_sequence),
         settings=inputs.settings,
         logger=logger,
         enable_x64_computations=enable_x64_computations,
@@ -105,7 +105,7 @@ def runtime_run_context(
     """Return static runtime inputs bundled for execution."""
 
     return RuntimeRunContext(
-        run_sequence=tuple(inputs.run_sequence),
+        run_sequence=tuple(normalize_run_sequence(inputs.run_sequence)),
         clock=inputs.clock,
         logger=logger,
         log_level=log_level,

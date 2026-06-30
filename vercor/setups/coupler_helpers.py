@@ -25,7 +25,7 @@ def build_coupler(
     *,
     clock: Clock,
     components: Iterable[Component],
-    run_sequence: RunSequence,
+    run_sequence: RunSequence | Sequence[str],
 ) -> Coupler:
     """Build a coupler with components registered and run order configured."""
 

@@ -15,7 +15,7 @@ from vercor.jax_logging import (
     configure_python_logger,
     setup_logger as _setup_logger,
 )
-from vercor.run_sequence import RunSequence
+from vercor.run_sequence import RunSequence, normalize_run_sequence
 import vercor.runtime.facade as _runtime_facade
 from vercor.runtime.resources import CouplerRuntimeResources
 from vercor.settings import VercorSettings
@@ -55,7 +55,7 @@ class Coupler:
     clock: Clock
     log_level: int | str = "INFO"
     logger: LoggerLike = field(default_factory=_setup_logger)
-    run_sequence: RunSequence = field(default_factory=RunSequence)
+    run_sequence: RunSequence | Sequence[str] = field(default_factory=RunSequence)
     components: dict[str, Component] = field(default_factory=dict)
     exchanges: list[Exchange] = field(default_factory=list)
     settings: VercorSettings = field(default_factory=VercorSettings)
@@ -70,6 +70,8 @@ class Coupler:
 
     def __post_init__(self) -> None:
         """Apply the configured logging threshold at construction time."""
+
+        self.run_sequence = normalize_run_sequence(self.run_sequence)
 
         if isinstance(self.logger, logging.Logger):
             self.logger = JaxCallbackLogger(
@@ -117,18 +119,22 @@ class Coupler:
             f" Added exchange {exchange.name}: Fields ({formatted_field_names})"
         )
 
-    def set_components_run_sequence(self, run_sequence: RunSequence) -> None:
+    def set_components_run_sequence(
+        self,
+        run_sequence: RunSequence | Sequence[str],
+    ) -> None:
         """
         Set the run sequence for the coupler components.
 
         Arguments:
-            run_sequence: RunSequence instance defining the order of components execution
+            run_sequence: component names defining the order of components execution
         """
 
-        for cname in run_sequence:
+        normalized_run_sequence = normalize_run_sequence(run_sequence)
+        for cname in normalized_run_sequence:
             if cname not in self.components.keys():
                 raise CouplerError(f"Component {cname} not registered in coupler")
-        self.run_sequence = run_sequence
+        self.run_sequence = normalized_run_sequence
         self.logger.info(
             f" Set coupler components run sequence: {', '.join(self.run_sequence)}"
         )
@@ -136,6 +142,7 @@ class Coupler:
     def _runtime_inputs(self) -> _runtime_facade.RuntimeFacadeInputs:
         """Return the repeated runtime facade input bundle for this coupler."""
 
+        self.run_sequence = normalize_run_sequence(self.run_sequence)
         return _runtime_facade.RuntimeFacadeInputs(
             self.components,
             self.exchanges,

@@ -222,6 +222,10 @@ historical commands, failure messages, or detailed validation notes.
   red/green pytest, Black, flake8, mypy, focused post-format pytest, full fast
   pytest, full pytest, and git diff whitespace check passed as of 2026-06-30
   using the direct `scipy` environment executable.
+- Latest local simplification-plan quick-win validation: baseline fast pytest,
+  focused red/green pytest, focused affected pytest, Black, flake8, mypy, full
+  fast pytest, full pytest, and git diff whitespace check passed as of
+  2026-06-30 using the direct `scipy` environment executable.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -248,12 +252,43 @@ historical commands, failure messages, or detailed validation notes.
 
 ## Follow-Up Candidates
 
-- Keep public simplification candidates review-only unless a compatibility
-  decision is made: `RunSequence`, `Grid`, component authoring mixins, calendar
+- Keep remaining public simplification candidates review-only unless a
+  compatibility decision is made: `Grid`, component authoring mixins, calendar
   compatibility delegates, and setup helper APIs are still public or
-  boundary-tested surfaces.
+  boundary-tested surfaces. `RunSequence` now has compatibility-safe plain
+  sequence support, but the wrapper remains public API.
 
 ## Recent Work
+
+### 2026-06-30: Simplification Plan Quick Wins
+
+- Relaxed private architecture-locking tests toward behavior and public-boundary
+  assertions where cleanup was implemented.
+- Removed unused public NumPy dtype helper functions; tests now derive NumPy
+  dtypes with `np.dtype(jax_real_dtype(...))` and
+  `np.dtype(jax_index_dtype(...))`.
+- Added compatibility-safe plain component-name sequence support for `Coupler`,
+  setup helpers, and runtime preparation/facade paths while preserving
+  `RunSequence` normalization internally. Updated examples and `DESIGN.md`
+  accordingly.
+- Simplified regridder internals by removing the unused interpolation protocol
+  and subclass post-initialization mutation; concrete regridders now pass their
+  interpolator and identical-grid flag into the shared base.
+- Removed the callable component request dataclass/init hop; callable component
+  constructors now build field specs and lifecycle hooks directly.
+- Validation run for this change: the focused red tests first failed on the old
+  dtype helpers, mandatory `RunSequence` storage, regridder protocol, and
+  callable request dataclass. After implementation, focused affected pytest,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/black vercor examples tests`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/mypy vercor examples tests`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/ -q --fast --tb=short`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/ -q`,
+  and `git diff --check` passed. Black emitted the existing Python
+  3.13/target-3.14 safety-check warning, and full pytest emitted the existing
+  JAX dtype-promotion warning. The earlier baseline `conda run -n scipy ...`
+  path still hit the local Conda/Rattler panic before pytest, so validation used
+  the direct `scipy` environment executable.
 
 ### 2026-06-30: Centralized Output Adapter Record Logic
 
