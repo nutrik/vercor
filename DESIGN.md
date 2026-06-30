@@ -147,12 +147,10 @@ immutable runtime containers used during traced integration.
   compatibility adapter; new code should pass lists or tuples directly.
 - Component-author API: `Component`, `DataComponent`, and
   `HostRuntimeComponent` are the stable extension points. Custom adapters should
-  use the helper-first authoring layer where possible. The most concise public
-  helpers are `data_component()`, `differentiable_component()`, and
-  `host_component()`, which delegate to the class-level constructors:
+  use the class-level authoring constructors where possible:
   `DataComponent.from_fields()` for data-only fields, `Component.from_model()`
   for pure callable JAX models, and `HostRuntimeComponent.from_model()` for
-  Python host-side models. These helpers use author-facing field names:
+  Python host-side models. These constructors use author-facing field names:
   `inputs` declare fields the model reads, `outputs` declare fields the model
   writes, and `default_fields` declare concrete runtime defaults for fields
   the model reads or updates. Scalar default and seeded values expand
@@ -172,16 +170,19 @@ immutable runtime containers used during traced integration.
   `DataComponent` seeding
   automatically records seeded fields as declared outputs, so data-only
   components remain introspectable whether fields are declared up front or added
-  through helper seeding. The legacy `wrap()` classmethods and
-  `make_*_component()` factory functions have been removed; component authors
-  should use the helper facade, class-level `from_fields()` / `from_model()`
-  constructors, or subclasses with `declare_fields(...)`. `vercor.components`
-  and `vercor` reexport the component-author facade.
+  through constructor seeding. The legacy `wrap()` classmethods and
+  `make_*_component()` factory functions have been removed. The module-level
+  `data_component()`, `differentiable_component()`, and `host_component()`
+  helpers remain importable only as deprecated compatibility shims that warn and
+  delegate to the class constructors. Component authors should use
+  class-level `from_fields()` / `from_model()` constructors, or subclasses with
+  `declare_fields(...)`. `vercor.components` and `vercor` reexport the
+  component-author facade.
   `vercor.components.contracts` owns public author-facing contract types and
   context aliases, `vercor.components.base` owns only the abstract
   differentiable `Component` contract, `vercor.components.data` owns
   `DataComponent`, `vercor.components.host` owns `HostRuntimeComponent`, and
-  module-level factory helpers live in `vercor.components.factories`.
+  deprecated module-level factory shims live in `vercor.components.factories`.
   Field-name de-duplication lives in private
   `vercor.components._field_names`, and component authoring methods for field
   declarations, setup seeding, and settings updates live in private

@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from vercor.components import (
     Component,
     ComponentStepContext,
-    differentiable_component,
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
@@ -79,7 +78,7 @@ def make_slab_ocean(
         )
         return {"sea_surface_temperature": updated_sst}
 
-    return differentiable_component(
+    return Component.from_model(
         name=name,
         grid=grid,
         step=step,

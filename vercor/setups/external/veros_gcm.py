@@ -7,7 +7,7 @@ from datetime import timedelta
 from functools import partial
 from typing import Any
 
-from vercor.components import HostRuntimeComponent, host_component
+from vercor.components import HostRuntimeComponent
 import vercor.setups.external.veros_gcm_state as _veros_gcm_state
 import vercor.setups.external.veros_runtime as _veros_runtime
 from vercor.setups.external.veros_gcm_state import VerosGCMSetupState
@@ -42,7 +42,7 @@ def make_veros_gcm(
         output_variables=output_variables,
         jitted=jitted,
     )
-    return host_component(
+    return HostRuntimeComponent.from_model(
         name=name,
         grid=state.grid,
         step=partial(_veros_runtime.step_veros_runtime, state),

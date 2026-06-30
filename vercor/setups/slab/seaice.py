@@ -4,7 +4,7 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from vercor.components import Component, differentiable_component
+from vercor.components import Component
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
 
@@ -31,7 +31,7 @@ def make_slab_seaice(grid: RectilinearGrid, name: str = "ICE") -> Component:
         ice_fraction = _diagnose_ice_fraction(sea_surface_temperature)
         return {"ice_fraction": ice_fraction}
 
-    return differentiable_component(
+    return Component.from_model(
         name=name,
         grid=grid,
         step=step,

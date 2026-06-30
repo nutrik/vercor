@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from vercor.components import (
     Component,
     ComponentStepContext,
-    differentiable_component,
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
@@ -49,7 +48,7 @@ def make_slab_land(grid: RectilinearGrid, name: str = "LND") -> Component:
         )
         return {"soil_moisture": updated_soil_moisture}
 
-    return differentiable_component(
+    return Component.from_model(
         name=name,
         grid=grid,
         step=step,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
-from vercor.components import ComponentSetupContext, DataComponent, data_component
+from vercor.components import ComponentSetupContext, DataComponent
 from vercor.grid import RectilinearGrid
 
 
@@ -17,7 +17,7 @@ def time_interpolated_data_component(
 ) -> DataComponent:
     """Create a data component with the standard time-interpolation metadata."""
 
-    component = data_component(
+    component = DataComponent.from_fields(
         name=name,
         grid=grid,
         fields=fields,

@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from jax.typing import ArrayLike
 from typing import TYPE_CHECKING, Any
 
-from vercor.components import DataComponent, data_component
+from vercor.components import DataComponent
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
 from vercor.grid_masks import create_lnd_mask_from_ocn
@@ -77,7 +77,7 @@ def make_jcm_land(
         binary_mask=lnd_bmask,
     )
 
-    component = data_component(
+    component = DataComponent.from_fields(
         name=name,
         grid=grid,
         fields={

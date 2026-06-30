@@ -4,7 +4,7 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from vercor.components import Component, differentiable_component
+from vercor.components import Component
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
 
@@ -87,7 +87,7 @@ def make_slab_atmosphere(grid: RectilinearGrid, name: str = "ATM") -> Component:
             "temperature_2m": updated_temperature_2m,
         }
 
-    return differentiable_component(
+    return Component.from_model(
         name=name,
         grid=grid,
         step=step,

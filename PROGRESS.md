@@ -257,6 +257,11 @@ historical commands, failure messages, or detailed validation notes.
   pytest, focused red/green boundary tests, focused affected pytest, Black,
   flake8, mypy, full fast pytest, full pytest, and git diff whitespace check
   passed as of 2026-06-30 using `conda run -n scipy`.
+- Latest local component factory helper deprecation validation: focused
+  red/green deprecation/API tests, focused affected fast pytest, Black,
+  flake8, mypy, full fast pytest, full pytest, and `conda run -n scipy` fast
+  smoke pytest passed as of 2026-06-30 using the direct `scipy` environment
+  executable for the full suite.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -290,6 +295,25 @@ historical commands, failure messages, or detailed validation notes.
   sequence support, but the wrapper remains public API.
 
 ## Recent Work
+
+### 2026-06-30: Component Factory Helper Deprecation
+
+- Deprecated `data_component()`, `differentiable_component()`, and
+  `host_component()` as importable compatibility shims that warn and delegate
+  to `DataComponent.from_fields()`, `Component.from_model()`, and
+  `HostRuntimeComponent.from_model()`.
+- Added lifecycle-hook parameters to `DataComponent.from_fields()` so data-only
+  components no longer need the module-level helper for setup/runtime hooks.
+- Migrated VerCOR setup factories, the custom component example, and ordinary
+  tests to the class constructors; kept focused warning coverage for the
+  deprecated public helpers.
+- Validation run for this change: focused red deprecation/API tests failed on
+  missing warnings, missing data constructor hook keywords, and internal helper
+  imports; after implementation, focused affected fast pytest, Black, flake8,
+  mypy, full fast pytest, full pytest, and `conda run -n scipy pytest tests/ -q
+  --fast` passed. Black emitted the existing Python 3.13/target-3.14
+  safety-check warning, and full pytest emitted the existing JAX dtype-promotion
+  warning.
 
 ### 2026-06-30: Concrete Regridder Call Ownership
 

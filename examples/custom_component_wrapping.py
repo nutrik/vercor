@@ -10,9 +10,6 @@ from vercor import (
     ComponentStepResult,
     DataComponent,
     HostRuntimeComponent,
-    data_component,
-    differentiable_component,
-    host_component,
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
@@ -31,7 +28,7 @@ def make_example_grid() -> RectilinearGrid:
 def make_data_forcing(grid: RectilinearGrid) -> DataComponent:
     """Wrap static or time-dependent forcing fields without a runtime step."""
 
-    return data_component(
+    return DataComponent.from_fields(
         name="ATM",
         grid=grid,
         fields={
@@ -56,7 +53,7 @@ def make_differentiable_model(grid: RectilinearGrid) -> Component:
             )
         }
 
-    return differentiable_component(
+    return Component.from_model(
         name="OCN",
         grid=grid,
         step=step,
@@ -96,7 +93,7 @@ def make_host_model(grid: RectilinearGrid) -> HostRuntimeComponent:
             payload=payload,
         )
 
-    return host_component(
+    return HostRuntimeComponent.from_model(
         name="LND",
         grid=grid,
         step=step,

@@ -13,9 +13,8 @@ from tests.assertions import assert_allclose_compact
 from vercor.clock import Clock
 from vercor.components import (
     Component,
-    data_component,
-    differentiable_component,
-    host_component,
+    DataComponent,
+    HostRuntimeComponent,
 )
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.setups.data.era5_land import make_era5_land
@@ -118,7 +117,7 @@ def _make_data_component(
     settings: VercorSettings | None = None,
 ) -> Any:
     _ = component_type
-    component = data_component(
+    component = DataComponent.from_fields(
         name=name,
         grid=grid,
         fields=data,
@@ -229,7 +228,7 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
         dimension_order=jax_gcm_output_module.JAX_GCM_OUTPUT_DIMENSION_ORDER,
     )
     state.output_frequency = None
-    component = differentiable_component(
+    component = Component.from_model(
         name="ATM",
         grid=grid,
         step=(
@@ -967,7 +966,7 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
         dtype=jnp.float64,
     )
     monthly_ocean = monthly_ocean.at[0].set(first_month)
-    ocean = data_component(
+    ocean = DataComponent.from_fields(
         name="OCN",
         grid=grid,
         fields={"sea_surface_temperature": monthly_ocean},
@@ -1710,7 +1709,7 @@ def test_run_accepts_default_runtime_component() -> None:
 
 def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
     grid = make_test_grid(name="camulator")
-    camulator_land = host_component(
+    camulator_land = HostRuntimeComponent.from_model(
         name="LND",
         grid=grid,
         step=lambda fields, context, payload: {},
@@ -1735,7 +1734,7 @@ def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
 
 def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
     grid = make_test_grid(name="camulator-gcm")
-    camulator = host_component(
+    camulator = HostRuntimeComponent.from_model(
         name="ATM",
         grid=grid,
         step=lambda fields, context, payload: {},
@@ -1758,7 +1757,7 @@ def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
 
 def test_scanned_runtime_rejects_veros_runtime_boundary() -> None:
     grid = make_test_grid(name="veros")
-    veros = host_component(
+    veros = HostRuntimeComponent.from_model(
         name="OCN",
         grid=grid,
         step=lambda fields, context, payload: {},

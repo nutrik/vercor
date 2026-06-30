@@ -6,7 +6,6 @@ from vercor.components import (
     ComponentSetupContext,
     ComponentStepContext,
     HostRuntimeComponent,
-    host_component,
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
@@ -115,7 +114,7 @@ def make_camulator_land(
 
         return {"land_surface_temperature": as_jax_real_array(ts["TS"].values)}
 
-    return host_component(
+    return HostRuntimeComponent.from_model(
         name=name,
         grid=grid,
         step=step,

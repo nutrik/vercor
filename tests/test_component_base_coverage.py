@@ -218,7 +218,7 @@ def test_data_component_uses_explicit_noop_runtime_step() -> None:
 @pytest.mark.fast_always
 def test_data_component_seeds_canonical_fields() -> None:
     grid = make_test_grid(name="factory-data")
-    component = components_module.data_component(
+    component = data_module.DataComponent.from_fields(
         name="OBS",
         grid=grid,
         fields={"temperature": jnp.full(grid.shape, 281.0)},
@@ -232,14 +232,83 @@ def test_data_component_seeds_canonical_fields() -> None:
 
 
 @pytest.mark.fast_always
-def test_convenience_factories_delegate_to_authoring_facade() -> None:
-    grid = make_test_grid(name="author-factories")
+def test_data_component_from_fields_accepts_lifecycle_hooks() -> None:
+    grid = make_test_grid(name="data-facade-hooks")
+    calls: list[str] = []
 
-    data_component = components_module.data_component(
+    def initialize(
+        component: base_module.Component, context: ComponentSetupContext
+    ) -> None:
+        calls.append(f"initialize:{component.name}:{context.dt_seconds}")
+        component.seed_field("temperature", 280.0)
+
+    def create_runtime_payload(component: base_module.Component) -> dict[str, str]:
+        calls.append(f"payload:{component.name}")
+        return {"component": component.name}
+
+    def prefill_runtime_state_fields(
+        component: base_module.Component,
+        data: dict[str, RuntimeArray],
+        incoming: dict[str, RuntimeArray],
+        outgoing: dict[str, RuntimeArray],
+        contract: RuntimeComponentContract,
+    ) -> None:
+        _ = incoming, outgoing, contract
+        calls.append(f"prefill:{component.name}")
+        data["humidity"] = jnp.full(component.grid.shape, 0.5)
+
+    def validate_runtime_state(
+        component: base_module.Component,
+        component_state: RuntimeComponentState,
+        contract: RuntimeComponentContract,
+    ) -> None:
+        _ = contract
+        calls.append(f"validate:{component.name}:{'humidity' in component_state.data}")
+
+    component = data_module.DataComponent.from_fields(
         name="OBS",
         grid=grid,
-        fields={"temperature": 281.0},
+        initialize=initialize,
+        create_runtime_payload=create_runtime_payload,
+        prefill_runtime_state_fields=prefill_runtime_state_fields,
+        validate_runtime_state=validate_runtime_state,
     )
+    context = ComponentSetupContext(
+        start=datetime(2000, 1, 1),
+        dt_seconds=60.0,
+        logger=cast(Any, None),
+        settings=VercorSettings(),
+        run_sequence=("OBS",),
+    )
+    component.initialize(context)
+    state = create_runtime_component_state(
+        component,
+        prefill_missing=True,
+        contract=RuntimeComponentContract(),
+    )
+    component.validate_runtime_state(state, RuntimeComponentContract())
+
+    assert calls == [
+        "initialize:OBS:60.0",
+        "prefill:OBS",
+        "payload:OBS",
+        "validate:OBS:True",
+    ]
+    assert_allclose_compact(component.data["temperature"], np.full(grid.shape, 280.0))
+    assert_allclose_compact(state.data.get("humidity"), np.full(grid.shape, 0.5))
+    assert state.runtime_payload == {"component": "OBS"}
+
+
+@pytest.mark.fast_always
+def test_deprecated_component_factories_warn_and_delegate_to_authoring_facade() -> None:
+    grid = make_test_grid(name="author-factories")
+
+    with pytest.warns(DeprecationWarning, match="data_component\\(\\) is deprecated"):
+        data_component = components_module.data_component(
+            name="OBS",
+            grid=grid,
+            fields={"temperature": 281.0},
+        )
     assert isinstance(data_component, data_module.DataComponent)
     assert_allclose_compact(
         data_component.data["temperature"],
@@ -257,14 +326,18 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
             "tendency": fields["tendency"] + context.dt_seconds,
         }
 
-    differentiable = components_module.differentiable_component(
-        name="ATM",
-        grid=grid,
-        step=step,
-        inputs=("forcing",),
-        outputs=("temperature", "tendency"),
-        default_fields={"temperature": 280.0, "forcing": 2.0},
-    )
+    with pytest.warns(
+        DeprecationWarning,
+        match="differentiable_component\\(\\) is deprecated",
+    ):
+        differentiable = components_module.differentiable_component(
+            name="ATM",
+            grid=grid,
+            step=step,
+            inputs=("forcing",),
+            outputs=("temperature", "tendency"),
+            default_fields={"temperature": 280.0, "forcing": 2.0},
+        )
     assert isinstance(differentiable, base_module.Component)
     assert differentiable.field_spec.inputs == ("forcing",)
     assert differentiable.field_spec.outputs == ("temperature", "tendency")
@@ -287,13 +360,14 @@ def test_convenience_factories_delegate_to_authoring_facade() -> None:
         np.full(grid.shape, 3.0),
     )
 
-    host = components_module.host_component(
-        name="HOST",
-        grid=grid,
-        step=step,
-        outputs=("temperature",),
-        default_fields={"temperature": 1.0, "forcing": 4.0, "tendency": 0.0},
-    )
+    with pytest.warns(DeprecationWarning, match="host_component\\(\\) is deprecated"):
+        host = components_module.host_component(
+            name="HOST",
+            grid=grid,
+            step=step,
+            outputs=("temperature",),
+            default_fields={"temperature": 1.0, "forcing": 4.0, "tendency": 0.0},
+        )
     assert isinstance(host, host_module.HostRuntimeComponent)
     host_state = create_runtime_component_state(
         host,
@@ -440,21 +514,21 @@ def test_callable_facade_accepts_one_two_and_three_argument_steps() -> None:
         }
 
     components = (
-        components_module.differentiable_component(
+        base_module.Component.from_model(
             name="ONE",
             grid=grid,
             step=fields_only,
             outputs=("temperature",),
             default_fields={"temperature": 280.0},
         ),
-        components_module.differentiable_component(
+        base_module.Component.from_model(
             name="TWO",
             grid=grid,
             step=fields_and_context,
             outputs=("temperature",),
             default_fields={"temperature": 280.0},
         ),
-        components_module.differentiable_component(
+        base_module.Component.from_model(
             name="THREE",
             grid=grid,
             step=fields_context_payload,
@@ -501,7 +575,7 @@ def test_callable_facade_rejects_unsupported_step_signature() -> None:
         ComponentError,
         match="step callable.*1, 2, or 3 positional arguments",
     ):
-        components_module.differentiable_component(
+        base_module.Component.from_model(
             name="ATM",
             grid=grid,
             step=too_many_arguments,
@@ -517,7 +591,7 @@ def test_callable_facade_rejects_removed_legacy_field_seed_keyword() -> None:
 
     removed_keyword = "initial" + "_fields"
     with pytest.raises(TypeError, match=removed_keyword):
-        cast(Any, components_module.differentiable_component)(
+        cast(Any, base_module.Component.from_model)(
             name="ATM",
             grid=grid,
             step=step,
@@ -623,7 +697,7 @@ def test_apply_step_result_updates_fields_and_payload() -> None:
 @pytest.mark.fast_always
 def test_data_component_seeding_updates_declared_outputs() -> None:
     grid = make_test_grid(name="data-outputs")
-    component = components_module.data_component(
+    component = data_module.DataComponent.from_fields(
         name="OBS",
         grid=grid,
         fields={"temperature": 281.0},
@@ -670,7 +744,7 @@ def test_data_component_seeding_preserves_inputs_and_defaults() -> None:
 
 
 @pytest.mark.fast_always
-def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> None:
+def test_constructor_lifecycle_hooks_are_stored_in_single_private_container() -> None:
     grid = make_test_grid(name="lifecycle-container")
     events: list[str] = []
 
@@ -706,7 +780,7 @@ def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> Non
         component.require_runtime_fields(state, "temperature")
 
     factories = (
-        components_module.data_component(
+        data_module.DataComponent.from_fields(
             name="DATA",
             grid=grid,
             initialize=initialize,
@@ -714,7 +788,7 @@ def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> Non
             prefill_runtime_state_fields=prefill,
             validate_runtime_state=validate,
         ),
-        components_module.differentiable_component(
+        base_module.Component.from_model(
             name="ATM",
             grid=grid,
             step=step,
@@ -723,7 +797,7 @@ def test_factory_lifecycle_hooks_are_stored_in_single_private_container() -> Non
             prefill_runtime_state_fields=prefill,
             validate_runtime_state=validate,
         ),
-        components_module.host_component(
+        host_module.HostRuntimeComponent.from_model(
             name="HOST",
             grid=grid,
             step=step,
@@ -863,11 +937,11 @@ def test_required_fields_declaration_api_is_removed() -> None:
             {"name": "HOST", "grid": grid, "step": step},
         ),
         (
-            components_module.differentiable_component,
+            base_module.Component.from_model,
             {"name": "ATM", "grid": grid, "step": step},
         ),
         (
-            components_module.host_component,
+            host_module.HostRuntimeComponent.from_model,
             {"name": "HOST", "grid": grid, "step": step},
         ),
     )
@@ -1173,7 +1247,7 @@ def test_data_component_rejects_non_grid_fields_early() -> None:
         ComponentError,
         match="data field 'bad_metadata'.*canonical grid-field layout",
     ):
-        components_module.data_component(
+        data_module.DataComponent.from_fields(
             name="OBS",
             grid=grid,
             fields={"bad_metadata": jnp.zeros((3,), dtype=jnp.float64)},
@@ -1236,7 +1310,7 @@ def test_differentiable_component_applies_callable_field_updates() -> None:
         assert payload is None
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
-    component = components_module.differentiable_component(
+    component = base_module.Component.from_model(
         name="ATM",
         grid=grid,
         step=step,
@@ -1273,7 +1347,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
         assert isinstance(payload, Mapping)
         return {"temperature": fields["temperature"] + payload["offset"]}
 
-    preserve_component = components_module.differentiable_component(
+    preserve_component = base_module.Component.from_model(
         name="ATM",
         grid=grid,
         payload={"offset": jnp.asarray(2.0)},
@@ -1309,7 +1383,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
             payload={"offset": payload["offset"] + 1.0},
         )
 
-    replace_component = components_module.differentiable_component(
+    replace_component = base_module.Component.from_model(
         name="ATM",
         grid=grid,
         payload={"offset": jnp.asarray(2.0)},
@@ -1344,7 +1418,7 @@ def test_callable_payload_default_can_be_overridden_by_lifecycle_hook() -> None:
         return {"temperature": fields["temperature"] + 1.0}
 
     payload = {"offset": 2}
-    component = components_module.differentiable_component(
+    component = base_module.Component.from_model(
         name="ATM",
         grid=grid,
         payload=payload,
@@ -1358,7 +1432,7 @@ def test_callable_payload_default_can_be_overridden_by_lifecycle_hook() -> None:
     def create_runtime_payload(owner: Any) -> dict[str, str]:
         return {"owner": owner.name}
 
-    hooked_component = components_module.differentiable_component(
+    hooked_component = base_module.Component.from_model(
         name="HOOKED",
         grid=grid,
         payload=payload,
@@ -1383,7 +1457,7 @@ def test_host_component_runs_through_coupler_host_runtime() -> None:
         _ = payload
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
-    component = components_module.host_component(
+    component = host_module.HostRuntimeComponent.from_model(
         name="HOST",
         grid=grid,
         step=step,
@@ -1414,7 +1488,7 @@ def test_callable_component_rejects_unseeded_field_updates() -> None:
         _ = fields, context, payload
         return {"created_during_step": jnp.zeros(grid.shape)}
 
-    component = components_module.differentiable_component(
+    component = base_module.Component.from_model(
         name="ATM",
         grid=grid,
         step=step,

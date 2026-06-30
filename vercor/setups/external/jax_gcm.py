@@ -9,7 +9,7 @@ from dinosaur.coordinate_systems import CoordinateSystem
 from jcm.model import ForcingData
 from jcm.physics_interface import TerrainData
 
-from vercor.components import Component, differentiable_component
+from vercor.components import Component
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
 import vercor.setups.external.jax_gcm_runtime as _jax_gcm_runtime
 from vercor.setups.external.jax_gcm_state import JAXGCMSetupState
@@ -51,7 +51,7 @@ def make_jax_gcm(
         do_spinup=do_spinup,
         jitted=jitted,
     )
-    component = differentiable_component(
+    component = Component.from_model(
         name=name,
         grid=state.grid,
         step=partial(_jax_gcm_runtime.step_jax_gcm_component, state),

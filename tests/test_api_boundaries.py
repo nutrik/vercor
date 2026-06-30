@@ -31,6 +31,7 @@ from vercor.run_sequence import RunSequence, normalize_run_sequence
 from vercor.runtime.state import RuntimeComponentState
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.regridders import bilinear
+from vercor.types import RuntimeArray
 
 
 @pytest.mark.fast_always
@@ -108,6 +109,39 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
     assert vercor.RunSequence is RunSequence
     for name in (*runtime_internal_names, *legacy_component_names):
         assert not hasattr(vercor, name)
+
+
+@pytest.mark.fast_always
+def test_deprecated_component_factory_exports_remain_importable_and_warn() -> None:
+    grid = make_test_grid(name="deprecated-factory-export")
+
+    with pytest.warns(DeprecationWarning, match="data_component\\(\\) is deprecated"):
+        data = vercor.data_component(name="OBS", grid=grid)
+
+    def step(fields: object) -> dict[str, RuntimeArray]:
+        _ = fields
+        return {}
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="differentiable_component\\(\\) is deprecated",
+    ):
+        differentiable = vercor.differentiable_component(
+            name="ATM",
+            grid=grid,
+            step=step,
+        )
+
+    with pytest.warns(DeprecationWarning, match="host_component\\(\\) is deprecated"):
+        host = vercor.host_component(
+            name="HOST",
+            grid=grid,
+            step=step,
+        )
+
+    assert isinstance(data, DataComponent)
+    assert isinstance(differentiable, Component)
+    assert isinstance(host, HostRuntimeComponent)
 
 
 @pytest.mark.fast_always
@@ -193,6 +227,41 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert not hasattr(components_module, "RuntimeComponentState")
     assert not hasattr(components_module, "ComponentInitContext")
     assert not hasattr(components_module, "RuntimeStepContext")
+
+
+@pytest.mark.fast_always
+def test_setup_and_examples_do_not_import_deprecated_component_factories() -> None:
+    deprecated_names = {
+        "data_component",
+        "differentiable_component",
+        "host_component",
+    }
+    import_modules = {
+        "vercor",
+        "vercor.components",
+        "vercor.components.factories",
+    }
+    scanned_paths = (
+        *Path("vercor/setups").glob("**/*.py"),
+        *Path("examples").glob("**/*.py"),
+    )
+    offenders: list[str] = []
+
+    for path in sorted(scanned_paths):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if (
+                not isinstance(node, ast.ImportFrom)
+                or node.module not in import_modules
+            ):
+                continue
+            imported_deprecated_names = deprecated_names.intersection(
+                alias.name for alias in node.names
+            )
+            for name in sorted(imported_deprecated_names):
+                offenders.append(f"{path}:{node.lineno}:{name}")
+
+    assert offenders == []
 
 
 @pytest.mark.fast_always
@@ -688,17 +757,16 @@ def test_coupler_accepts_plain_component_name_sequences() -> None:
     import numpy as np
 
     from tests._coverage_support import make_test_grid as _make_grid
-    from vercor.components import data_component
     from vercor.setups.coupler_helpers import build_coupler
 
     clock = Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1)
     grid = _make_grid("grid")
-    ocean = data_component(
+    ocean = DataComponent.from_fields(
         "OCN",
         grid,
         fields={"sea_surface_temperature": np.zeros(grid.shape)},
     )
-    atmosphere = data_component(
+    atmosphere = DataComponent.from_fields(
         "ATM",
         grid,
         fields={"sea_surface_temperature": np.zeros(grid.shape)},

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import warnings
 
 from vercor.components.contracts import (
     AuthorFieldValues,
@@ -11,7 +12,6 @@ from vercor.components.contracts import (
     ComponentValidateHook,
     FieldNames,
 )
-from vercor.components._lifecycle import install_lifecycle_hooks
 from vercor.components.base import (
     Component,
 )
@@ -38,22 +38,23 @@ def data_component(
     prefill_runtime_state_fields: ComponentPrefillHook | None = None,
     validate_runtime_state: ComponentValidateHook | None = None,
 ) -> DataComponent:
-    """Create a data-only component using the author-friendly field facade."""
+    """Create a deprecated data-only component compatibility wrapper."""
 
-    component = DataComponent.from_fields(
+    warnings.warn(
+        "data_component() is deprecated; use DataComponent.from_fields() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return DataComponent.from_fields(
         name=name,
         grid=grid,
         fields=fields,
         settings=settings,
-    )
-    install_lifecycle_hooks(
-        component,
         initialize=initialize,
         create_runtime_payload=create_runtime_payload,
         prefill_runtime_state_fields=prefill_runtime_state_fields,
         validate_runtime_state=validate_runtime_state,
     )
-    return component
 
 
 def differentiable_component(
@@ -71,8 +72,13 @@ def differentiable_component(
     prefill_runtime_state_fields: ComponentPrefillHook | None = None,
     validate_runtime_state: ComponentValidateHook | None = None,
 ) -> Component:
-    """Create a differentiable component using the author-friendly facade."""
+    """Create a deprecated differentiable component compatibility wrapper."""
 
+    warnings.warn(
+        "differentiable_component() is deprecated; use Component.from_model() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return Component.from_model(
         name=name,
         grid=grid,
@@ -104,8 +110,13 @@ def host_component(
     prefill_runtime_state_fields: ComponentPrefillHook | None = None,
     validate_runtime_state: ComponentValidateHook | None = None,
 ) -> HostRuntimeComponent:
-    """Create a host-runtime component using the author-friendly facade."""
+    """Create a deprecated host-runtime component compatibility wrapper."""
 
+    warnings.warn(
+        "host_component() is deprecated; use HostRuntimeComponent.from_model() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return HostRuntimeComponent.from_model(
         name=name,
         grid=grid,

@@ -6,7 +6,7 @@ from datetime import timedelta
 from functools import partial
 from typing import Optional
 
-from vercor.components import HostRuntimeComponent, host_component
+from vercor.components import HostRuntimeComponent
 from vercor.jax_logging import LoggerLike
 import vercor.setups.external.camulator_contracts as _camulator_contracts
 import vercor.setups.external.camulator_runtime as _camulator_runtime
@@ -41,7 +41,7 @@ def make_camulator_gcm(
         output_frequency=output_frequency,
         logger=logger,
     )
-    return host_component(
+    return HostRuntimeComponent.from_model(
         name=name,
         grid=state.grid,
         step=partial(_camulator_runtime.step_camulator_runtime, state),

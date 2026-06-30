@@ -3,11 +3,18 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, final
 
-from vercor.components.contracts import AuthorFieldValues
+from vercor.components.contracts import (
+    AuthorFieldValues,
+    ComponentCreatePayloadHook,
+    ComponentInitializeHook,
+    ComponentPrefillHook,
+    ComponentValidateHook,
+)
 from vercor.components._contracts import (
     merge_component_outputs,
 )
 from vercor.components.base import Component
+from vercor.components._lifecycle import install_lifecycle_hooks
 from vercor.dtypes import PrecisionPolicy
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
@@ -35,11 +42,17 @@ class DataComponent(Component):
         grid: RectilinearGrid,
         fields: AuthorFieldValues = None,
         settings: VercorSettings | None = None,
+        *,
+        initialize: ComponentInitializeHook | None = None,
+        create_runtime_payload: ComponentCreatePayloadHook | None = None,
+        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+        validate_runtime_state: ComponentValidateHook | None = None,
     ) -> "DataComponent":
         """Create a data-only component from user-provided grid fields.
 
         Scalar field values expand to grid-shaped constants and seeded field
-        names are exposed as declared outputs.
+        names are exposed as declared outputs. Optional lifecycle hooks mirror
+        the callable component constructors for setup and runtime customization.
         """
 
         if settings is None:
@@ -48,6 +61,13 @@ class DataComponent(Component):
             component = cls(name=name, grid=grid, settings=settings)
         if fields is not None:
             component.seed_fields(fields)
+        install_lifecycle_hooks(
+            component,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
+        )
         return component
 
     def seed_fields(
