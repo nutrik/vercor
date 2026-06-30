@@ -9,7 +9,7 @@ import vercor.output as _output
 from vercor.clock import Clock
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike
-from vercor.run_sequence import normalize_run_sequence
+from vercor._run_order import normalize_run_sequence
 from vercor.runtime.dispatch_context import (
     RuntimeDispatchContext,
     build_runtime_dispatch_context,

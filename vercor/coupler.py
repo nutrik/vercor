@@ -15,7 +15,7 @@ from vercor.jax_logging import (
     configure_python_logger,
     setup_logger as _setup_logger,
 )
-from vercor.run_sequence import normalize_run_sequence
+from vercor._run_order import normalize_run_sequence
 import vercor.runtime.facade as _runtime_facade
 from vercor.runtime.resources import CouplerRuntimeResources
 from vercor.settings import VercorSettings

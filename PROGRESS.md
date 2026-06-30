@@ -262,6 +262,11 @@ historical commands, failure messages, or detailed validation notes.
   flake8, mypy, full fast pytest, full pytest, and `conda run -n scipy` fast
   smoke pytest passed as of 2026-06-30 using the direct `scipy` environment
   executable for the full suite.
+- Latest local deprecated compatibility shim removal validation: focused
+  red/green API/component/forcing tests, Black, flake8, mypy, full fast pytest,
+  full pytest, coverage pytest, git diff whitespace check, and
+  `conda run -n scipy` fast pytest passed as of 2026-06-30 using the direct
+  `scipy` environment executable for full-suite validation.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -289,12 +294,30 @@ historical commands, failure messages, or detailed validation notes.
 ## Follow-Up Candidates
 
 - Keep remaining public simplification candidates review-only unless a
-  compatibility decision is made: `Grid`, component authoring mixins, calendar
-  compatibility delegates, and setup helper APIs are still public or
-  boundary-tested surfaces. `RunSequence` now has compatibility-safe plain
-  sequence support, but the wrapper remains public API.
+  compatibility decision is made: `Grid`, component authoring mixins, and setup
+  helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-06-30: Deprecated Compatibility Shim Removal
+
+- Removed the explicit deprecated public shims: `RunSequence`, module-level
+  component factory helpers, `vercor.components.factories`, `vercor.run_sequence`,
+  and forcing-index delegates from `vercor.calendar`.
+- Kept the supported behavior: plain run-order sequences normalize to immutable
+  tuples, string run-order values fail early, component authors use
+  `DataComponent.from_fields()`, `Component.from_model()`, and
+  `HostRuntimeComponent.from_model()`, and daily forcing-index policy lives in
+  `vercor.forcing_index`.
+- Moved run-order normalization to private `vercor._run_order`, refreshed
+  `DESIGN.md`/`DEPENDENCIES.md`, and updated boundary tests so removed modules
+  and exports stay absent.
+- Validation run for this change: focused red tests first failed on still-present
+  exports/modules/delegates; after implementation, focused affected tests,
+  Black, flake8, mypy, full fast pytest, full pytest, coverage pytest, git diff
+  whitespace check, and `conda run -n scipy pytest tests/ -q --fast --tb=short`
+  passed. Black emitted the existing Python 3.13/target-3.14 warning, and full
+  pytest/coverage emitted the existing JAX dtype-promotion warning.
 
 ### 2026-06-30: Component Factory Helper Deprecation
 

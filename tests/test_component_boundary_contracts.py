@@ -83,7 +83,6 @@ def test_public_lifecycle_hook_types_are_owned_by_component_contracts() -> None:
     for path in (
         "vercor/components/base.py",
         "vercor/components/host.py",
-        "vercor/components/factories.py",
     ):
         private_imports = _imported_names_from(path, "vercor.components._lifecycle")
         public_imports = _imported_names_from(path, "vercor.components.contracts")

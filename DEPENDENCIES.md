@@ -3,7 +3,7 @@
 3. `vercor/pytree.py` - shared declarative PyTree mixin for immutable JAX-registered containers
 4. `vercor/settings.py` - unified metadata-backed `VercorSettings` container and static runtime controls built on (2)
 5. `vercor/field_names.py` - canonical exchange-field vocabulary
-6. `vercor/calendar.py` and `vercor/forcing_index.py` - calendar constants, model-calendar datetime values, leap-year logic, month/day conversion, compatibility delegates, and daily forcing-index policy
+6. `vercor/calendar.py` and `vercor/forcing_index.py` - calendar constants, model-calendar datetime values, leap-year logic, month/day conversion, and daily forcing-index policy
 7. `vercor/fluxes/vertical_coordinates.py` - hybrid/sigma-coordinate pressure and altitude helpers built on (1, 4)
 8. `vercor/fluxes/utilities.py` - JAX-native scalar/array thermodynamic helpers built on (1, 4)
 9. `vercor/fluxes/bulk_formula_cesm.py` - JAX-native atmosphere-ocean / atmosphere-ice bulk flux kernels with local JAX-array normalization built on (1, 4, 8)
@@ -21,7 +21,7 @@
 21. `vercor/assets.py` - generic asset cache/download/checksum boundary
 22. `vercor/forcing_data.py` - canonical NetCDF forcing-file read boundary
 23. `vercor/time_selection.py` - day-slice and periodic interpolation index helpers built on (6)
-24. `vercor/run_sequence.py` and `vercor/clock.py` - deprecated run-sequence compatibility adapter plus immutable tuple normalization (no deps), and coupler clock/timestep iteration helpers built on (6)
+24. `vercor/_run_order.py` and `vercor/clock.py` - immutable tuple run-order normalization with string rejection (no deps), and coupler clock/timestep iteration helpers built on (6)
 25. `vercor/_logging/*.py` and `vercor/jax_logging.py` - private logger configuration, protocol, host-emission, and JAX-callback owners behind the public logging facade for Python and traced JAX runtime diagnostics
 26. `vercor/setups/_time_helpers.py` - shared setup-time timestep validation, lifecycle assignment, spinup logging, forcing-index, and default-field seeding helpers built on (23)
 27. `vercor/setups/_lazy_imports.py` - shared lazy package export helper for setup modules with optional dependencies
@@ -59,7 +59,7 @@
 59. `vercor/components/contexts.py` - immutable component setup and step context payloads built on calendar, tuple run-order sequences, settings helpers, and (25)
 60. `vercor/runtime/views.py` - explicit runtime component metadata and shared read-only field resolution for diagnostics/output views and compatible runtime states built on (12, 64)
 61. `vercor/diagnostics/fields.py`, `tables.py`, `plotting.py`, and `__init__.py` - derived diagnostic fields, console tables, optional plotting, and public reexports with runtime field lookup delegated to (60) built on (10, 60)
-62. `vercor/components/contracts.py`, `base.py`, `data.py`, `host.py`, `_field_names.py`, `_protocols.py`, `_field_authoring.py`, `_contracts.py`, `_lifecycle.py`, `_lifecycle_api.py`, `_callable_wrappers.py`, `_runtime_fields.py`, `_runtime_validation.py`, `runtime_execution.py`, `setup_validation.py`, and `factories.py` - public component author contracts and lifecycle hook aliases, abstract/component-kind owners, concrete callable-backed wrappers beside their runtime-kind bases, shared field-name de-duplication, one private host-runtime execution protocol, field-authoring helpers, internal field normalization, lifecycle hook storage/dispatch/default-payload fallback, shared callable construction/signature/runtime helpers with explicit author-argument adapter names, runtime-field adapters plus direct `Component` accessors, component-facing runtime validation through shared field-layout checks, protocol-backed component-owned runtime execution policy, setup validation, and public factory helpers built on (1, 12, 14, 59)
+62. `vercor/components/contracts.py`, `base.py`, `data.py`, `host.py`, `_field_names.py`, `_protocols.py`, `_field_authoring.py`, `_contracts.py`, `_lifecycle.py`, `_lifecycle_api.py`, `_callable_wrappers.py`, `_runtime_fields.py`, `_runtime_validation.py`, `runtime_execution.py`, and `setup_validation.py` - public component author contracts and lifecycle hook aliases, abstract/component-kind owners, concrete callable-backed wrappers beside their runtime-kind bases, shared field-name de-duplication, one private host-runtime execution protocol, field-authoring helpers, internal field normalization, lifecycle hook storage/dispatch/default-payload fallback, shared callable construction/signature/runtime helpers with explicit author-argument adapter names, runtime-field adapters plus direct `Component` accessors, component-facing runtime validation through shared field-layout checks, protocol-backed component-owned runtime execution policy, and setup validation built on (1, 12, 14, 59)
 63. `vercor/runtime/contracts.py` - runtime import/export contracts, exchange-field flattening, stable exchange mask key names, and contract construction
 64. `vercor/runtime/stores.py`, `state.py`, and `__init__.py` - immutable runtime field stores, component/coupler runtime state containers, and an empty runtime package initializer with no compatibility reexports built on (1, 3, 63)
 65. `vercor/runtime/time.py` - `RuntimeStepInfo` plus host-precomputed daily/monthly runtime step metadata built on (3, 6, 23, 64)

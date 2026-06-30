@@ -9,7 +9,7 @@ from vercor.runtime.coupler_state import (
 )
 from vercor.runtime.dispatch_context import build_runtime_dispatch_context
 from vercor.runtime.driver import prime_runtime_outgoing
-from vercor.run_sequence import normalize_run_sequence
+from vercor._run_order import normalize_run_sequence
 from vercor.runtime.state_validation import (
     validate_runtime_state as _validate_runtime_state,
 )

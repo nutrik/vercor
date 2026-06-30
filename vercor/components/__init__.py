@@ -19,11 +19,6 @@ from vercor.components.data import (
 from vercor.components.host import (
     HostRuntimeComponent,
 )
-from vercor.components.factories import (
-    data_component,
-    differentiable_component,
-    host_component,
-)
 
 __all__ = [
     "Component",
@@ -37,7 +32,4 @@ __all__ = [
     "ComponentValidateHook",
     "DataComponent",
     "HostRuntimeComponent",
-    "data_component",
-    "differentiable_component",
-    "host_component",
 ]

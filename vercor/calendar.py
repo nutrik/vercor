@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 import time as _time
 from typing import ClassVar, Literal, Protocol, Self
 
@@ -337,77 +337,3 @@ def month_day_from_day_of_year(
             return month, day_cursor
         day_cursor -= month_len
     raise ValueError(f"invalid day_of_year={day_of_year}")
-
-
-def gregorian_month_lengths(year: int, *, no_leap: bool) -> tuple[int, ...]:
-    """Return Gregorian month lengths for forcing-index selection.
-
-    This compatibility delegate preserves the historic ``vercor.calendar``
-    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
-    """
-
-    from vercor.forcing_index import gregorian_month_lengths as _month_lengths
-
-    return _month_lengths(year, no_leap=no_leap)
-
-
-def day_of_year_360_to_gregorian(
-    time: CalendarDate,
-    *,
-    no_leap: bool,
-) -> int:
-    """Map a 360-day calendar date to a Gregorian day-of-year.
-
-    This compatibility delegate preserves the historic ``vercor.calendar``
-    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
-    """
-
-    from vercor.forcing_index import day_of_year_360_to_gregorian as _map_day
-
-    return _map_day(time, no_leap=no_leap)
-
-
-def noleap_day_of_year(time: CalendarDate) -> int:
-    """Return a one-based no-leap model-calendar day-of-year.
-
-    This compatibility delegate preserves the historic ``vercor.calendar``
-    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
-    """
-
-    from vercor.forcing_index import noleap_day_of_year as _noleap_day
-
-    return _noleap_day(time)
-
-
-def daily_forcing_day_of_year(
-    time: datetime | CalendarDate,
-    *,
-    year_type: str,
-    no_leap: bool = True,
-) -> int:
-    """Return the one-based day-of-year used for daily forcing lookup.
-
-    This compatibility delegate preserves the historic ``vercor.calendar``
-    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
-    """
-
-    from vercor.forcing_index import daily_forcing_day_of_year as _day_of_year
-
-    return _day_of_year(time, year_type=year_type, no_leap=no_leap)
-
-
-def daily_forcing_index(
-    time: datetime | CalendarDate,
-    *,
-    year_type: str,
-    no_leap: bool = True,
-) -> int:
-    """Return the zero-based daily forcing index for a runtime timestamp.
-
-    This compatibility delegate preserves the historic ``vercor.calendar``
-    import path while ``vercor.forcing_index`` owns daily forcing-index policy.
-    """
-
-    from vercor.forcing_index import daily_forcing_index as _daily_index
-
-    return _daily_index(time, year_type=year_type, no_leap=no_leap)

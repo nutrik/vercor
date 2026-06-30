@@ -128,11 +128,10 @@ def test_get_field_time_slice_cases(
 
 
 @pytest.mark.fast_always
-def test_forcing_index_owner_matches_calendar_compatibility_delegates(
+def test_forcing_index_resolves_daily_forcing_calendar_cases(
     select_fast_cases: SelectFastCases,
 ) -> None:
     forcing_index_module = importlib.import_module("vercor.forcing_index")
-    calendar_module = importlib.import_module("vercor.calendar")
     cases = [
         DailyForcingIndexCase(
             case_id="gregorian-common",
@@ -184,37 +183,25 @@ def test_forcing_index_owner_matches_calendar_compatibility_delegates(
             year_type=case.year_type,
             no_leap=case.no_leap,
         )
-        compat_day = calendar_module.daily_forcing_day_of_year(
-            case.time,
-            year_type=case.year_type,
-            no_leap=case.no_leap,
-        )
         owner_index = forcing_index_module.daily_forcing_index(
             case.time,
             year_type=case.year_type,
             no_leap=case.no_leap,
         )
-        compat_index = calendar_module.daily_forcing_index(
-            case.time,
-            year_type=case.year_type,
-            no_leap=case.no_leap,
-        )
 
-        assert owner_day == compat_day == case.expected_day_of_year
-        assert owner_index == compat_index == case.expected_index
+        assert owner_day == case.expected_day_of_year
+        assert owner_index == case.expected_index
 
 
 @pytest.mark.fast_always
 def test_forcing_index_rejects_unknown_year_type() -> None:
     forcing_index_module = importlib.import_module("vercor.forcing_index")
-    calendar_module = importlib.import_module("vercor.calendar")
     time = datetime(2001, 1, 1)
 
-    for module in (forcing_index_module, calendar_module):
-        with pytest.raises(ValueError, match="year_type must be one of"):
-            module.daily_forcing_day_of_year(time, year_type="gregorian")
-        with pytest.raises(ValueError, match="year_type must be one of"):
-            module.daily_forcing_index(time, year_type="gregorian")
+    with pytest.raises(ValueError, match="year_type must be one of"):
+        forcing_index_module.daily_forcing_day_of_year(time, year_type="gregorian")
+    with pytest.raises(ValueError, match="year_type must be one of"):
+        forcing_index_module.daily_forcing_index(time, year_type="gregorian")
 
 
 def test_get_field_time_slice_returns_jax_array_for_jax_backed_data() -> None:

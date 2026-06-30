@@ -143,8 +143,7 @@ immutable runtime containers used during traced integration.
   and bundled concrete components are the objects users compose when
   configuring a coupled run. `Coupler` and setup helpers accept plain
   component-name sequences for run order and normalize them internally to
-  immutable tuples. `RunSequence` remains importable only as a deprecated
-  compatibility adapter; new code should pass lists or tuples directly.
+  immutable tuples.
 - Component-author API: `Component`, `DataComponent`, and
   `HostRuntimeComponent` are the stable extension points. Custom adapters should
   use the class-level authoring constructors where possible:
@@ -173,24 +172,22 @@ immutable runtime containers used during traced integration.
   through constructor seeding. The legacy `wrap()` classmethods and
   `make_*_component()` factory functions have been removed. The module-level
   `data_component()`, `differentiable_component()`, and `host_component()`
-  helpers remain importable only as deprecated compatibility shims that warn and
-  delegate to the class constructors. Component authors should use
+  factory helpers have also been removed. Component authors should use
   class-level `from_fields()` / `from_model()` constructors, or subclasses with
   `declare_fields(...)`. `vercor.components` and `vercor` reexport the
   component-author facade.
   `vercor.components.contracts` owns public author-facing contract types and
   context aliases, `vercor.components.base` owns only the abstract
   differentiable `Component` contract, `vercor.components.data` owns
-  `DataComponent`, `vercor.components.host` owns `HostRuntimeComponent`, and
-  deprecated module-level factory shims live in `vercor.components.factories`.
+  `DataComponent`, and `vercor.components.host` owns `HostRuntimeComponent`.
   Field-name de-duplication lives in private
   `vercor.components._field_names`, and component authoring methods for field
   declarations, setup seeding, and settings updates live in private
   `vercor.components._field_authoring`. Lifecycle hook storage and hook
   installation live behind the typed private `ComponentLifecycleOwner`
   boundary in `vercor.components._lifecycle`; default lifecycle dispatch lives
-  in private `vercor.components._lifecycle_api`, and factory-installed hooks are
-  stored in one private `ComponentLifecycleHooks` container rather than as
+  in private `vercor.components._lifecycle_api`, and constructor-installed
+  hooks are stored in one private `ComponentLifecycleHooks` container rather than as
   ad-hoc component attributes. Author-value normalization lives in private
   `vercor.components._contracts`; callable signature adaptation, shared
   callable construction metadata, and shared callable runtime mechanics live in
@@ -372,9 +369,8 @@ duplicated beside recipes.
 Core helper ownership follows the same boundary. Calendar constants,
 model-calendar datetime values, leap-year logic, and month/day conversion live
 in `vercor.calendar`. Daily forcing-index policy, including noleap and 360-day
-calendar mapping to forcing-file day indexes, lives in `vercor.forcing_index`;
-`vercor.calendar` preserves thin compatibility delegates for the historic import
-path. The canonical exchange field vocabulary lives in `vercor.field_names`.
+calendar mapping to forcing-file day indexes, lives in `vercor.forcing_index`.
+The canonical exchange field vocabulary lives in `vercor.field_names`.
 Rectilinear grid construction, center-to-edge geometry, and grid identity checks
 live in `vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while
 default component-topology name validation and lookup are private to

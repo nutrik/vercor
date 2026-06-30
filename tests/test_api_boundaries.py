@@ -16,7 +16,6 @@ import vercor.components.base as base_module
 import vercor.components.contexts as component_contexts_module
 import vercor.components.contracts as component_contracts_module
 import vercor.components.data as data_module
-import vercor.components.factories as factories_module
 import vercor.components.host as host_module
 import vercor.components.setup_validation as setup_validation_module
 from tests._architecture_support import package_import_cycles
@@ -27,11 +26,9 @@ from vercor.components.host import HostRuntimeComponent
 from vercor.clock import Clock
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
-from vercor.run_sequence import RunSequence, normalize_run_sequence
 from vercor.runtime.state import RuntimeComponentState
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.regridders import bilinear
-from vercor.types import RuntimeArray
 
 
 @pytest.mark.fast_always
@@ -52,10 +49,6 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
         "Exchange",
         "HostRuntimeComponent",
         "RectilinearGrid",
-        "RunSequence",
-        "data_component",
-        "differentiable_component",
-        "host_component",
     }
     runtime_internal_names = {
         "ComponentInitContext",
@@ -68,7 +61,11 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
         "RuntimeStepContext",
         "RuntimeStepInfo",
     }
-    legacy_component_names = {
+    removed_compatibility_names = {
+        "RunSequence",
+        "data_component",
+        "differentiable_component",
+        "host_component",
         "make_data_component",
         "make_differentiable_component",
         "make_host_component",
@@ -76,7 +73,7 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
 
     assert expected_public_names.issubset(set(vercor.__all__))
     assert runtime_internal_names.isdisjoint(set(vercor.__all__))
-    assert legacy_component_names.isdisjoint(set(vercor.__all__))
+    assert removed_compatibility_names.isdisjoint(set(vercor.__all__))
 
     assert vercor.Component is Component
     assert (
@@ -103,45 +100,20 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
     assert data_component_type is not None
     assert getattr(vercor, "DataComponent", None) is data_component_type
     assert vercor.HostRuntimeComponent is HostRuntimeComponent
-    assert vercor.data_component is components_module.data_component
-    assert vercor.differentiable_component is components_module.differentiable_component
-    assert vercor.host_component is components_module.host_component
-    assert vercor.RunSequence is RunSequence
-    for name in (*runtime_internal_names, *legacy_component_names):
+    for name in (*runtime_internal_names, *removed_compatibility_names):
         assert not hasattr(vercor, name)
 
 
 @pytest.mark.fast_always
-def test_deprecated_component_factory_exports_remain_importable_and_warn() -> None:
-    grid = make_test_grid(name="deprecated-factory-export")
+def test_removed_compatibility_modules_are_not_importable() -> None:
+    removed_modules = (
+        "vercor.components.factories",
+        "vercor.run_sequence",
+    )
 
-    with pytest.warns(DeprecationWarning, match="data_component\\(\\) is deprecated"):
-        data = vercor.data_component(name="OBS", grid=grid)
-
-    def step(fields: object) -> dict[str, RuntimeArray]:
-        _ = fields
-        return {}
-
-    with pytest.warns(
-        DeprecationWarning,
-        match="differentiable_component\\(\\) is deprecated",
-    ):
-        differentiable = vercor.differentiable_component(
-            name="ATM",
-            grid=grid,
-            step=step,
-        )
-
-    with pytest.warns(DeprecationWarning, match="host_component\\(\\) is deprecated"):
-        host = vercor.host_component(
-            name="HOST",
-            grid=grid,
-            step=step,
-        )
-
-    assert isinstance(data, DataComponent)
-    assert isinstance(differentiable, Component)
-    assert isinstance(host, HostRuntimeComponent)
+    for module_name in removed_modules:
+        with pytest.raises(ModuleNotFoundError, match=module_name):
+            importlib.import_module(module_name)
 
 
 @pytest.mark.fast_always
@@ -171,9 +143,6 @@ def test_components_package_exports_only_component_author_contracts() -> None:
         "ComponentValidateHook",
         "DataComponent",
         "HostRuntimeComponent",
-        "data_component",
-        "differentiable_component",
-        "host_component",
     ]
     assert components_module.Component is Component
     assert (
@@ -205,12 +174,6 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert host_module is imported_host_module
     assert components_module.DataComponent is data_module.DataComponent
     assert components_module.HostRuntimeComponent is host_module.HostRuntimeComponent
-    assert components_module.data_component is factories_module.data_component
-    assert (
-        components_module.differentiable_component
-        is factories_module.differentiable_component
-    )
-    assert components_module.host_component is factories_module.host_component
     assert setup_validation_module.validate_component_setup is not None
     assert "FieldDefaults" not in contracts_module.__all__
     assert "FieldDefaults" not in private_contracts_module.__all__
@@ -221,6 +184,9 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert not hasattr(base_module, "data_component")
     assert not hasattr(base_module, "differentiable_component")
     assert not hasattr(base_module, "host_component")
+    assert not hasattr(components_module, "data_component")
+    assert not hasattr(components_module, "differentiable_component")
+    assert not hasattr(components_module, "host_component")
     assert not hasattr(components_module, "make_data_component")
     assert not hasattr(components_module, "make_differentiable_component")
     assert not hasattr(components_module, "make_host_component")
@@ -230,8 +196,8 @@ def test_components_package_exports_only_component_author_contracts() -> None:
 
 
 @pytest.mark.fast_always
-def test_setup_and_examples_do_not_import_deprecated_component_factories() -> None:
-    deprecated_names = {
+def test_setup_and_examples_do_not_import_removed_component_factories() -> None:
+    removed_names = {
         "data_component",
         "differentiable_component",
         "host_component",
@@ -239,7 +205,6 @@ def test_setup_and_examples_do_not_import_deprecated_component_factories() -> No
     import_modules = {
         "vercor",
         "vercor.components",
-        "vercor.components.factories",
     }
     scanned_paths = (
         *Path("vercor/setups").glob("**/*.py"),
@@ -255,10 +220,10 @@ def test_setup_and_examples_do_not_import_deprecated_component_factories() -> No
                 or node.module not in import_modules
             ):
                 continue
-            imported_deprecated_names = deprecated_names.intersection(
+            imported_removed_names = removed_names.intersection(
                 alias.name for alias in node.names
             )
-            for name in sorted(imported_deprecated_names):
+            for name in sorted(imported_removed_names):
                 offenders.append(f"{path}:{node.lineno}:{name}")
 
     assert offenders == []
@@ -357,8 +322,6 @@ def test_callable_author_api_does_not_expose_legacy_field_seed_keyword() -> None
     public_callables = (
         components_module.Component.from_model,
         components_module.HostRuntimeComponent.from_model,
-        components_module.differentiable_component,
-        components_module.host_component,
     )
     removed_keyword = "initial" + "_fields"
 
@@ -394,9 +357,6 @@ def test_component_base_internals_are_private_modules() -> None:
         encoding="utf-8"
     )
     runtime_execution_source = Path("vercor/components/runtime_execution.py").read_text(
-        encoding="utf-8"
-    )
-    factories_source = Path("vercor/components/factories.py").read_text(
         encoding="utf-8"
     )
     lifecycle_source = Path("vercor/components/_lifecycle.py").read_text(
@@ -461,10 +421,10 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def _callable_component_from_model(" not in base_source
     assert "from vercor.components.factories import" not in base_source
     assert "from vercor.components.factories import" not in host_source
+    assert not Path("vercor/components/factories.py").exists()
     assert "def data_component(" not in base_source
     assert "def differentiable_component(" not in base_source
     assert "def host_component(" not in base_source
-    assert "def _install_lifecycle_hooks(" not in factories_source
     assert "def install_lifecycle_hooks(" in lifecycle_source
     assert "class ComponentLifecycleHooks" in lifecycle_source
     assert "ComponentInitializeHook =" not in lifecycle_source
@@ -480,18 +440,10 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "from vercor.components.host import HostRuntimeComponent" not in (
         callable_source
     )
-    assert "def _callable_component_from_model(" not in factories_source
-    assert "class CallableComponentRequest" not in factories_source
-    assert "_create_callable_component(" not in factories_source
     assert "class _CallableComponentDefinition" not in callable_source
     assert "def _callable_component_definition(" not in callable_source
-    assert "Component.from_model(" in factories_source
-    assert "HostRuntimeComponent.from_model(" in factories_source
     assert "class _CallableComponent" in base_source
     assert "class _CallableHostRuntimeComponent" in host_source
-    assert "def data_component(" in factories_source
-    assert "def differentiable_component(" in factories_source
-    assert "def host_component(" in factories_source
     assert "_required_fields" not in callable_source
     assert "_prefill_fields" not in callable_source
     assert "_field_defaults" not in callable_source
@@ -785,19 +737,15 @@ def test_coupler_accepts_plain_component_name_sequences() -> None:
 
 
 @pytest.mark.fast_always
-def test_run_sequence_adapter_is_deprecated_tuple_compatibility() -> None:
-    with pytest.warns(DeprecationWarning, match="RunSequence is deprecated"):
-        sequence = RunSequence(order=["OCN", "ATM"])
-
-    assert sequence.order == ("OCN", "ATM")
-    assert list(sequence) == ["OCN", "ATM"]
-    assert normalize_run_sequence(sequence) == ("OCN", "ATM")
-
+def test_coupler_rejects_string_run_sequence() -> None:
     with pytest.raises(
         TypeError,
         match="run_sequence must be a sequence of component names, not str",
     ):
-        normalize_run_sequence("ATM")
+        Coupler(
+            clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
+            run_sequence="ATM",
+        )
 
 
 @pytest.mark.fast_always
@@ -859,17 +807,12 @@ def test_runtime_state_is_separate_from_public_component_objects() -> None:
 
 
 @pytest.mark.fast_always
-def test_examples_import_run_sequence_from_top_level_public_api() -> None:
+def test_examples_do_not_import_removed_run_sequence_api() -> None:
     for path in Path("examples").glob("run_*.py"):
         source = path.read_text(encoding="utf-8")
         assert "from vercor.coupler import RunSequence" not in source
-        if "RunSequence" in source:
-            public_import_lines = [
-                line
-                for line in source.splitlines()
-                if line.startswith("from vercor import ")
-            ]
-            assert any("RunSequence" in line for line in public_import_lines), path
+        assert "from vercor import RunSequence" not in source
+        assert "RunSequence" not in source
 
 
 @pytest.mark.fast_always
@@ -967,11 +910,16 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     import vercor.exchange as exchange_module
 
     assert callable(calendar_module.is_leap_year)
-    assert callable(calendar_module.daily_forcing_index)
-    assert (
-        forcing_index_module.daily_forcing_index
-        is not calendar_module.daily_forcing_index
+    removed_calendar_delegates = (
+        "gregorian_month_lengths",
+        "day_of_year_360_to_gregorian",
+        "noleap_day_of_year",
+        "daily_forcing_day_of_year",
+        "daily_forcing_index",
     )
+    for name in removed_calendar_delegates:
+        assert not hasattr(calendar_module, name)
+    assert callable(forcing_index_module.daily_forcing_index)
     assert not hasattr(clock_module, "DateTime360")
     assert not hasattr(clock_module, "DateTime365")
     assert not hasattr(clock_module, "ModelDateTime")
