@@ -1515,14 +1515,29 @@ def test_assets_and_diagnostics_have_focused_ownership_boundaries() -> None:
 
 @pytest.mark.fast_always
 def test_veros_setup_state_does_not_keep_one_line_step_wrapper() -> None:
+    gcm_source = Path("vercor/setups/external/veros_gcm.py").read_text(encoding="utf-8")
     source = Path("vercor/setups/external/veros_gcm_state.py").read_text(
         encoding="utf-8"
+    )
+    tree = ast.parse(source)
+    setup_state_class = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "VerosGCMSetupState"
     )
 
     assert "def advance_veros_model_step(" not in source
     assert '"advance_veros_model_step"' not in source
     assert "partial(" in source
     assert "_veros_state.pure," in source
+    assert "step" not in {
+        node.name
+        for node in setup_state_class.body
+        if isinstance(node, ast.FunctionDef)
+    }
+    assert "from functools import partial" in gcm_source
+    assert "import vercor.setups.external.veros_runtime as _veros_runtime" in gcm_source
+    assert "step=partial(_veros_runtime.step_veros_runtime, state)," in gcm_source
 
 
 @pytest.mark.fast_always
@@ -1540,6 +1555,34 @@ def test_camulator_adapters_share_runtime_cursor_state_transition_helper() -> No
         source = path.read_text(encoding="utf-8")
         assert "runtime_forcing_index(" not in source, path
         assert "timestep_counter += 1" not in source, path
+
+
+@pytest.mark.fast_always
+def test_camulator_gcm_factory_passes_runtime_step_directly() -> None:
+    gcm_source = Path("vercor/setups/external/camulator.py").read_text(encoding="utf-8")
+    state_source = Path("vercor/setups/external/camulator_gcm_state.py").read_text(
+        encoding="utf-8"
+    )
+    tree = ast.parse(state_source)
+    setup_state_class = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "CAMulatorGCMSetupState"
+    )
+
+    assert "step" not in {
+        node.name
+        for node in setup_state_class.body
+        if isinstance(node, ast.FunctionDef)
+    }
+    assert "from functools import partial" in gcm_source
+    assert (
+        "import vercor.setups.external.camulator_runtime as _camulator_runtime"
+        in gcm_source
+    )
+    assert (
+        "step=partial(_camulator_runtime.step_camulator_runtime, state)," in gcm_source
+    )
 
 
 @pytest.mark.fast_always

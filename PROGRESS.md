@@ -234,6 +234,10 @@ historical commands, failure messages, or detailed validation notes.
   red/green pytest, Black, flake8, mypy, full fast pytest, full pytest, and
   git diff whitespace check passed as of 2026-06-30 using the direct `scipy`
   environment executable.
+- Latest local external setup-step/remapper derived-state simplification
+  validation: baseline fast pytest, focused red/green pytest, focused affected
+  pytest, Black, flake8, mypy, full fast pytest, full pytest, and git diff
+  whitespace check passed as of 2026-06-30 using `conda run -n scipy`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -267,6 +271,28 @@ historical commands, failure messages, or detailed validation notes.
   sequence support, but the wrapper remains public API.
 
 ## Recent Work
+
+### 2026-06-30: External Setup-Step and Remapper Derived-State Simplification
+
+- Removed one-line Veros and CAMulator GCM setup-state `step()` delegates.
+  Their factories now pass `partial(...step_*_runtime, state)` directly to
+  the host component boundary, matching the existing JAXGCM factory pattern.
+- Removed conservative remapper cached derived fields
+  `_normalize_fracarea` and `_n_dst_cells`; `apply_scalar()` now derives those
+  values locally from declared metadata, so PyTree unflattening no longer
+  needs a class-specific post-unflatten hook.
+- Updated boundary/PyTree tests to guard the simplified behavior. The first
+  full pytest run exposed a stale runtime-state source assertion that assumed
+  Veros and CAMulator GCM setup-state files must still define `def step(`;
+  that assertion now only inspects the remaining CAMulator land inline step
+  and explicitly verifies the removed setup-state delegates stay absent.
+- Validation run for this change: baseline fast pytest passed; focused red
+  tests first failed on the existing setup-state delegates and remapper cached
+  derived attributes. After implementation, focused affected pytest, Black,
+  flake8, mypy, full fast pytest, full pytest, and `git diff --check` passed
+  using `conda run -n scipy`. Black emitted the existing Python
+  3.13/target-3.14 safety-check warning, and full pytest emitted the existing
+  JAX dtype-promotion warning.
 
 ### 2026-06-30: Internal Helper Type-Surface Simplification
 

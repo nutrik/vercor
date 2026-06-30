@@ -527,16 +527,13 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "target_vars: Sequence[str] = [" not in camulator_wind_filter_source
     assert "def _step_host_runtime_state" not in base_source
     assert "_step_host_runtime_state" not in runtime_driver_source
-    for source in (
-        veros_gcm_state_source,
-        camulator_gcm_state_source,
-        camulator_land_source,
-    ):
-        signature = source.split("def step(", 1)[1].split(") ->", 1)[0]
-        assert "coupler" not in signature
-        assert "context" in signature
-        assert "logger" not in signature
-        assert "runtime_settings" not in signature
+    assert "def step(" not in veros_gcm_state_source
+    assert "def step(" not in camulator_gcm_state_source
+    signature = camulator_land_source.split("def step(", 1)[1].split(") ->", 1)[0]
+    assert "coupler" not in signature
+    assert "context" in signature
+    assert "logger" not in signature
+    assert "runtime_settings" not in signature
     assert "def step_runtime_state" not in veros_source
     assert "def step_runtime_state" not in camulator_source
     assert "def step_runtime_state" not in camulator_land_source

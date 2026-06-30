@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import timedelta
+from functools import partial
 from typing import Any
 
 from vercor.components import HostRuntimeComponent, host_component
 import vercor.setups.external.veros_gcm_state as _veros_gcm_state
+import vercor.setups.external.veros_runtime as _veros_runtime
 from vercor.setups.external.veros_gcm_state import VerosGCMSetupState
 
 try:
@@ -43,7 +45,7 @@ def make_veros_gcm(
     return host_component(
         name=name,
         grid=state.grid,
-        step=state.step,
+        step=partial(_veros_runtime.step_veros_runtime, state),
         inputs=_veros_gcm_state.VEROS_INPUT_FIELD_NAMES,
         outputs=("sea_surface_temperature",),
         default_fields=_veros_gcm_state.veros_default_fields(),

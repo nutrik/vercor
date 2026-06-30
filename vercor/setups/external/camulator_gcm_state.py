@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import torch
 import xarray as xr
 
 from vercor.components import (
     ComponentSetupContext,
-    ComponentStepContext,
     HostRuntimeComponent,
 )
 from vercor.dtypes import jax_ones
@@ -27,7 +25,6 @@ import vercor.setups.external.camulator_contracts as _camulator_contracts
 from vercor.setups.external.camulator_forcing import CamulatorRuntimeCursor
 import vercor.setups.external.camulator_init as _camulator_init
 import vercor.setups.external.camulator_output as _camulator_output
-import vercor.setups.external.camulator_runtime as _camulator_runtime
 from vercor.setups.external.camulator_runtime_settings import (
     configure_camulator_runtime,
 )
@@ -187,21 +184,6 @@ class CAMulatorGCMSetupState:
             component,
             _camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES,
             context,
-        )
-
-    def step(
-        self,
-        fields: Mapping[str, Any],
-        context: ComponentStepContext,
-        payload: Any | None,
-    ) -> Mapping[str, Any]:
-        """Delegate CAMulator host-runtime advancement to the runtime helper."""
-
-        return _camulator_runtime.step_camulator_runtime(
-            self,
-            fields,
-            context,
-            payload,
         )
 
 

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from functools import partial
 from typing import Optional
 
 from vercor.components import HostRuntimeComponent, host_component
 from vercor.jax_logging import LoggerLike
 import vercor.setups.external.camulator_contracts as _camulator_contracts
+import vercor.setups.external.camulator_runtime as _camulator_runtime
 from vercor.setups.external.camulator_gcm_state import CAMulatorGCMSetupState
 
 
@@ -42,7 +44,7 @@ def make_camulator_gcm(
     return host_component(
         name=name,
         grid=state.grid,
-        step=state.step,
+        step=partial(_camulator_runtime.step_camulator_runtime, state),
         inputs=("sea_surface_temperature", "land_surface_temperature"),
         outputs=_camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES,
         default_fields=_camulator_contracts.camulator_runtime_field_defaults(),

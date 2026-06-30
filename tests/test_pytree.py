@@ -80,7 +80,7 @@ def test_static_pytree_metadata_round_trip_uses_declared_aux_fields() -> None:
     assert_allclose_compact(restored_store.get("humidity"), store.get("humidity"))
 
 
-def test_remapper_post_unflatten_restores_derived_static_state() -> None:
+def test_remapper_pytree_round_trip_uses_declared_metadata_only() -> None:
     remapper = ConservativeRectilinearRemapper(
         src_lon_edges=jnp.asarray([0.0, 1.0, 2.0]),
         src_lat_edges=jnp.asarray([2.0, 1.0, 0.0]),
@@ -92,11 +92,12 @@ def test_remapper_post_unflatten_restores_derived_static_state() -> None:
     leaves, treedef = jax.tree_util.tree_flatten(remapper)
     restored = jax.tree_util.tree_unflatten(treedef, leaves)
 
-    assert restored._normalize_fracarea is True
     assert restored._s_lat_flip is True
     assert restored._d_lat_flip is True
-    assert restored._n_dst_cells == 16
+    assert not hasattr(restored, "_normalize_fracarea")
+    assert not hasattr(restored, "_n_dst_cells")
     assert not hasattr(restored, "_n_src_cells")
+    assert "_pytree_post_unflatten" not in ConservativeRectilinearRemapper.__dict__
     assert_allclose_compact(
         restored.apply_scalar(jnp.ones((2, 2))),
         remapper.apply_scalar(jnp.ones((2, 2))),

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from datetime import timedelta
 from functools import partial
 from typing import Any, cast
@@ -11,7 +11,6 @@ import jax.numpy as jnp
 
 from vercor.components import (
     ComponentSetupContext,
-    ComponentStepContext,
     HostRuntimeComponent,
 )
 from vercor.grid import RectilinearGrid
@@ -21,7 +20,6 @@ from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
     run_logged_spinup,
 )
-import vercor.setups.external.veros_runtime as _veros_runtime
 import vercor.setups.external.veros_output as _veros_output
 import vercor.setups.external.veros_setup as _veros_setup
 import vercor.setups.external.veros_state as _veros_state
@@ -152,16 +150,6 @@ class VerosGCMSetupState:
             "sea_surface_temperature",
             _veros_state.extract_veros_runtime_sst(self._veros_state),
         )
-
-    def step(
-        self,
-        fields: Mapping[str, Any],
-        context: ComponentStepContext,
-        payload: Any | None,
-    ) -> Mapping[str, Any]:
-        """Delegate Veros host-runtime advancement to the runtime helper."""
-
-        return _veros_runtime.step_veros_runtime(self, fields, context, payload)
 
 
 def veros_default_fields() -> dict[str, float]:

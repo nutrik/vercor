@@ -76,7 +76,6 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
 
         self.radius = float(radius)
         self.normalize = normalize
-        self._normalize_fracarea = normalize == "fracarea"
 
         # 1. Standardize and store bounds
         self.src_lon_b = as_jax_real_array(src_lon_edges)
@@ -88,7 +87,6 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
         self.n_src_lat = self.src_lat_b.shape[0] - 1
         self.n_dst_lon = self.dst_lon_b.shape[0] - 1
         self.n_dst_lat = self.dst_lat_b.shape[0] - 1
-        self._n_dst_cells = self.n_dst_lat * self.n_dst_lon
 
         # 2. Compute 1D overlaps
         lon_dst_idx, lon_src_idx, lon_overlap = self._compute_lon_overlaps(
@@ -133,12 +131,6 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
             (self.radius**2) * jnp.outer(dst_lat_diff, dst_lon_diff)
         ).reshape(-1)
         self.dst_areas = jnp.where(dst_areas <= 1e-15, jnp.inf, dst_areas)
-
-    def _pytree_post_unflatten(self) -> None:
-        """Restore derived static remapping state after PyTree unflattening."""
-
-        self._normalize_fracarea = self.normalize == "fracarea"
-        self._n_dst_cells = self.n_dst_lon * self.n_dst_lat
 
     @staticmethod
     def _segment_sum(values: jax.Array, indices: jax.Array, size: int) -> jax.Array:
@@ -232,18 +224,19 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
         flat_field = field_array.reshape(-1)
         clean_field = jnp.where(jnp.isnan(flat_field), 0.0, flat_field)
         weighted_values = self.overlap_weights * clean_field[self.src_indices]
+        n_dst_cells = self.n_dst_lat * self.n_dst_lon
         weighted_sum = self._segment_sum(
             weighted_values,
             self.dst_indices,
-            self._n_dst_cells,
+            n_dst_cells,
         )
 
-        if self._normalize_fracarea:
+        if self.normalize == "fracarea":
             valid = jnp.where(jnp.isnan(flat_field), 0.0, 1.0)
             norm = self._segment_sum(
                 self.overlap_weights * valid[self.src_indices],
                 self.dst_indices,
-                self._n_dst_cells,
+                n_dst_cells,
             )
         else:
             norm = self.dst_areas
