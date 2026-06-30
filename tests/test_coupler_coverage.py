@@ -584,7 +584,7 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
     created_keys: list[tuple[str, str]] = []
     for exchange in exchanges:
 
-        def fake_create(
+        def fake_regridder_factory(
             source_grid: Any,
             destination_grid: Any,
             exchange_name: str = exchange.name,
@@ -593,7 +593,11 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
             created_keys.append((source_grid.name, destination_grid.name))
             return RecordingRegridder()
 
-        monkeypatch.setattr(exchange, "create", fake_create)
+        monkeypatch.setattr(
+            exchange,
+            "regridder_factory",
+            cast(Any, fake_regridder_factory),
+        )
         coupler.add_exchange(exchange)
 
     def fake_create_surface_exchange_masks(

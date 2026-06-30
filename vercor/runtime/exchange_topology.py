@@ -36,7 +36,7 @@ def build_exchange_topology_maps(
         key = (exchange.source, exchange.destination, exchange.interpolation_type)
 
         if key not in initialized_maps.regridders:
-            initialized_maps.regridders[key] = exchange.create(
+            initialized_maps.regridders[key] = exchange.regridder_factory(
                 components[exchange.source].grid,
                 components[exchange.destination].grid,
             )

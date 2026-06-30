@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Callable, TypeAlias
 
-from vercor.grid import Grid
 from vercor.regridders.bilinear import BilinearRectilinearRegridder
 from vercor.regridders.conservative import ConservativeRectilinearRegridder
 
@@ -70,20 +69,3 @@ class Exchange:
             f"{self.__class__.__name__}(name={self.name}, source={self.source},"
             f" destination={self.destination}, fields={self.field_names})"
         )
-
-    def create(
-        self,
-        source_grid: Grid,
-        destination_grid: Grid,
-    ) -> BilinearRectilinearRegridder | ConservativeRectilinearRegridder:
-        """
-        Create and return a Regridder instance using the provided factory.
-
-        Arguments:
-            source_grid: Grid of the source component
-            destination_grid: Grid of the destination component
-
-        Returns:
-            Regridder instance created by the factory
-        """
-        return self.regridder_factory(source_grid, destination_grid)

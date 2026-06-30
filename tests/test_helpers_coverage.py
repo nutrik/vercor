@@ -132,7 +132,7 @@ def test_helper_kernels_support_jax_jit() -> None:
     assert_allclose_compact(land_mask, np.asarray([[1, 0], [1, 0]]))
 
 
-def test_exchange_create_uses_factory_and_formatting() -> None:
+def test_exchange_stores_factory_and_formatting_without_create_wrapper() -> None:
     source_grid = RectilinearGrid(
         name="src",
         longitude=np.asarray([0.0, 180.0]),
@@ -159,8 +159,9 @@ def test_exchange_create_uses_factory_and_formatting() -> None:
         regridder_factory=cast(Any, dummy_factory),
     )
 
-    created = exchange.create(source_grid, destination_grid)
+    created = exchange.regridder_factory(source_grid, destination_grid)
 
+    assert not hasattr(exchange, "create")
     assert exchange.name == "OCN --(dummy_factory)--> ATM"
     assert exchange.interpolation_type == "dummy_factory"
     assert "Source component: OCN" in str(exchange)
@@ -169,7 +170,7 @@ def test_exchange_create_uses_factory_and_formatting() -> None:
     assert calls == [(source_grid, destination_grid)]
 
 
-def test_exchange_uses_wrapped_factory_name_and_create_keeps_partial_options() -> None:
+def test_exchange_uses_wrapped_factory_name_and_keeps_partial_options() -> None:
     source_grid = RectilinearGrid(
         name="src",
         longitude=np.asarray([0.0, 90.0, 180.0]),
@@ -193,8 +194,9 @@ def test_exchange_uses_wrapped_factory_name_and_create_keeps_partial_options() -
         field_names=["temperature"],
         regridder_factory=regridder_factory,
     )
-    created = exchange.create(source_grid, destination_grid)
+    created = exchange.regridder_factory(source_grid, destination_grid)
 
+    assert not hasattr(exchange, "create")
     assert exchange.name == "OCN --(bilinear)--> ATM"
     assert exchange.interpolation_type == "bilinear"
     assert created.source_grid is source_grid

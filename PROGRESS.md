@@ -248,6 +248,11 @@ historical commands, failure messages, or detailed validation notes.
   pytest, full pytest, git diff whitespace check, and `conda run -n scipy`
   fast pytest passed as of 2026-06-30. The earlier planning-time Conda/Rattler
   panic was not reproduced during final validation.
+- Latest local Exchange create-wrapper removal validation: baseline fast
+  pytest, focused red/green Exchange tests, focused affected pytest, Black,
+  flake8, mypy, full fast pytest, full pytest, and `conda run -n scipy`
+  smoke pytest passed as of 2026-06-30. The earlier planning-time
+  Conda/Rattler panic was not reproduced during final validation.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -281,6 +286,24 @@ historical commands, failure messages, or detailed validation notes.
   sequence support, but the wrapper remains public API.
 
 ## Recent Work
+
+### 2026-06-30: Exchange Create Wrapper Removal
+
+- Removed the public-looking one-line `Exchange.create()` wrapper so exchange
+  declarations remain static configuration and runtime topology construction
+  calls `exchange.regridder_factory(...)` directly.
+- Updated helper and coupler coverage tests to assert the removed wrapper stays
+  absent, preserve factory-name formatting behavior, and patch
+  `regridder_factory` for topology recording tests while keeping existing
+  interpolation keys.
+- Validation run for this change: baseline fast pytest passed; focused red
+  tests first failed on `Exchange.create` still existing, then passed after
+  removal. The first full pytest run exposed one stale test monkeypatching the
+  removed wrapper; after updating that test double, focused affected pytest,
+  Black, flake8, mypy, full fast pytest, full pytest, and
+  `conda run -n scipy python -m pytest tests/test_helpers_coverage.py -q --fast --tb=short`
+  passed. Black emitted the existing Python 3.13/target-3.14 safety-check
+  warning, and full pytest emitted the existing JAX dtype-promotion warning.
 
 ### 2026-06-30: Legacy Component Seed Helper Removal
 
