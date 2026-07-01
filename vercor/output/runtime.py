@@ -59,6 +59,23 @@ def write_runtime_component_view_to_netcdf(
     )
 
 
+def write_runtime_component_snapshot_to_netcdf(
+    view: RuntimeComponentView,
+    filename: Path,
+    output_field_names: Sequence[str],
+    *,
+    logger: "LoggerLike | None" = None,
+) -> None:
+    """Write declared output data fields from one runtime component view."""
+
+    write_netcdf_dataset(
+        output=str(filename),
+        coordinate_variables=_runtime_coordinate_variables(view),
+        data_variables=_snapshot_data_variables(view, output_field_names),
+        logger=logger,
+    )
+
+
 def _runtime_coordinate_variables(
     view: RuntimeComponentView,
 ) -> dict[str, OutputVariable]:
@@ -110,6 +127,48 @@ def _runtime_output_variable(
     )
 
 
+def _snapshot_data_variables(
+    view: RuntimeComponentView,
+    output_field_names: Sequence[str],
+) -> dict[str, OutputVariable]:
+    return {
+        field_name: _snapshot_output_variable(
+            view,
+            view.data.get(field_name),
+            field_name=field_name,
+        )
+        for field_name in output_field_names
+    }
+
+
+def _snapshot_output_variable(
+    view: RuntimeComponentView,
+    value: RuntimeArray,
+    *,
+    field_name: str,
+) -> OutputVariable:
+    return OutputVariable(
+        _snapshot_variable_dims(field_name, value),
+        value,
+        {
+            "component": view.name,
+            "runtime_store": "data",
+            "field_name": field_name,
+        },
+    )
+
+
+def _snapshot_variable_dims(field_name: str, value: RuntimeArray) -> tuple[str, ...]:
+    shape = tuple(value.shape)
+    if len(shape) < 2:
+        return tuple(f"{field_name}_dim{index}" for index in range(len(shape)))
+    return (
+        *(f"{field_name}_dim{index}" for index in range(len(shape) - 2)),
+        "nlat",
+        "nlon",
+    )
+
+
 def write_coupler_runtime_outputs(
     *,
     final_state: RuntimeCouplerState,
@@ -146,8 +205,32 @@ def write_coupler_runtime_outputs(
             logger.info(f" Finalized {name}")
 
 
+def write_coupler_component_snapshots(
+    *,
+    final_state: RuntimeCouplerState,
+    components: Mapping[str, "Component"],
+    logger: "LoggerLike | None" = None,
+) -> None:
+    """Write declared output-field snapshots for all configured components."""
+
+    for name, component in components.items():
+        view = RuntimeComponentView.from_component_state(
+            name,
+            component.grid,
+            final_state.get_component_state(name),
+        )
+        write_runtime_component_snapshot_to_netcdf(
+            view,
+            Path(f"{name}.snapshot.nc"),
+            tuple(component.field_spec.outputs),
+            logger=logger,
+        )
+
+
 __all__ = [
     "output_masks_for_component",
+    "write_coupler_component_snapshots",
     "write_coupler_runtime_outputs",
+    "write_runtime_component_snapshot_to_netcdf",
     "write_runtime_component_view_to_netcdf",
 ]

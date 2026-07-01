@@ -271,6 +271,11 @@ historical commands, failure messages, or detailed validation notes.
   red/green warning pytest, Black, flake8, mypy, full fast pytest, full pytest,
   and git diff whitespace check passed as of 2026-07-01 using `conda run` in
   the `scipy` environment; no Conda/Rattler fallback was needed.
+- Latest local component snapshot finalize-output validation: baseline fast
+  pytest, focused red/green snapshot pytest, focused fast pytest, Black,
+  flake8, mypy, full fast pytest, full pytest, and coverage pytest passed as
+  of 2026-07-01 using the direct `scipy` environment executable because
+  `conda run -n scipy` hit the known Conda/Rattler panic during orientation.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -302,6 +307,26 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-01: Component Snapshot Finalize Output
+
+- Extended `Coupler.finalize(...)` to keep the existing runtime-output write
+  and then write exact `<component_name>.snapshot.nc` files for every
+  registered component.
+- Snapshot files reuse the shared VerCOR h5netcdf output machinery and contain
+  only current runtime `data` values from `component.field_spec.outputs`.
+  Incoming, outgoing, mask, default-only, and adapter-native period-output
+  variables are intentionally excluded.
+- Added coverage for finalize orchestration and actual NetCDF snapshot contents,
+  including case-preserving filenames, declared-output filtering, attrs, and
+  field-specific leading dimensions.
+- Validation run for this change: the required `conda run -n scipy` orientation
+  command hit the known Conda/Rattler panic, so final validation used the direct
+  `scipy` environment executable. Baseline fast pytest, focused red/green
+  snapshot pytest, focused fast pytest, Black, flake8, mypy, full fast pytest,
+  full pytest, and coverage pytest passed. Black emitted the existing Python
+  3.13/target-3.14 warning, and full pytest/coverage emitted the existing JAX
+  dtype-promotion warning.
 
 ### 2026-07-01: Non-Differentiable Host-Runtime Warning
 

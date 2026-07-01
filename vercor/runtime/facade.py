@@ -193,6 +193,11 @@ def finalize(
         output_file_mask=output_file_mask,
         logger=logger,
     )
+    _output.write_coupler_component_snapshots(
+        final_state=final_state,
+        components=inputs.components,
+        logger=logger,
+    )
 
 
 __all__ = [

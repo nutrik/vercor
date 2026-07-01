@@ -7,6 +7,7 @@ import sys
 from types import SimpleNamespace
 from typing import Any, cast
 
+import h5netcdf
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -1167,30 +1168,40 @@ def test_coupler_finalize_writes_runtime_outputs_for_all_components(
     }
     coupler.components = cast(Any, components)
     state = runtime_state_from_coupler_components(coupler, prefill_missing=True)
-    captured: dict[str, Any] = {}
+    captured_runtime: dict[str, Any] = {}
+    captured_snapshots: dict[str, Any] = {}
 
     def fake_write_outputs(**kwargs: Any) -> None:
-        captured.update(kwargs)
+        captured_runtime.update(kwargs)
+
+    def fake_write_snapshots(**kwargs: Any) -> None:
+        captured_snapshots.update(kwargs)
 
     monkeypatch.setattr(
         output_module, "write_coupler_runtime_outputs", fake_write_outputs
     )
+    monkeypatch.setattr(
+        output_module, "write_coupler_component_snapshots", fake_write_snapshots
+    )
 
     coupler.finalize(state, Path("snapshot"))
 
-    assert captured["final_state"] is state
-    assert captured["components"] is coupler.components
-    assert captured["exchanges"] is coupler.exchanges
+    assert captured_runtime["final_state"] is state
+    assert captured_runtime["components"] is coupler.components
+    assert captured_runtime["exchanges"] is coupler.exchanges
     assert (
-        captured["binary_masks"]
+        captured_runtime["binary_masks"]
         is coupler._runtime_resources.topology_maps.binary_masks
     )
     assert (
-        captured["fractional_masks"]
+        captured_runtime["fractional_masks"]
         is coupler._runtime_resources.topology_maps.fractional_masks
     )
-    assert captured["output_file_mask"] == Path("snapshot")
-    assert captured["logger"] is coupler.logger
+    assert captured_runtime["output_file_mask"] == Path("snapshot")
+    assert captured_runtime["logger"] is coupler.logger
+    assert captured_snapshots["final_state"] is state
+    assert captured_snapshots["components"] is coupler.components
+    assert captured_snapshots["logger"] is coupler.logger
 
 
 def test_output_boundary_builds_runtime_views_filenames_and_masks(
@@ -1231,6 +1242,64 @@ def test_output_boundary_builds_runtime_views_filenames_and_masks(
     assert captured[0][1].grid is components["ATM"].grid
     assert captured[0][2] == Path("atm_snapshot.nc")
     assert captured[1][2] == Path("ocn_snapshot.nc")
+
+
+def test_output_boundary_writes_declared_component_snapshot_variables(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    grid = make_test_grid(name="snapshot-atm")
+    component = DummyComponent(name="ATM", grid=grid)
+    component.declare_fields(
+        outputs=("temperature", "pressure"),
+        default_fields={
+            "temperature": 280.0,
+            "pressure": jnp.zeros((3, *grid.shape)),
+            "forcing": 2.0,
+        },
+    )
+    coupler = make_coupler()
+    coupler.components = cast(Any, {"ATM": component})
+    state = runtime_state_from_coupler_components(coupler, prefill_missing=True)
+    component_state = state.get_component_state("ATM")
+    temperature = jnp.asarray([[281.0, 282.0], [283.0, 284.0]])
+    pressure = jnp.arange(12.0).reshape((3, *grid.shape))
+    state = state.set_component_state(
+        "ATM",
+        component_state.with_data(
+            component_state.data.replace_many(
+                {
+                    "temperature": temperature,
+                    "pressure": pressure,
+                }
+            )
+        ),
+    )
+
+    output_module.write_coupler_component_snapshots(
+        final_state=state,
+        components=coupler.components,
+        logger=coupler.logger,
+    )
+
+    output = tmp_path / "ATM.snapshot.nc"
+    assert output.exists()
+    with h5netcdf.File(output, "r") as actual:
+        assert "temperature" in actual.variables
+        assert "pressure" in actual.variables
+        assert "forcing" not in actual.variables
+        assert actual.variables["temperature"].dimensions == ("nlat", "nlon")
+        assert actual.variables["pressure"].dimensions == (
+            "pressure_dim0",
+            "nlat",
+            "nlon",
+        )
+        assert actual.variables["temperature"].attrs["component"] == "ATM"
+        assert actual.variables["temperature"].attrs["runtime_store"] == "data"
+        assert actual.variables["temperature"].attrs["field_name"] == "temperature"
+        assert_allclose_compact(actual.variables["temperature"][:], temperature)
+        assert_allclose_compact(actual.variables["pressure"][:], pressure)
 
 
 def test_coupler_string_representations_include_registered_state() -> None:
