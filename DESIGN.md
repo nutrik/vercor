@@ -81,14 +81,16 @@ The output is done in a structured format, such as NetCDF, HDF5, that can be eas
 Model restart files are supported and written in compact HDF5 format using `h5py`.
 
 Current example output snapshots are also written in HDF5. JAXGCM, Veros, and
-configured CAMulator averaged period outputs, CAMulator forecast increments,
-and final runtime-view NetCDF files are written directly with `h5netcdf`,
+configured CAMulator averaged period outputs, external-component native
+snapshots, CAMulator forecast increments, and final runtime-view NetCDF files
+are written directly with `h5netcdf`,
 bypassing xarray conversion so adapters can preserve VerCOR calendar
 timestamps, shape-derived JCM coordinates, native Veros/CAMulator metadata, and
 runtime field attrs. Shared
 period-output adapter state, record/write orchestration, cadence, calendar time
 encoding, dataset coordinate helpers, accumulation, variable containers,
-mean-output conversion, period-file write lifecycle, and NetCDF writing live in `vercor.output`;
+mean-output conversion, single-record snapshot storage, period-file write
+lifecycle, and NetCDF writing live in `vercor.output`;
 model-specific output helpers live beside their setup adapters in
 `vercor.setups.external` and adapt native model objects into that shared output
 boundary.
@@ -399,7 +401,9 @@ shared JAX-backed sum/count period accumulator instead of retaining all period
 samples or calling xarray adapters. JAXGCM-specific output helpers construct
 the configured adapter and delegate prediction extraction, coordinate/metadata
 builders, accumulation, cadence checks, and file writes through the shared
-adapter record boundary.
+adapter record boundary. Final JAXGCM snapshots are registered by the external
+factory and are written from the final runtime payload's `JCMState`, not from
+runtime data fields or declared component outputs.
 Shared cadence, calendar time metadata, dataset coordinate discovery,
 period-sample/output conversion, period-average file orchestration, and direct
 `h5netcdf` writing live in
@@ -423,6 +427,8 @@ shared `ComponentOutputAdapter`, and `vercor.setups.external.veros_runtime`
 streams selected snapshots through the Veros output helper, which delegates
 accumulation, cadence checks, and file writes to the shared adapter record
 boundary with the same day/month/year cadence policy used by JAXGCM. Veros
+final snapshots use the same native-state extraction helpers through a
+component-registered snapshot writer.
 average files keep VerCOR's
 lowercase `time` dimension while matching native Veros spatial NetCDF dimension
 order, and the accumulator averages only across recorded runtime samples rather
@@ -451,7 +457,10 @@ factory. CAMulator forecast-increment output remains the default when
 and `vercor.setups.external.camulator_runtime` streams native prediction
 tensors through the CAMulator output helper, which delegates average
 accumulation, cadence checks, and file writes to the shared adapter record
-boundary. CAMulator tensor reshaping, metadata handling, output filtering from
+boundary. CAMulator records the latest native prediction as a single snapshot
+record in both increment-output and period-output modes, and final snapshots
+reuse the same adapter/output builders without falling back to VerCOR runtime
+fields. CAMulator tensor reshaping, metadata handling, output filtering from
 `predict.save_vars`, average-file path/coordinate adaptation, and
 forecast-increment writing live in `vercor.setups.external.camulator_output`.
 

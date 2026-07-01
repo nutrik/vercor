@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import vercor.output as _output
+from vercor.calendar import ModelDateTime
 from vercor.clock import Clock
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike
@@ -196,8 +198,18 @@ def finalize(
     _output.write_coupler_component_snapshots(
         final_state=final_state,
         components=inputs.components,
+        output_time=_final_snapshot_time(inputs.clock),
         logger=logger,
     )
+
+
+def _final_snapshot_time(clock: Clock) -> datetime | ModelDateTime:
+    """Return the model time represented by the final runtime state."""
+
+    final_time: datetime | ModelDateTime = clock.start
+    for _, time, dt in clock.iter():
+        final_time = time + dt
+    return final_time
 
 
 __all__ = [

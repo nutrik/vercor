@@ -27,7 +27,7 @@ import vercor.setups.external.camulator_wind_filter as camulator_wind_filter_mod
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
 from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
-from vercor.output.adapters import ComponentOutputAdapter
+from vercor.output.adapters import ComponentOutputAdapter, component_snapshot_writer
 from vercor.output.variables import OutputVariable
 from vercor.setups.external.camulator import make_camulator_gcm
 from vercor.fluxes.vertical_coordinates import get_altitudes_hybrid_sigma_levels
@@ -1008,6 +1008,7 @@ def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
         == camulator_contracts_module.CAMULATOR_RUNTIME_FIELD_NAMES
     )
     assert_allclose_compact(component.grid.binary_mask, np.ones((3, 2)))
+    assert callable(component_snapshot_writer(component))
 
 
 def test_camulator_constructor_logs_save_forecast_path(monkeypatch: Any) -> None:
@@ -1341,7 +1342,7 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
         _apply_postprocessing=lambda prediction, model_input: prediction,
     )
     component.static_forcing = torch.zeros((1, 1, 1, 2, 2))
-    component.state = torch.zeros((1, 1, 1, 2, 2))
+    component.state = torch.zeros((1, 6, 1, 2, 2))
     component.LANDM_COSLAT = jnp.asarray([[0.0, 1.0], [0.5, 0.0]])
     component.name = "ATM"
     component.grid = RectilinearGrid(
@@ -1364,9 +1365,14 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
         latitude=SimpleNamespace(values=np.asarray([0.0, 1.0])),
         longitude=SimpleNamespace(values=np.asarray([0.0, 1.0])),
     )
-    component.conf = {}
+    component.conf = _camulator_output_conf(
+        surface_variables=[],
+        diagnostic_variables=[],
+        save_vars=["U"],
+    )
     component.lead_time_periods = 6
     component.output_frequency = None
+    component.output_adapter = _make_camulator_output_adapter()
     component.forecast_hour = 1
     component.metadata = {}
     component.state_transformer = SimpleNamespace(
@@ -1431,6 +1437,75 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     )
     assert component.runtime_cursor.timestep_counter == 1
     assert output_calls["kwargs"]["state_transformer"] is component.state_transformer
+
+
+@pytest.mark.parametrize("output_frequency", [None, "day"])
+def test_record_camulator_output_records_latest_snapshot_in_all_output_modes(
+    monkeypatch: Any,
+    tmp_path: Path,
+    output_frequency: str | None,
+) -> None:
+    component = cast(
+        Any,
+        camulator_gcm_state_module.CAMulatorGCMSetupState.__new__(
+            camulator_gcm_state_module.CAMulatorGCMSetupState
+        ),
+    )
+    component.runtime_cursor = camulator_forcing_module.CamulatorRuntimeCursor(
+        start_ix=0,
+        init_str="2000-01-01T00Z",
+        model_substeps=1,
+        timestep_counter=0,
+    )
+    component.output_frequency = output_frequency
+    component.output_adapter = _make_camulator_output_adapter()
+    component.latlons = SimpleNamespace(
+        latitude=SimpleNamespace(values=np.asarray([0.0, 1.0])),
+        longitude=SimpleNamespace(values=np.asarray([0.0, 1.0])),
+    )
+    component.metadata = {"T": {"units": "K"}}
+    component.conf = _camulator_output_conf(
+        save_forecast=str(tmp_path),
+        save_vars=["T"],
+    )
+    component.state_transformer = None
+    component.lead_time_periods = 6
+    component.forecast_hour = 1
+    prediction = torch.arange(2 * 8 * 1 * 2 * 2, dtype=torch.float32).reshape(
+        2, 8, 1, 2, 2
+    )
+
+    monkeypatch.setattr(
+        camulator_output_module,
+        "write_camulator_prediction_output",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        camulator_output_module,
+        "record_camulator_period_output",
+        lambda *args, **kwargs: False,
+    )
+
+    camulator_runtime_module.record_camulator_prediction_output(
+        component,
+        prediction=prediction,
+        utc_datetime=datetime(2000, 1, 2),
+        logger=cast(Any, _RecordingLogger()),
+    )
+
+    assert not component.output_adapter.snapshot_empty
+    assert component.output_adapter.snapshot_time == datetime(2000, 1, 2)
+    assert tuple(component.output_adapter.snapshot_variables) == ("T",)
+    assert component.output_adapter.snapshot_variables["T"].dims == (
+        "level",
+        "latitude",
+        "longitude",
+    )
+    assert component.output_adapter.snapshot_variables["T"].attrs["units"] == "K"
+    assert_allclose_compact(
+        component.output_adapter.snapshot_variables["T"].values,
+        np.mean(prediction[:, 3:6, 0].numpy(), axis=0),
+    )
 
 
 def test_record_camulator_output_averages_when_frequency_is_configured(

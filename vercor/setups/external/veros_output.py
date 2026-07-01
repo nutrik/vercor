@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import jax.numpy as jnp
@@ -234,6 +235,41 @@ def record_veros_period_output(
     )
 
 
+def write_veros_snapshot_output(
+    state: Any,
+    component_state: Any,
+    output: Path,
+    output_time: datetime | ModelDateTime,
+    logger: LoggerLike | None = None,
+) -> None:
+    """Write one final Veros native-state snapshot through the shared adapter."""
+
+    _ = component_state
+    output_variables = getattr(state, "output_variables", ())
+    if not output_variables:
+        return
+
+    state.output_adapter.record_snapshot(
+        extract_veros_output_snapshot(state._veros_state, output_variables),
+        time=output_time,
+    )
+
+    def build_coordinate_variables(
+        snapshot_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return veros_average_coordinate_variables(
+            veros_state=state._veros_state,
+            output_time=output_time,
+            variables=snapshot_variables,
+        )
+
+    state.output_adapter.write_snapshot(
+        str(output),
+        build_coordinate_variables=build_coordinate_variables,
+        logger=logger,
+    )
+
+
 __all__ = [
     "VEROS_AVERAGE_EMPTY_ERROR_MESSAGE",
     "VEROS_TIME_DIM",
@@ -243,4 +279,5 @@ __all__ = [
     "record_veros_period_output",
     "veros_average_coordinate_variables",
     "veros_average_value_dims",
+    "write_veros_snapshot_output",
 ]

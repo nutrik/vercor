@@ -271,11 +271,11 @@ historical commands, failure messages, or detailed validation notes.
   red/green warning pytest, Black, flake8, mypy, full fast pytest, full pytest,
   and git diff whitespace check passed as of 2026-07-01 using `conda run` in
   the `scipy` environment; no Conda/Rattler fallback was needed.
-- Latest local component snapshot finalize-output validation: baseline fast
-  pytest, focused red/green snapshot pytest, focused fast pytest, Black,
-  flake8, mypy, full fast pytest, full pytest, and coverage pytest passed as
-  of 2026-07-01 using the direct `scipy` environment executable because
-  `conda run -n scipy` hit the known Conda/Rattler panic during orientation.
+- Latest local external-native snapshot finalize-output validation: focused
+  red/green snapshot tests, affected output/runtime/external/API tests, Black,
+  flake8, mypy, full fast pytest, full pytest, coverage pytest, git diff
+  whitespace check, and `conda run -n scipy` fast pytest passed as of
+  2026-07-01.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -310,21 +310,24 @@ historical commands, failure messages, or detailed validation notes.
 
 ### 2026-07-01: Component Snapshot Finalize Output
 
-- Extended `Coupler.finalize(...)` to keep the existing runtime-output write
-  and then write exact `<component_name>.snapshot.nc` files for every
-  registered component.
-- Snapshot files reuse the shared VerCOR h5netcdf output machinery and contain
-  only current runtime `data` values from `component.field_spec.outputs`.
-  Incoming, outgoing, mask, default-only, and adapter-native period-output
-  variables are intentionally excluded.
-- Added coverage for finalize orchestration and actual NetCDF snapshot contents,
-  including case-preserving filenames, declared-output filtering, attrs, and
-  field-specific leading dimensions.
-- Validation run for this change: the required `conda run -n scipy` orientation
-  command hit the known Conda/Rattler panic, so final validation used the direct
-  `scipy` environment executable. Baseline fast pytest, focused red/green
-  snapshot pytest, focused fast pytest, Black, flake8, mypy, full fast pytest,
-  full pytest, and coverage pytest passed. Black emitted the existing Python
+- Refactored `Coupler.finalize(...)` snapshots so runtime finalization only
+  calls component-registered native snapshot writers and skips components
+  without a provider. The public finalize API and runtime field output files
+  are unchanged.
+- `ComponentOutputAdapter` now stores one latest snapshot record separately
+  from period-average accumulation and writes it through the existing
+  period-output NetCDF pipeline using a temporary accumulator.
+- JAXGCM snapshots read the final runtime payload `JCMState`, Veros snapshots
+  read `VerosGCMSetupState._veros_state`, and CAMulator records the latest
+  prediction in both increment-output and period-output modes. Snapshot output
+  no longer uses runtime `data` values or `component.field_spec.outputs`.
+- Focused red/green coverage added for adapter snapshots, provider-based
+  finalize orchestration, native external snapshot contents, and API-boundary
+  checks.
+- Validation run for this change: focused red/green snapshot tests, affected
+  output/runtime/external/API tests, Black, flake8, mypy, full fast pytest,
+  full pytest, coverage pytest, git diff whitespace check, and
+  `conda run -n scipy` fast pytest passed. Black emitted the existing Python
   3.13/target-3.14 warning, and full pytest/coverage emitted the existing JAX
   dtype-promotion warning.
 

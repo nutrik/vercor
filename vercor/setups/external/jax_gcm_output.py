@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta
 from importlib import resources
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Protocol, cast
 
 import jax
@@ -299,6 +300,30 @@ def jax_gcm_prediction_output_variables(
     return variables
 
 
+def jax_gcm_state_snapshot_output_variables(
+    jcm_state: Any,
+    *,
+    coords: Any,
+    physics_module: _PhysicsModuleLike | None = None,
+) -> dict[str, OutputVariable]:
+    """Return final JAXGCM state variables ready for snapshot output."""
+
+    prediction = SimpleNamespace(
+        dynamics=jax.tree_util.tree_map(_with_leading_time_dim, jcm_state.prog),
+        physics=jax.tree_util.tree_map(_with_leading_time_dim, jcm_state.phydata),
+        times=as_jax_real_array([0.0]),
+    )
+    return jax_gcm_prediction_output_variables(
+        prediction,
+        coords=coords,
+        physics_module=physics_module,
+    )
+
+
+def _with_leading_time_dim(value: Any) -> Any:
+    return jnp.asarray(value)[jnp.newaxis, ...]
+
+
 def _read_units_table(path: Path) -> dict[str, dict[str, str]]:
     metadata: dict[str, dict[str, str]] = {}
     with path.open(newline="", encoding="utf-8") as csv_file:
@@ -402,6 +427,60 @@ def record_jax_gcm_period_output(
     )
 
 
+def write_jax_gcm_snapshot_output(
+    state: Any,
+    component_state: Any,
+    output: Path,
+    output_time: datetime | ModelDateTime,
+    logger: LoggerLike | None = None,
+) -> None:
+    """Write one final JAXGCM state snapshot through the shared output adapter."""
+
+    payload = getattr(component_state, "runtime_payload", None)
+    jcm_state = getattr(payload, "jcm_state", None)
+    if jcm_state is None:
+        jcm_state = getattr(state, "_state", None)
+    if jcm_state is None:
+        raise ValueError("JAXGCM snapshot output requires a final JCM state.")
+
+    physics_module = getattr(state.model, "physics", None)
+    variables = jax_gcm_state_snapshot_output_variables(
+        jcm_state,
+        coords=state.model.coords,
+        physics_module=physics_module,
+    )
+    state.output_adapter.record_snapshot(
+        variables,
+        summation_dim=JAX_GCM_TIME_DIM,
+        time=output_time,
+    )
+    unit_metadata = jax_gcm_unit_metadata(physics_module)
+
+    def build_coordinate_variables(
+        snapshot_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        _ = snapshot_variables
+        return jax_gcm_coordinate_variables(
+            coords=state.model.coords,
+            output_time=output_time,
+        )
+
+    def build_data_variables(
+        snapshot_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return jax_gcm_data_variables_with_unit_metadata(
+            snapshot_variables,
+            unit_metadata,
+        )
+
+    state.output_adapter.write_snapshot(
+        str(output),
+        build_coordinate_variables=build_coordinate_variables,
+        build_data_variables=build_data_variables,
+        logger=logger,
+    )
+
+
 __all__ = [
     "JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE",
     "JAX_GCM_OUTPUT_DIMENSION_ORDER",
@@ -409,7 +488,9 @@ __all__ = [
     "jax_gcm_coordinate_variables",
     "jax_gcm_data_variables_with_unit_metadata",
     "jax_gcm_prediction_output_variables",
+    "jax_gcm_state_snapshot_output_variables",
     "jax_gcm_unit_metadata",
     "make_jax_gcm_output_adapter",
     "record_jax_gcm_period_output",
+    "write_jax_gcm_snapshot_output",
 ]

@@ -35,7 +35,7 @@ from tests.assertions import assert_allclose_compact
 from vercor.calendar import DateTime360, DateTime365
 from vercor.components.data import DataComponent
 from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
-from vercor.output.adapters import ComponentOutputAdapter
+from vercor.output.adapters import ComponentOutputAdapter, component_snapshot_writer
 from vercor.output.variables import OutputVariable
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.state import RuntimeComponentState
@@ -568,6 +568,7 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
     assert_allclose_compact(component.grid.longitude, np.asarray([0.0, 180.0]))
     assert_allclose_compact(component.grid.latitude, np.asarray([-45.0, 0.0, 45.0]))
     assert_allclose_compact(component.grid.binary_mask, np.ones((3, 2)))
+    assert callable(component_snapshot_writer(component))
 
 
 def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
@@ -1172,6 +1173,52 @@ def test_jax_gcm_write_output_preserves_model_calendar_attrs(
         assert time.attrs["fixed_30_day_months"] == int(expected_calendar == "360_day")
 
 
+def test_jax_gcm_snapshot_output_uses_final_runtime_payload_not_runtime_data(
+    tmp_path: Path,
+) -> None:
+    coords = _make_jax_gcm_output_coords()
+    physics_module = _FakePhysicsModule()
+    setup_state = SimpleNamespace(
+        output_adapter=_make_jax_gcm_output_adapter(),
+        model=SimpleNamespace(coords=coords, physics=physics_module),
+    )
+    jcm_state = SimpleNamespace(
+        prog={
+            "temperature": np.arange(18.0).reshape(3, 2, 3),
+            "u_wind": np.full((3, 2, 3), 4.0),
+        },
+        phydata={},
+    )
+    component_state = RuntimeComponentState(
+        data=RuntimeFieldStore.from_mapping(
+            {"temperature": np.full((3, 2, 3), -999.0)}
+        ),
+        incoming=RuntimeFieldStore.empty(),
+        outgoing=RuntimeFieldStore.empty(),
+        runtime_payload=SimpleNamespace(jcm_state=jcm_state),
+    )
+    output = tmp_path / "ATM.snapshot.nc"
+
+    jax_gcm_output_module.write_jax_gcm_snapshot_output(
+        setup_state,
+        component_state,
+        output,
+        datetime(2000, 1, 2),
+        logger=None,
+    )
+
+    with h5netcdf.File(output, "r") as actual:
+        temperature = actual.variables["temperature"]
+        assert temperature.dimensions == ("time", "level", "lat", "lon")
+        assert temperature.attrs["units"] == "K"
+        assert temperature.attrs["description"] == "temperature"
+        assert np.asarray(temperature)[0, 0, 0, 0] != -999.0
+        assert_allclose_compact(
+            np.asarray(temperature)[0],
+            np.transpose(jcm_state.prog["temperature"], axes=(0, 2, 1)),
+        )
+
+
 def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1566,6 +1613,39 @@ def test_veros_write_output_persists_period_mean_and_coordinates(
     assert adapter.empty
 
 
+def test_veros_snapshot_output_uses_native_state_variables(tmp_path: Path) -> None:
+    state = _make_veros_output_state()
+    setup_state = SimpleNamespace(
+        _veros_state=state,
+        output_variables=("temp", "surface_taux"),
+        output_adapter=_make_veros_output_adapter(),
+    )
+    component_state = _runtime_component_state(
+        "OCN",
+        {"temp": np.full((2, 3, 2), -999.0)},
+    )
+    output = tmp_path / "OCN.snapshot.nc"
+
+    veros_output_module.write_veros_snapshot_output(
+        setup_state,
+        component_state,
+        output,
+        datetime(2000, 1, 2),
+        logger=None,
+    )
+
+    with h5netcdf.File(output, "r") as actual:
+        assert actual.variables["time"].attrs["calendar"] == "proleptic_gregorian"
+        assert actual.variables["temp"].dimensions == ("time", "zt", "yt", "xt")
+        assert actual.variables["temp"].attrs["units"] == "deg C"
+        assert actual.variables["surface_taux"].dimensions == ("time", "yt", "xu")
+        expected_temp = state.variables.temp[2:-2, 2:-2, :, state.variables.tau]
+        assert_allclose_compact(
+            np.asarray(actual.variables["temp"])[0],
+            np.transpose(expected_temp),
+        )
+
+
 def test_veros_record_period_output_accumulates_and_writes_mean_dataset(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1815,6 +1895,7 @@ def test_veros_constructor_builds_jax_backed_grid(
     )
     assert component.field_spec.outputs == ("sea_surface_temperature",)
     assert component.grid.binary_mask.shape == (4, 4)
+    assert callable(component_snapshot_writer(component))
     expected_mask = np.ones((4, 4))
     expected_mask[1, 0] = 0.0
     assert_allclose_compact(component.grid.binary_mask, expected_mask)

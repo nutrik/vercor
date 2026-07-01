@@ -7,7 +7,6 @@ import sys
 from types import SimpleNamespace
 from typing import Any, cast
 
-import h5netcdf
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -29,6 +28,7 @@ from tests._runtime_helpers import (
     runtime_state_from_coupler_components,
 )
 from tests.assertions import assert_allclose_compact
+from vercor.calendar import ModelDateTime
 from vercor.clock import Clock
 from vercor.components.base import Component
 from vercor.components.host import HostRuntimeComponent
@@ -49,6 +49,7 @@ from vercor.regridders.conservative import conservative
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.exchange_dispatch import dispatch_component_exchanges
 from vercor.output import output_masks_for_component
+from vercor.output.adapters import register_component_snapshot_writer
 from vercor.runtime.surface_masks import (
     apply_surface_exchange_masks,
     create_surface_exchange_masks,
@@ -1201,6 +1202,7 @@ def test_coupler_finalize_writes_runtime_outputs_for_all_components(
     assert captured_runtime["logger"] is coupler.logger
     assert captured_snapshots["final_state"] is state
     assert captured_snapshots["components"] is coupler.components
+    assert captured_snapshots["output_time"] == datetime(2000, 1, 1, 0, 1)
     assert captured_snapshots["logger"] is coupler.logger
 
 
@@ -1244,62 +1246,44 @@ def test_output_boundary_builds_runtime_views_filenames_and_masks(
     assert captured[1][2] == Path("ocn_snapshot.nc")
 
 
-def test_output_boundary_writes_declared_component_snapshot_variables(
+def test_output_boundary_calls_registered_snapshot_writers_and_skips_others(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    grid = make_test_grid(name="snapshot-atm")
-    component = DummyComponent(name="ATM", grid=grid)
-    component.declare_fields(
-        outputs=("temperature", "pressure"),
-        default_fields={
-            "temperature": 280.0,
-            "pressure": jnp.zeros((3, *grid.shape)),
-            "forcing": 2.0,
-        },
-    )
+    component = DummyComponent(name="ATM", grid=make_test_grid(name="snapshot-atm"))
+    skipped = DummyComponent(name="OCN", grid=make_test_grid(name="snapshot-ocn"))
     coupler = make_coupler()
-    coupler.components = cast(Any, {"ATM": component})
+    coupler.components = cast(Any, {"ATM": component, "OCN": skipped})
     state = runtime_state_from_coupler_components(coupler, prefill_missing=True)
-    component_state = state.get_component_state("ATM")
-    temperature = jnp.asarray([[281.0, 282.0], [283.0, 284.0]])
-    pressure = jnp.arange(12.0).reshape((3, *grid.shape))
-    state = state.set_component_state(
-        "ATM",
-        component_state.with_data(
-            component_state.data.replace_many(
-                {
-                    "temperature": temperature,
-                    "pressure": pressure,
-                }
-            )
-        ),
-    )
+    calls: list[tuple[Any, Path, datetime | ModelDateTime, Any]] = []
+
+    def write_snapshot(
+        component_state: Any,
+        output: Path,
+        output_time: datetime | ModelDateTime,
+        logger: Any,
+    ) -> None:
+        calls.append((component_state, output, output_time, logger))
+
+    register_component_snapshot_writer(component, write_snapshot)
 
     output_module.write_coupler_component_snapshots(
         final_state=state,
         components=coupler.components,
+        output_time=datetime(2000, 1, 1, 0, 1),
         logger=coupler.logger,
     )
 
-    output = tmp_path / "ATM.snapshot.nc"
-    assert output.exists()
-    with h5netcdf.File(output, "r") as actual:
-        assert "temperature" in actual.variables
-        assert "pressure" in actual.variables
-        assert "forcing" not in actual.variables
-        assert actual.variables["temperature"].dimensions == ("nlat", "nlon")
-        assert actual.variables["pressure"].dimensions == (
-            "pressure_dim0",
-            "nlat",
-            "nlon",
+    assert calls == [
+        (
+            state.get_component_state("ATM"),
+            Path("ATM.snapshot.nc"),
+            datetime(2000, 1, 1, 0, 1),
+            coupler.logger,
         )
-        assert actual.variables["temperature"].attrs["component"] == "ATM"
-        assert actual.variables["temperature"].attrs["runtime_store"] == "data"
-        assert actual.variables["temperature"].attrs["field_name"] == "temperature"
-        assert_allclose_compact(actual.variables["temperature"][:], temperature)
-        assert_allclose_compact(actual.variables["pressure"][:], pressure)
+    ]
+    assert not (tmp_path / "OCN.snapshot.nc").exists()
 
 
 def test_coupler_string_representations_include_registered_state() -> None:

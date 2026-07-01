@@ -145,6 +145,14 @@ def record_camulator_prediction_output(
     """Write CAMulator increment output or record period-average output."""
 
     output_frequency = getattr(state, "output_frequency", None)
+    _camulator_output.record_camulator_snapshot(
+        state.output_adapter,
+        prediction,
+        output_time=utc_datetime,
+        metadata=state.metadata,
+        conf=state.conf,
+        state_transformer=state.state_transformer,
+    )
     if output_frequency is None:
         _camulator_output.write_camulator_prediction_output(
             prediction,

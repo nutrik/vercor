@@ -8,7 +8,9 @@ from typing import Optional
 
 from vercor.components import HostRuntimeComponent
 from vercor.jax_logging import LoggerLike
+from vercor.output.adapters import register_component_snapshot_writer
 import vercor.setups.external.camulator_contracts as _camulator_contracts
+import vercor.setups.external.camulator_output as _camulator_output
 import vercor.setups.external.camulator_runtime as _camulator_runtime
 from vercor.setups.external.camulator_gcm_state import CAMulatorGCMSetupState
 
@@ -41,7 +43,7 @@ def make_camulator_gcm(
         output_frequency=output_frequency,
         logger=logger,
     )
-    return HostRuntimeComponent.from_model(
+    component = HostRuntimeComponent.from_model(
         name=name,
         grid=state.grid,
         step=partial(_camulator_runtime.step_camulator_runtime, state),
@@ -50,6 +52,11 @@ def make_camulator_gcm(
         default_fields=_camulator_contracts.camulator_runtime_field_defaults(),
         initialize=state.initialize,
     )
+    register_component_snapshot_writer(
+        component,
+        partial(_camulator_output.write_camulator_snapshot_output, state),
+    )
+    return component
 
 
 __all__ = [

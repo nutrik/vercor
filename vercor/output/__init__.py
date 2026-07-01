@@ -7,7 +7,6 @@ from vercor.output.runtime import (
     output_masks_for_component,
     write_coupler_component_snapshots,
     write_coupler_runtime_outputs,
-    write_runtime_component_snapshot_to_netcdf,
     write_runtime_component_view_to_netcdf,
 )
 
@@ -16,6 +15,5 @@ __all__ = [
     "output_masks_for_component",
     "write_coupler_component_snapshots",
     "write_coupler_runtime_outputs",
-    "write_runtime_component_snapshot_to_netcdf",
     "write_runtime_component_view_to_netcdf",
 ]

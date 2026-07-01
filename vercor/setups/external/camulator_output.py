@@ -344,6 +344,74 @@ def record_camulator_period_output(
     )
 
 
+def record_camulator_snapshot(
+    adapter: ComponentOutputAdapter,
+    prediction: torch.Tensor,
+    *,
+    output_time: datetime,
+    metadata: Mapping[str, Any],
+    conf: Mapping[str, Any],
+    state_transformer: Any | None,
+) -> None:
+    """Record one CAMulator prediction as the latest snapshot sample."""
+
+    adapter.record_snapshot(
+        camulator_period_output_variables(
+            prediction,
+            metadata=metadata,
+            conf=conf,
+            state_transformer=state_transformer,
+        ),
+        summation_dim=CAMULATOR_TIME_DIM,
+        time=output_time,
+    )
+
+
+def write_camulator_snapshot_output(
+    state: Any,
+    component_state: Any,
+    output: Path,
+    output_time: Any,
+    logger: LoggerLike | None = None,
+) -> None:
+    """Write one final CAMulator prediction snapshot through the shared adapter."""
+
+    _ = component_state
+    if state.output_adapter.snapshot_empty:
+        return
+
+    snapshot_time = state.output_adapter.snapshot_time or output_time
+    if not isinstance(snapshot_time, datetime):
+        raise TypeError("CAMulator snapshot output requires a datetime timestamp.")
+
+    def build_coordinate_variables(
+        snapshot_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return camulator_average_coordinate_variables(
+            snapshot_variables,
+            output_time=snapshot_time,
+            latitude=state.latlons.latitude.values,
+            longitude=state.latlons.longitude.values,
+            metadata=state.metadata,
+            conf=state.conf,
+        )
+
+    def build_data_variables(
+        snapshot_variables: Mapping[str, OutputVariable],
+    ) -> dict[str, OutputVariable]:
+        return camulator_average_data_variables(
+            snapshot_variables,
+            metadata=state.metadata,
+        )
+
+    state.output_adapter.write_snapshot(
+        str(output),
+        build_coordinate_variables=build_coordinate_variables,
+        build_data_variables=build_data_variables,
+        logger=logger,
+    )
+
+
 def _validate_supported_output_options(conf: Mapping[str, Any]) -> None:
     predict_conf = _mapping(conf.get("predict", {}), name="predict")
     for option in _UNSUPPORTED_PREDICT_OPTIONS:
@@ -613,6 +681,8 @@ __all__ = [
     "load_camulator_output_metadata",
     "make_camulator_output_adapter",
     "record_camulator_period_output",
+    "record_camulator_snapshot",
     "write_camulator_netcdf_increment",
+    "write_camulator_snapshot_output",
     "write_camulator_prediction_output",
 ]

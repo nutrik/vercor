@@ -220,3 +220,72 @@ def test_component_output_adapter_record_keeps_samples_when_write_fails(
         )
 
     assert not adapter.empty
+
+
+def test_component_output_adapter_writes_latest_snapshot_without_clearing_period_state(
+    tmp_path: Path,
+) -> None:
+    adapter = ComponentOutputAdapter(empty_error_message="missing samples")
+    adapter.accumulate({"period": OutputVariable(("x",), np.asarray([10.0, 20.0]))})
+    adapter.record_snapshot(
+        {
+            "temperature": OutputVariable(
+                ("sample", "x"),
+                np.asarray([[1.0, np.nan], [3.0, 5.0]]),
+                {"units": "K"},
+            )
+        },
+        summation_dim="sample",
+        time=datetime(2000, 1, 2),
+    )
+
+    assert not adapter.empty
+    assert not adapter.snapshot_empty
+    assert adapter.snapshot_time == datetime(2000, 1, 2)
+    assert tuple(adapter.snapshot_variables) == ("temperature",)
+    assert adapter.snapshot_variables["temperature"].dims == ("x",)
+
+    adapter.write_snapshot(
+        str(tmp_path / "snapshot.nc"),
+        build_coordinate_variables=_coordinate_variables,
+    )
+
+    assert not adapter.empty
+    assert not adapter.snapshot_empty
+    assert_allclose_compact(
+        adapter.accumulator.mean_samples()["period"].values,
+        np.asarray([10.0, 20.0]),
+    )
+    with h5netcdf.File(tmp_path / "snapshot.nc", "r") as actual:
+        temperature = actual.variables["temperature"]
+        assert temperature.dimensions == ("time", "x")
+        assert temperature.attrs["units"] == "K"
+        assert_allclose_compact(
+            np.asarray(temperature),
+            np.asarray([[2.0, 5.0]]),
+        )
+
+
+def test_component_output_adapter_snapshot_replaces_previous_record_and_resets() -> (
+    None
+):
+    adapter = ComponentOutputAdapter(empty_error_message="missing samples")
+    adapter.record_snapshot({"old": OutputVariable(("x",), np.asarray([1.0]))})
+    adapter.record_snapshot(
+        {"new": OutputVariable(("x",), np.asarray([2.0]))},
+        time=datetime(2001, 1, 1),
+    )
+
+    assert tuple(adapter.snapshot_variables) == ("new",)
+    assert_allclose_compact(
+        adapter.snapshot_variables["new"].values,
+        np.asarray([2.0]),
+    )
+    assert adapter.snapshot_time == datetime(2001, 1, 1)
+
+    adapter.accumulate({"period": OutputVariable(("x",), np.asarray([3.0]))})
+    adapter.reset()
+
+    assert adapter.empty
+    assert adapter.snapshot_empty
+    assert adapter.snapshot_time is None

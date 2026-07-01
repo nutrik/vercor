@@ -1321,6 +1321,14 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     )
     assert "write_netcdf_dataset(" in runtime_output_source
     assert "write_netcdf_dataset(" in period_files_source
+    snapshot_output_source = runtime_output_source.split(
+        "def write_coupler_component_snapshots(",
+        1,
+    )[1]
+    assert "component_snapshot_writer(" in snapshot_output_source
+    assert "field_spec.outputs" not in snapshot_output_source
+    assert ".data.get(" not in snapshot_output_source
+    assert "RuntimeComponentView.from_component_state" not in snapshot_output_source
     assert "import numpy" not in period_averages_source
     assert "import numpy" not in period_files_source
     assert "import numpy" not in jax_gcm_output_source
@@ -1335,6 +1343,8 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "class ComponentOutputAdapter" in output_adapters_source
     assert "accumulate_output_variables(" not in output_adapters_source
     assert "self._accumulator.add_samples(" in output_adapters_source
+    assert "def record_snapshot(" in output_adapters_source
+    assert "def register_component_snapshot_writer(" in output_adapters_source
     assert "def record_period_average_if_due(" in output_adapters_source
     assert "period_mean_output_variables(" in output_adapters_source
     assert "write_period_average_netcdf(" in output_adapters_source
@@ -1347,16 +1357,19 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "write_period_average_netcdf(" not in jax_gcm_output_source
     assert "def make_jax_gcm_output_adapter(" in jax_gcm_output_source
     assert "def record_jax_gcm_period_output(" in jax_gcm_output_source
+    assert "def write_jax_gcm_snapshot_output(" in jax_gcm_output_source
     assert "time_coordinate_variable(" in jax_gcm_output_source
     assert "accumulate_output_variables(" not in veros_output_source
     assert "period_mean_output_variables(" not in veros_output_source
     assert "write_period_average_netcdf(" not in veros_output_source
     assert "def make_veros_output_adapter(" in veros_output_source
     assert "def record_veros_period_output(" in veros_output_source
+    assert "def write_veros_snapshot_output(" in veros_output_source
     assert "time_coordinate_variable(" in veros_output_source
     assert "used_dimension_names(" in veros_output_source
     assert "def make_camulator_output_adapter(" in camulator_output_source
     assert "def record_camulator_period_output(" in camulator_output_source
+    assert "def write_camulator_snapshot_output(" in camulator_output_source
     assert "write_period_average_if_due(" not in jax_gcm_runtime_source
     assert "write_period_average_if_due(" not in veros_runtime_source
     assert "write_period_average_if_due(" not in camulator_runtime_source

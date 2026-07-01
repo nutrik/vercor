@@ -10,7 +10,9 @@ from jcm.model import ForcingData
 from jcm.physics_interface import TerrainData
 
 from vercor.components import Component
+from vercor.output.adapters import register_component_snapshot_writer
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
+import vercor.setups.external.jax_gcm_output as _jax_gcm_output
 import vercor.setups.external.jax_gcm_runtime as _jax_gcm_runtime
 from vercor.setups.external.jax_gcm_state import JAXGCMSetupState
 
@@ -77,6 +79,10 @@ def make_jax_gcm(
             _jax_gcm_runtime.validate_jax_gcm_runtime_state,
             state,
         ),
+    )
+    register_component_snapshot_writer(
+        component,
+        partial(_jax_gcm_output.write_jax_gcm_snapshot_output, state),
     )
     return component
 
