@@ -1337,6 +1337,27 @@ def test_host_runtime_components_use_explicit_host_contract() -> None:
     )
 
 
+def test_run_warns_when_host_backed_components_make_loop_nondifferentiable() -> None:
+    logger = _RecordingLogger()
+    coupler = make_coupler()
+    coupler.logger = cast(Any, logger)
+    coupler.components = cast(
+        Any,
+        {
+            "ATM": _HostRunComponent("ATM"),
+            "OCN": _HostRunComponent("OCN"),
+        },
+    )
+    coupler.run_sequence = ("ATM", "OCN")
+
+    coupler.run()
+
+    assert logger.warning_messages == [
+        "Coupled loop is not differentiable because host-backed component(s) "
+        "require the Python runtime: ATM, OCN"
+    ]
+
+
 def test_run_rejects_state_donation_for_host_backed_components() -> None:
     coupler = make_coupler()
     coupler.components = cast(Any, {"ATM": _HostRunComponent("ATM")})

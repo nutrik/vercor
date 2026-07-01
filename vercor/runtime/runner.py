@@ -49,6 +49,10 @@ def run_coupler_runtime(
             donate_state=donate_state,
             host_names=host_names,
         )
+        _warn_non_differentiable_host_runtime(
+            context.logger,
+            host_names,
+        )
         return run_host_runtime(
             runtime_state,
             run_sequence=context.run_sequence,
@@ -111,6 +115,19 @@ def _raise_if_donating_host_runtime(
     raise CouplerError(
         "Runtime state donation is only supported for differentiable "
         f"components; host-backed component(s) require non-donating run(): {names}"
+    )
+
+
+def _warn_non_differentiable_host_runtime(
+    logger: LoggerLike,
+    host_names: Sequence[str],
+) -> None:
+    """Warn that host-backed components make the coupled loop non-differentiable."""
+
+    names = ", ".join(host_names)
+    logger.warning(
+        "Coupled loop is not differentiable because host-backed component(s) "
+        f"require the Python runtime: {names}"
     )
 
 

@@ -267,6 +267,10 @@ historical commands, failure messages, or detailed validation notes.
   full pytest, coverage pytest, git diff whitespace check, and
   `conda run -n scipy` fast pytest passed as of 2026-06-30 using the direct
   `scipy` environment executable for full-suite validation.
+- Latest local non-differentiable host-runtime warning validation: focused
+  red/green warning pytest, Black, flake8, mypy, full fast pytest, full pytest,
+  and git diff whitespace check passed as of 2026-07-01 using `conda run` in
+  the `scipy` environment; no Conda/Rattler fallback was needed.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -298,6 +302,21 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-01: Non-Differentiable Host-Runtime Warning
+
+- Added one `Coupler.run()` warning before the Python host runtime starts when
+  host-backed components make the full coupled loop non-differentiable.
+- The warning lists all host-backed component names in runtime component
+  insertion order and reuses the existing `vercor.jax_logging` logger boundary.
+- Added regression coverage for multiple host-backed components and documented
+  the behavior in `DESIGN.md`.
+- Validation run for this change: focused red warning pytest failed before the
+  runtime warning existed; after implementation, focused green pytest, Black,
+  flake8, mypy, full fast pytest, full pytest, and git diff whitespace check
+  passed using `conda run -n scipy`. Black emitted the existing Python
+  3.13/target-3.14 warning, and full pytest emitted the existing JAX
+  dtype-promotion warning.
 
 ### 2026-06-30: Deprecated Compatibility Shim Removal
 

@@ -565,6 +565,10 @@ callback helpers in `vercor.runtime.progress`. The scanned path precomputes
 datetime and timestep labels on the host, then selects the per-step label inside
 ordered callbacks so progress logging remains traceable without putting Python
 datetime objects in the scan carry.
+When `Coupler.run()` selects the Python host runtime because one or more
+host-backed components are present, VerCOR emits one warning before the runtime
+loop starts. The warning names the host-backed components so users can see why
+the full coupled loop is not differentiable.
 
 ### Runtime interruption across host and scanned integrations
 
