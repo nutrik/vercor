@@ -69,16 +69,6 @@ class _PhysicsModuleLike(Protocol):
     ) -> dict[str, Any]: ...
 
 
-def make_jax_gcm_output_adapter() -> ComponentOutputAdapter:
-    """Return the configured period-output adapter for JAXGCM predictions."""
-
-    return ComponentOutputAdapter(
-        empty_error_message=JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE,
-        time_dim=JAX_GCM_TIME_DIM,
-        dimension_order=JAX_GCM_OUTPUT_DIMENSION_ORDER,
-    )
-
-
 def _vertical_layers(coords: Any) -> int:
     level = as_jax_real_array(coords.vertical.centers)
     layers = getattr(coords.vertical, "layers", None)
@@ -490,7 +480,6 @@ __all__ = [
     "jax_gcm_prediction_output_variables",
     "jax_gcm_state_snapshot_output_variables",
     "jax_gcm_unit_metadata",
-    "make_jax_gcm_output_adapter",
     "record_jax_gcm_period_output",
     "write_jax_gcm_snapshot_output",
 ]

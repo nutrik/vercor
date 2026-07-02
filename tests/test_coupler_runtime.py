@@ -659,7 +659,6 @@ def _make_initial_state(sea_surface_temperature: jax.Array) -> RuntimeCouplerSta
                 "OCN|ICE|_identity_factory": jnp.ones_like(sea_surface_temperature),
             }
         ),
-        binary_masks=RuntimeFieldStore.empty(),
     )
 
 
@@ -1793,7 +1792,6 @@ def test_run_validates_regridders_and_fractional_masks() -> None:
         component_names=state.component_names,
         components=state.components,
         fractional_masks=RuntimeFieldStore.empty(),
-        binary_masks=RuntimeFieldStore.empty(),
     )
 
     with pytest.raises(CouplerError, match="fractional mask"):
@@ -1882,7 +1880,6 @@ def test_run_validates_fractional_mask_shape_before_scan() -> None:
                 "OCN|ICE|_identity_factory": jnp.ones((2, 2), dtype=jnp.float64),
             }
         ),
-        binary_masks=state.binary_masks,
     )
 
     with pytest.raises(CouplerError, match="fractional mask.*shape"):

@@ -95,8 +95,7 @@ def test_component_runtime_execution_policy_helpers_detect_host_components() -> 
     pure_component = _RuntimeOnlyComponent(name="ATM", grid=make_test_grid())
     host_component = _HostStepOnlyComponent(name="OCN", grid=make_test_grid())
 
-    assert runtime_execution.component_requires_host_runtime(pure_component) is False
-    assert runtime_execution.component_requires_host_runtime(host_component) is True
+    assert not hasattr(runtime_execution, "component_requires_host_runtime")
     assert runtime_execution.host_component_names(
         {"ATM": pure_component, "OCN": host_component}
     ) == ["OCN"]

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from tests._architecture_support import package_import_cycles, source_for
-from vercor.runtime.facade import PreparedRuntimeState, RuntimeFacadeInputs
+from vercor.runtime.facade import RuntimeFacadeInputs
 from vercor.runtime.resources import CouplerRuntimeResources
 
 
@@ -37,18 +37,13 @@ def test_runtime_preparation_module_owns_runtime_state_preparation() -> None:
     assert preparation_path.exists()
 
     preparation_source = preparation_path.read_text(encoding="utf-8")
-    assert "class PreparedRuntimeState" in preparation_source
+    assert "class PreparedRuntimeState" not in preparation_source
     assert "def runtime_state_from_components(" in preparation_source
     assert "def validate_runtime_state(" in preparation_source
     assert "def create_runtime_state(" in preparation_source
     assert "def prepare_runtime_state(" in preparation_source
     assert "RuntimePreparationInputs" not in preparation_source
-
-    assert is_dataclass(PreparedRuntimeState)
-    assert [field.name for field in fields(PreparedRuntimeState)] == [
-        "runtime_state",
-        "runtime_contracts",
-    ]
+    assert "return PreparedRuntimeState" not in preparation_source
 
 
 @pytest.mark.fast_always
@@ -231,11 +226,12 @@ def test_runtime_facade_reexports_preparation_without_owning_it() -> None:
     preparation_source = source_for("vercor/runtime/preparation.py")
 
     assert "from vercor.runtime.preparation import" in facade_source
+    assert "PreparedRuntimeState" not in facade_source
+    assert "PreparedRuntimeState" not in preparation_source
     assert "Protocol" not in preparation_source
     assert "RuntimePreparationInputs" not in preparation_source
     assert "if TYPE_CHECKING:" in preparation_source
     assert "from vercor.runtime.facade import RuntimeFacadeInputs" in preparation_source
-    assert "class PreparedRuntimeState" not in facade_source
     assert "def runtime_state_from_components(" not in facade_source
     assert "def validate_runtime_state(" not in facade_source
     assert "def create_runtime_state(" not in facade_source

@@ -88,7 +88,7 @@ class CamulatorRuntimeCursor:
         coupler_start_datetime: object,
         model_substeps: int,
         logger: Any,
-    ) -> CAMulatorForcingCursor:
+    ) -> None:
         """Initialize forcing index metadata and reset the runtime counter."""
 
         cursor = initialize_camulator_forcing_cursor(
@@ -102,7 +102,6 @@ class CamulatorRuntimeCursor:
         self.init_str = cursor.init_str
         self.model_substeps = int(model_substeps)
         self.timestep_counter = 0
-        return cursor
 
     def current_index(self) -> int:
         """Return the current forcing index for this cursor."""

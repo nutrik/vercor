@@ -63,7 +63,6 @@ def test_dispatch_component_exchanges_handles_scalar_masks_and_gradients() -> No
                 ),
             ),
             fractional_masks=RuntimeFieldStore.from_mapping({"OCN|ATM|_factory": mask}),
-            binary_masks=RuntimeFieldStore.empty(),
         )
         dispatched = dispatch_component_exchanges(
             state,
@@ -118,7 +117,6 @@ def test_dispatch_component_exchanges_preserves_vector_regridding_behavior() -> 
         fractional_masks=RuntimeFieldStore.from_mapping(
             {"OCN|ATM|_factory": jnp.full((2, 2), 0.25)}
         ),
-        binary_masks=RuntimeFieldStore.empty(),
     )
 
     dispatched = dispatch_component_exchanges(state, "ATM", (exchange,), regridders)
@@ -148,7 +146,6 @@ def test_runtime_dispatch_context_groups_exchanges_by_destination() -> None:
 
     context = RuntimeDispatchContext(
         components={},
-        exchanges=(atm_exchange, land_exchange),
         exchanges_by_destination={
             "ATM": (atm_exchange,),
             "LND": (land_exchange,),
@@ -168,3 +165,4 @@ def test_exchange_dispatch_uses_scalar_and_vector_primitives() -> None:
 
     assert "def _dispatch_scalar_exchange_field(" in source
     assert "def _dispatch_vector_exchange_field(" in source
+    assert "exchange.destination != destination_name" not in source

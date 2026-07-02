@@ -37,15 +37,6 @@ _UNSUPPORTED_PREDICT_OPTIONS = (
 )
 
 
-def make_camulator_output_adapter() -> ComponentOutputAdapter:
-    """Return the configured period-output adapter for CAMulator predictions."""
-
-    return ComponentOutputAdapter(
-        empty_error_message=CAMULATOR_AVERAGE_EMPTY_ERROR_MESSAGE,
-        time_dim=CAMULATOR_TIME_DIM,
-    )
-
-
 def load_camulator_output_metadata(conf: Mapping[str, Any]) -> dict[str, Any]:
     """Load CAMulator output metadata from an explicit path or bundled filename."""
 
@@ -679,7 +670,6 @@ __all__ = [
     "camulator_average_output_path",
     "camulator_period_output_variables",
     "load_camulator_output_metadata",
-    "make_camulator_output_adapter",
     "record_camulator_period_output",
     "record_camulator_snapshot",
     "write_camulator_netcdf_increment",

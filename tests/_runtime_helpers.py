@@ -54,7 +54,7 @@ def run_scanned_coupler(
         validate_state=validate_state,
     )
     return run_scanned_runtime(
-        prepared.runtime_state,
+        prepared,
         run_sequence=tuple(coupler.run_sequence),
         clock=coupler.clock,
         settings=coupler.settings,
@@ -73,8 +73,7 @@ def runtime_state_from_coupler_components(
 ) -> RuntimeCouplerState:
     """Build runtime state from a Coupler's components for focused tests."""
 
-    prepared = runtime_facade.runtime_state_from_components(
+    return runtime_facade.runtime_state_from_components(
         inputs=runtime_facade_inputs(coupler),
         prefill_missing=prefill_missing,
     )
-    return prepared.runtime_state

@@ -185,7 +185,6 @@ def _make_initial_state(sea_surface_temperature: jax.Array) -> RuntimeCouplerSta
                 "OCN|ICE|_identity_factory": jnp.ones_like(sea_surface_temperature),
             }
         ),
-        binary_masks=RuntimeFieldStore.empty(),
     )
 
 

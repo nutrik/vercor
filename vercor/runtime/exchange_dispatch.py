@@ -50,16 +50,13 @@ def dispatch_component_exchanges(
     exchanges: Sequence[Exchange],
     regridders: Mapping[tuple[str, str, str], Any],
 ) -> RuntimeCouplerState:
-    """Dispatch all exchanges targeting one destination component."""
+    """Dispatch destination-specific exchanges into one component."""
 
     destination_component = state.get_component_state(destination_name)
     destination_incoming = destination_component.incoming
     incoming_updates: dict[str, Any] = {}
 
     for exchange in exchanges:
-        if exchange.destination != destination_name:
-            continue
-
         source_component = state.get_component_state(exchange.source)
         source_fields = source_component.outgoing
         key = (exchange.source, exchange.destination, exchange.interpolation_type)

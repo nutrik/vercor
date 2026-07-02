@@ -6,6 +6,8 @@ import numpy as np
 
 from tests.assertions import assert_allclose_compact
 import vercor.diagnostics as diagnostics_module
+from vercor.dtypes import as_jax_real_array
+from vercor.field_layout import canonicalize_time_last_surface_field
 from vercor.setups.data.era5_atmosphere import (
     _compute_monthly_diagnostics,
     _decode_surface_pressure,
@@ -15,7 +17,6 @@ from vercor.setups.data._field_helpers import (
     mask_time_last_surface_field,
     positive_binary_mask,
 )
-from vercor.setups.data.era5_land import _prepare_era5_land_runtime_fields
 from vercor.setups.data.era5_ocean import (
     _ocean_binary_mask_from_land_fraction,
 )
@@ -23,10 +24,6 @@ from vercor.setups.data.erainterim_ocean import (
     _assemble_erainterim_field,
     _assemble_erainterim_latitude,
     _binary_ocean_mask_from_salinity,
-)
-from vercor.setups.data.jcm_land import (
-    _jcm_coordinates_in_degrees,
-    _prepare_jcm_land_runtime_fields,
 )
 from vercor.runtime.stores import RuntimeFieldStore
 from vercor.runtime.views import RuntimeComponentView
@@ -138,7 +135,7 @@ def test_total_surface_temperature_diagnostic_uses_runtime_view_fields() -> None
     assert_allclose_compact(total, np.asarray([[272.0, 270.0], [544.0, 274.0]]))
 
 
-def test_era5_land_helper_supports_jit_and_gradients() -> None:
+def test_era5_land_layout_uses_shared_jax_helpers() -> None:
     longitude = jnp.asarray([0.0, 120.0, 240.0])
     latitude = jnp.asarray([-30.0, 30.0])
     binary_mask = jnp.asarray([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
@@ -155,7 +152,14 @@ def test_era5_land_helper_supports_jit_and_gradients() -> None:
         prepared_latitude,
         prepared_binary_mask,
         prepared_land_surface_temperature,
-    ) = jax.jit(_prepare_era5_land_runtime_fields)(
+    ) = jax.jit(
+        lambda lon, lat, mask, temperature: (
+            as_jax_real_array(lon),
+            as_jax_real_array(lat),
+            as_jax_real_array(mask).T,
+            canonicalize_time_last_surface_field(temperature),
+        )
+    )(
         longitude,
         latitude,
         binary_mask,
@@ -175,14 +179,7 @@ def test_era5_land_helper_supports_jit_and_gradients() -> None:
     )
 
     gradient = jax.grad(
-        lambda temperature: jnp.sum(
-            _prepare_era5_land_runtime_fields(
-                longitude,
-                latitude,
-                binary_mask,
-                temperature,
-            )[3]
-        )
+        lambda temperature: jnp.sum(canonicalize_time_last_surface_field(temperature))
     )(land_surface_temperature)
     assert_allclose_compact(
         gradient, np.ones_like(np.asarray(land_surface_temperature))
@@ -300,22 +297,7 @@ def test_erainterim_helpers_prepare_jax_backed_grid_and_masked_fields() -> None:
     assert np.isclose(np.asarray(sea_surface_temperature)[0, 3, 0], 274.15)
 
 
-def test_jcm_land_coordinate_helper_supports_jit() -> None:
-    longitude_radians = jnp.deg2rad(jnp.asarray([0.0, 180.0]))
-    latitude_radians = jnp.deg2rad(jnp.asarray([-45.0, 45.0]))
-
-    longitude_degrees, latitude_degrees = jax.jit(_jcm_coordinates_in_degrees)(
-        longitude_radians,
-        latitude_radians,
-    )
-
-    assert isinstance(longitude_degrees, jax.Array)
-    assert isinstance(latitude_degrees, jax.Array)
-    assert_allclose_compact(longitude_degrees, np.asarray([0.0, 180.0]))
-    assert_allclose_compact(latitude_degrees, np.asarray([-45.0, 45.0]))
-
-
-def test_jcm_land_runtime_helper_supports_jit_and_gradients() -> None:
+def test_jcm_land_layout_uses_shared_jax_helpers() -> None:
     longitude_radians = jnp.deg2rad(jnp.asarray([0.0, 180.0]))
     latitude_radians = jnp.deg2rad(jnp.asarray([-45.0, 45.0]))
     land_surface_temperature = jnp.asarray([[280.0, 281.0], [282.0, 283.0]])
@@ -326,7 +308,14 @@ def test_jcm_land_runtime_helper_supports_jit_and_gradients() -> None:
         latitude_degrees,
         prepared_temperature,
         prepared_soil_moisture,
-    ) = jax.jit(_prepare_jcm_land_runtime_fields)(
+    ) = jax.jit(
+        lambda lon, lat, temperature, soil: (
+            jnp.rad2deg(as_jax_real_array(lon)),
+            jnp.rad2deg(as_jax_real_array(lat)),
+            canonicalize_surface_field(temperature),
+            canonicalize_surface_field(soil),
+        )
+    )(
         longitude_radians,
         latitude_radians,
         land_surface_temperature,
@@ -346,18 +335,7 @@ def test_jcm_land_runtime_helper_supports_jit_and_gradients() -> None:
 
     temperature_gradient, soil_gradient = jax.grad(
         lambda temperature, soil: jnp.sum(
-            _prepare_jcm_land_runtime_fields(
-                longitude_radians,
-                latitude_radians,
-                temperature,
-                soil,
-            )[2]
-            + _prepare_jcm_land_runtime_fields(
-                longitude_radians,
-                latitude_radians,
-                temperature,
-                soil,
-            )[3]
+            canonicalize_surface_field(temperature) + canonicalize_surface_field(soil)
         ),
         argnums=(0, 1),
     )(land_surface_temperature, soil_moisture)

@@ -86,7 +86,9 @@ mean-output conversion, single-record snapshot storage, period-file write
 lifecycle, and NetCDF writing live in `vercor.output`;
 model-specific output helpers live beside their setup adapters in
 `vercor.setups.external` and adapt native model objects into that shared output
-boundary.
+boundary. Setup-state constructors instantiate `ComponentOutputAdapter`
+directly from model-specific output constants and helpers; output modules do
+not keep one-case adapter factories.
 VerCOR-owned period output samples, accumulators, extracted variables, mean
 variables, and runtime-view fields stay JAX-backed until the file boundary;
 `vercor.host_arrays` owns the final host transfer. NetCDF time-coordinate
@@ -196,7 +198,9 @@ immutable runtime containers used during traced integration.
   type-only `Component` annotations where they need concrete component shape.
   `vercor.components._protocols` is reserved for the runtime-checkable
   `HostRuntimeExecutionProtocol`, so host-runtime detection remains structural
-  rather than a concrete component class check. Component-facing runtime-field
+  rather than a concrete component class check. The protocol requires only
+  `step_host_runtime_state()` because every `Component` already owns the
+  differentiable `step_runtime_state()` contract. Component-facing runtime-field
   adapters live in private `vercor.components._runtime_fields`, runtime-field
   convenience methods live directly on `Component`, and component-facing
   required-field validation lives in private
@@ -273,9 +277,10 @@ immutable runtime containers used during traced integration.
   preserving established dtypes. Import/export contract construction lives in
   `vercor.runtime.contracts`, exchange dispatch lives in
   `vercor.runtime.exchange_dispatch`, static dispatch context construction
-  lives in `vercor.runtime.dispatch_context`, runtime step metadata lives in
-  `vercor.runtime.time`, component state creation lives in
-  `vercor.runtime.component_state`, field receive/send mechanics live in
+  lives in `vercor.runtime.dispatch_context`, which stores exchanges grouped by
+  destination so per-component dispatch receives destination-specific work,
+  runtime step metadata lives in `vercor.runtime.time`, component state
+  creation lives in `vercor.runtime.component_state`, field receive/send mechanics live in
   `vercor.runtime.field_transfer`, component/store runtime validation lives in
   `vercor.runtime.validation`, and configured runtime-state/topology validation
   lives in `vercor.runtime.state_validation`. Runtime coupler-state assembly
@@ -289,14 +294,18 @@ immutable runtime containers used during traced integration.
   validation, and bilinear exchange patching live in
   `vercor.runtime.surface_masks`. `vercor.runtime.topology` remains the
   orchestration boundary that composes those owners and returns the explicit
-  topology state for the runtime facade to store. Setup-time component
+  topology state for the runtime facade to store. `RuntimeCouplerState` carries
+  component states and fractional masks through `jax.lax.scan`; binary masks
+  remain in `RuntimeTopologyMaps` for final output and topology bookkeeping.
+  Setup-time component
   precision synchronization, initialization context construction, component
   setup validation, runtime contract validation, and topology handoff live in
-  `vercor.runtime.initialization`. Runtime state preparation, the
-  `PreparedRuntimeState` bundle, contract refresh for prepared states,
-  validation, and initial outgoing-store priming live in
-  `vercor.runtime.preparation`; `vercor.runtime.facade` reexports these helpers
-  for the coupler-facing runtime boundary but does not own their implementation.
+  `vercor.runtime.initialization`. Runtime state preparation, contract refresh
+  for created or validated states, validation, and initial outgoing-store
+  priming live in `vercor.runtime.preparation`; it returns
+  `RuntimeCouplerState` directly while refreshed contracts stay on
+  `CouplerRuntimeResources`. `vercor.runtime.facade` reexports these helpers for
+  the coupler-facing runtime boundary but does not own their implementation.
   Frozen `RuntimeRunContext` execution inputs live in
   `vercor.runtime.run_context`; it carries only static execution metadata and
   shared runtime controllers, not compiled-runtime cache state.

@@ -208,7 +208,9 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert 'hasattr(component, "step_host_runtime_state")' not in coupler_source
     assert "isinstance(component, HostRuntimeComponent)" not in coupler_source
     assert "HostRuntimeComponent" not in runtime_driver_source
-    assert "def component_requires_host_runtime(" in component_runtime_execution_source
+    assert (
+        "def component_requires_host_runtime(" not in component_runtime_execution_source
+    )
     assert "def host_component_names(" in component_runtime_execution_source
     assert "def step_component_runtime_state(" in component_runtime_execution_source
     assert "from vercor.components._protocols import" in (
@@ -938,7 +940,6 @@ def test_runtime_component_and_coupler_state_are_pytrees() -> None:
         fractional_masks=RuntimeFieldStore.from_mapping(
             {"OCN|ATM|bilinear": jnp.ones((2, 2))}
         ),
-        binary_masks=RuntimeFieldStore.empty(),
     )
 
     def update(value: RuntimeCouplerState) -> RuntimeCouplerState:
@@ -971,7 +972,6 @@ def test_runtime_coupler_state_restores_component_index_cache_after_pytree_round
         component_names=("ATM", "OCN"),
         components=(component, component),
         fractional_masks=RuntimeFieldStore.empty(),
-        binary_masks=RuntimeFieldStore.empty(),
     )
     leaves, treedef = jax.tree_util.tree_flatten(state)
     restored = jax.tree_util.tree_unflatten(treedef, leaves)

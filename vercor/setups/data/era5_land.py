@@ -1,9 +1,6 @@
 from pathlib import Path
 from typing import Optional
 
-import jax
-from jax.typing import ArrayLike
-
 from vercor.components import DataComponent
 from vercor.dtypes import as_jax_real_array
 from vercor.field_layout import canonicalize_time_last_surface_field
@@ -13,21 +10,6 @@ from vercor.setups.data.assets import get_forcing_data
 from vercor.setups.data._component_helpers import time_interpolated_data_component
 
 _ERA5_LAND_FIELD_NAMES = ("land_surface_temperature",)
-
-
-def _prepare_era5_land_runtime_fields(
-    longitude: ArrayLike,
-    latitude: ArrayLike,
-    binary_mask: ArrayLike,
-    land_surface_temperature: ArrayLike,
-) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
-    """Normalize ERA5 land forcing arrays for JAX-backed runtime storage."""
-    return (
-        as_jax_real_array(longitude),
-        as_jax_real_array(latitude),
-        as_jax_real_array(binary_mask).T,
-        canonicalize_time_last_surface_field(land_surface_temperature),
-    )
 
 
 def make_era5_land(
@@ -43,16 +25,13 @@ def make_era5_land(
         "surface": str(surface_file),
     }
 
-    (
-        longitude,
-        latitude,
-        binary_mask,
-        land_surface_temperature,
-    ) = _prepare_era5_land_runtime_fields(
-        _read_forcing(data_files, "lon", where="surface"),
-        _read_forcing(data_files, "lat", where="surface"),
-        _read_forcing(data_files, "mask", where="surface"),
-        _read_forcing(data_files, "skt", where="surface"),
+    longitude = as_jax_real_array(_read_forcing(data_files, "lon", where="surface"))
+    latitude = as_jax_real_array(_read_forcing(data_files, "lat", where="surface"))
+    binary_mask = as_jax_real_array(
+        _read_forcing(data_files, "mask", where="surface")
+    ).T
+    land_surface_temperature = canonicalize_time_last_surface_field(
+        _read_forcing(data_files, "skt", where="surface")
     )
     grid = RectilinearGrid(
         name=f"{name.lower()}-grid",

@@ -71,13 +71,12 @@ class RuntimeComponentState(PyTreeNodeMixin):
 class RuntimeCouplerState(PyTreeNodeMixin):
     """Immutable runtime state for the VerCOR runtime core."""
 
-    pytree_children = ("components", "fractional_masks", "binary_masks")
+    pytree_children = ("components", "fractional_masks")
     pytree_aux_data = ("component_names",)
 
     component_names: tuple[str, ...]
     components: tuple[RuntimeComponentState, ...]
     fractional_masks: RuntimeFieldStore
-    binary_masks: RuntimeFieldStore
     component_indices: dict[str, int] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -118,7 +117,6 @@ class RuntimeCouplerState(PyTreeNodeMixin):
             component_names=self.component_names,
             components=tuple(components),
             fractional_masks=self.fractional_masks,
-            binary_masks=self.binary_masks,
         )
 
     def get_fractional_mask(

@@ -1,6 +1,4 @@
-import jax
 import jax.numpy as jnp
-from jax.typing import ArrayLike
 from typing import TYPE_CHECKING, Any
 
 from vercor.components import DataComponent
@@ -16,35 +14,6 @@ if TYPE_CHECKING:
 _JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture")
 
 
-def _jcm_coordinates_in_degrees(
-    longitude_radians: ArrayLike,
-    latitude_radians: ArrayLike,
-) -> tuple[jax.Array, jax.Array]:
-    """Convert JCM horizontal coordinates from radians to degrees."""
-    return (
-        jnp.rad2deg(as_jax_real_array(longitude_radians)),
-        jnp.rad2deg(as_jax_real_array(latitude_radians)),
-    )
-
-
-def _prepare_jcm_land_runtime_fields(
-    longitude_radians: ArrayLike,
-    latitude_radians: ArrayLike,
-    land_surface_temperature: ArrayLike,
-    soil_moisture: ArrayLike,
-) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
-    """Prepare JCM land coordinates and monthly forcing fields for VerCOR storage."""
-    longitude, latitude = _jcm_coordinates_in_degrees(
-        longitude_radians, latitude_radians
-    )
-    return (
-        longitude,
-        latitude,
-        canonicalize_surface_field(land_surface_temperature),
-        canonicalize_surface_field(soil_moisture),
-    )
-
-
 def make_jcm_land(
     jcm_coords: "CoordinateSystem | Any",
     jcm_forcing: "ForcingData | Any",
@@ -53,17 +22,10 @@ def make_jcm_land(
 ) -> DataComponent:
     """Return a JCM land forcing component."""
 
-    (
-        longitude,
-        latitude,
-        land_surface_temperature,
-        soil_moisture,
-    ) = _prepare_jcm_land_runtime_fields(
-        jcm_coords.horizontal.longitudes,
-        jcm_coords.horizontal.latitudes,
-        jcm_forcing.stl_am,
-        jcm_forcing.soilw_am,
-    )
+    longitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.longitudes))
+    latitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.latitudes))
+    land_surface_temperature = canonicalize_surface_field(jcm_forcing.stl_am)
+    soil_moisture = canonicalize_surface_field(jcm_forcing.soilw_am)
     lnd_bmask, _ = create_lnd_mask_from_ocn(
         atm_lat=latitude,
         atm_lon=longitude,

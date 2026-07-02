@@ -17,7 +17,6 @@ class RuntimeDispatchContext:
     """Static runtime plumbing shared by per-component dispatch helpers."""
 
     components: Mapping[str, Component]
-    exchanges: Sequence[Exchange]
     exchanges_by_destination: Mapping[str, tuple[Exchange, ...]]
     regridders: Mapping[tuple[str, str, str], Any]
     contracts: Mapping[str, RuntimeComponentContract]
@@ -47,7 +46,6 @@ def build_runtime_dispatch_context(
 
     return RuntimeDispatchContext(
         components=components,
-        exchanges=exchanges,
         exchanges_by_destination={
             name: tuple(destination_exchanges)
             for name, destination_exchanges in exchanges_by_destination.items()

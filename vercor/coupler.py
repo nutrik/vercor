@@ -175,11 +175,10 @@ class Coupler:
     ) -> _runtime_state_module.RuntimeCouplerState:
         """Create and validate the immutable state used by the unified runtime."""
 
-        prepared = _runtime_facade.create_runtime_state(
+        return _runtime_facade.create_runtime_state(
             inputs=self._runtime_inputs(),
             prefill_missing=prefill_missing,
         )
-        return prepared.runtime_state
 
     def runtime_component_view(
         self,
@@ -256,12 +255,13 @@ class Coupler:
         Host-backed components run through the Python host bridge.
         """
 
-        prepared = _runtime_facade.prepare_runtime_state(
+        inputs = self._runtime_inputs()
+        runtime_state = _runtime_facade.prepare_runtime_state(
             initial_state,
-            inputs=self._runtime_inputs(),
+            inputs=inputs,
         )
         return _runtime_facade.run(
-            prepared.runtime_state,
-            inputs=self._runtime_inputs(),
+            runtime_state,
+            inputs=inputs,
             logger=self.logger,
         )

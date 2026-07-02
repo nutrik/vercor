@@ -11,14 +11,6 @@ if TYPE_CHECKING:
 class HostRuntimeExecutionProtocol(Protocol):
     """Private structural contract for components that require host stepping."""
 
-    def step_runtime_state(
-        self,
-        component_state: "RuntimeComponentState",
-        context: "ComponentStepContext",
-    ) -> "RuntimeComponentState":
-        """Return this component advanced by one differentiable runtime step."""
-        ...
-
     def step_host_runtime_state(
         self,
         component_state: "RuntimeComponentState",

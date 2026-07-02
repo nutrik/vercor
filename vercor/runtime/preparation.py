@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from vercor.runtime.contracts import RuntimeComponentContract, build_runtime_contracts
@@ -20,19 +19,11 @@ if TYPE_CHECKING:
     from vercor.runtime.facade import RuntimeFacadeInputs
 
 
-@dataclass(frozen=True)
-class PreparedRuntimeState:
-    """Runtime state bundled with the refreshed contracts used to build it."""
-
-    runtime_state: RuntimeCouplerState
-    runtime_contracts: dict[str, RuntimeComponentContract]
-
-
 def runtime_state_from_components(
     *,
     inputs: "RuntimeFacadeInputs",
     prefill_missing: bool,
-) -> PreparedRuntimeState:
+) -> RuntimeCouplerState:
     """Build immutable runtime state from setup components and exchanges."""
 
     runtime_contracts = build_runtime_contracts(
@@ -46,13 +37,10 @@ def runtime_state_from_components(
         inputs.components,
         inputs.exchanges,
         topology_maps.fractional_masks,
-        topology_maps.binary_masks,
         contracts=inputs.runtime_resources.runtime_contracts,
         prefill_missing=prefill_missing,
     )
-    return PreparedRuntimeState(
-        runtime_state, inputs.runtime_resources.runtime_contracts
-    )
+    return runtime_state
 
 
 def validate_runtime_state(
@@ -83,14 +71,13 @@ def create_runtime_state(
     *,
     inputs: "RuntimeFacadeInputs",
     prefill_missing: bool,
-) -> PreparedRuntimeState:
+) -> RuntimeCouplerState:
     """Create, prime, and validate immutable runtime state."""
 
-    prepared = runtime_state_from_components(
+    runtime_state = runtime_state_from_components(
         inputs=inputs,
         prefill_missing=prefill_missing,
     )
-    runtime_state = prepared.runtime_state
     run_sequence = normalize_run_sequence(inputs.run_sequence)
     if prefill_missing and tuple(run_sequence):
         dispatch_context = build_runtime_dispatch_context(
@@ -107,11 +94,11 @@ def create_runtime_state(
             dispatch_context=dispatch_context,
             step_info=initial_runtime_step_info(inputs.clock, inputs.settings),
         )
-    runtime_contracts = validate_runtime_state(
+    validate_runtime_state(
         runtime_state,
         inputs=inputs,
     )
-    return PreparedRuntimeState(runtime_state, runtime_contracts)
+    return runtime_state
 
 
 def prepare_runtime_state(
@@ -119,7 +106,7 @@ def prepare_runtime_state(
     *,
     inputs: "RuntimeFacadeInputs",
     validate_state: bool = True,
-) -> PreparedRuntimeState:
+) -> RuntimeCouplerState:
     """Return a runtime state ready for execution."""
 
     if initial_state is None:
@@ -128,19 +115,14 @@ def prepare_runtime_state(
             prefill_missing=True,
         )
     if validate_state:
-        refreshed_contracts = validate_runtime_state(
+        validate_runtime_state(
             initial_state,
             inputs=inputs,
         )
-        return PreparedRuntimeState(initial_state, refreshed_contracts)
-    return PreparedRuntimeState(
-        initial_state,
-        dict(inputs.runtime_resources.runtime_contracts),
-    )
+    return initial_state
 
 
 __all__ = [
-    "PreparedRuntimeState",
     "create_runtime_state",
     "prepare_runtime_state",
     "runtime_state_from_components",

@@ -194,7 +194,11 @@ class _ConstructedVerosState:
 
 
 def _make_jax_gcm_output_adapter() -> ComponentOutputAdapter:
-    return jax_gcm_output_module.make_jax_gcm_output_adapter()
+    return ComponentOutputAdapter(
+        empty_error_message=jax_gcm_output_module.JAX_GCM_AVERAGE_EMPTY_ERROR_MESSAGE,
+        time_dim=jax_gcm_output_module.JAX_GCM_TIME_DIM,
+        dimension_order=jax_gcm_output_module.JAX_GCM_OUTPUT_DIMENSION_ORDER,
+    )
 
 
 def _write_jax_gcm_average_output(
@@ -234,7 +238,11 @@ def _write_jax_gcm_average_output(
 
 
 def _make_veros_output_adapter() -> ComponentOutputAdapter:
-    return veros_output_module.make_veros_output_adapter()
+    return ComponentOutputAdapter(
+        empty_error_message=veros_output_module.VEROS_AVERAGE_EMPTY_ERROR_MESSAGE,
+        time_dim=veros_output_module.VEROS_TIME_DIM,
+        value_dims_for_sample=veros_output_module.veros_average_value_dims,
+    )
 
 
 def _make_coupler(

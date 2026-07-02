@@ -11,12 +11,6 @@ if TYPE_CHECKING:
     from vercor.runtime.state import RuntimeComponentState
 
 
-def component_requires_host_runtime(component: "Component") -> bool:
-    """Return whether ``component`` must run through the Python host runtime."""
-
-    return isinstance(component, HostRuntimeExecutionProtocol)
-
-
 def host_component_names(
     components: Mapping[str, "Component"],
 ) -> list[str]:
@@ -25,7 +19,7 @@ def host_component_names(
     return [
         name
         for name, component in components.items()
-        if component_requires_host_runtime(component)
+        if isinstance(component, HostRuntimeExecutionProtocol)
     ]
 
 

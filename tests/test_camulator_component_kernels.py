@@ -82,7 +82,10 @@ def _runtime_component_state(
 
 
 def _make_camulator_output_adapter() -> ComponentOutputAdapter:
-    return camulator_output_module.make_camulator_output_adapter()
+    return ComponentOutputAdapter(
+        empty_error_message=camulator_output_module.CAMULATOR_AVERAGE_EMPTY_ERROR_MESSAGE,
+        time_dim=camulator_output_module.CAMULATOR_TIME_DIM,
+    )
 
 
 def _make_coupler(start: datetime) -> ComponentSetupContext:

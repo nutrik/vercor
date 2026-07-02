@@ -408,7 +408,7 @@ def test_component_base_internals_are_private_modules() -> None:
         "def validate_runtime_component_data_field("
         not in core_runtime_validation_source
     )
-    assert "def component_requires_host_runtime(" in runtime_execution_source
+    assert "def component_requires_host_runtime(" not in runtime_execution_source
     assert "def host_component_names(" in runtime_execution_source
     assert "def step_component_runtime_state(" in runtime_execution_source
     assert "from vercor.components._protocols import" in runtime_execution_source
@@ -1120,11 +1120,8 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert callable(output_adapters_module.ComponentOutputAdapter)
     assert callable(period_averages_module.PeriodAverageAccumulator)
     assert callable(period_files_module.write_period_average_netcdf)
-    assert callable(jax_gcm_output_module.make_jax_gcm_output_adapter)
     assert callable(jax_gcm_output_module.record_jax_gcm_period_output)
-    assert callable(veros_output_module.make_veros_output_adapter)
     assert callable(veros_output_module.record_veros_period_output)
-    assert callable(camulator_output_module.make_camulator_output_adapter)
     assert callable(camulator_output_module.record_camulator_period_output)
     assert callable(veros_fluxes_module.compute_fluxes)
     assert callable(veros_output_module.extract_veros_output_snapshot)
@@ -1376,19 +1373,22 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "accumulate_output_variables(" not in jax_gcm_output_source
     assert "period_mean_output_variables(" not in jax_gcm_output_source
     assert "write_period_average_netcdf(" not in jax_gcm_output_source
-    assert "def make_jax_gcm_output_adapter(" in jax_gcm_output_source
+    assert "def make_jax_gcm_output_adapter(" not in jax_gcm_output_source
+    assert "ComponentOutputAdapter(" in jax_gcm_state_source
     assert "def record_jax_gcm_period_output(" in jax_gcm_output_source
     assert "def write_jax_gcm_snapshot_output(" in jax_gcm_output_source
     assert "time_coordinate_variable(" in jax_gcm_output_source
     assert "accumulate_output_variables(" not in veros_output_source
     assert "period_mean_output_variables(" not in veros_output_source
     assert "write_period_average_netcdf(" not in veros_output_source
-    assert "def make_veros_output_adapter(" in veros_output_source
+    assert "def make_veros_output_adapter(" not in veros_output_source
+    assert "ComponentOutputAdapter(" in veros_gcm_state_source
     assert "def record_veros_period_output(" in veros_output_source
     assert "def write_veros_snapshot_output(" in veros_output_source
     assert "time_coordinate_variable(" in veros_output_source
     assert "used_dimension_names(" in veros_output_source
-    assert "def make_camulator_output_adapter(" in camulator_output_source
+    assert "def make_camulator_output_adapter(" not in camulator_output_source
+    assert "ComponentOutputAdapter(" in camulator_gcm_state_source
     assert "def record_camulator_period_output(" in camulator_output_source
     assert "def write_camulator_snapshot_output(" in camulator_output_source
     assert "write_period_average_if_due(" not in jax_gcm_runtime_source
@@ -1707,10 +1707,12 @@ def test_camulator_state_facade_is_removed() -> None:
 
 
 @pytest.mark.fast_always
-def test_jcm_land_uses_single_coordinate_conversion_helper() -> None:
+def test_jcm_land_inlines_single_use_coordinate_conversion() -> None:
     source = Path("vercor/setups/data/jcm_land.py").read_text(encoding="utf-8")
 
-    assert "def _jcm_coordinates_in_degrees" in source
+    assert "def _jcm_coordinates_in_degrees" not in source
+    assert "def _prepare_jcm_land_runtime_fields" not in source
+    assert "jnp.rad2deg(" in source
     assert "def _coordinates_in_degrees" not in source
 
 

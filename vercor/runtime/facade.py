@@ -21,7 +21,6 @@ from vercor.runtime.initialization import (
     initialize_coupler_runtime as _initialize_coupler_runtime,
 )
 from vercor.runtime.preparation import (
-    PreparedRuntimeState,
     create_runtime_state,
     prepare_runtime_state,
     runtime_state_from_components,
@@ -197,7 +196,6 @@ def _final_snapshot_time(clock: Clock) -> datetime | ModelDateTime:
 
 
 __all__ = [
-    "PreparedRuntimeState",
     "RuntimeFacadeInputs",
     "create_runtime_state",
     "finalize",

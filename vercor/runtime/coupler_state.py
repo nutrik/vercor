@@ -22,7 +22,6 @@ def runtime_state_from_components(
     components: Mapping[str, Component],
     exchanges: Sequence[Exchange],
     fractional_masks: Mapping[tuple[str, str, str], RuntimeArray],
-    binary_masks: Mapping[tuple[str, str, str], RuntimeArray],
     *,
     contracts: Mapping[str, RuntimeComponentContract] | None = None,
     prefill_missing: bool = False,
@@ -49,12 +48,8 @@ def runtime_state_from_components(
     runtime_fractional_masks = {
         exchange_key_name(*key): value for key, value in fractional_masks.items()
     }
-    runtime_binary_masks = {
-        exchange_key_name(*key): value for key, value in binary_masks.items()
-    }
     return RuntimeCouplerState(
         component_names=tuple(components.keys()),
         components=runtime_components,
         fractional_masks=RuntimeFieldStore.from_mapping(runtime_fractional_masks),
-        binary_masks=RuntimeFieldStore.from_mapping(runtime_binary_masks),
     )

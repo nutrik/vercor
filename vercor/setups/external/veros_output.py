@@ -31,16 +31,6 @@ _TIMESTEP_DIM = "timesteps"
 _GHOST_DIMS = ("xt", "yt", "xu", "yu")
 
 
-def make_veros_output_adapter() -> ComponentOutputAdapter:
-    """Return the configured period-output adapter for Veros snapshots."""
-
-    return ComponentOutputAdapter(
-        empty_error_message=VEROS_AVERAGE_EMPTY_ERROR_MESSAGE,
-        time_dim=VEROS_TIME_DIM,
-        value_dims_for_sample=veros_average_value_dims,
-    )
-
-
 def normalize_veros_output_variables(
     output_variables: Sequence[str] | None,
     *,
@@ -274,7 +264,6 @@ __all__ = [
     "VEROS_AVERAGE_EMPTY_ERROR_MESSAGE",
     "VEROS_TIME_DIM",
     "extract_veros_output_snapshot",
-    "make_veros_output_adapter",
     "normalize_veros_output_variables",
     "record_veros_period_output",
     "veros_average_coordinate_variables",

@@ -300,6 +300,10 @@ historical commands, failure messages, or detailed validation notes.
   red/green pytest, affected fast pytest, Black, flake8, mypy, full fast
   pytest, full pytest, and git diff whitespace check passed as of 2026-07-02
   using `/Users/romannuterman/miniforge3/envs/scipy/bin/python`.
+- Latest local over-engineering simplification slice validation: baseline fast
+  pytest, focused red/green pytest, focused affected fast pytest, Black,
+  flake8, mypy, full fast pytest, full pytest, coverage pytest, and git diff
+  whitespace check passed as of 2026-07-02 using `conda run -n scipy`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -331,6 +335,33 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-02: Over-Engineering Simplification Slice
+
+- Removed `PreparedRuntimeState`; runtime preparation now returns
+  `RuntimeCouplerState` directly while refreshed contracts stay on
+  `CouplerRuntimeResources`.
+- Removed binary masks from `RuntimeCouplerState` scan carry; topology resources
+  still own binary masks for final output and mask bookkeeping.
+- Slimmed runtime dispatch and component host-runtime detection by dropping
+  redundant all-exchanges storage/filtering, the one-line host-runtime
+  predicate, and the duplicated differentiable method on the host protocol.
+- Inlined one-case output adapter factories into JAXGCM, Veros, and CAMulator
+  setup-state constructors, and inlined single-use ERA5/JCM land data prep
+  helpers at their public factory boundaries.
+- Made `CamulatorRuntimeCursor.initialize(...)` command-only while keeping the
+  pure cursor calculation helper value-returning and directly tested.
+- Updated architecture tests to verify behavior/public boundaries instead of
+  preserving private helper placement.
+- Required validation passed:
+  `conda run -n scipy black vercor examples tests`,
+  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
+  `conda run -n scipy mypy vercor examples tests`,
+  `conda run -n scipy pytest tests/ -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/ -q --tb=short`,
+  `conda run -n scipy pytest --cov=vercor tests/ -q --tb=short`, and
+  `git diff --check`. The existing Black Python 3.13/target-3.14 warning and
+  JAX dtype-promotion warning remain.
 
 ### 2026-07-02: JAXGCM PyTree and Lifecycle Simplification
 

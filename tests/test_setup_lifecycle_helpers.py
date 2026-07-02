@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import jax.numpy as jnp
 import pytest
@@ -168,7 +168,7 @@ def test_camulator_runtime_cursor_initializes_indexes_and_advances() -> None:
     dynamic_ds = SimpleNamespace(indexes={"time": _TimeIndex(4)})
     cursor = camulator_forcing_module.CamulatorRuntimeCursor()
 
-    cursor.initialize(
+    result = cast(Any, cursor.initialize)(
         conf={"predict": {"start_datetime": forcing_start}},
         dynamic_ds=dynamic_ds,
         coupler_start_datetime=forcing_start,
@@ -176,6 +176,7 @@ def test_camulator_runtime_cursor_initializes_indexes_and_advances() -> None:
         logger=logger,
     )
 
+    assert result is None
     assert cursor.start_ix == 4
     assert cursor.init_datetime == forcing_start
     assert cursor.init_str == "2000-01-01T00Z"
