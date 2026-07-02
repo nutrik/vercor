@@ -14,7 +14,7 @@ from vercor.grid_masks import (
 from vercor.grid_geometry import grids_identical
 from vercor.jax_logging import LoggerLike
 from vercor.regridders import ConservativeRectilinearRegridder
-from vercor.runtime.component_topology import get_component
+from vercor.runtime.component_topology import require_component
 from vercor.runtime.topology_state import RuntimeTopologyMaps, SurfaceExchangeMasks
 
 if TYPE_CHECKING:
@@ -28,9 +28,9 @@ def create_surface_exchange_masks(
 ) -> SurfaceExchangeMasks:
     """Create atmosphere-grid ocean/land masks required by exchange setup."""
 
-    land_component = get_component(components, "LND")
-    atmosphere_component = get_component(components, "ATM")
-    ocean_component = get_component(components, "OCN")
+    land_component = require_component(components, "LND")
+    atmosphere_component = require_component(components, "ATM")
+    ocean_component = require_component(components, "OCN")
 
     if not grids_identical(land_component.grid, atmosphere_component.grid):
         raise CouplerError(
@@ -75,7 +75,7 @@ def validate_land_mask_consistency(
 ) -> None:
     """Validate that a component land mask matches the remapped exchange mask."""
 
-    land_component = get_component(components, "LND")
+    land_component = require_component(components, "LND")
     lnd_mask_from_component = land_component.grid.binary_mask
     if lnd_mask_from_component is not None:
         component_mask = jnp.asarray(lnd_mask_from_component)

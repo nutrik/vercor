@@ -70,13 +70,6 @@ class RuntimeFieldStore(PyTreeNodeMixin):
             raise KeyError(f"Runtime field {name!r} not found") from exc
         return self.values[index]
 
-    def get_or(self, name: str, default: RuntimeArray) -> RuntimeArray:
-        """Return a field by name, or ``default`` when it is absent."""
-
-        if name in self:
-            return self.get(name)
-        return jnp.asarray(default)
-
     def get_or_zeros_like(
         self,
         name: str,

@@ -304,6 +304,13 @@ historical commands, failure messages, or detailed validation notes.
   pytest, focused red/green pytest, focused affected fast pytest, Black,
   flake8, mypy, full fast pytest, full pytest, coverage pytest, and git diff
   whitespace check passed as of 2026-07-02 using `conda run -n scipy`.
+- Latest local runtime/CAMulator helper simplification validation: focused
+  red/green pytest, focused affected fast pytest, Black, flake8, mypy, full
+  fast pytest, full pytest, coverage pytest at 90% total, and git diff
+  whitespace check passed as of 2026-07-02 using the direct `scipy`
+  environment executable. The session-start `conda run -n scipy pytest tests/
+  -v --fast 2>&1 | tail -20` smoke still failed before pytest with the known
+  Conda/Rattler `PanicException`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -335,6 +342,27 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-02: Runtime and CAMulator Helper Simplification
+
+- Removed the redundant `RuntimeFieldStore.get_or(...)` default helper;
+  `runtime_field_or(...)` now returns normalized component defaults directly,
+  while zero-like fallback behavior stays on the runtime store.
+- Replaced value-scanning `get_component(...)` with keyed
+  `require_component(...)`, including explicit key/name mismatch errors for
+  topology component mappings.
+- Removed CAMulator wind-filter loader globals from `camulator_imports.py`.
+  `CAMulatorStepper` now imports the internal wind-filter facade directly,
+  owns state shifting and forcing concatenation itself, and runtime code calls
+  the stepper directly instead of reaching through `stepper.state_manager`.
+- Updated architecture tests, `DESIGN.md`, and `DEPENDENCIES.md` to reflect the
+  slimmer helper ownership.
+- Validation run for this change: focused red tests failed against the old
+  helper surfaces before implementation; after cleanup, affected fast pytest,
+  Black, flake8, mypy, full fast pytest, full pytest, coverage pytest, and
+  `git diff --check` passed using
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/python`. The recurring Black
+  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
 ### 2026-07-02: Over-Engineering Simplification Slice
 

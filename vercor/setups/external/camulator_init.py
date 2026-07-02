@@ -132,7 +132,6 @@ def initialize_camulator(
     log.info(
         f"Conservation fixers: Mass={stepper.flag_mass}, Water={stepper.flag_water}, Energy={stepper.flag_energy}"
     )
-    log.info(f"Wind filtering: {stepper.enable_wind_filtering}")
     log.info("=" * 70)
 
     return {

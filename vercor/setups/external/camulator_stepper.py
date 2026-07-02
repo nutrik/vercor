@@ -8,17 +8,22 @@ import torch
 
 from vercor.jax_logging import get_default_logger
 from vercor.setups.external import camulator_imports
+from vercor.setups.external.camulator_wind_filter import post_process_wind_artifacts
 
 logger = get_default_logger()
 
 
-class StateManager:
-    """Manage CAMulator state tensor shifts and forcing concatenation."""
+class CAMulatorStepper:
+    """Core CAMulator time-stepper with optional post-processing fixers."""
 
-    def __init__(self, conf: dict[str, Any]) -> None:
-        """Initialize tensor-shape metadata from a CAMulator configuration."""
+    def __init__(
+        self, model: torch.nn.Module, conf: dict[str, Any], device: torch.device
+    ):
+        """Initialize model, state helpers, and post-processing hooks."""
 
+        self.model = model
         self.conf = conf
+        self.device = device
         self.history_len = conf["data"]["history_len"]
         self.varnum_diag = len(conf["data"]["diagnostic_variables"])
         self.static_dim = (
@@ -27,6 +32,7 @@ class StateManager:
             else 0
         )
         self.static_first = conf["data"]["static_first"]
+        self._setup_postprocessing()
 
     def shift_state_forward(
         self,
@@ -67,27 +73,11 @@ class StateManager:
 
         return torch.cat((state, forcing), dim=1)
 
-
-class CAMulatorStepper:
-    """Core CAMulator time-stepper with optional post-processing fixers."""
-
-    def __init__(
-        self, model: torch.nn.Module, conf: dict[str, Any], device: torch.device
-    ):
-        """Initialize model, state helpers, and post-processing hooks."""
-
-        self.model = model
-        self.conf = conf
-        self.device = device
-        self.state_manager = StateManager(conf)
-        self._setup_postprocessing()
-
     def _setup_postprocessing(self) -> None:
         """Initialize conservation fixers and wind filtering if available."""
 
         post_conf = self.conf["model"]["post_conf"]
         postblock_available = camulator_imports.load_postblock_modules()
-        windpp_available = camulator_imports.load_windpp_module()
 
         self.flag_mass = (
             postblock_available
@@ -115,8 +105,6 @@ class CAMulatorStepper:
             self.opt_energy = camulator_imports.GlobalEnergyFixer(post_conf)
             logger.info("Global energy fixer initialized")
 
-        self.enable_wind_filtering = windpp_available
-
     def _apply_postprocessing(
         self,
         prediction: torch.Tensor,
@@ -124,12 +112,11 @@ class CAMulatorStepper:
     ) -> torch.Tensor:
         """Apply wind artifact filtering and conservation fixers."""
 
-        if self.enable_wind_filtering:
-            camulator_imports.post_process_wind_artifacts(
-                prediction,
-                self.conf,
-                enable_filtering=True,
-            )
+        post_process_wind_artifacts(
+            prediction,
+            self.conf,
+            enable_filtering=True,
+        )
 
         if self.flag_mass:
             prediction = self.opt_mass({"y_pred": prediction, "x": model_input})[
@@ -148,5 +135,4 @@ class CAMulatorStepper:
 
 __all__ = [
     "CAMulatorStepper",
-    "StateManager",
 ]

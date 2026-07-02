@@ -225,8 +225,9 @@ immutable runtime containers used during traced integration.
   `runtime_field_or()`, or `runtime_field_or_zeros_like()` and return updates
   with `with_runtime_fields()` where possible. These component helpers are
   author-facing adapters in `vercor.components._runtime_fields` over
-  `RuntimeFieldStore` membership, mapping, fallback, and existing-field
-  replacement mechanics owned by the runtime.
+  `RuntimeFieldStore` membership, mapping, zero-like fallback, and
+  existing-field replacement mechanics owned by the runtime; default fallback
+  normalization stays in the component adapter layer.
   When a step also needs to replace runtime payload, `apply_step_result()`
   applies either a field mapping or `ComponentStepResult` through the same
   validated update path used by callable wrappers.
@@ -469,7 +470,7 @@ Diagnostics are split into `vercor.diagnostics.fields`, `vercor.diagnostics.tabl
 `vercor.runtime.views` and `vercor.diagnostics` preserving the public reexport
 surface.
 
-CAMulator runtime field contracts, optional-dependency loading, forcing cursors,
+CAMulator runtime field contracts, optional CREDIT/postblock loading, forcing cursors,
 tensor accessors, runtime stepping, output, wind filtering, land forcing, and
 initialization are split across
 `vercor.setups.external.camulator_contracts`,

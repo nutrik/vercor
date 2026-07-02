@@ -1063,7 +1063,9 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert "def compute_land_mask(" in grid_masks_source
     assert "def get_component(" not in grid_masks_source
     assert "def get_component(" not in topology_source
-    assert "def get_component(" in component_topology_source
+    assert "def require_component(" in component_topology_source
+    assert "def get_component(" not in component_topology_source
+    assert ".values()" not in component_topology_source
     assert "def compute_pressure_levels(" not in jax_gcm_tools_source
     assert "def get_altitudes_sigma_levels(" not in jax_gcm_tools_source
     assert "def mean_leaf(" not in jax_gcm_tools_source
@@ -1215,6 +1217,9 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     host_arrays_source = Path("vercor/host_arrays.py").read_text(encoding="utf-8")
     camulator_imports_source = Path(
         "vercor/setups/external/camulator_imports.py"
+    ).read_text(encoding="utf-8")
+    camulator_stepper_source = Path(
+        "vercor/setups/external/camulator_stepper.py"
     ).read_text(encoding="utf-8")
 
     assert Path("vercor/setups/external/camulator_land.py").exists()
@@ -1402,8 +1407,11 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
     assert "write_runtime_component_view_to_netcdf" in output_init_source
     assert "def array_to_host(" in host_arrays_source
     assert "def host_int64_array(" in host_arrays_source
-    assert "from vercor.setups.external.camulator_wind_filter import" in (
+    assert "from vercor.setups.external.camulator_wind_filter import" not in (
         camulator_imports_source
+    )
+    assert "from vercor.setups.external.camulator_wind_filter import" in (
+        camulator_stepper_source
     )
     assert camulator_private_wind_filtering_path.exists()
     assert (

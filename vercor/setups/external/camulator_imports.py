@@ -6,7 +6,6 @@ from typing import Any
 
 CREDIT_AVAILABLE = False
 POSTBLOCK_AVAILABLE = False
-WINDPP_AVAILABLE = False
 
 load_model: Any = None
 load_model_name: Any = None
@@ -19,7 +18,6 @@ credit_main_parser: Any = None
 GlobalMassFixer: Any = None
 GlobalWaterFixer: Any = None
 GlobalEnergyFixer: Any = None
-post_process_wind_artifacts: Any = None
 
 
 def load_credit_modules() -> None:
@@ -99,42 +97,19 @@ def load_postblock_modules() -> bool:
     return True
 
 
-def load_windpp_module() -> bool:
-    """Load optional wind post-processing only when CAMulator stepping needs it."""
-
-    global WINDPP_AVAILABLE, post_process_wind_artifacts
-
-    if WINDPP_AVAILABLE:
-        return True
-
-    try:
-        from vercor.setups.external.camulator_wind_filter import (
-            post_process_wind_artifacts as windpp_post_process,
-        )
-    except ImportError:
-        return False
-
-    post_process_wind_artifacts = windpp_post_process
-    WINDPP_AVAILABLE = True
-    return True
-
-
 __all__ = [
     "CREDIT_AVAILABLE",
     "POSTBLOCK_AVAILABLE",
-    "WINDPP_AVAILABLE",
     "GlobalEnergyFixer",
     "GlobalMassFixer",
     "GlobalWaterFixer",
     "Normalize_ERA5_and_Forcing",
     "load_credit_modules",
     "load_postblock_modules",
-    "load_windpp_module",
     "credit_main_parser",
     "distributed_model_wrapper",
     "load_model",
     "load_model_name",
     "load_model_state",
     "load_transforms",
-    "post_process_wind_artifacts",
 ]

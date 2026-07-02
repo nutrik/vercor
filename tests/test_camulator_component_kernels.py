@@ -1288,7 +1288,7 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     )
     captured: dict[str, torch.Tensor] = {}
 
-    class _StateManager:
+    class _Stepper:
         def build_input_with_forcing(
             self,
             state: torch.Tensor,
@@ -1305,9 +1305,16 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
             _ = prediction
             return state
 
-    class _Model:
-        def __call__(self, model_input: torch.Tensor) -> torch.Tensor:
+        def model(self, model_input: torch.Tensor) -> torch.Tensor:
             return model_input + 1.0
+
+        def _apply_postprocessing(
+            self,
+            prediction: torch.Tensor,
+            model_input: torch.Tensor,
+        ) -> torch.Tensor:
+            _ = model_input
+            return prediction
 
     class _StepAccessor:
         def set_state_var(
@@ -1339,11 +1346,7 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     )
     component.dynamic_ds = dynamic_ds
     component.device = "cpu"
-    component.stepper = SimpleNamespace(
-        state_manager=_StateManager(),
-        model=_Model(),
-        _apply_postprocessing=lambda prediction, model_input: prediction,
-    )
+    component.stepper = _Stepper()
     component.static_forcing = torch.zeros((1, 1, 1, 2, 2))
     component.state = torch.zeros((1, 6, 1, 2, 2))
     component.LANDM_COSLAT = jnp.asarray([[0.0, 1.0], [0.5, 0.0]])

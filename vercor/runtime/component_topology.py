@@ -21,16 +21,17 @@ def validate_component_topology_names(components: Mapping[str, Component]) -> No
             raise ComponentError(f"Incorrect component name: {name}, must be {allowed}")
 
 
-def get_component(allcomponents: Mapping[str, Component], types: str) -> Component:
-    """Return the registered component with the requested VerCOR component name."""
+def require_component(components: Mapping[str, Component], name: str) -> Component:
+    """Return the component registered under ``name`` or raise a coupler error."""
 
-    components: list[Component] = [
-        component for component in allcomponents.values() if component.name == types
-    ]
-    if len(components) > 1:
+    try:
+        component = components[name]
+    except KeyError as exc:
+        raise CouplerError(f"No component of type {name!r} registered") from exc
+
+    if component.name != name:
         raise CouplerError(
-            f"Multiple {components[0].name} components registered; only one supported"
+            f"Component registered under key {name!r} has name {component.name!r}; "
+            "component mapping keys must match component.name"
         )
-    if not components:
-        raise CouplerError(f"No component of types ({types}) registered")
-    return components[0]
+    return component

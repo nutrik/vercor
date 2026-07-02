@@ -81,7 +81,7 @@ def runtime_field_or(
             f"Default runtime field '{name}' could not be normalized for "
             f"component '{component.name}'."
         )
-    return component_state.data.get_or(name, normalized[name])
+    return normalized[name]
 
 
 def runtime_field_or_zeros_like(

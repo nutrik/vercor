@@ -75,7 +75,7 @@ def run_camulator_prediction_block(
         dynamic_forcing_t = gpu_forcing_chunk[t].unsqueeze(0)
 
         if state.forecast_hour != 1:
-            model_input = state.stepper.state_manager.build_input_with_forcing(
+            model_input = state.stepper.build_input_with_forcing(
                 state.state,
                 dynamic_forcing_t,
                 state.static_forcing,
@@ -120,7 +120,7 @@ def run_camulator_prediction_block(
             logger=logger,
         )
 
-        state.state = state.stepper.state_manager.shift_state_forward(
+        state.state = state.stepper.shift_state_forward(
             state.state,
             prediction,
         )

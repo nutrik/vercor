@@ -462,8 +462,11 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def patch_exchange_masks(" not in runtime_topology_source
     assert "def validate_component_topology_names(" not in runtime_topology_source
     assert "def get_component(" not in runtime_topology_source
+    assert "def require_component(" not in runtime_topology_source
     assert "def validate_component_topology_names(" in runtime_component_topology_source
-    assert "def get_component(" in runtime_component_topology_source
+    assert "def require_component(" in runtime_component_topology_source
+    assert "def get_component(" not in runtime_component_topology_source
+    assert ".values()" not in runtime_component_topology_source
     assert "from vercor.runtime.topology import" not in coupler_source
     assert "from vercor.runtime.topology_state import" in runtime_resources_source
     assert "ExchangeTopologyState" not in runtime_resources_source
@@ -537,6 +540,21 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "def step_runtime_state" not in camulator_source
     assert "def step_runtime_state" not in camulator_land_source
     assert "component_state.data.to_mapping()" not in camulator_land_source
+    camulator_imports_source = Path(
+        "vercor/setups/external/camulator_imports.py"
+    ).read_text(encoding="utf-8")
+    camulator_stepper_source = Path(
+        "vercor/setups/external/camulator_stepper.py"
+    ).read_text(encoding="utf-8")
+    camulator_runtime_source = Path(
+        "vercor/setups/external/camulator_runtime.py"
+    ).read_text(encoding="utf-8")
+    assert "WINDPP_AVAILABLE" not in camulator_imports_source
+    assert "load_windpp_module" not in camulator_imports_source
+    assert "post_process_wind_artifacts: Any = None" not in camulator_imports_source
+    assert "class StateManager" not in camulator_stepper_source
+    assert "state_manager" not in camulator_stepper_source
+    assert ".state_manager." not in camulator_runtime_source
     assert "post_process_wind_artifacts_deprecated" not in camulator_wind_filter_source
     assert "old_flux_atmOcn" not in flux_source
     assert "new_flux_atmOcn" not in flux_source
@@ -840,7 +858,9 @@ def test_runtime_field_store_replacement_preserves_existing_dtype() -> None:
     assert_allclose_compact(updated.get("temperature"), np.ones((2, 2)))
 
 
-def test_runtime_field_store_exposes_mapping_membership_and_fallback_helpers() -> None:
+def test_runtime_field_store_exposes_mapping_membership_without_default_fallbacks() -> (
+    None
+):
     store = RuntimeFieldStore.from_mapping(
         {
             "temperature": jnp.full((2, 2), 280.0, dtype=jnp.float32),
@@ -856,14 +876,7 @@ def test_runtime_field_store_exposes_mapping_membership_and_fallback_helpers() -
         store.get("missing")
     assert tuple(fields) == ("temperature", "humidity")
     assert_allclose_compact(fields["temperature"], np.full((2, 2), 280.0))
-    assert_allclose_compact(
-        store.get_or("temperature", jnp.zeros((2, 2))),
-        np.full((2, 2), 280.0),
-    )
-    assert_allclose_compact(
-        store.get_or("missing", jnp.full((2, 2), 3.0)),
-        np.full((2, 2), 3.0),
-    )
+    assert not hasattr(store, "get_or")
     assert_allclose_compact(
         store.get_or_zeros_like("missing", "temperature"),
         np.zeros((2, 2)),

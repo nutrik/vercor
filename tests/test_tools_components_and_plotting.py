@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import os
 from pathlib import Path
 import tempfile
-from typing import Any, cast
+from typing import cast
 
 import jax
 import jax.numpy as jnp
@@ -15,6 +16,8 @@ import tests.conftest as conftest_module
 from tests._tools_support import DummyComponentA, DummyComponentB
 from tests.assertions import assert_allclose_compact
 import vercor.diagnostics as diagnostics_module
+import vercor.runtime.component_topology as component_topology_module
+from vercor.components.base import Component
 from vercor.exceptions import CouplerError
 from vercor.grid import RectilinearGrid
 from vercor.runtime.contracts import (
@@ -29,7 +32,6 @@ from vercor.diagnostics import (
     print_component_field_means_table,
     safe_component_nanmean,
 )
-from vercor.runtime.component_topology import get_component
 from vercor.grid_geometry import grids_identical
 
 matplotlib.use("Agg")
@@ -70,28 +72,26 @@ def test_grids_identical_detects_equal_and_unequal_grids() -> None:
     assert not grids_identical(g0, g2)
 
 
-def test_get_component_returns_single_and_raises_for_ambiguous_or_missing() -> None:
-    allcomponents: dict[str, object] = {
-        "a": DummyComponentA(name="ATM"),
-        "b": DummyComponentB(name="OCN"),
-    }
+def test_require_component_uses_canonical_component_mapping_keys() -> None:
+    allcomponents = cast(
+        Mapping[str, Component],
+        {
+            "ATM": DummyComponentA(name="ATM"),
+            "OCN": DummyComponentB(name="OCN"),
+        },
+    )
+    require_component = component_topology_module.require_component
 
-    selected = get_component(cast(Any, allcomponents), "ATM")
+    selected = require_component(allcomponents, "ATM")
     assert isinstance(selected, DummyComponentA)
 
     with pytest.raises(CouplerError, match="No component"):
-        get_component(cast(Any, allcomponents), "UNKNOWN")
+        require_component(allcomponents, "UNKNOWN")
 
-    with pytest.raises(CouplerError, match="Multiple"):
-        get_component(
-            cast(
-                Any,
-                {
-                    "a": DummyComponentA(name="OCN"),
-                    "b": DummyComponentA(name="OCN"),
-                },
-            ),
-            "OCN",
+    with pytest.raises(CouplerError, match="registered under key 'ATM'"):
+        require_component(
+            cast(Mapping[str, Component], {"ATM": DummyComponentA(name="OCN")}),
+            "ATM",
         )
 
 

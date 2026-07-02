@@ -47,7 +47,7 @@ def test_runtime_preparation_module_owns_runtime_state_preparation() -> None:
 
 
 @pytest.mark.fast_always
-def test_component_topology_module_owns_component_lookup_helpers() -> None:
+def test_component_topology_module_owns_component_name_validation() -> None:
     component_topology_source = source_for("vercor/runtime/component_topology.py")
     topology_source = source_for("vercor/runtime/topology.py")
     surface_masks_source = source_for("vercor/runtime/surface_masks.py")
@@ -55,9 +55,12 @@ def test_component_topology_module_owns_component_lookup_helpers() -> None:
 
     assert "VALID_TOPOLOGY_COMPONENT_NAMES" in component_topology_source
     assert "def validate_component_topology_names(" in component_topology_source
-    assert "def get_component(" in component_topology_source
+    assert "def require_component(" in component_topology_source
+    assert "def get_component(" not in component_topology_source
+    assert ".values()" not in component_topology_source
     assert "def validate_component_topology_names(" not in topology_source
     assert "def get_component(" not in topology_source
+    assert "def require_component(" not in topology_source
     assert "from vercor.runtime.component_topology import" not in topology_source
     assert "from vercor.runtime.component_topology import" in surface_masks_source
     assert "from vercor.runtime.component_topology import" in initialization_source
