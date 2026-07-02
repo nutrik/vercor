@@ -44,31 +44,24 @@ All functions are pure, jitted with `jax.jit` decorator and stateless. No mutabl
 This is critical for JAX compatibility and makes reasoning about the code easier.
 Each function takes explicit inputs and returns explicit outputs, which can be easily tested and debugged.
 
-### Compile cache hits and safe buffer donation
+### One-shot JIT scanned runtime
 
-To ensure good performance, we need to design the code to maximize JIT cache hits and enable safe buffer donation.
-This means avoiding dynamic shapes, using static arguments for control parameters, and ensuring that arrays are not mutated in-place.
+Pure differentiable coupled runs use a one-shot `jax.jit` wrapper around the
+scanned runtime. VerCOR does not own a persistent compiled-runtime cache and
+does not expose state-buffer donation controls through `Coupler.run()`.
+Configuration objects still need stable shapes and PyTree structures because
+JAX traces the scanned runtime at the run boundary.
 
-**Keep JIT compile keys stable (avoid surprise recompiles):**
-- Define model/containers at module top‑level so identities don’t change between runs.
-- Mark non‑array metadata as static so it isn’t traced.
-- Keep argument pytrees small and consistent (e.g., NamedTuple with fixed fields).
-- If you pass constants/flags, make them static args.
+**Keep traced runtime inputs stable:**
+- Define model/containers at module top-level so identities are easy to reason
+  about.
+- Mark non-array metadata as static so it is not traced.
+- Keep argument pytrees small and consistent, with fixed fields and stable
+  mapping keys.
+- Prefer deterministic RNG splitting at the runtime boundary.
 
-**Anti‑pattern to avoid:** constructing fresh containers every call with changing non‑array fields (e.g., dicts with varying keys or dataclasses whose __eq__ changes) → recompiles.
-
-**Donate buffers safely (lower peak memory, speed up):**
-Donation lets XLA reuse input buffers for outputs.
-- Rule of thumb: donate only arrays you won’t read again after the call.
-- Practical boundary: donate at the outer step (not deep internals) so the contract is easy to respect.
-
-**Small patterns that add up**
-1) Stable run‑state wrapper
-Keep “run‑level” scalars (step, time, dt) in a fixed NamedTuple; keep big arrays (model params) in plain pytrees (tuples/dicts) with stable keys.
-2) Keep non‑array metadata out of traces
-3) Reduce variant explosion: prefer fixed‑shape boundary tuples over dicts whose keys appear/disappear:
-4) Donation audit at the callsite.
-5) Deterministic RNG: split once per step at the boundary; don’t split inside inner kernels (helps compile stability).
+**Anti-pattern to avoid:** constructing fresh containers every call with
+changing non-array fields, such as dicts with keys that appear or disappear.
 
 ### Input / Output
 
@@ -303,31 +296,21 @@ immutable runtime containers used during traced integration.
   validation, and initial outgoing-store priming live in
   `vercor.runtime.preparation`; `vercor.runtime.facade` reexports these helpers
   for the coupler-facing runtime boundary but does not own their implementation.
-  Shared compiled-runtime aliases live with `CompiledRuntimeCache` in
-  `vercor.runtime.cache`. Frozen
-  `RuntimeRunContext` execution inputs live in `vercor.runtime.run_context`,
-  which also owns context-derived compiled-runtime cache keys.
-  `CompiledRuntimeCache` storage and JIT wrapping live in
-  `vercor.runtime.cache`. The run context carries the cache owner rather than a
-  mutable cache mapping, while the cache owner remains independent of run
-  context internals.
+  Frozen `RuntimeRunContext` execution inputs live in
+  `vercor.runtime.run_context`; it carries only static execution metadata and
+  shared runtime controllers, not compiled-runtime cache state.
   Shared host/scanned progress messages plus traced callbacks live in
   `vercor.runtime.progress`, and the interrupt controller lives in
   `vercor.runtime.interrupts`. Mutable per-coupler runtime resources live in
   `vercor.runtime.resources.CouplerRuntimeResources`, a small public-field
-  dataclass holding exchange topology maps, refreshed runtime contracts, a
-  compiled-runtime cache owner, and the interrupt controller. Runtime facade
-  and preparation code update those grouped resources directly, while compiled
-  runtime cache clearing, counting, and test inspection stay on the cache owner
-  rather than exposing its dictionary. `Coupler` passes repeated
-  runtime inputs through the internal
-  `vercor.runtime.facade.RuntimeFacadeInputs` bundle and exposes only
-  `clear_runtime_cache()` plus `runtime_cache_entry_count()` as a small public
-  profiling facade; there are no private compatibility aliases for individual
-  runtime maps or caches.
+  dataclass holding exchange topology maps, refreshed runtime contracts, and
+  the interrupt controller. Runtime facade and preparation code update those
+  grouped resources directly. `Coupler` passes repeated runtime inputs through
+  the internal `vercor.runtime.facade.RuntimeFacadeInputs` bundle; there are no
+  private compatibility aliases for individual runtime maps.
   Host/scanned runtime loops, run-mode
-  selection, compiled scanned dispatch, donation checks, and interrupt
-  translation live in `vercor.runtime.runner`. High-level runtime orchestration
+  selection, one-shot compiled scanned dispatch, and interrupt translation live
+  in `vercor.runtime.runner`. High-level runtime orchestration
   for the public `Coupler` facade lives in `vercor.runtime.facade`: runtime-state
   preparation, dispatch/run context construction, host/scanned execution,
   runtime views, and final output delegation enter through this module instead

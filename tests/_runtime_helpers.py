@@ -24,24 +24,6 @@ def runtime_facade_inputs(coupler: Coupler) -> runtime_facade.RuntimeFacadeInput
     )
 
 
-def clear_runtime_cache(coupler: Coupler) -> None:
-    """Clear a coupler's compiled runtime cache through its public facade."""
-
-    coupler.clear_runtime_cache()
-
-
-def runtime_cache_entry_count(coupler: Coupler) -> int:
-    """Return a coupler's compiled runtime cache entry count."""
-
-    return coupler.runtime_cache_entry_count()
-
-
-def compiled_runtime_cache_values(coupler: Coupler) -> tuple[Any, ...]:
-    """Return compiled runtime cache values for focused cache tests."""
-
-    return coupler._runtime_resources.runtime_cache.values()
-
-
 def replace_runtime_topology_maps(
     coupler: Coupler,
     *,

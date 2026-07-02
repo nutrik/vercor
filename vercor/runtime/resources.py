@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from vercor.runtime.cache import CompiledRuntimeCache
 from vercor.runtime.contracts import RuntimeComponentContract
 from vercor.runtime.interrupts import RuntimeInterruptController
 from vercor.runtime.topology_state import RuntimeTopologyMaps
@@ -16,7 +15,6 @@ class CouplerRuntimeResources:
         default_factory=RuntimeTopologyMaps.empty
     )
     runtime_contracts: dict[str, RuntimeComponentContract] = field(default_factory=dict)
-    runtime_cache: CompiledRuntimeCache = field(default_factory=CompiledRuntimeCache)
     interrupt_controller: RuntimeInterruptController = field(
         default_factory=RuntimeInterruptController
     )

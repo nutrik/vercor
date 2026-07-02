@@ -30,12 +30,9 @@ from vercor.setups.exchange_recipes import (
 
 @dataclass(frozen=True)
 class RuntimeProfileResult:
-    """Wall-clock timings for the pure scanned runtime path."""
+    """Wall-clock timing for the pure scanned runtime path."""
 
-    first_non_donating_seconds: float
-    cached_non_donating_seconds: float
-    first_donating_seconds: float | None
-    compiled_cache_entries: int
+    run_seconds: float
     final_state_leaves: int
 
 
@@ -64,11 +61,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--log-level",
         default="WARNING",
         help="Coupler log level. WARNING avoids per-step JAX host callbacks.",
-    )
-    parser.add_argument(
-        "--donate-state",
-        action="store_true",
-        help="Also time the first donating compiled runtime invocation.",
     )
     return parser
 
@@ -191,9 +183,8 @@ def profile_runtime(
     grid_nx: int,
     grid_ny: int,
     log_level: int | str,
-    donate_state: bool,
 ) -> RuntimeProfileResult:
-    """Run a small timing profile for first and cached scanned-runtime calls."""
+    """Run a small timing profile for the scanned runtime."""
 
     coupler = build_slab_coupler(
         steps=steps,
@@ -201,48 +192,23 @@ def profile_runtime(
         grid_ny=grid_ny,
         log_level=log_level,
     )
-    coupler.clear_runtime_cache()
-
-    first_state = coupler.create_runtime_state()
-    second_state = coupler.create_runtime_state()
-    donating_state = coupler.create_runtime_state() if donate_state else None
+    runtime_state = coupler.create_runtime_state()
 
     start = time.perf_counter()
-    first_final = _block_until_ready(coupler.run(first_state, donate_state=False))
-    first_non_donating_seconds = time.perf_counter() - start
-
-    start = time.perf_counter()
-    _block_until_ready(coupler.run(second_state, donate_state=False))
-    cached_non_donating_seconds = time.perf_counter() - start
-
-    first_donating_seconds = None
-    if donating_state is not None:
-        start = time.perf_counter()
-        _block_until_ready(coupler.run(donating_state, donate_state=True))
-        first_donating_seconds = time.perf_counter() - start
+    final_state = _block_until_ready(coupler.run(runtime_state))
+    run_seconds = time.perf_counter() - start
 
     return RuntimeProfileResult(
-        first_non_donating_seconds=first_non_donating_seconds,
-        cached_non_donating_seconds=cached_non_donating_seconds,
-        first_donating_seconds=first_donating_seconds,
-        compiled_cache_entries=coupler.runtime_cache_entry_count(),
-        final_state_leaves=len(jax.tree_util.tree_leaves(first_final)),
+        run_seconds=run_seconds,
+        final_state_leaves=len(jax.tree_util.tree_leaves(final_state)),
     )
 
 
 def _format_result(result: RuntimeProfileResult) -> Sequence[str]:
     lines = [
-        f"first_non_donating_s={result.first_non_donating_seconds:.6f}",
-        f"cached_non_donating_s={result.cached_non_donating_seconds:.6f}",
+        f"run_s={result.run_seconds:.6f}",
+        f"final_state_leaves={result.final_state_leaves}",
     ]
-    if result.first_donating_seconds is not None:
-        lines.append(f"first_donating_s={result.first_donating_seconds:.6f}")
-    lines.extend(
-        [
-            f"compiled_cache_entries={result.compiled_cache_entries}",
-            f"final_state_leaves={result.final_state_leaves}",
-        ]
-    )
     return lines
 
 
@@ -255,7 +221,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         grid_nx=args.grid_nx,
         grid_ny=args.grid_ny,
         log_level=args.log_level,
-        donate_state=args.donate_state,
     )
     for line in _format_result(result):
         print(line)

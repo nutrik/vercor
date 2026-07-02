@@ -161,7 +161,6 @@ def test_runtime_resources_expose_simple_public_resource_fields() -> None:
     for public_field in (
         "topology_maps",
         "runtime_contracts",
-        "runtime_cache",
         "interrupt_controller",
     ):
         assert hasattr(resources, public_field), public_field
@@ -176,7 +175,8 @@ def test_runtime_resources_expose_simple_public_resource_fields() -> None:
     assert "def replace_topology_maps(" not in resources_source
     assert "runtime_cache_mapping(" not in resources_source
     assert "MutableMapping" not in run_context_source
-    assert "runtime_cache: CompiledRuntimeCache" in run_context_source
+    assert "runtime_cache" not in run_context_source
+    assert "CompiledRuntimeCache" not in run_context_source
     for source in (facade_source, preparation_source):
         for raw_access in (
             "runtime_resources.regridders",
@@ -191,23 +191,22 @@ def test_runtime_resources_expose_simple_public_resource_fields() -> None:
 
 
 @pytest.mark.fast_always
-def test_runtime_compilation_cache_has_narrow_context_boundary() -> None:
+def test_runtime_compilation_cache_is_removed() -> None:
     compilation_path = Path("vercor/runtime/compilation.py")
+    cache_path = Path("vercor/runtime/cache.py")
     assert not compilation_path.exists()
+    assert not cache_path.exists()
 
-    cache_source = source_for("vercor/runtime/cache.py")
     run_context_source = source_for("vercor/runtime/run_context.py")
     resources_source = source_for("vercor/runtime/resources.py")
 
-    assert "CompiledRuntime = Callable[" in cache_source
-    assert "RuntimeCompilationKey: TypeAlias" in cache_source
-    assert "from vercor.runtime.compilation import" not in cache_source
     assert "from vercor.runtime.compilation import" not in run_context_source
     assert "from vercor.runtime.compilation import" not in resources_source
-    assert "RuntimeRunContext" not in cache_source
-    assert "def get_or_compile_for_context(" not in cache_source
-    assert "compiled_runtime_cache_key(" not in cache_source
-    assert "def compiled_runtime_cache_key(" in run_context_source
+    assert "from vercor.runtime.cache import" not in run_context_source
+    assert "from vercor.runtime.cache import" not in resources_source
+    assert "CompiledRuntime" not in run_context_source
+    assert "CompiledRuntimeCache" not in resources_source
+    assert "compiled_runtime_cache_key(" not in run_context_source
 
 
 @pytest.mark.fast_always
@@ -252,14 +251,15 @@ def test_runtime_runner_splits_path_selection_helpers() -> None:
     )[0]
 
     assert "def _run_compiled_scanned_runtime(" in runner_source
-    assert "def _raise_if_donating_host_runtime(" in runner_source
+    assert "def _raise_if_donating_host_runtime(" not in runner_source
     assert "compiled_runtime_cache_key(" not in run_coupler_body
     assert "def compiled_runtime_cache_key(" not in runner_source
     assert "compiled_scanned_runtime," not in runner_source
     assert "return compiled_scanned_runtime(" not in runner_source
     assert "get_or_compile_for_context(" not in runner_source
-    assert "context.compiled_runtime_cache_key(" in runner_source
-    assert "get_or_compile(" in runner_source
+    assert "context.compiled_runtime_cache_key(" not in runner_source
+    assert "get_or_compile(" not in runner_source
+    assert "donate_state" not in runner_source
     assert "raise CouplerError(" not in run_coupler_body
 
 

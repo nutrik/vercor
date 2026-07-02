@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import inspect
 import logging
 from pathlib import Path
 import sys
@@ -1460,13 +1461,10 @@ def test_run_warns_when_host_backed_components_make_loop_nondifferentiable() -> 
     ]
 
 
-def test_run_rejects_state_donation_for_host_backed_components() -> None:
-    coupler = make_coupler()
-    coupler.components = cast(Any, {"ATM": _HostRunComponent("ATM")})
-    coupler.run_sequence = ("ATM",)
+def test_run_api_does_not_expose_state_donation_option() -> None:
+    signature = inspect.signature(Coupler.run)
 
-    with pytest.raises(CouplerError, match="donation"):
-        coupler.run(donate_state=True)
+    assert "donate_state" not in signature.parameters
 
 
 def test_host_and_scanned_run_use_runtime_component_helper(

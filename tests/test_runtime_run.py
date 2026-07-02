@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+import inspect
 import importlib
 from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 
 from tests._coverage_support import make_test_grid
 from tests._runtime_helpers import (
-    clear_runtime_cache,
-    compiled_runtime_cache_values,
     replace_runtime_topology_maps,
-    runtime_cache_entry_count,
 )
 from vercor.clock import Clock
 from vercor.setups.slab.atmosphere import make_slab_atmosphere
@@ -63,7 +60,7 @@ def _component_state(
 
 
 def _make_coupler(steps: int) -> Coupler:
-    grid = make_test_grid(name="run-cache")
+    grid = make_test_grid(name="runtime-run")
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=steps)
     )
@@ -207,24 +204,12 @@ def _runtime_treedef_repr(value: RuntimeCouplerState) -> str:
     return repr(jax.tree_util.tree_structure(value))
 
 
-def test_run_reuses_compiled_cache_for_same_shapes_and_metadata() -> None:
+def test_run_executes_pure_scanned_runtime_for_same_shapes_and_metadata() -> None:
     coupler = _make_coupler(steps=2)
-    clear_runtime_cache(coupler)
 
-    first = _block_until_ready(
-        coupler.run(_runtime_state_with_sst(288.15), donate_state=False)
-    )
-    compiled = cast(Any, next(iter(compiled_runtime_cache_values(coupler))))
-    first_cache_size = compiled._cache_size()
+    first = _block_until_ready(coupler.run(_runtime_state_with_sst(288.15)))
+    second = _block_until_ready(coupler.run(_runtime_state_with_sst(291.15)))
 
-    second = _block_until_ready(
-        coupler.run(_runtime_state_with_sst(291.15), donate_state=False)
-    )
-    second_cache_size = compiled._cache_size()
-
-    assert runtime_cache_entry_count(coupler) == 1
-    assert first_cache_size == 1
-    assert second_cache_size == first_cache_size
     assert first.get_component_state("OCN").data.get(
         "sea_surface_temperature"
     ).shape == (2, 2)
@@ -233,35 +218,19 @@ def test_run_reuses_compiled_cache_for_same_shapes_and_metadata() -> None:
     ).shape == (2, 2)
 
 
-def test_run_donation_uses_donating_compiled_runtime() -> None:
-    coupler = _make_coupler(steps=2)
-    clear_runtime_cache(coupler)
+def test_run_api_does_not_expose_state_donation() -> None:
+    signature = inspect.signature(Coupler.run)
 
-    final_state = _block_until_ready(
-        coupler.run(_runtime_state_with_sst(289.15), donate_state=True)
-    )
-    compiled = cast(Any, next(iter(compiled_runtime_cache_values(coupler))))
-
-    assert compiled._cache_size() == 1
-    assert final_state.component_names == ("ATM", "OCN", "LND", "ICE")
-    assert np.all(
-        np.isfinite(
-            np.asarray(
-                final_state.get_component_state("OCN").data.get(
-                    "sea_surface_temperature"
-                )
-            )
-        )
-    )
+    assert "donate_state" not in signature.parameters
 
 
-def test_non_donating_run_preserves_runtime_treedef() -> None:
+def test_run_preserves_runtime_treedef() -> None:
     coupler = _make_coupler(steps=1)
 
     first_state = _runtime_state_with_sst(287.15)
     second_state = _runtime_state_with_sst(292.15)
-    first_final = _block_until_ready(coupler.run(first_state, donate_state=False))
-    second_final = _block_until_ready(coupler.run(second_state, donate_state=False))
+    first_final = _block_until_ready(coupler.run(first_state))
+    second_final = _block_until_ready(coupler.run(second_state))
 
     expected_treedef = _runtime_treedef_repr(first_state)
     assert _runtime_treedef_repr(second_state) == expected_treedef
@@ -283,7 +252,7 @@ def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
     args = parser.parse_args(["--steps", "3", "--log-level", "WARNING"])
     assert args.steps == 3
     assert args.log_level == "WARNING"
-    assert args.donate_state is False
+    assert not hasattr(args, "donate_state")
 
 
 def test_runtime_profile_harness_runs_small_slab_profile() -> None:
@@ -294,8 +263,8 @@ def test_runtime_profile_harness_runs_small_slab_profile() -> None:
         grid_nx=2,
         grid_ny=2,
         log_level="WARNING",
-        donate_state=False,
     )
 
-    assert result.compiled_cache_entries == 1
+    assert result.run_seconds >= 0.0
+    assert not hasattr(result, "compiled_cache_entries")
     assert result.final_state_leaves > 0

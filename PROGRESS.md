@@ -292,6 +292,10 @@ historical commands, failure messages, or detailed validation notes.
   red/green setup-validation pytest, focused affected fast pytest, Black,
   flake8, mypy, full fast pytest, and full pytest passed as of 2026-07-02
   using `/Users/romannuterman/miniforge3/envs/scipy/bin/python`.
+- Latest local runtime cache/donation API removal validation: focused red/green
+  runtime/API/coupler/profile pytest, Black, flake8, mypy, focused affected
+  fast pytest, full fast pytest, full pytest, and `conda run -n scipy` fast
+  pytest passed as of 2026-07-02.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -323,6 +327,22 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-02: Runtime Cache and Donation API Removal
+
+- Removed `vercor.runtime.cache`, `CompiledRuntimeCache`, runtime cache keys,
+  public cache inspection/clearing facades, and the `donate_state` run option.
+- Simplified runtime resources to topology maps, runtime contracts, and the
+  interrupt controller. `RuntimeRunContext` now carries only static execution
+  inputs and shared controllers.
+- Pure scanned runs still execute through a one-shot `jax.jit` wrapper, while
+  host-backed runs keep the Python bridge and non-differentiability warning.
+- Simplified `examples/profile_runtime.py` to report one `run_s` timing plus
+  final state leaf count, without cache or donation metrics.
+- Validation run for this change: focused red tests failed against the old
+  cache/donation API before implementation; after cleanup, Black, flake8,
+  mypy, focused affected fast pytest, full fast pytest, full pytest, and
+  `conda run -n scipy` fast pytest passed.
 
 ### 2026-07-02: Component Setup Validation Wrapper Cleanup
 
@@ -2639,8 +2659,6 @@ historical commands, failure messages, or detailed validation notes.
   block, not once per model substep.
 - Masked surface fields should use `jnp.where(mask, field, jnp.nan)` rather
   than multiply-by-NaN masking, which produced NaN gradients on valid cells.
-- Runtime field stores copy leaves on insertion so donated runtime states do
-  not reuse duplicate JAX buffers and trip XLA donation errors.
 - Source-boundary assertions should be precise. Several earlier failures came
   from over-broad substring checks that matched intentional helper names.
 - Tests that patch host-backed external components should call

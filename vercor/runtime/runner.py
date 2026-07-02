@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any
+from collections.abc import Callable, Sequence
+from typing import Any, cast
 
 import jax
 from jax.errors import JaxRuntimeError
 
 from vercor.clock import Clock
 from vercor.components.runtime_execution import host_component_names
-from vercor.exceptions import CouplerError
 from vercor.jax_logging import LoggerLike
 from vercor.dtypes import as_jax_index_array
 from vercor.runtime.dispatch_context import RuntimeDispatchContext
@@ -32,7 +31,6 @@ def run_coupler_runtime(
     runtime_state: RuntimeCouplerState,
     *,
     context: RuntimeRunContext,
-    donate_state: bool,
 ) -> RuntimeCouplerState:
     """Run a validated runtime state through the host or compiled scanned path."""
 
@@ -42,13 +40,7 @@ def run_coupler_runtime(
             return _run_compiled_scanned_runtime(
                 runtime_state,
                 context=context,
-                donate_state=donate_state,
             )
-
-        _raise_if_donating_host_runtime(
-            donate_state=donate_state,
-            host_names=host_names,
-        )
         _warn_non_differentiable_host_runtime(
             context.logger,
             host_names,
@@ -68,9 +60,8 @@ def _run_compiled_scanned_runtime(
     runtime_state: RuntimeCouplerState,
     *,
     context: RuntimeRunContext,
-    donate_state: bool,
 ) -> RuntimeCouplerState:
-    """Run a pure runtime state through the cached compiled scanned path."""
+    """Run a pure runtime state through a one-shot compiled scanned path."""
 
     try:
 
@@ -87,35 +78,16 @@ def _run_compiled_scanned_runtime(
                 interrupts=context.interrupts,
             )
 
-        return context.runtime_cache.get_or_compile(
-            scanned_runtime,
-            cache_key=context.compiled_runtime_cache_key(
-                donate_state=donate_state,
-            ),
-            donate_state=donate_state,
-        )(runtime_state)
+        compiled_runtime = cast(
+            Callable[[RuntimeCouplerState], RuntimeCouplerState],
+            jax.jit(scanned_runtime),
+        )
+        return compiled_runtime(runtime_state)
     except JaxRuntimeError as error:
         context.interrupts.raise_if_jax_callback_interrupted(
             error,
             "compiled scanned runtime",
         )
-
-
-def _raise_if_donating_host_runtime(
-    *,
-    donate_state: bool,
-    host_names: Sequence[str],
-) -> None:
-    """Reject buffer donation when host-backed components are present."""
-
-    if not donate_state:
-        return
-
-    names = ", ".join(host_names)
-    raise CouplerError(
-        "Runtime state donation is only supported for differentiable "
-        f"components; host-backed component(s) require non-donating run(): {names}"
-    )
 
 
 def _warn_non_differentiable_host_runtime(

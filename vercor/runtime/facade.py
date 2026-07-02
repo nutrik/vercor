@@ -95,7 +95,6 @@ def runtime_run_context(
     *,
     inputs: RuntimeFacadeInputs,
     logger: LoggerLike,
-    log_level: int | str,
 ) -> RuntimeRunContext:
     """Return static runtime inputs bundled for execution."""
 
@@ -103,11 +102,9 @@ def runtime_run_context(
         run_sequence=tuple(normalize_run_sequence(inputs.run_sequence)),
         clock=inputs.clock,
         logger=logger,
-        log_level=log_level,
         dispatch_context=runtime_dispatch_context(
             inputs=inputs,
         ),
-        runtime_cache=inputs.runtime_resources.runtime_cache,
         interrupts=inputs.runtime_resources.interrupt_controller,
     )
 
@@ -117,8 +114,6 @@ def run(
     *,
     inputs: RuntimeFacadeInputs,
     logger: LoggerLike,
-    log_level: int | str,
-    donate_state: bool,
 ) -> RuntimeCouplerState:
     """Run a validated runtime state through the selected runtime path."""
 
@@ -127,9 +122,7 @@ def run(
         context=runtime_run_context(
             inputs=inputs,
             logger=logger,
-            log_level=log_level,
         ),
-        donate_state=donate_state,
     )
 
 

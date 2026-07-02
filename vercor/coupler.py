@@ -50,7 +50,7 @@ class Coupler:
         ocn_fmask_on_atm_grid: fractional ocean mask regridded onto atmosphere grid
         lnd_fmask_on_atm_grid: fractional land mask regridded onto atmosphere grid
         _runtime_resources: runtime-owned holder for topology maps, runtime
-            contracts, compiled runtime cache, and interrupt controller.
+            contracts, and interrupt controller.
     """
 
     clock: Clock
@@ -181,16 +181,6 @@ class Coupler:
         )
         return prepared.runtime_state
 
-    def clear_runtime_cache(self) -> None:
-        """Clear compiled runtime entries cached for this coupler instance."""
-
-        self._runtime_resources.runtime_cache.clear()
-
-    def runtime_cache_entry_count(self) -> int:
-        """Return the number of compiled runtime entries cached by this coupler."""
-
-        return self._runtime_resources.runtime_cache.entry_count()
-
     def runtime_component_view(
         self,
         runtime_state: _runtime_state_module.RuntimeCouplerState,
@@ -258,16 +248,12 @@ class Coupler:
     def run(
         self,
         initial_state: _runtime_state_module.RuntimeCouplerState | None = None,
-        *,
-        donate_state: bool = False,
     ) -> _runtime_state_module.RuntimeCouplerState:
         """
         Run all registered components through the unified runtime entrypoint.
 
-        Pure differentiable components run through the cached JIT-scanned runtime.
-        Host-backed components run through the Python host bridge. When
-        ``donate_state`` is true for pure runs, callers must treat the input
-        runtime state as consumed after this method returns.
+        Pure differentiable components run through the JIT-scanned runtime.
+        Host-backed components run through the Python host bridge.
         """
 
         prepared = _runtime_facade.prepare_runtime_state(
@@ -278,6 +264,4 @@ class Coupler:
             prepared.runtime_state,
             inputs=self._runtime_inputs(),
             logger=self.logger,
-            log_level=self.log_level,
-            donate_state=donate_state,
         )
