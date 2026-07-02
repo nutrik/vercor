@@ -127,7 +127,7 @@ def write_coupler_runtime_outputs(
 
     for name, component in components.items():
         if output_file_mask is None:
-            filepath = Path(f"{name.lower()}_component_runtime_fields.nc")
+            filepath = Path(f"{name.lower()}.runtime_fields.nc")
         else:
             filepath = Path(f"{name.lower()}_{output_file_mask}.nc")
         view = RuntimeComponentView.from_component_state(
@@ -164,7 +164,7 @@ def write_coupler_component_snapshots(
             continue
         writer(
             final_state.get_component_state(name),
-            Path(f"{name}.snapshot.nc"),
+            Path(f"{name.lower()}.snapshot.nc"),
             output_time,
             logger,
         )
