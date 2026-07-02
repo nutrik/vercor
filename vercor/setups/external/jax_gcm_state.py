@@ -32,12 +32,12 @@ from vercor.components import (
 from vercor.dtypes import as_jax_real_array, jax_ones
 from vercor.grid import RectilinearGrid
 from vercor.output.adapters import ComponentOutputAdapter
-from vercor.pytree_utils import asfloat, mean_leaf
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
     run_logged_spinup,
     seed_grid_field_defaults,
 )
+from vercor.setups.external._jax_gcm_pytree import tree_as_real_dtype, tree_mean
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
 import vercor.setups.external.jax_gcm_output as _jax_gcm_output
 import vercor.setups.external.jax_gcm_runtime as _jax_gcm_runtime
@@ -143,12 +143,12 @@ class JAXGCMSetupState:
             # JCM currently returns a stacked object; reduce to one runtime state.
             return (
                 JCMState(
-                    prog=asfloat(
-                        mean_leaf(predictions.dynamics, axis=0),
+                    prog=tree_as_real_dtype(
+                        tree_mean(predictions.dynamics, axis=0),
                         precision_policy,
                     ),
-                    phydata=asfloat(
-                        mean_leaf(predictions.physics, axis=0),
+                    phydata=tree_as_real_dtype(
+                        tree_mean(predictions.physics, axis=0),
                         precision_policy,
                     ),
                     metadata=new_atm_modal_state,

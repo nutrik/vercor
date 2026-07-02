@@ -296,6 +296,10 @@ historical commands, failure messages, or detailed validation notes.
   runtime/API/coupler/profile pytest, Black, flake8, mypy, focused affected
   fast pytest, full fast pytest, full pytest, and `conda run -n scipy` fast
   pytest passed as of 2026-07-02.
+- Latest local JAXGCM PyTree/lifecycle simplification validation: focused
+  red/green pytest, affected fast pytest, Black, flake8, mypy, full fast
+  pytest, full pytest, and git diff whitespace check passed as of 2026-07-02
+  using `/Users/romannuterman/miniforge3/envs/scipy/bin/python`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -327,6 +331,24 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-02: JAXGCM PyTree and Lifecycle Simplification
+
+- Removed the public `vercor.pytree_utils` helper module and moved its PyTree
+  leaf transforms into private `vercor.setups.external._jax_gcm_pytree`, the
+  only production owner that needed them.
+- Simplified component lifecycle hook setup by deleting the private owner
+  protocol, hook merge method, and installer helper. Constructors now build one
+  `ComponentLifecycleHooks` value, and callable/data wrappers assign it
+  directly to the component's private lifecycle field.
+- Relaxed architecture-locking tests around those old helper layers while
+  keeping public API and removed-module guards.
+- Updated `DESIGN.md` and `DEPENDENCIES.md` to reflect the new helper
+  ownership.
+- Validation run for this change: focused red tests failed against the old
+  structure before implementation; after cleanup, affected fast pytest, Black,
+  flake8, mypy, full fast pytest, full pytest, and git diff whitespace check
+  passed using the direct `scipy` environment executable.
 
 ### 2026-07-02: Runtime Cache and Donation API Removal
 

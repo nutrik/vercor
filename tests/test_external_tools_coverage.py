@@ -10,12 +10,12 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+import vercor.setups.external._jax_gcm_pytree as jax_gcm_pytree_module
 import vercor.setups.external.jax_gcm_tools as jax_gcm_tools_module
 import vercor.setups.external.veros_fluxes as veros_fluxes_module
 import vercor.setups.external.veros_state as veros_state_module
 from tests.assertions import assert_allclose_compact
 from vercor.fluxes import vertical_coordinates as vertical_coordinates_module
-import vercor.pytree_utils as pytree_utils_module
 from vercor.settings import VercorSettings
 
 
@@ -194,17 +194,17 @@ def test_generate_jcm_coords_forcing_topography_files_uses_expected_paths(
         assert calls["package_name"] == "jcm.data.bc.t30.clim"
 
 
-def test_tree_helpers_transform_pytrees() -> None:
+def test_jax_gcm_tree_helpers_transform_pytrees() -> None:
     tree = {
         "a": jnp.asarray([[1.0, 3.0], [5.0, 7.0]]),
         "b": jnp.asarray([[2.0, 4.0], [6.0, 8.0]]),
     }
 
-    mean_tree = pytree_utils_module.mean_leaf(tree, axis=0)
+    mean_tree = jax_gcm_pytree_module.tree_mean(tree, axis=0)
     assert_allclose_compact(mean_tree["a"], np.asarray([3.0, 5.0]))
     assert_allclose_compact(mean_tree["b"], np.asarray([4.0, 6.0]))
 
-    unwrapped = pytree_utils_module.unwrap_leading_dims(
+    unwrapped = jax_gcm_pytree_module.tree_unwrap_leading_dims(
         {
             "a": jnp.arange(24.0).reshape(2, 3, 4),
             "b": jnp.arange(24.0, 48.0).reshape(2, 3, 4),
@@ -214,7 +214,7 @@ def test_tree_helpers_transform_pytrees() -> None:
     assert unwrapped["a"].shape == (6, 4)
     assert unwrapped["b"].shape == (6, 4)
 
-    stacked = pytree_utils_module.stack_objects(
+    stacked = jax_gcm_pytree_module.tree_stack(
         [
             {"a": jnp.asarray([1.0, 2.0]), "b": jnp.asarray([3.0, 4.0])},
             {"a": jnp.asarray([5.0, 6.0]), "b": jnp.asarray([7.0, 8.0])},

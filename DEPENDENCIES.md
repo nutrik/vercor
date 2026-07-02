@@ -8,7 +8,7 @@
 8. `vercor/fluxes/utilities.py` - JAX-native scalar/array thermodynamic helpers built on (1, 4)
 9. `vercor/fluxes/bulk_formula_cesm.py` - JAX-native atmosphere-ocean / atmosphere-ice bulk flux kernels with local JAX-array normalization built on (1, 4, 8)
 10. `vercor/host_arrays.py` - explicit JAX/NumPy host-transfer boundary for non-differentiable adapters, output, and host `int64` NetCDF time coordinates
-11. `vercor/pytree_utils.py` - generic leafwise PyTree transforms and casting helpers used by setup adapters
+11. `vercor/setups/external/_jax_gcm_pytree.py` - adapter-local JAXGCM PyTree leaf transforms and dtype casting helpers built on (1)
 12. `vercor/grid.py` - JAX-friendly `RectilinearGrid` holder with eager validation and PyTree registration built on (3)
 13. `vercor/grid_geometry.py` - rectilinear grid construction, center-to-edge geometry, and grid identity built on (1, 12)
 14. `vercor/field_layout.py` - shared canonical grid-field shape validation, component data-field layout validation, and time-last forcing normalization helpers built on (12)
@@ -26,7 +26,7 @@
 26. `vercor/setups/_time_helpers.py` - shared setup-time timestep validation, lifecycle assignment, spinup logging, forcing-index, and default-field seeding helpers built on (23)
 27. `vercor/setups/_lazy_imports.py` - shared lazy package export helper for setup modules with optional dependencies
 28. `vercor/exchange.py`, `vercor/setups/exchange_recipes.py`, and `vercor/setups/coupler_helpers.py` - public exchange declarations and exchange-owned field/factory aliases, shared exchange field recipes, compact `ExchangeSpec` construction, and orchestration helpers built on (12, 17, 18, 19)
-29. `vercor/setups/external/jax_gcm_tools.py` - JCM-specific parameter and input-data helpers built on (1, 7, 8, 11)
+29. `vercor/setups/external/jax_gcm_tools.py` - JCM-specific parameter and input-data helpers built on (1, 7, 8)
 30. `vercor/setups/external/jax_gcm_fields.py` - public package-internal JCM output-field mapping and surface-temperature forcing helpers built on (1, 7)
 31. `vercor/output/variables.py`, `period_averages.py`, `period_files.py`, `adapters.py`, `datasets.py`, `time.py`, and `netcdf.py` - shared period-output variable containers, JAX-backed sum/count period-average accumulation using the shared `OutputVariable` sample shape, shared mean-output conversion helpers, lightweight component output adapter ownership, single-record snapshot storage and writer registration, centralized record/write orchestration, period-average file write lifecycle, dataset coordinate discovery, VerCOR-calendar time encoding, cadence policy, and direct h5netcdf averaged/snapshot NetCDF writing with host conversion delegated to (10) built on (1, 6, 10, 25)
 32. `vercor/setups/external/jax_gcm_output.py`, `jax_gcm_runtime.py`, `jax_gcm_state.py`, and `jax_gcm.py` - JAXGCM prediction/state-to-output adaptation, metadata helpers, configured output-adapter construction, period-output record delegation and final native snapshot writing through `ComponentOutputAdapter`, payload/hooks/stepping with concrete setup-state annotations, setup-state initialization and canonical `JCMState` ownership, direct runtime hook binding, and thin JCM adapter factory boundary built on (1, 3, 11, 26, 29, 30, 31, 62)

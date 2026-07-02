@@ -17,6 +17,7 @@ import pytest
 import xarray as xr
 
 import vercor.setups.external.jax_gcm as jax_gcm_module
+import vercor.setups.external._jax_gcm_pytree as jax_gcm_pytree_module
 import vercor.setups.external.jax_gcm_fields as jax_gcm_fields_module
 import vercor.setups.external.jax_gcm_output as jax_gcm_output_module
 import vercor.setups.external.jax_gcm_runtime as jax_gcm_runtime_module
@@ -29,7 +30,6 @@ import vercor.setups.external.veros_runtime as veros_runtime_module
 import vercor.setups.external.veros_runtime_settings as veros_runtime_settings_module
 import vercor.setups.external.veros_setup as veros_setup_module
 import vercor.setups.external.veros_state as veros_state_module
-import vercor.pytree_utils as pytree_utils_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.calendar import DateTime360, DateTime365
@@ -292,13 +292,13 @@ def _make_flux_ready_veros_state() -> Any:
     )
 
 
-def test_asfloat_converts_tree_leaves_to_float_dtype() -> None:
+def test_jax_gcm_tree_as_real_dtype_converts_tree_leaves() -> None:
     tree = {
         "a": jnp.asarray([1, 2], dtype=jnp.int32),
         "b": jnp.asarray([[3, 4]], dtype=jnp.int32),
     }
 
-    converted = pytree_utils_module.asfloat(tree)
+    converted = jax_gcm_pytree_module.tree_as_real_dtype(tree)
 
     assert jnp.issubdtype(converted["a"].dtype, jnp.floating)
     assert jnp.issubdtype(converted["b"].dtype, jnp.floating)
@@ -815,9 +815,13 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
             prediction,
         ),
     )
-    monkeypatch.setattr(jax_gcm_runtime_module, "stack_objects", lambda objs: objs[0])
-    monkeypatch.setattr(jax_gcm_runtime_module, "unwrap_leading_dims", lambda obj: obj)
-    monkeypatch.setattr(jax_gcm_runtime_module, "mean_leaf", lambda obj, axis: obj)
+    monkeypatch.setattr(jax_gcm_runtime_module, "tree_stack", lambda objs: objs[0])
+    monkeypatch.setattr(
+        jax_gcm_runtime_module,
+        "tree_unwrap_leading_dims",
+        lambda obj: obj,
+    )
+    monkeypatch.setattr(jax_gcm_runtime_module, "tree_mean", lambda obj, axis: obj)
     monkeypatch.setattr(
         jax_gcm_fields_module,
         "compute_sigma_pressure_levels",

@@ -12,8 +12,12 @@ from vercor.components import Component, ComponentStepContext, ComponentStepResu
 from vercor.dtypes import as_jax_real_array, jax_zeros
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.pytree import PyTreeNodeMixin
-from vercor.pytree_utils import mean_leaf, stack_objects, unwrap_leading_dims
 from vercor.settings import VercorSettings
+from vercor.setups.external._jax_gcm_pytree import (
+    tree_mean,
+    tree_stack,
+    tree_unwrap_leading_dims,
+)
 import vercor.setups.external.jax_gcm_fields as _jax_gcm_fields
 import vercor.setups.external.jax_gcm_output as _jax_gcm_output
 from vercor.types import RuntimeArray
@@ -195,8 +199,9 @@ def step_jax_gcm_runtime(
         payload.jcm_state,
         applied_forcing,
     )
-    averaged_prediction = mean_leaf(
-        unwrap_leading_dims(stack_objects([prediction])), axis=0
+    averaged_prediction = tree_mean(
+        tree_unwrap_leading_dims(tree_stack([prediction])),
+        axis=0,
     )
 
     mapped_fields = _jax_gcm_fields.map_jcm_output_fields(

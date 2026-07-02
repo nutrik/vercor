@@ -437,8 +437,12 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "def data_component(" not in base_source
     assert "def differentiable_component(" not in base_source
     assert "def host_component(" not in base_source
-    assert "def install_lifecycle_hooks(" in lifecycle_source
     assert "class ComponentLifecycleHooks" in lifecycle_source
+    assert "def install_lifecycle_hooks(" not in lifecycle_source
+    assert "class ComponentLifecycleOwner" not in lifecycle_source
+    assert "def with_updates(" not in lifecycle_source
+    assert "component._lifecycle_hooks = lifecycle_hooks" in callable_source
+    assert "ComponentLifecycleHooks(" in data_source
     assert "ComponentInitializeHook =" not in lifecycle_source
     assert "ComponentCreatePayloadHook =" not in lifecycle_source
     assert "ComponentPrefillHook =" not in lifecycle_source
@@ -917,9 +921,12 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     import vercor.fluxes.vertical_coordinates as vertical_module
     import vercor.grid_geometry as grid_geometry_module
     import vercor.grid_masks as grid_masks_module
-    import vercor.pytree_utils as pytree_utils_module
     import vercor.physical_constants as physical_constants_module
     import vercor.exchange as exchange_module
+
+    jax_gcm_pytree_module = importlib.import_module(
+        "vercor.setups.external._jax_gcm_pytree"
+    )
 
     assert callable(calendar_module.is_leap_year)
     removed_calendar_delegates = (
@@ -943,11 +950,12 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert callable(vertical_module.compute_hybrid_pressure_levels)
     assert callable(vertical_module.compute_hybrid_sigma_full_level_altitudes)
     assert callable(vertical_module.get_altitudes_sigma_levels)
-    assert callable(pytree_utils_module.asfloat)
-    assert callable(pytree_utils_module.mean_leaf)
-    assert callable(pytree_utils_module.stack_objects)
-    assert callable(pytree_utils_module.unwrap_leading_dims)
-    assert not hasattr(pytree_utils_module, "concat_objects")
+    assert callable(jax_gcm_pytree_module.tree_as_real_dtype)
+    assert callable(jax_gcm_pytree_module.tree_mean)
+    assert callable(jax_gcm_pytree_module.tree_stack)
+    assert callable(jax_gcm_pytree_module.tree_unwrap_leading_dims)
+    with pytest.raises(ModuleNotFoundError, match="vercor.pytree_utils"):
+        importlib.import_module("vercor.pytree_utils")
     assert "gravity" in physical_constants_module.PHYSICAL_CONSTANT_SETTINGS
     assert not hasattr(exchange_module, "VALID_EXCHANGE_FIELD_NAMES")
     assert "sea_surface_temperature" in field_names_module.VALID_EXCHANGE_FIELD_NAMES

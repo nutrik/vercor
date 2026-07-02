@@ -14,7 +14,7 @@ from vercor.components._contracts import (
     merge_component_outputs,
 )
 from vercor.components.base import Component
-from vercor.components._lifecycle import install_lifecycle_hooks
+from vercor.components._lifecycle import ComponentLifecycleHooks
 from vercor.dtypes import PrecisionPolicy
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
@@ -61,8 +61,7 @@ class DataComponent(Component):
             component = cls(name=name, grid=grid, settings=settings)
         if fields is not None:
             component.seed_fields(fields)
-        install_lifecycle_hooks(
-            component,
+        component._lifecycle_hooks = ComponentLifecycleHooks(
             initialize=initialize,
             create_runtime_payload=create_runtime_payload,
             prefill_runtime_state_fields=prefill_runtime_state_fields,

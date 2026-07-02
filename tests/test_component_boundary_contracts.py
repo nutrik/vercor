@@ -91,15 +91,23 @@ def test_public_lifecycle_hook_types_are_owned_by_component_contracts() -> None:
 
 
 @pytest.mark.fast_always
-def test_lifecycle_storage_uses_private_typed_owner_boundary() -> None:
+def test_lifecycle_storage_uses_direct_private_hook_assignment() -> None:
     lifecycle_source = source_for("vercor/components/_lifecycle.py")
+    base_source = source_for("vercor/components/base.py")
+    callable_source = source_for("vercor/components/_callable_wrappers.py")
+    data_source = source_for("vercor/components/data.py")
     protocol_source = source_for("vercor/components/_protocols.py")
 
-    assert "class ComponentLifecycleOwner(Protocol)" in lifecycle_source
-    assert "component: ComponentLifecycleOwner" in lifecycle_source
+    assert "class ComponentLifecycleHooks" in lifecycle_source
+    assert "class ComponentLifecycleOwner" not in lifecycle_source
+    assert "component: ComponentLifecycleOwner" not in lifecycle_source
+    assert "install_lifecycle_hooks" not in lifecycle_source
+    assert "def with_updates(" not in lifecycle_source
     assert "component: Any" not in lifecycle_source
-    assert "_lifecycle_hooks: ComponentLifecycleHooks" in lifecycle_source
-    assert "_lifecycle_hooks: Any" not in lifecycle_source
+    assert "_lifecycle_hooks: ComponentLifecycleHooks" in base_source
+    assert "_lifecycle_hooks: Any" not in base_source
+    assert "component._lifecycle_hooks = lifecycle_hooks" in callable_source
+    assert "component._lifecycle_hooks = ComponentLifecycleHooks(" in data_source
     assert "_lifecycle_hooks" not in protocol_source
 
 

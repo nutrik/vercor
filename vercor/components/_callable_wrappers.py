@@ -9,10 +9,7 @@ from vercor.components.contracts import (
     ComponentStepCallable,
     ComponentStepReturn,
 )
-from vercor.components._lifecycle import (
-    ComponentLifecycleHooks,
-    install_lifecycle_hooks,
-)
+from vercor.components._lifecycle import ComponentLifecycleHooks
 from vercor.components._runtime_fields import apply_step_result
 from vercor.exceptions import ComponentError
 from vercor.types import RuntimeArray
@@ -142,11 +139,7 @@ class _CallableRuntimeMixin:
         self._step = normalize_component_step_callable(step)
         self._payload = payload
         component.declare_fields(field_spec)
-
-        install_lifecycle_hooks(
-            component,
-            hooks=lifecycle_hooks,
-        )
+        component._lifecycle_hooks = lifecycle_hooks
 
     def _default_runtime_payload(self) -> Any | None:
         """Return the payload supplied to the callable component factory."""

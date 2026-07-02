@@ -178,12 +178,13 @@ immutable runtime containers used during traced integration.
   Field-name de-duplication lives in private
   `vercor.components._field_names`, and component authoring methods for field
   declarations, setup seeding, and settings updates live in private
-  `vercor.components._field_authoring`. Lifecycle hook storage and hook
-  installation live behind the typed private `ComponentLifecycleOwner`
-  boundary in `vercor.components._lifecycle`; default lifecycle dispatch lives
-  in private `vercor.components._lifecycle_api`, and constructor-installed
-  hooks are stored in one private `ComponentLifecycleHooks` container rather than as
-  ad-hoc component attributes. Author-value normalization lives in private
+  `vercor.components._field_authoring`. Lifecycle hook storage lives on the
+  private `_lifecycle_hooks` component field; constructors build one
+  `ComponentLifecycleHooks` container and callable/data wrappers assign it
+  directly. Default lifecycle dispatch lives in private
+  `vercor.components._lifecycle_api`, and constructor-installed hooks are
+  stored in one private container rather than as ad-hoc component attributes.
+  Author-value normalization lives in private
   `vercor.components._contracts`; callable signature adaptation, shared
   callable construction metadata, and shared callable runtime mechanics live in
   private `vercor.components._callable_wrappers`, which carries lifecycle hooks
@@ -361,8 +362,9 @@ live in `vercor.grid_geometry`; mask math lives in `vercor.grid_masks`, while
 default component-topology name validation and lookup are private to
 `vercor.runtime.component_topology`. Generic hybrid/sigma-coordinate pressure
 and altitude helpers live in `vercor.fluxes.vertical_coordinates`, and generic
-PyTree transforms live in `vercor.pytree_utils`. Flux helper modules keep local
-JAX array normalization helpers explicitly named as JAX conversion boundaries so
+JAXGCM PyTree transforms live beside that adapter in private
+`vercor.setups.external._jax_gcm_pytree`. Flux helper modules keep local JAX
+array normalization helpers explicitly named as JAX conversion boundaries so
 they are not confused with host-array or NumPy transfer helpers.
 Adapter-specific runtime and file-output policy lives beside adapters in focused
 helpers instead of in factory/bootstrap modules. Exported adapter helpers use
