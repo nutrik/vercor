@@ -196,6 +196,18 @@ def test_components_package_exports_only_component_author_contracts() -> None:
 
 
 @pytest.mark.fast_always
+def test_runtime_setup_validation_uses_single_component_entrypoint() -> None:
+    removed_wrapper_name = "validate_" + "registered_component_setup"
+    offenders = [
+        str(path)
+        for path in sorted(Path("vercor").glob("**/*.py"))
+        if removed_wrapper_name in path.read_text(encoding="utf-8")
+    ]
+
+    assert offenders == []
+
+
+@pytest.mark.fast_always
 def test_setup_and_examples_do_not_import_removed_component_factories() -> None:
     removed_names = {
         "data_component",

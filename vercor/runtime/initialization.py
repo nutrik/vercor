@@ -56,12 +56,6 @@ def apply_run_precision_to_component(
         )
 
 
-def validate_registered_component_setup(component: Component) -> None:
-    """Validate one setup component through the runtime-initialization boundary."""
-
-    validate_component_setup(component)
-
-
 def initialize_coupler_runtime(
     *,
     clock: Clock,
@@ -90,6 +84,9 @@ def initialize_coupler_runtime(
         jax.config.update("jax_enable_x64", True)
 
     for component in components.values():
+        validate_component_setup(component)
+
+    for component in components.values():
         apply_run_precision_to_component(component, settings)
 
     init_context = ComponentSetupContext(
@@ -102,6 +99,7 @@ def initialize_coupler_runtime(
 
     for name, component in components.items():
         component.initialize(init_context)
+        validate_component_setup(component)
         validate_component_topology_names({name: component})
         logger.info(f" Initialized {name}")
 
@@ -112,7 +110,6 @@ def initialize_coupler_runtime(
     )
 
     for name, component in components.items():
-        validate_component_setup(component)
         contract = runtime_contracts[name]
         check_not_empty_import_export_lists(component, contract)
         check_valid_exchange_field_names(component, contract)

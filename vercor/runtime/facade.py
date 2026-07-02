@@ -19,7 +19,6 @@ from vercor.runtime.dispatch_context import (
 from vercor.runtime.initialization import (
     RuntimeInitializationState,
     initialize_coupler_runtime as _initialize_coupler_runtime,
-    validate_registered_component_setup as _validate_registered_component_setup,
 )
 from vercor.runtime.preparation import (
     PreparedRuntimeState,
@@ -51,12 +50,6 @@ class RuntimeFacadeInputs:
     run_sequence: Sequence[str]
     clock: Clock
     settings: VercorSettings
-
-
-def validate_registered_component_setup(component: "Component") -> None:
-    """Validate one public component through the runtime setup boundary."""
-
-    _validate_registered_component_setup(component)
 
 
 def initialize_coupler_runtime(
@@ -181,10 +174,8 @@ def finalize(
     output_file_mask: Path | None,
     logger: LoggerLike,
 ) -> None:
-    """Validate components and write final runtime output files."""
+    """Write final runtime output files."""
 
-    for component in inputs.components.values():
-        validate_registered_component_setup(component)
     topology_maps = inputs.runtime_resources.topology_maps
     _output.write_coupler_runtime_outputs(
         final_state=final_state,
@@ -225,6 +216,5 @@ __all__ = [
     "runtime_dispatch_context",
     "runtime_run_context",
     "runtime_state_from_components",
-    "validate_registered_component_setup",
     "validate_runtime_state",
 ]

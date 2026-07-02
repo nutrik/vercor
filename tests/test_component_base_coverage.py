@@ -1445,6 +1445,30 @@ def test_component_setup_validation_reports_missing_required_attributes() -> Non
 
 
 @pytest.mark.fast_always
+def test_coupler_register_validates_component_setup_before_name_lookup() -> None:
+    coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
+
+    with pytest.raises(
+        ComponentError,
+        match="missing required setup attribute.*name.*grid.*data.*settings",
+    ):
+        coupler.register(cast(Any, _MissingSetupComponent()))
+
+
+@pytest.mark.fast_always
+def test_coupler_initialize_validates_component_setup_before_precision_sync() -> None:
+    coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
+    coupler.components = {"ATM": cast(Any, _MissingSetupComponent())}
+    coupler.run_sequence = ("ATM",)
+
+    with pytest.raises(
+        ComponentError,
+        match="missing required setup attribute.*name.*grid.*data.*settings",
+    ):
+        coupler.initialize()
+
+
+@pytest.mark.fast_always
 def test_component_data_layout_validation_accepts_canonical_grid_fields() -> None:
     grid = make_test_grid(
         name="layout",

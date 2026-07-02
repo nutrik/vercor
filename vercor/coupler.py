@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from vercor.clock import Clock
+from vercor.components.setup_validation import validate_component_setup
 from vercor.exceptions import CouplerError
 from vercor.exchange import Exchange
 from vercor.jax_logging import (
@@ -95,7 +96,7 @@ class Coupler:
             component: component instance to register
         """
 
-        _runtime_facade.validate_registered_component_setup(component)
+        validate_component_setup(component)
         if component.name in self.components:
             raise CouplerError(f"Component {component.name} already registered")
 

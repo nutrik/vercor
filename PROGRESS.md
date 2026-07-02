@@ -288,6 +288,10 @@ historical commands, failure messages, or detailed validation notes.
     `clock.start`.
   - Corrected the stale registered snapshot-writer filename expectation to
     match the existing lowercase snapshot filename policy.
+- Latest local component setup validation wrapper cleanup validation: focused
+  red/green setup-validation pytest, focused affected fast pytest, Black,
+  flake8, mypy, full fast pytest, and full pytest passed as of 2026-07-02
+  using `/Users/romannuterman/miniforge3/envs/scipy/bin/python`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -319,6 +323,28 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-02: Component Setup Validation Wrapper Cleanup
+
+- Removed the redundant `validate_registered_component_setup(...)` pass-through
+  wrappers from runtime initialization/facade code. `validate_component_setup(...)`
+  remains the single component-owned setup validator.
+- `Coupler.register(...)` now calls the canonical validator directly, and
+  runtime initialization validates components before precision synchronization
+  and immediately after component initialization hooks.
+- Removed the finalization-time setup revalidation; finalization now consumes
+  validated runtime state and writes outputs.
+- Added regression coverage for registration-time validation, direct
+  initialization validation before precision sync, and removal of the obsolete
+  wrapper name from production source.
+- Validation run for this change: focused red tests failed for initialization
+  ordering and wrapper-name presence before implementation; after cleanup,
+  focused green tests, focused affected fast pytest, Black, flake8, mypy, full
+  fast pytest, and full pytest passed with the direct `scipy` environment
+  executable. The session-orientation `conda run` command failed before pytest
+  with the known Conda/Rattler `PanicException`; Black emitted the existing
+  Python 3.13/target-3.14 warning, and full pytest emitted the existing JAX
+  dtype-promotion warning.
 
 ### 2026-07-01: Component Snapshot Finalize Output
 
