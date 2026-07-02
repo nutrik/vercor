@@ -207,8 +207,8 @@ def _final_snapshot_time(clock: Clock) -> datetime | ModelDateTime:
     """Return the model time represented by the final runtime state."""
 
     final_time: datetime | ModelDateTime = clock.start
-    for _, time, dt in clock.iter():
-        final_time = time + dt
+    for _, time, _ in clock.iter():
+        final_time = time
     return final_time
 
 

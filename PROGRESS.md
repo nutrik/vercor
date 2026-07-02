@@ -276,6 +276,18 @@ historical commands, failure messages, or detailed validation notes.
   flake8, mypy, full fast pytest, full pytest, coverage pytest, git diff
   whitespace check, and `conda run -n scipy` fast pytest passed as of
   2026-07-01.
+- Latest local final snapshot timestamp alignment validation: focused
+  red/green finalize pytest, focused output-boundary pytest, Black, flake8,
+  mypy, full fast pytest, full pytest, and `conda run -n scipy` full fast
+  pytest passed as of 2026-07-02. Direct-environment validation used
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/python`; the earlier
+  Conda/Rattler initialization panic was not reproduced during final smoke and
+  fast-suite validation.
+  - Fixed final native snapshot timestamps to use the last runtime step time
+    yielded by `Clock.iter()` instead of one extra `dt`; zero-step runs keep
+    `clock.start`.
+  - Corrected the stale registered snapshot-writer filename expectation to
+    match the existing lowercase snapshot filename policy.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus

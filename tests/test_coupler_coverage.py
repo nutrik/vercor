@@ -148,6 +148,35 @@ def make_coupler() -> Coupler:
     return Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
 
 
+def _snapshot_output_time_for_finalize(
+    coupler: Coupler,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
+    components = {
+        "ATM": DummyComponent(name="ATM", grid=make_test_grid(name="atm")),
+    }
+    coupler.components = cast(Any, components)
+    state = runtime_state_from_coupler_components(coupler, prefill_missing=True)
+    captured_snapshots: dict[str, Any] = {}
+
+    def fake_write_outputs(**kwargs: Any) -> None:
+        _ = kwargs
+
+    def fake_write_snapshots(**kwargs: Any) -> None:
+        captured_snapshots.update(kwargs)
+
+    monkeypatch.setattr(
+        output_module, "write_coupler_runtime_outputs", fake_write_outputs
+    )
+    monkeypatch.setattr(
+        output_module, "write_coupler_component_snapshots", fake_write_snapshots
+    )
+
+    coupler.finalize(state)
+
+    return captured_snapshots["output_time"]
+
+
 def _topology_components() -> dict[str, DummyComponent]:
     lnd_mask = np.asarray([[1.0, 0.0], [0.0, 1.0]])
     return {
@@ -1202,8 +1231,28 @@ def test_coupler_finalize_writes_runtime_outputs_for_all_components(
     assert captured_runtime["logger"] is coupler.logger
     assert captured_snapshots["final_state"] is state
     assert captured_snapshots["components"] is coupler.components
-    assert captured_snapshots["output_time"] == datetime(2000, 1, 1, 0, 1)
+    assert captured_snapshots["output_time"] == datetime(2000, 1, 1, 0, 0)
     assert captured_snapshots["logger"] is coupler.logger
+
+
+def test_coupler_finalize_uses_last_executed_runtime_step_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=2))
+
+    output_time = _snapshot_output_time_for_finalize(coupler, monkeypatch)
+
+    assert output_time == datetime(2000, 1, 1, 0, 1)
+
+
+def test_coupler_finalize_uses_clock_start_without_runtime_steps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=0))
+
+    output_time = _snapshot_output_time_for_finalize(coupler, monkeypatch)
+
+    assert output_time == coupler.clock.start
 
 
 def test_output_boundary_builds_runtime_views_filenames_and_masks(
@@ -1278,12 +1327,12 @@ def test_output_boundary_calls_registered_snapshot_writers_and_skips_others(
     assert calls == [
         (
             state.get_component_state("ATM"),
-            Path("ATM.snapshot.nc"),
+            Path("atm.snapshot.nc"),
             datetime(2000, 1, 1, 0, 1),
             coupler.logger,
         )
     ]
-    assert not (tmp_path / "OCN.snapshot.nc").exists()
+    assert not (tmp_path / "ocn.snapshot.nc").exists()
 
 
 def test_coupler_string_representations_include_registered_state() -> None:
