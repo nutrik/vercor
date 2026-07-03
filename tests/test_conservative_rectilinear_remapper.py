@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 from tests.assertions import assert_allclose_compact
 from vercor.dtypes import jax_index_dtype, jax_real_dtype
@@ -27,6 +28,17 @@ def _make_remapper(
     )
 
 
+def _cell_areas(
+    lon_edges: NDArray[np.float64],
+    lat_edges: NDArray[np.float64],
+    *,
+    radius: float = 6371.0,
+) -> NDArray[np.float64]:
+    dlon = np.abs(np.diff(np.deg2rad(lon_edges)))
+    dsinlat = np.abs(np.diff(np.sin(np.deg2rad(lat_edges))))
+    return np.asarray((radius**2) * dsinlat[:, None] * dlon[None, :], dtype=np.float64)
+
+
 def test_apply_scalar_shape_mismatch_raises_value_error() -> None:
     remapper = _make_remapper(
         src_lon_edges=np.array([0.0, 1.0, 2.0]),
@@ -48,6 +60,9 @@ def test_remapper_does_not_expose_vector_api() -> None:
     )
 
     assert not hasattr(remapper, "apply_vector")
+    assert not hasattr(remapper, "get_src_areas")
+    assert not hasattr(remapper, "get_src_total_mass")
+    assert not hasattr(remapper, "get_dst_total_mass")
 
 
 def test_constant_field_preserved_on_refinement_conservation_mode() -> None:
@@ -109,40 +124,50 @@ def test_remapper_accepts_jax_backed_constructor_inputs() -> None:
 
 
 def test_mass_conserved_between_source_and_destination() -> None:
+    src_lon_edges = np.array([0.0, 1.0, 2.0])
+    src_lat_edges = np.array([0.0, 1.0, 2.0])
+    dst_lon_edges = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
+    dst_lat_edges = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
     remapper = _make_remapper(
-        src_lon_edges=np.array([0.0, 1.0, 2.0]),
-        src_lat_edges=np.array([0.0, 1.0, 2.0]),
-        dst_lon_edges=np.array([0.0, 0.5, 1.0, 1.5, 2.0]),
-        dst_lat_edges=np.array([0.0, 0.5, 1.0, 1.5, 2.0]),
+        src_lon_edges=src_lon_edges,
+        src_lat_edges=src_lat_edges,
+        dst_lon_edges=dst_lon_edges,
+        dst_lat_edges=dst_lat_edges,
         normalize="conservation",
     )
 
     src = np.array([[1.0, 2.0], [3.0, 4.0]])
     out = remapper.apply_scalar(src)
 
-    src_mass = remapper.get_src_total_mass(src)
-    dst_mass = remapper.get_dst_total_mass(out)
+    src_mass = np.nansum(src * _cell_areas(src_lon_edges, src_lat_edges))
+    dst_mass = np.nansum(np.asarray(out) * _cell_areas(dst_lon_edges, dst_lat_edges))
 
     # Sparse-matrix assembly and trigonometric area terms accumulate tiny
     # floating-point error; enforce near-machine-precision agreement.
     assert_allclose_compact(dst_mass, src_mass, rtol=1e-12, atol=1e-8)
 
 
-def test_mass_helpers_accept_jax_arrays() -> None:
+def test_mass_conservation_accepts_jax_arrays() -> None:
+    src_lon_edges = np.array([0.0, 1.0, 2.0])
+    src_lat_edges = np.array([0.0, 1.0, 2.0])
+    dst_lon_edges = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
+    dst_lat_edges = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
     remapper = _make_remapper(
-        src_lon_edges=np.array([0.0, 1.0, 2.0]),
-        src_lat_edges=np.array([0.0, 1.0, 2.0]),
-        dst_lon_edges=np.array([0.0, 0.5, 1.0, 1.5, 2.0]),
-        dst_lat_edges=np.array([0.0, 0.5, 1.0, 1.5, 2.0]),
+        src_lon_edges=src_lon_edges,
+        src_lat_edges=src_lat_edges,
+        dst_lon_edges=dst_lon_edges,
+        dst_lat_edges=dst_lat_edges,
         normalize="conservation",
     )
 
     src = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
     dst = remapper.apply_scalar(src)
+    src_mass = np.nansum(np.asarray(src) * _cell_areas(src_lon_edges, src_lat_edges))
+    dst_mass = np.nansum(np.asarray(dst) * _cell_areas(dst_lon_edges, dst_lat_edges))
 
     assert_allclose_compact(
-        remapper.get_dst_total_mass(dst),
-        remapper.get_src_total_mass(src),
+        dst_mass,
+        src_mass,
         rtol=1e-12,
         atol=1e-8,
     )
@@ -297,14 +322,11 @@ def test_nan_handling_differs_between_fracarea_and_conservation() -> None:
     assert_allclose_compact(out_cons[0, 0], 0.0, rtol=0.0, atol=1e-14)
 
 
-def test_get_src_areas_shape_and_positive() -> None:
-    remapper = _make_remapper(
-        src_lon_edges=np.array([0.0, 1.0, 2.0, 3.0]),
-        src_lat_edges=np.array([-1.0, 0.0, 1.0]),
-        dst_lon_edges=np.array([0.0, 1.5, 3.0]),
-        dst_lat_edges=np.array([-1.0, 1.0]),
+def test_independent_cell_area_helper_shape_and_positive() -> None:
+    areas = _cell_areas(
+        lon_edges=np.array([0.0, 1.0, 2.0, 3.0]),
+        lat_edges=np.array([-1.0, 0.0, 1.0]),
     )
 
-    areas = remapper.get_src_areas()
     assert areas.shape == (2, 3)
     assert np.all(areas > 0.0)

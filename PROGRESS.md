@@ -326,6 +326,12 @@ historical commands, failure messages, or detailed validation notes.
   known Python 3.13/target-3.14 warning, and full pytest/coverage emitted the
   known JAX dtype-promotion `FutureWarning` in the JAXGCM runtime gradient
   test.
+- Latest local remaining legacy API cleanup validation: baseline fast pytest,
+  focused red/green pytest, focused affected pytest, Black, flake8, mypy, full
+  fast pytest, full pytest, coverage pytest at 90% total, and git diff
+  whitespace check passed as of 2026-07-03 using `conda run -n scipy`.
+  Black emitted the recurring Python 3.13/target-3.14 warning, and full
+  pytest/coverage emitted the recurring JAX dtype-promotion `FutureWarning`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -357,6 +363,28 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-03: Remaining Legacy API Cleanup
+
+- Renamed the daily forcing runtime-control setting from
+  `get_field_time_slice` to `apply_daily_time_selection` and updated runtime
+  field transfer, JCM land setup, and daily forcing tests to use the new API.
+- Removed remaining compatibility-only public surfaces: top-level
+  `CustomDateTime`, the vertical-coordinate `compute_pressure_levels` alias,
+  `Clock` calendar metadata properties, and conservative-remapper public
+  mass/area helpers.
+- Moved conservative remap mass checks into private `grid_masks` helpers that
+  compute rectilinear spherical cell areas from remapper geometry. Remapper
+  tests now verify conservation through `apply_scalar()` and independent
+  geometry calculations.
+- Updated `DESIGN.md`, `DEPENDENCIES.md`, and API-boundary tests so the removed
+  names stay absent and the current daily-selection setting is documented.
+- Validation run for this change: baseline fast pytest, focused red/green
+  pytest, focused affected pytest, Black, flake8, mypy, full fast pytest, full
+  pytest, coverage pytest at 90% total, and `git diff --check` passed using
+  `conda run -n scipy`. Black emitted the recurring Python 3.13/target-3.14
+  warning, and full pytest/coverage emitted the recurring JAX dtype-promotion
+  warning.
 
 ### 2026-07-03: Legacy Time-Selection Field-Helper Removal
 

@@ -306,7 +306,6 @@ class DateTime360(_ModelDateTimeBase):
 
 
 ModelDateTime = DateTime365 | DateTime360
-CustomDateTime = _ModelDateTimeBase
 
 
 def is_leap_year(year: int) -> bool:

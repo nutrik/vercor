@@ -48,6 +48,6 @@ def make_jcm_land(
         },
     )
     component.declare_fields(outputs=_JCM_LAND_FIELD_NAMES)
-    component.update_settings(get_field_time_slice=True)
+    component.update_settings(apply_daily_time_selection=True)
 
     return component

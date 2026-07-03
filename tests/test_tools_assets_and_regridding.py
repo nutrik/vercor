@@ -56,21 +56,18 @@ def test_check_remap_conservation_handles_skip_and_mismatch(
     class DummyRemapper:
         def __init__(
             self,
+            src_lon_b: np.ndarray,
             src_lat_b: np.ndarray,
+            dst_lon_b: np.ndarray,
             dst_lat_b: np.ndarray,
-            src_mass: float,
-            dst_mass: float,
         ) -> None:
+            self.src_lon_b = src_lon_b
             self.src_lat_b = src_lat_b
+            self.dst_lon_b = dst_lon_b
             self.dst_lat_b = dst_lat_b
-            self._src_mass = src_mass
-            self._dst_mass = dst_mass
-
-        def get_src_total_mass(self, _arr: np.ndarray) -> float:
-            return self._src_mass
-
-        def get_dst_total_mass(self, _arr: np.ndarray) -> float:
-            return self._dst_mass
+            self.radius = 1.0
+            self._s_lat_flip = False
+            self._d_lat_flip = False
 
     class DummyRegridder:
         def __init__(self, interpolator: Any) -> None:
@@ -80,10 +77,10 @@ def test_check_remap_conservation_handles_skip_and_mismatch(
         grid_masks_module, "ConservativeRectilinearRemapper", DummyRemapper
     )
     skip_interp = DummyRemapper(
+        src_lon_b=np.array([0.0, 1.0, 2.0]),
         src_lat_b=np.array([-90.0, 0.0, 90.0]),
+        dst_lon_b=np.array([0.0, 1.0, 2.0]),
         dst_lat_b=np.array([-80.0, 0.0, 80.0]),
-        src_mass=10.0,
-        dst_mass=1.0,
     )
     with capture_logger_output(DEFAULT_LOGGER_NAME, level=logging.WARNING) as stream:
         check_remap_conservation(
@@ -94,16 +91,16 @@ def test_check_remap_conservation_handles_skip_and_mismatch(
     assert "Skipping mass conservation check" in stream.getvalue()
 
     mismatch_interp = DummyRemapper(
+        src_lon_b=np.array([0.0, 1.0, 2.0]),
         src_lat_b=np.array([-90.0, 0.0, 90.0]),
+        dst_lon_b=np.array([0.0, 1.0, 2.0]),
         dst_lat_b=np.array([-90.0, 0.0, 90.0]),
-        src_mass=10.0,
-        dst_mass=9.0,
     )
     with pytest.raises(RegridderError, match="does not conserve total mass"):
         check_remap_conservation(
             cast(Any, DummyRegridder(mismatch_interp)),
             np.ones((2, 2)),
-            np.ones((2, 2)),
+            np.full((2, 2), 0.9),
         )
 
 

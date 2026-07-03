@@ -624,7 +624,7 @@ class PhysicsParameters:
 @dataclass(frozen=True)
 class ControlParameters:
     """Control parameters. NOT traced by JAX (static)."""
-    get_field_time_slice: bool
+    apply_daily_time_selection: bool
     apply_time_interpolation: bool
     enable_x64: bool
     identifier: str

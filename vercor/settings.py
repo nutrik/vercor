@@ -24,9 +24,9 @@ CONTROL_SETTINGS: dict[str, Settings] = {
         "Apply monthly time interpolation to exported forcing data",
         "-",
     ),
-    "get_field_time_slice": Settings(
+    "apply_daily_time_selection": Settings(
         False,
-        "Export only the relevant daily time slice from forcing data",
+        "Apply daily time selection to exported forcing data",
         "-",
     ),
     "year_in_seconds": Settings(365 * 86400.0, "Nominal model year length", "s"),
@@ -54,7 +54,7 @@ class VercorSettings:
     identifier: str
     missval: float
     apply_time_interpolation: bool
-    get_field_time_slice: bool
+    apply_daily_time_selection: bool
     year_in_seconds: float
     earth_radius: float
     gravity: float

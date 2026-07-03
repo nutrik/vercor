@@ -131,9 +131,6 @@ def compute_sigma_pressure_levels(
     return p_top_bcast + sigma[:, jnp.newaxis, jnp.newaxis] * (ps - p_top_bcast)
 
 
-compute_pressure_levels = compute_sigma_pressure_levels
-
-
 def get_altitudes_sigma_levels(
     temperature: RuntimeArray,
     pressure: RuntimeArray,

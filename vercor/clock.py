@@ -65,18 +65,6 @@ class Clock:
 
         return _calendar.DateTime365._day_of_year_from_month_day(start.month, start.day)
 
-    @property
-    def days_per_year(self) -> int | None:
-        if self.year_type == "360":
-            return 360
-        if self.year_type == "noleap":
-            return 365
-        return None
-
-    @property
-    def fixed_30_day_months(self) -> bool:
-        return self.year_type == "360"
-
     def _iter_gregorian(self) -> Iterator[tuple[int, datetime, timedelta]]:
         """Iterator over Gregorian datetimes anchored at `start`."""
         time = self.start

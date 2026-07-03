@@ -21,7 +21,7 @@ from vercor.fluxes.utilities import (
     qsat_august_eqn,
 )
 from vercor.fluxes.vertical_coordinates import (
-    compute_hybrid_pressure_levels as compute_pressure_levels,
+    compute_hybrid_pressure_levels,
     get_altitudes_hybrid_sigma_levels,
 )
 from vercor.settings import VercorSettings
@@ -89,12 +89,12 @@ def test_cdn_and_stability_functions_are_well_behaved() -> None:
     assert np.all(np.diff(psim) > 0.0)
 
 
-def test_compute_pressure_levels_matches_hybrid_definition() -> None:
+def test_compute_hybrid_pressure_levels_matches_hybrid_definition() -> None:
     sp = np.array([[100_000.0, 95_000.0], [101_000.0, 99_000.0]])
     hya = np.array([100.0, 1_000.0, 5_000.0])
     hyb = np.array([0.0, 0.2, 0.8])
 
-    ph = compute_pressure_levels(sp=sp, hya=hya, hyb=hyb)
+    ph = compute_hybrid_pressure_levels(sp=sp, hya=hya, hyb=hyb)
 
     assert ph.shape == (2, 2, 3)
     for k in range(3):
@@ -107,7 +107,7 @@ def test_get_altitudes_hybrid_sigma_levels_returns_finite_increasing_profile() -
     hya = np.array([100.0, 1_000.0, 5_000.0, 10_000.0, 20_000.0])
     hyb = np.array([0.0, 0.1, 0.3, 0.5, 0.8])
 
-    ph = compute_pressure_levels(sp=sp, hya=hya, hyb=hyb)
+    ph = compute_hybrid_pressure_levels(sp=sp, hya=hya, hyb=hyb)
     t = np.full((2, 2, 4), 260.0)
     q = np.full((2, 2, 4), 0.004)
 
@@ -186,7 +186,7 @@ def test_flux_utility_kernels_support_jit() -> None:
     hyb = jnp.asarray([0.0, 0.2, 0.8])
     t = jnp.full((2, 2, 4), 260.0)
     q = jnp.full((2, 2, 4), 0.004)
-    ph = jax.jit(compute_pressure_levels)(
+    ph = jax.jit(compute_hybrid_pressure_levels)(
         sp,
         jnp.asarray([100.0, 1_000.0, 5_000.0, 10_000.0, 20_000.0]),
         jnp.asarray([0.0, 0.1, 0.3, 0.5, 0.8]),
@@ -195,8 +195,8 @@ def test_flux_utility_kernels_support_jit() -> None:
     assert_allclose_compact(jax.jit(qsat)(tk), qsat(tk))
     assert_allclose_compact(jax.jit(qsat_august_eqn)(ps, tk), qsat_august_eqn(ps, tk))
     assert_allclose_compact(
-        jax.jit(compute_pressure_levels)(sp, hya, hyb),
-        compute_pressure_levels(sp, hya, hyb),
+        jax.jit(compute_hybrid_pressure_levels)(sp, hya, hyb),
+        compute_hybrid_pressure_levels(sp, hya, hyb),
     )
     assert_allclose_compact(
         jax.jit(

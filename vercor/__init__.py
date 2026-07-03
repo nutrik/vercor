@@ -1,5 +1,5 @@
 from vercor import fluxes
-from vercor.calendar import DateTime360, DateTime365, CustomDateTime, ModelDateTime
+from vercor.calendar import DateTime360, DateTime365, ModelDateTime
 from vercor.clock import Clock
 from vercor.components.base import (
     Component,
@@ -45,6 +45,5 @@ __all__ = [
     "RectilinearGrid",
     "Exchange",
     "fluxes",
-    "CustomDateTime",
     "ModelDateTime",
 ]

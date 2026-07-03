@@ -1029,7 +1029,7 @@ def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridd
         grid=grid,
         data={"sea_surface_temperature": forcing},
         exports=("sea_surface_temperature",),
-        settings=VercorSettings(get_field_time_slice=True),
+        settings=VercorSettings(apply_daily_time_selection=True),
     )
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 2), dt_seconds=3600.0, steps=1)
@@ -1183,7 +1183,7 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
         grid=grid,
         data={"land_surface_temperature": forcing},
         exports=("land_surface_temperature",),
-        settings=VercorSettings(get_field_time_slice=True),
+        settings=VercorSettings(apply_daily_time_selection=True),
     )
     atmosphere = _make_data_component(
         make_era5_atmosphere,
@@ -1259,7 +1259,7 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
         grid=grid,
         data={"land_surface_temperature": forcing},
         exports=("land_surface_temperature",),
-        settings=VercorSettings(get_field_time_slice=True),
+        settings=VercorSettings(apply_daily_time_selection=True),
     )
     atmosphere = _make_data_component(
         make_era5_atmosphere,
@@ -1339,7 +1339,7 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
         grid=grid,
         data={"land_surface_temperature": forcing},
         exports=("land_surface_temperature",),
-        settings=VercorSettings(get_field_time_slice=True),
+        settings=VercorSettings(apply_daily_time_selection=True),
     )
     atmosphere = _make_data_component(
         make_era5_atmosphere,

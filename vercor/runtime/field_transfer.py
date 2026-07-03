@@ -48,7 +48,7 @@ def _select_runtime_field_for_send(
             + step_info.monthly_weight_right * right
         )
 
-    if component.settings.get_field_time_slice:
+    if component.settings.apply_daily_time_selection:
         return jnp.take(jnp.asarray(field), step_info.daily_index, axis=0)
 
     return field

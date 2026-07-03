@@ -1067,7 +1067,7 @@ def test_runtime_send_applies_monthly_interpolation_under_jit_and_grad() -> None
 
 
 def test_runtime_send_applies_daily_time_slice_under_jit_and_grad() -> None:
-    component = _RuntimeSendComponent(VercorSettings(get_field_time_slice=True))
+    component = _RuntimeSendComponent(VercorSettings(apply_daily_time_selection=True))
     contract = RuntimeComponentContract(exports=("temperature",))
     step_info = jax.tree_util.tree_map(
         lambda value: value[0],

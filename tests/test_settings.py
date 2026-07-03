@@ -23,7 +23,7 @@ def test_default_settings_are_metadata_records() -> None:
     assert DEFAULT_SETTINGS["enable_x64"].units == "-"
     assert DEFAULT_SETTINGS["gravity"].units == "m/s^2"
     assert DEFAULT_SETTINGS["apply_time_interpolation"].value is False
-    assert DEFAULT_SETTINGS["get_field_time_slice"].value is False
+    assert DEFAULT_SETTINGS["apply_daily_time_selection"].value is False
 
 
 def test_constructor_overrides_known_setting_without_losing_metadata() -> None:
@@ -142,7 +142,7 @@ def test_coupler_and_components_get_independent_settings_containers() -> None:
 
     coupler.settings.enable_x64 = True
     atmosphere.settings.apply_time_interpolation = True
-    ocean.settings.get_field_time_slice = True
+    ocean.settings.apply_daily_time_selection = True
 
     assert coupler.settings is not atmosphere.settings
     assert atmosphere.settings is not ocean.settings
@@ -150,4 +150,4 @@ def test_coupler_and_components_get_independent_settings_containers() -> None:
     assert atmosphere.settings.enable_x64 is False
     assert atmosphere.settings.apply_time_interpolation is True
     assert ocean.settings.apply_time_interpolation is False
-    assert ocean.settings.get_field_time_slice is True
+    assert ocean.settings.apply_daily_time_selection is True

@@ -371,16 +371,21 @@ def test_clock_noleap_100_year_daily_run_reaches_year_100() -> None:
 
 
 @pytest.mark.parametrize(
-    ("year_type", "expected_days_per_year", "expected_fixed_30_day_months"),
+    (
+        "year_type",
+        "expected_type",
+        "expected_days_per_year",
+        "expected_fixed_30_day_months",
+    ),
     [
-        ("leap", None, False),
-        ("noleap", 365, False),
-        ("360", 360, True),
+        ("noleap", DateTime365, 365, False),
+        ("360", DateTime360, 360, True),
     ],
 )
-def test_clock_calendar_properties(
+def test_clock_model_calendar_metadata_lives_on_yielded_times(
     year_type: str,
-    expected_days_per_year: int | None,
+    expected_type: type[DateTime365] | type[DateTime360],
+    expected_days_per_year: int,
     expected_fixed_30_day_months: bool,
 ) -> None:
     clock = Clock(
@@ -390,8 +395,13 @@ def test_clock_calendar_properties(
         year_type=year_type,  # type: ignore[arg-type]
     )
 
-    assert clock.days_per_year == expected_days_per_year
-    assert clock.fixed_30_day_months is expected_fixed_30_day_months
+    _, model_time, _ = next(clock.iter())
+
+    assert isinstance(model_time, expected_type)
+    assert model_time.days_per_year == expected_days_per_year
+    assert model_time.fixed_30_day_months is expected_fixed_30_day_months
+    assert not hasattr(clock, "days_per_year")
+    assert not hasattr(clock, "fixed_30_day_months")
 
 
 def test_clock_does_not_store_iterator_dispatch_callable() -> None:

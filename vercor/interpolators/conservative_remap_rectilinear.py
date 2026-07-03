@@ -195,19 +195,6 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
         rows, cols, values = self._dense_overlaps_to_triplets(overlap_matrix)
         return rows, cols, jnp.deg2rad(values)
 
-    def get_src_areas(self) -> jax.Array:
-        """Returns the exact source cell areas (useful for mass verification)."""
-
-        dlon = jnp.diff(jnp.deg2rad(self.src_lon_b))
-        sin_lat = jnp.sin(jnp.deg2rad(self.src_lat_b))
-        dsinlat = jnp.abs(jnp.diff(sin_lat))
-        areas = (self.radius**2) * dsinlat[:, None] * dlon[None, :]
-
-        if self._s_lat_flip:
-            areas = areas[::-1, :]
-
-        return areas
-
     def apply_scalar(self, field: Any) -> jax.Array:
         """Apply conservative remapping to a scalar field."""
 
@@ -248,18 +235,3 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
             result_grid = result_grid[::-1, :]
 
         return result_grid
-
-    def get_src_total_mass(self, field_on_src: Any) -> float:
-        """Calculate total mass on source grid given field values."""
-
-        field_array = as_jax_real_array(field_on_src)
-        result = jnp.nansum(field_array * self.get_src_areas())
-        return float(result)
-
-    def get_dst_total_mass(self, field_on_dst: Any) -> float:
-        """Calculate total mass on destination grid given field values."""
-
-        clean_areas = jnp.where(jnp.isinf(self.dst_areas), 0.0, self.dst_areas)
-        field_array = as_jax_real_array(field_on_dst)
-        result = jnp.nansum(field_array.reshape(-1) * clean_areas)
-        return float(result)

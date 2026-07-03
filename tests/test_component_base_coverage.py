@@ -561,12 +561,12 @@ def test_update_settings_is_chainable() -> None:
 
     returned = component.update_settings(
         apply_time_interpolation=True,
-        get_field_time_slice=True,
+        apply_daily_time_selection=True,
     )
 
     assert returned is component
     assert component.settings.apply_time_interpolation
-    assert component.settings.get_field_time_slice
+    assert component.settings.apply_daily_time_selection
 
 
 @pytest.mark.fast_always
@@ -1749,7 +1749,7 @@ def test_send_runtime_fields_updates_outgoing_store() -> None:
     monthly = jnp.zeros((12, *grid.shape), dtype=jnp.float64)
     monthly = monthly.at[0].set(jnp.asarray([[1.0, 2.0], [3.0, 4.0]]))
     component.settings.apply_time_interpolation = True
-    component.settings.get_field_time_slice = False
+    component.settings.apply_daily_time_selection = False
     component.data["temperature"] = monthly
     component_state = send_runtime_fields(
         component,
@@ -1769,7 +1769,7 @@ def test_send_runtime_fields_updates_outgoing_store() -> None:
     )
     daily = jnp.arange(5 * 2 * 2, dtype=jnp.float64).reshape((5, *grid.shape))
     component.settings.apply_time_interpolation = False
-    component.settings.get_field_time_slice = True
+    component.settings.apply_daily_time_selection = True
     component.data["temperature"] = daily
     component_state = send_runtime_fields(
         component,

@@ -62,6 +62,7 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
         "RuntimeStepInfo",
     }
     removed_compatibility_names = {
+        "CustomDateTime",
         "RunSequence",
         "data_component",
         "differentiable_component",
@@ -946,7 +947,12 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     import vercor.grid_masks as grid_masks_module
     import vercor.physical_constants as physical_constants_module
     import vercor.exchange as exchange_module
+    import vercor.settings as settings_module
     import vercor.time_selection as time_selection_module
+
+    from vercor.interpolators.conservative_remap_rectilinear import (
+        ConservativeRectilinearRemapper,
+    )
 
     jax_gcm_pytree_module = importlib.import_module(
         "vercor.setups.external._jax_gcm_pytree"
@@ -963,17 +969,23 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     for name in removed_calendar_delegates:
         assert not hasattr(calendar_module, name)
     assert callable(forcing_index_module.daily_forcing_index)
+    assert not hasattr(calendar_module, "CustomDateTime")
     assert not hasattr(clock_module, "DateTime360")
     assert not hasattr(clock_module, "DateTime365")
     assert not hasattr(clock_module, "ModelDateTime")
+    assert not hasattr(clock_module.Clock, "days_per_year")
+    assert not hasattr(clock_module.Clock, "fixed_30_day_months")
     assert callable(grid_geometry_module.make_rectilinear_grid)
     assert callable(grid_geometry_module.centers_to_edges)
     assert not hasattr(grid_masks_module, "grids_identical")
-    assert callable(vertical_module.compute_pressure_levels)
+    assert not hasattr(vertical_module, "compute_pressure_levels")
     assert callable(vertical_module.compute_sigma_pressure_levels)
     assert callable(vertical_module.compute_hybrid_pressure_levels)
     assert callable(vertical_module.compute_hybrid_sigma_full_level_altitudes)
     assert callable(vertical_module.get_altitudes_sigma_levels)
+    assert not hasattr(ConservativeRectilinearRemapper, "get_src_areas")
+    assert not hasattr(ConservativeRectilinearRemapper, "get_src_total_mass")
+    assert not hasattr(ConservativeRectilinearRemapper, "get_dst_total_mass")
     assert callable(jax_gcm_pytree_module.tree_as_real_dtype)
     assert callable(jax_gcm_pytree_module.tree_mean)
     assert callable(jax_gcm_pytree_module.tree_stack)
@@ -982,6 +994,9 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert callable(time_selection_module.get_periodic_interval)
     assert not hasattr(time_selection_module, "get_field_time_slice")
     assert not hasattr(time_selection_module, "get_field_at_specific_time")
+    assert "apply_daily_time_selection" in settings_module.DEFAULT_SETTINGS
+    assert "get_field_time_slice" not in settings_module.DEFAULT_SETTINGS
+    assert not hasattr(settings_module.VercorSettings(), "get_field_time_slice")
     with pytest.raises(ModuleNotFoundError, match="vercor.pytree_utils"):
         importlib.import_module("vercor.pytree_utils")
     assert "gravity" in physical_constants_module.PHYSICAL_CONSTANT_SETTINGS

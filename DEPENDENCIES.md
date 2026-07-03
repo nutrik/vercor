@@ -17,7 +17,7 @@
 17. `vercor/regridders/base.py` - shared regridder grid/interpolator/display state built on (12, 13)
 18. `vercor/regridders/bilinear.py` - bilinear regridder wrapper over (15, 17)
 19. `vercor/regridders/conservative.py` - conservative regridder wrapper over (13, 16, 17)
-20. `vercor/grid_masks.py` - land/ocean mask construction and remap-conservation checks built on (1, 12, 13, 19)
+20. `vercor/grid_masks.py` - land/ocean mask construction, rectilinear area mass calculation, and remap-conservation checks built on (1, 12, 13, 19)
 21. `vercor/assets.py` - generic asset cache/download/checksum boundary
 22. `vercor/forcing_data.py` - canonical NetCDF forcing-file read boundary
 23. `vercor/time_selection.py` - model-time-to-year-seconds and periodic interpolation index helpers built on (6)

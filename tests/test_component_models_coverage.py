@@ -395,7 +395,7 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         _ = flip_y
         return forcing[variable]
 
-    def fake_compute_pressure_levels(
+    def fake_compute_hybrid_pressure_levels(
         surface_pressure: NDArray,
         hya: NDArray,
         hyb: NDArray,
@@ -460,7 +460,7 @@ def test_era5_atmosphere_constructor_initialize_and_step(
     monkeypatch.setattr(
         era5_atmosphere_module,
         "compute_hybrid_pressure_levels",
-        fake_compute_pressure_levels,
+        fake_compute_hybrid_pressure_levels,
     )
     monkeypatch.setattr(
         era5_atmosphere_module,
@@ -573,7 +573,7 @@ def test_jcm_land_constructor_converts_coords_and_preserves_data(
     component.initialize(coupler.init_context())
     _step_component(component, timedelta(hours=1), datetime(2000, 1, 1), coupler)
 
-    assert component.settings.get_field_time_slice
+    assert component.settings.apply_daily_time_selection
     assert component.field_spec.outputs == (
         "land_surface_temperature",
         "soil_moisture",

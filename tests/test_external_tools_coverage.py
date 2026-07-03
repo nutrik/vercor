@@ -58,10 +58,7 @@ def test_change_and_get_default_jcm_parameter_values() -> None:
 
 
 def test_compute_sigma_pressure_levels_handles_valid_and_invalid_inputs() -> None:
-    assert (
-        vertical_coordinates_module.compute_pressure_levels
-        is vertical_coordinates_module.compute_sigma_pressure_levels
-    )
+    assert not hasattr(vertical_coordinates_module, "compute_pressure_levels")
 
     pressure = vertical_coordinates_module.compute_sigma_pressure_levels(
         reference_pressure=jnp.asarray(100000.0),

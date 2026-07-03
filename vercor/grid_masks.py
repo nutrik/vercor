@@ -62,6 +62,41 @@ def check_total_lnd_ocn_mask_sum(
         )
 
 
+def _rectilinear_cell_areas(
+    lon_bounds: RuntimeArray,
+    lat_bounds: RuntimeArray,
+    *,
+    radius: float,
+    flip_lat: bool,
+) -> RuntimeArray:
+    """Return spherical rectilinear cell areas matching a field's latitude order."""
+
+    dlon = jnp.abs(jnp.diff(jnp.deg2rad(as_jax_real_array(lon_bounds))))
+    sin_lat = jnp.sin(jnp.deg2rad(as_jax_real_array(lat_bounds)))
+    dsinlat = jnp.abs(jnp.diff(sin_lat))
+    areas = (radius**2) * dsinlat[:, None] * dlon[None, :]
+    return areas[::-1, :] if flip_lat else areas
+
+
+def _total_mass_on_rectilinear_bounds(
+    field: RuntimeArray,
+    lon_bounds: RuntimeArray,
+    lat_bounds: RuntimeArray,
+    *,
+    radius: float,
+    flip_lat: bool,
+) -> float:
+    """Return total finite scalar mass on rectilinear spherical bounds."""
+
+    areas = _rectilinear_cell_areas(
+        lon_bounds,
+        lat_bounds,
+        radius=radius,
+        flip_lat=flip_lat,
+    )
+    return float(jnp.nansum(as_jax_real_array(field) * areas))
+
+
 def check_remap_conservation(
     regridder: ConservativeRectilinearRegridder,
     ocean_binary_mask_on_ocn_grid: RuntimeArray,
@@ -85,11 +120,19 @@ def check_remap_conservation(
                 "due to different latitude bounds."
             )
 
-        src_total_mass = regridder.interpolator.get_src_total_mass(
-            ocean_binary_mask_on_ocn_grid
+        src_total_mass = _total_mass_on_rectilinear_bounds(
+            ocean_binary_mask_on_ocn_grid,
+            regridder.interpolator.src_lon_b,
+            regridder.interpolator.src_lat_b,
+            radius=regridder.interpolator.radius,
+            flip_lat=regridder.interpolator._s_lat_flip,
         )
-        dst_total_mass = regridder.interpolator.get_dst_total_mass(
-            ocn_fmask_on_atm_grid
+        dst_total_mass = _total_mass_on_rectilinear_bounds(
+            ocn_fmask_on_atm_grid,
+            regridder.interpolator.dst_lon_b,
+            regridder.interpolator.dst_lat_b,
+            radius=regridder.interpolator.radius,
+            flip_lat=regridder.interpolator._d_lat_flip,
         )
 
         if not do_not_check_mass and not bool(
