@@ -29,6 +29,7 @@ jobs:
       with:
         repository: climate-analytics-lab/jax-gcm
         path: vendor/jax-gcm
+        ref: v1.1.1 
     - name: Get Veros
       uses: actions/checkout@v4
       with:
