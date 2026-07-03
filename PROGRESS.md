@@ -318,6 +318,14 @@ historical commands, failure messages, or detailed validation notes.
   the direct `scipy` environment executable for the full validation. Full
   pytest emitted the known JAX dtype-promotion `FutureWarning` in the JAXGCM
   runtime gradient test.
+- Latest local legacy time-selection field-helper removal validation: baseline
+  fast pytest, focused red/green pytest, Black, flake8, mypy, full fast pytest,
+  full pytest, coverage pytest at 90% total, git diff whitespace check, and
+  `conda run -n scipy` fast pytest passed as of 2026-07-03 using the direct
+  `scipy` environment executable for the full validation. Black emitted the
+  known Python 3.13/target-3.14 warning, and full pytest/coverage emitted the
+  known JAX dtype-promotion `FutureWarning` in the JAXGCM runtime gradient
+  test.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -349,6 +357,25 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-03: Legacy Time-Selection Field-Helper Removal
+
+- Removed the test-only direct field selection helpers
+  `get_field_time_slice(...)` and `get_field_at_specific_time(...)` from
+  `vercor.time_selection`. Runtime time selection now stays on
+  `RuntimeStepInfo`, `daily_forcing_index(...)`, and `send_runtime_fields(...)`.
+- Rewrote affected tests to assert the new time-selection boundary, use
+  `daily_forcing_index(...)` for expected daily slices, and rely on existing
+  JIT/gradient runtime coverage for daily slicing and monthly interpolation.
+- Removed the now-unused dummy coupler test helper that only existed to satisfy
+  the deleted helper's coupler-shaped argument.
+- Updated `DEPENDENCIES.md` to describe `vercor.time_selection` as the owner of
+  model-year seconds and periodic interpolation index math only.
+- Validation run for this change: baseline fast pytest, focused red/green
+  pytest, Black, flake8, mypy, full fast pytest, full pytest, coverage pytest,
+  git diff whitespace check, and `conda run -n scipy` fast pytest passed.
+  Black emitted the recurring Python 3.13/target-3.14 warning, and full
+  pytest/coverage emitted the recurring JAX dtype-promotion warning.
 
 ### 2026-07-02: Runtime and CAMulator Helper Simplification
 

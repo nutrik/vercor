@@ -20,7 +20,7 @@
 20. `vercor/grid_masks.py` - land/ocean mask construction and remap-conservation checks built on (1, 12, 13, 19)
 21. `vercor/assets.py` - generic asset cache/download/checksum boundary
 22. `vercor/forcing_data.py` - canonical NetCDF forcing-file read boundary
-23. `vercor/time_selection.py` - day-slice and periodic interpolation index helpers built on (6)
+23. `vercor/time_selection.py` - model-time-to-year-seconds and periodic interpolation index helpers built on (6)
 24. `vercor/_run_order.py` and `vercor/clock.py` - immutable tuple run-order normalization with string rejection (no deps), and coupler clock/timestep iteration helpers built on (6)
 25. `vercor/_logging/*.py` and `vercor/jax_logging.py` - private logger configuration, protocol, host-emission, and JAX-callback owners behind the public logging facade for Python and traced JAX runtime diagnostics
 26. `vercor/setups/_time_helpers.py` - shared setup-time timestep validation, lifecycle assignment, spinup logging, forcing-index, and default-field seeding helpers built on (23)

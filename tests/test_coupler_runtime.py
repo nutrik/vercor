@@ -34,6 +34,7 @@ from vercor.setups.slab.seaice import make_slab_seaice
 from vercor.coupler import Coupler
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.exchange import Exchange
+from vercor.forcing_index import daily_forcing_index
 from vercor.grid import RectilinearGrid
 from vercor.regridders import bilinear, conservative
 from vercor.runtime.state import RuntimeComponentState, RuntimeCouplerState
@@ -41,7 +42,6 @@ from vercor.runtime.stores import RuntimeFieldStore
 from vercor.settings import VercorSettings
 from vercor.time_selection import (
     datetime_to_seconds_in_year,
-    get_field_time_slice,
     get_periodic_interval,
 )
 from tests._runtime_helpers import replace_runtime_topology_maps, run_scanned_coupler
@@ -1379,11 +1379,12 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
         fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
     )
     _, runtime_time, _ = next(coupler.clock.iter())
-    expected_slice = get_field_time_slice(
-        "land_surface_temperature",
-        {"land_surface_temperature": forcing},
+    expected_index = daily_forcing_index(
         runtime_time,
+        year_type=coupler.clock.year_type,
+        no_leap=True,
     )
+    expected_slice = forcing[expected_index]
 
     initial_state = coupler.create_runtime_state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1392,6 +1393,7 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
     atmosphere_state = final_state.get_component_state("ATM")
     received_temperature = atmosphere_state.incoming.get("land_surface_temperature")
 
+    assert expected_index == 56
     assert_allclose_compact(expected_slice, np.asarray(forcing[56]))
     assert "total_surface_temperature" not in atmosphere_state.data.field_names
     assert_allclose_compact(received_temperature, expected_slice)

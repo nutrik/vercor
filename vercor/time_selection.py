@@ -1,18 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from datetime import datetime
-from typing import Any
 
-import jax.numpy as jnp
-
-from vercor.calendar import (
-    DateTime360,
-    DateTime365,
-    ModelDateTime,
-)
-from vercor.forcing_index import daily_forcing_day_of_year
-from vercor.types import RuntimeArray
+from vercor.calendar import ModelDateTime
 
 
 def get_periodic_interval(
@@ -46,59 +36,3 @@ def datetime_to_seconds_in_year(dt: datetime | ModelDateTime) -> float:
         + dt.second
         + dt.microsecond / 1_000_000.0
     )
-
-
-def get_field_time_slice(
-    field_name: str,
-    data: Mapping[str, RuntimeArray],
-    time: datetime | ModelDateTime,
-    no_leap: bool = True,
-) -> RuntimeArray:
-    """Return a field indexed by day-of-year without time interpolation."""
-
-    if isinstance(time, DateTime360):
-        tm_yday = daily_forcing_day_of_year(
-            time,
-            year_type="360",
-            no_leap=no_leap,
-        )
-    elif isinstance(time, DateTime365):
-        tm_yday = daily_forcing_day_of_year(
-            time,
-            year_type="noleap",
-            no_leap=no_leap,
-        )
-    else:
-        tm_yday = daily_forcing_day_of_year(
-            time,
-            year_type="leap",
-            no_leap=no_leap,
-        )
-
-    time_index = tm_yday - 1
-    out: RuntimeArray = jnp.asarray(data[field_name])[time_index, ...]
-    return out
-
-
-def get_field_at_specific_time(
-    field_name: str,
-    data: Mapping[str, RuntimeArray],
-    coupler: Any,
-    current_time: datetime | ModelDateTime | None = None,
-) -> RuntimeArray:
-    """Return a monthly field interpolated to a specific model time."""
-
-    total_seconds = datetime_to_seconds_in_year(
-        coupler.clock.start if current_time is None else current_time
-    )
-
-    (n1, f1), (n2, f2) = get_periodic_interval(
-        current_time=total_seconds,
-        cycle_length=coupler.settings.year_in_seconds,
-        rec_spacing=coupler.settings.year_in_seconds / 12.0,
-        n_rec=12,
-    )
-
-    arr = jnp.asarray(data[field_name])
-    out: RuntimeArray = f1 * arr[n1, ...] + f2 * arr[n2, ...]
-    return out

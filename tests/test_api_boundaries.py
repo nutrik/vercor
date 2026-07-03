@@ -946,6 +946,7 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     import vercor.grid_masks as grid_masks_module
     import vercor.physical_constants as physical_constants_module
     import vercor.exchange as exchange_module
+    import vercor.time_selection as time_selection_module
 
     jax_gcm_pytree_module = importlib.import_module(
         "vercor.setups.external._jax_gcm_pytree"
@@ -977,6 +978,10 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert callable(jax_gcm_pytree_module.tree_mean)
     assert callable(jax_gcm_pytree_module.tree_stack)
     assert callable(jax_gcm_pytree_module.tree_unwrap_leading_dims)
+    assert callable(time_selection_module.datetime_to_seconds_in_year)
+    assert callable(time_selection_module.get_periodic_interval)
+    assert not hasattr(time_selection_module, "get_field_time_slice")
+    assert not hasattr(time_selection_module, "get_field_at_specific_time")
     with pytest.raises(ModuleNotFoundError, match="vercor.pytree_utils"):
         importlib.import_module("vercor.pytree_utils")
     assert "gravity" in physical_constants_module.PHYSICAL_CONSTANT_SETTINGS
@@ -1025,9 +1030,9 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert forcing_index_path.exists()
     assert "mapped_day_in_month =" not in calendar_source
     assert 'if year_type == "360"' not in calendar_source
-    assert "from vercor.forcing_index import daily_forcing_day_of_year" in (
-        time_selection_source
-    )
+    assert "daily_forcing_day_of_year" not in time_selection_source
+    assert "def get_field_time_slice(" not in time_selection_source
+    assert "def get_field_at_specific_time(" not in time_selection_source
     assert "Protocol" not in time_selection_source
     assert "_custom_360_day_to_gregorian_day_of_year" not in time_selection_source
     assert "from vercor.forcing_index import daily_forcing_index" in (
