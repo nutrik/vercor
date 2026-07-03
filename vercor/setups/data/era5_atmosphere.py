@@ -20,7 +20,7 @@ from vercor.fluxes.vertical_coordinates import (
     get_altitudes_hybrid_sigma_levels,
 )
 from vercor.grid import RectilinearGrid
-from vercor.components import ComponentSetupContext
+from vercor.components import SetupContext
 from vercor.forcing_data import read_forcing as _read_forcing
 from vercor.settings import VercorSettings
 from vercor.setups.data.assets import get_forcing_data
@@ -164,7 +164,7 @@ def make_era5_atmosphere(
         "temperature": temperature_3d[:, 0, :, :],
     }
 
-    def initialize(component: DataComponent, context: ComponentSetupContext) -> None:
+    def initialize(component: DataComponent, context: SetupContext) -> None:
         diagnostics = [
             _compute_monthly_diagnostics(
                 context.settings,

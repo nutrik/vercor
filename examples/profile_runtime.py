@@ -190,7 +190,7 @@ def profile_runtime(
         grid_ny=grid_ny,
         log_level=log_level,
     )
-    runtime_state = coupler.create_runtime_state()
+    runtime_state = coupler.state()
 
     start = time.perf_counter()
     final_state = _block_until_ready(coupler.run(runtime_state))

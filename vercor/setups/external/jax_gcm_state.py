@@ -27,7 +27,7 @@ from jcm.physics_interface import (
 
 from vercor.components import (
     Component,
-    ComponentSetupContext,
+    SetupContext,
 )
 from vercor.dtypes import as_jax_real_array, jax_ones
 from vercor.grid import RectilinearGrid
@@ -165,7 +165,7 @@ class JAXGCMSetupState:
     def initialize(
         self,
         component: Component,
-        context: ComponentSetupContext,
+        context: SetupContext,
     ) -> None:
         """Initialize runtime payload, defaults, and optional spinup state."""
 

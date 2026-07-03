@@ -13,9 +13,9 @@ import pytest
 from tests._coverage_support import make_test_grid
 from vercor.clock import Clock
 from vercor.components.base import Component
-from vercor.components.host import HostRuntimeComponent
+from vercor.components.host import HostComponent
 from vercor.coupler import Coupler
-from vercor.components.contexts import ComponentStepContext
+from vercor.components.contexts import StepContext
 from vercor.runtime.interrupts import (
     RuntimeInterruptController,
     RuntimeInterrupted,
@@ -31,13 +31,13 @@ class _NoopRuntimeComponent(Component):
     def step_runtime_state(
         self,
         component_state: Any,
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> Any:
         _ = context
         return component_state
 
 
-class _InterruptingHostComponent(HostRuntimeComponent):
+class _InterruptingHostComponent(HostComponent):
     def __init__(self, name: str) -> None:
         super().__init__(name=name, grid=make_test_grid(name=name.lower()))
         self.data["temperature"] = np.ones((2, 2), dtype=float)
@@ -45,7 +45,7 @@ class _InterruptingHostComponent(HostRuntimeComponent):
     def step_host_runtime_state(
         self,
         component_state: Any,
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> Any:
         _ = context
         signal.raise_signal(signal.SIGINT)

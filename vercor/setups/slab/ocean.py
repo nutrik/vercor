@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from vercor.components import (
     Component,
-    ComponentStepContext,
+    StepContext,
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
@@ -52,7 +52,7 @@ def make_slab_ocean(
 
     def step(
         fields: Mapping[str, Any],
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> Mapping[str, Any]:
         dt_seconds = context.dt_seconds
         sea_surface_temperature = fields["sea_surface_temperature"]
@@ -78,11 +78,11 @@ def make_slab_ocean(
         )
         return {"sea_surface_temperature": updated_sst}
 
-    return Component.from_model(
+    return Component.from_step(
         name=name,
         grid=grid,
         step=step,
         inputs=_OCEAN_INPUTS,
         outputs=_OCEAN_OUTPUTS,
-        default_fields=_OCEAN_DEFAULT_FIELDS,
+        defaults=_OCEAN_DEFAULT_FIELDS,
     )

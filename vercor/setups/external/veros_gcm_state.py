@@ -10,8 +10,8 @@ from typing import Any, cast
 import jax.numpy as jnp
 
 from vercor.components import (
-    ComponentSetupContext,
-    HostRuntimeComponent,
+    HostComponent,
+    SetupContext,
 )
 from vercor.grid import RectilinearGrid
 from vercor.output.adapters import ComponentOutputAdapter
@@ -112,8 +112,8 @@ class VerosGCMSetupState:
 
     def initialize(
         self,
-        component: HostRuntimeComponent,
-        context: ComponentSetupContext,
+        component: HostComponent,
+        context: SetupContext,
     ) -> None:
         """Align timestep, optionally spin up, and seed the initial SST."""
 

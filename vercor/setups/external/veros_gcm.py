@@ -7,7 +7,7 @@ from datetime import timedelta
 from functools import partial
 from typing import Any
 
-from vercor.components import HostRuntimeComponent
+from vercor.components import HostComponent
 from vercor.output.adapters import register_component_snapshot_writer
 import vercor.setups.external.veros_gcm_state as _veros_gcm_state
 import vercor.setups.external.veros_output as _veros_output
@@ -31,7 +31,7 @@ def make_veros_gcm(
     output_frequency: str | None = None,
     output_variables: Sequence[str] | None = None,
     jitted: bool = False,
-) -> HostRuntimeComponent:
+) -> HostComponent:
     """Return a host-backed Veros GCM component."""
 
     state = VerosGCMSetupState(
@@ -44,13 +44,13 @@ def make_veros_gcm(
         output_variables=output_variables,
         jitted=jitted,
     )
-    component = HostRuntimeComponent.from_model(
+    component = HostComponent.from_step(
         name=name,
         grid=state.grid,
         step=partial(_veros_runtime.step_veros_runtime, state),
         inputs=_veros_gcm_state.VEROS_INPUT_FIELD_NAMES,
         outputs=("sea_surface_temperature",),
-        default_fields=_veros_gcm_state.veros_default_fields(),
+        defaults=_veros_gcm_state.veros_default_fields(),
         initialize=state.initialize,
     )
     register_component_snapshot_writer(

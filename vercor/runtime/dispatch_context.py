@@ -42,7 +42,7 @@ def build_runtime_dispatch_context(
 
     exchanges_by_destination: dict[str, list[Exchange]] = {}
     for exchange in exchanges:
-        exchanges_by_destination.setdefault(exchange.destination, []).append(exchange)
+        exchanges_by_destination.setdefault(exchange.target, []).append(exchange)
 
     return RuntimeDispatchContext(
         components=components,

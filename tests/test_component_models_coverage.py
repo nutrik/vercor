@@ -17,7 +17,7 @@ import vercor.setups.data.erainterim_ocean as erainterim_ocean_module
 import vercor.setups.data.jcm_land as jcm_land_module
 from tests._coverage_support import CoverageCouplerStub, make_test_grid
 from tests.assertions import assert_allclose_compact
-from vercor.components.contexts import ComponentStepContext
+from vercor.components.contexts import StepContext
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.setups.data.era5_land import make_era5_land
 from vercor.setups.data.era5_ocean import make_era5_ocean
@@ -46,7 +46,7 @@ def _step_component(
             prefill_missing=True,
             contract=RuntimeComponentContract(),
         ),
-        ComponentStepContext(
+        StepContext(
             dt_seconds=dt.total_seconds(),
             settings=coupler.settings,
             time=time,
@@ -75,9 +75,7 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
         "u_velocity_10m",
         "v_velocity_10m",
     )
-    assert set(atmosphere.field_spec.default_fields) == set(
-        atmosphere.field_spec.outputs
-    )
+    assert set(atmosphere.field_spec.defaults) == set(atmosphere.field_spec.outputs)
     atmosphere.initialize(coupler.init_context())
     atmosphere_state = _step_component(atmosphere, dt, timestamp, coupler)
     assert_allclose_compact(
@@ -110,7 +108,7 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     ocean = make_slab_ocean(grid=grid)
     assert ocean.field_spec.inputs == ("sensible_heat_flux", "latent_heat_flux")
     assert ocean.field_spec.outputs == ("sea_surface_temperature",)
-    assert set(ocean.field_spec.default_fields) == {"sea_surface_temperature"}
+    assert set(ocean.field_spec.defaults) == {"sea_surface_temperature"}
     ocean_state = _step_component(ocean, dt, timestamp, coupler)
     assert ocean.data == {}
     assert ocean_state.data.field_names == ("sea_surface_temperature",)
@@ -131,7 +129,7 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     land = make_slab_land(grid=grid)
     assert land.field_spec.inputs == ("latent_heat_flux",)
     assert land.field_spec.outputs == ("soil_moisture", "land_surface_temperature")
-    assert set(land.field_spec.default_fields) == {
+    assert set(land.field_spec.defaults) == {
         "soil_moisture",
         "land_surface_temperature",
     }
@@ -145,7 +143,7 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     seaice = make_slab_seaice(grid=grid)
     assert seaice.field_spec.inputs == ("sea_surface_temperature",)
     assert seaice.field_spec.outputs == ("ice_fraction",)
-    assert set(seaice.field_spec.default_fields) == {"ice_fraction"}
+    assert set(seaice.field_spec.defaults) == {"ice_fraction"}
     seaice_state = _step_component(seaice, dt, timestamp, coupler)
     assert seaice.data == {}
     assert seaice_state.data.field_names == ("ice_fraction",)

@@ -14,14 +14,14 @@ from vercor.components.contracts import (
 from vercor.components._contracts import (
     merge_component_outputs,
 )
+from vercor.components._constructor_options import normalize_lifecycle_hooks
 from vercor.components.base import Component
-from vercor.components._lifecycle import ComponentLifecycleHooks
 from vercor.dtypes import PrecisionPolicy
 from vercor.grid import RectilinearGrid
 from vercor.settings import VercorSettings
 
 if TYPE_CHECKING:
-    from vercor.components.contexts import ComponentStepContext
+    from vercor.components.contexts import StepContext
     from vercor.runtime.state import RuntimeComponentState
 
 
@@ -57,35 +57,18 @@ class DataComponent(Component):
         the callable component constructors for setup and runtime customization.
         """
 
-        if hooks is not None and any(
-            hook is not None
-            for hook in (
-                initialize,
-                create_runtime_payload,
-                prefill_runtime_state_fields,
-                validate_runtime_state,
-            )
-        ):
-            raise TypeError(
-                "Use either hooks=ComponentHooks(...) or individual hook arguments, not both"
-            )
         if settings is None:
             component = cls(name=name, grid=grid)
         else:
             component = cls(name=name, grid=grid, settings=settings)
         if fields is not None:
             component.seed_fields(fields)
-        component._lifecycle_hooks = ComponentLifecycleHooks(
-            initialize=hooks.initialize if hooks is not None else initialize,
-            create_runtime_payload=(
-                hooks.create_payload if hooks is not None else create_runtime_payload
-            ),
-            prefill_runtime_state_fields=(
-                hooks.prefill if hooks is not None else prefill_runtime_state_fields
-            ),
-            validate_runtime_state=(
-                hooks.validate if hooks is not None else validate_runtime_state
-            ),
+        component._lifecycle_hooks = normalize_lifecycle_hooks(
+            hooks=hooks,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
         )
         return component
 
@@ -104,7 +87,7 @@ class DataComponent(Component):
     def step_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> "RuntimeComponentState":
         """Return the runtime state unchanged for data-only components."""
 

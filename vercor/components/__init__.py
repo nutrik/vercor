@@ -1,21 +1,18 @@
+from vercor._deprecation import deprecated_getattr
 from vercor.components.base import (
     Component,
 )
 from vercor.components.contracts import (
     ComponentHooks,
     ComponentCreatePayloadHook,
-    ComponentFieldSpec,
     ComponentInitializeHook,
     ComponentPrefillHook,
-    ComponentStepResult,
     ComponentValidateHook,
     FieldSpec,
     KEEP_PAYLOAD,
     StepResult,
 )
 from vercor.components.contexts import (
-    ComponentSetupContext,
-    ComponentStepContext,
     SetupContext,
     StepContext,
 )
@@ -24,26 +21,33 @@ from vercor.components.data import (
 )
 from vercor.components.host import (
     HostComponent,
-    HostRuntimeComponent,
 )
 
 __all__ = [
     "Component",
     "ComponentCreatePayloadHook",
-    "ComponentFieldSpec",
     "ComponentHooks",
     "ComponentInitializeHook",
     "ComponentPrefillHook",
-    "ComponentSetupContext",
-    "ComponentStepContext",
-    "ComponentStepResult",
     "ComponentValidateHook",
     "DataComponent",
     "FieldSpec",
     "HostComponent",
-    "HostRuntimeComponent",
     "KEEP_PAYLOAD",
     "SetupContext",
     "StepContext",
     "StepResult",
 ]
+
+
+__getattr__ = deprecated_getattr(
+    __name__,
+    {
+        "ComponentFieldSpec": ("vercor.components.FieldSpec", FieldSpec),
+        "ComponentSetupContext": ("vercor.components.SetupContext", SetupContext),
+        "ComponentStepContext": ("vercor.components.StepContext", StepContext),
+        "ComponentStepResult": ("vercor.components.StepResult", StepResult),
+        "HostRuntimeComponent": ("vercor.components.HostComponent", HostComponent),
+    },
+    remove_in="0.2.0",
+)

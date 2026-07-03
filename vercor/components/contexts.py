@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
+from vercor._deprecation import deprecated_getattr
 from vercor.calendar import ModelDateTime
 from vercor.jax_logging import LoggerLike
 from vercor.settings import VercorSettings
@@ -31,13 +32,20 @@ class StepContext:
     step: int = 0
 
 
-ComponentSetupContext = SetupContext
-ComponentStepContext = StepContext
-
-
 __all__ = [
-    "ComponentSetupContext",
-    "ComponentStepContext",
     "SetupContext",
     "StepContext",
 ]
+
+
+__getattr__ = deprecated_getattr(
+    __name__,
+    {
+        "ComponentSetupContext": (
+            "vercor.components.contexts.SetupContext",
+            SetupContext,
+        ),
+        "ComponentStepContext": ("vercor.components.contexts.StepContext", StepContext),
+    },
+    remove_in="0.2.0",
+)

@@ -1,21 +1,34 @@
+from vercor._deprecation import deprecated_getattr
 from vercor.regridders.base import Regridder
 from vercor.regridders.bilinear import (
     BilinearRectilinearRegridder,
-    BilinearRegridder,
     bilinear,
 )
 from vercor.regridders.conservative import (
     ConservativeRectilinearRegridder,
-    ConservativeRegridder,
     conservative,
 )
 
 __all__ = [
     "Regridder",
-    "BilinearRegridder",
     "BilinearRectilinearRegridder",
-    "ConservativeRegridder",
     "ConservativeRectilinearRegridder",
     "bilinear",
     "conservative",
 ]
+
+
+__getattr__ = deprecated_getattr(
+    __name__,
+    {
+        "BilinearRegridder": (
+            "vercor.regridders.BilinearRectilinearRegridder",
+            BilinearRectilinearRegridder,
+        ),
+        "ConservativeRegridder": (
+            "vercor.regridders.ConservativeRectilinearRegridder",
+            ConservativeRectilinearRegridder,
+        ),
+    },
+    remove_in="0.2.0",
+)

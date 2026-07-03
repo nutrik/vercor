@@ -3,9 +3,9 @@ from datetime import timedelta
 from typing import Any, cast
 
 from vercor.components import (
-    ComponentSetupContext,
-    ComponentStepContext,
-    HostRuntimeComponent,
+    HostComponent,
+    SetupContext,
+    StepContext,
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
@@ -41,7 +41,7 @@ def make_camulator_land(
     camulator_grid: RectilinearGrid,
     ocn_grid: RectilinearGrid,
     name: str = "LND",
-) -> HostRuntimeComponent:
+) -> HostComponent:
     """Return a host-backed CAMulator land forcing component."""
 
     longitude = camulator_grid.longitude
@@ -68,8 +68,8 @@ def make_camulator_land(
     )
 
     def initialize(
-        component: HostRuntimeComponent,
-        context: ComponentSetupContext,
+        component: HostComponent,
+        context: SetupContext,
     ) -> None:
         logger = context.logger
         state.coupler_start_datetime = context.start
@@ -98,7 +98,7 @@ def make_camulator_land(
 
     def step(
         fields: dict[str, Any],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> dict[str, Any]:
         _ = fields, payload
@@ -114,11 +114,11 @@ def make_camulator_land(
 
         return {"land_surface_temperature": as_jax_real_array(ts["TS"].values)}
 
-    return HostRuntimeComponent.from_model(
+    return HostComponent.from_step(
         name=name,
         grid=grid,
         step=step,
         outputs=_CAMULATOR_LAND_OUTPUTS,
-        default_fields=_CAMULATOR_LAND_DEFAULT_FIELDS,
+        defaults=_CAMULATOR_LAND_DEFAULT_FIELDS,
         initialize=initialize,
     )

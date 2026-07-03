@@ -5,11 +5,11 @@ from collections.abc import Iterable
 from vercor.components.contracts import (
     AuthorFieldValues,
     AuthorStepCallable,
-    ComponentFieldSpec,
     ComponentStepCallable,
-    ComponentStepResult,
     ComponentStepReturn,
+    FieldSpec,
     FieldNames,
+    StepResult,
 )
 from vercor.components._field_names import unique_field_names
 from vercor.dtypes import PrecisionPolicy, as_jax_real_array, jax_full
@@ -52,39 +52,39 @@ def normalize_author_field_values(
     return normalized
 
 
-def declared_runtime_field_names(field_spec: ComponentFieldSpec) -> tuple[str, ...]:
+def declared_runtime_field_names(field_spec: FieldSpec) -> tuple[str, ...]:
     """Return all fields that a declaration validates at runtime."""
 
     return unique_field_names(
         (
             *field_spec.inputs,
             *field_spec.outputs,
-            *tuple(field_spec.default_fields),
+            *tuple(field_spec.defaults),
         )
     )
 
 
 def merge_component_outputs(
-    field_spec: ComponentFieldSpec,
+    field_spec: FieldSpec,
     output_names: Iterable[str],
-) -> ComponentFieldSpec:
+) -> FieldSpec:
     """Return ``field_spec`` with additional output names merged in."""
 
-    return ComponentFieldSpec(
+    return FieldSpec(
         inputs=field_spec.inputs,
         outputs=unique_field_names((*field_spec.outputs, *tuple(output_names))),
-        default_fields=field_spec.default_fields,
+        defaults=field_spec.defaults,
     )
 
 
 __all__ = [
     "AuthorFieldValues",
     "AuthorStepCallable",
-    "ComponentFieldSpec",
     "ComponentStepCallable",
-    "ComponentStepResult",
     "ComponentStepReturn",
+    "FieldSpec",
     "FieldNames",
+    "StepResult",
     "declared_runtime_field_names",
     "merge_component_outputs",
     "normalize_author_field_values",

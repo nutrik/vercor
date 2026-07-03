@@ -13,7 +13,7 @@ from numpy.typing import NDArray
 from vercor.clock import Clock
 from vercor.components import DataComponent
 from vercor.grid import RectilinearGrid
-from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
+from vercor.components.contexts import SetupContext, StepContext
 from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
@@ -79,8 +79,8 @@ class CoverageCouplerStub:
     )
     run_sequence: Sequence[str] = field(default_factory=tuple)
 
-    def init_context(self) -> ComponentSetupContext:
-        return ComponentSetupContext(
+    def init_context(self) -> SetupContext:
+        return SetupContext(
             start=self.clock.start,
             dt_seconds=self.clock.dt_seconds,
             run_sequence=self.run_sequence,
@@ -90,8 +90,8 @@ class CoverageCouplerStub:
 
     def step_context(
         self, *, time: datetime | None = None, with_logger: bool = True
-    ) -> ComponentStepContext:
-        return ComponentStepContext(
+    ) -> StepContext:
+        return StepContext(
             dt_seconds=self.clock.dt_seconds,
             settings=self.settings,
             time=time,
@@ -100,7 +100,7 @@ class CoverageCouplerStub:
 
 
 class DummyComponent(DataComponent):
-    def initialize(self, context: ComponentSetupContext) -> None:
+    def initialize(self, context: SetupContext) -> None:
         _ = context
         self.data.setdefault("temperature", np.zeros(self.grid.shape, dtype=float))
 

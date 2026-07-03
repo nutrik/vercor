@@ -14,7 +14,7 @@ from vercor.clock import Clock
 from vercor.components import (
     Component,
     DataComponent,
-    HostRuntimeComponent,
+    HostComponent,
 )
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.setups.data.era5_land import make_era5_land
@@ -228,7 +228,7 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
         dimension_order=jax_gcm_output_module.JAX_GCM_OUTPUT_DIMENSION_ORDER,
     )
     state.output_frequency = None
-    component = Component.from_model(
+    component = Component.from_step(
         name="ATM",
         grid=grid,
         step=(
@@ -249,7 +249,7 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
             *JAXGCM_OUTPUT_GRID_FIELD_NAMES,
             "pressure",
         ),
-        default_fields={
+        defaults={
             field_name: 0.0
             for field_name in jax_gcm_runtime_module.jax_gcm_default_field_names(
                 include_total_surface_temperature=True
@@ -335,27 +335,27 @@ def _make_coupler(steps: int) -> Coupler:
     coupler.exchanges = [
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         ),
         Exchange(
             source="ATM",
-            destination="OCN",
-            field_names=["sensible_heat_flux", "latent_heat_flux"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="OCN",
+            fields=["sensible_heat_flux", "latent_heat_flux"],
+            regrid=cast(Any, _identity_factory),
         ),
         Exchange(
             source="ATM",
-            destination="LND",
-            field_names=["latent_heat_flux"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="LND",
+            fields=["latent_heat_flux"],
+            regrid=cast(Any, _identity_factory),
         ),
         Exchange(
             source="OCN",
-            destination="ICE",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ICE",
+            fields=["sea_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         ),
     ]
     key = ("OCN", "ATM", "_identity_factory")
@@ -408,59 +408,59 @@ def _make_initialized_slab_coupler(steps: int) -> Coupler:
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=steps)
     )
-    coupler.register(make_slab_atmosphere(atmosphere_grid))
-    coupler.register(make_slab_ocean(ocean_grid))
-    coupler.register(make_slab_land(land_grid))
-    coupler.register(make_slab_seaice(ice_grid))
+    coupler.add_component(make_slab_atmosphere(atmosphere_grid))
+    coupler.add_component(make_slab_ocean(ocean_grid))
+    coupler.add_component(make_slab_land(land_grid))
+    coupler.add_component(make_slab_seaice(ice_grid))
     coupler.add_exchange(
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=bilinear,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="LND",
-            destination="ATM",
-            field_names=["land_surface_temperature"],
-            regridder_factory=bilinear,
+            target="ATM",
+            fields=["land_surface_temperature"],
+            regrid=bilinear,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="ICE",
-            destination="ATM",
-            field_names=["ice_fraction"],
-            regridder_factory=bilinear,
+            target="ATM",
+            fields=["ice_fraction"],
+            regrid=bilinear,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="ATM",
-            destination="OCN",
-            field_names=["sensible_heat_flux", "latent_heat_flux"],
-            regridder_factory=bilinear,
+            target="OCN",
+            fields=["sensible_heat_flux", "latent_heat_flux"],
+            regrid=bilinear,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="ATM",
-            destination="LND",
-            field_names=["latent_heat_flux"],
-            regridder_factory=bilinear,
+            target="LND",
+            fields=["latent_heat_flux"],
+            regrid=bilinear,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="OCN",
-            destination="ICE",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
+            target="ICE",
+            fields=["sea_surface_temperature"],
+            regrid=bilinear,
         )
     )
-    coupler.set_components_run_sequence(
+    coupler.set_run_order(
         (
             "ATM",
             "OCN",
@@ -531,59 +531,59 @@ def _make_initialized_mixed_grid_slab_coupler(steps: int) -> Coupler:
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=steps)
     )
-    coupler.register(make_slab_atmosphere(atmosphere_grid))
-    coupler.register(make_slab_ocean(ocean_grid))
-    coupler.register(make_slab_land(land_grid))
-    coupler.register(make_slab_seaice(ice_grid))
+    coupler.add_component(make_slab_atmosphere(atmosphere_grid))
+    coupler.add_component(make_slab_ocean(ocean_grid))
+    coupler.add_component(make_slab_land(land_grid))
+    coupler.add_component(make_slab_seaice(ice_grid))
     coupler.add_exchange(
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=conservative,
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=conservative,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="LND",
-            destination="ATM",
-            field_names=["land_surface_temperature"],
-            regridder_factory=bilinear,
+            target="ATM",
+            fields=["land_surface_temperature"],
+            regrid=bilinear,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="ICE",
-            destination="ATM",
-            field_names=["ice_fraction"],
-            regridder_factory=bilinear,
+            target="ATM",
+            fields=["ice_fraction"],
+            regrid=bilinear,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="ATM",
-            destination="OCN",
-            field_names=["sensible_heat_flux", "latent_heat_flux"],
-            regridder_factory=bilinear,
+            target="OCN",
+            fields=["sensible_heat_flux", "latent_heat_flux"],
+            regrid=bilinear,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="ATM",
-            destination="LND",
-            field_names=["latent_heat_flux"],
-            regridder_factory=bilinear,
+            target="LND",
+            fields=["latent_heat_flux"],
+            regrid=bilinear,
         )
     )
     coupler.add_exchange(
         Exchange(
             source="OCN",
-            destination="ICE",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
+            target="ICE",
+            fields=["sea_surface_temperature"],
+            regrid=bilinear,
         )
     )
-    coupler.set_components_run_sequence(
+    coupler.set_run_order(
         (
             "ATM",
             "OCN",
@@ -738,8 +738,8 @@ def test_run_matches_one_step_closed_form_for_slab_ocean() -> None:
 def test_initialized_slab_coupler_creates_jittable_runtime_state() -> None:
     coupler = _make_initialized_slab_coupler(steps=2)
     initial_sst = jnp.full((2, 2), 286.15, dtype=jnp.float64)
-    canonical_state = coupler.create_runtime_state()
-    runtime_state_copy = coupler.create_runtime_state()
+    canonical_state = coupler.state()
+    runtime_state_copy = coupler.state()
     assert runtime_state_copy.component_names == canonical_state.component_names
     initial_state = _with_ocean_sst(canonical_state, initial_sst)
 
@@ -781,7 +781,7 @@ def test_initialized_slab_coupler_run_prefills_missing_imports() -> None:
 
 def test_scanned_runtime_state_uses_runtime_field_stores() -> None:
     coupler = _make_initialized_slab_coupler(steps=1)
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
 
     assert all(
         isinstance(component_state.data, RuntimeFieldStore)
@@ -804,7 +804,7 @@ def test_mixed_grid_slab_coupler_runs_with_real_regridders_under_jit_grad_and_jv
     None
 ):
     coupler = _make_initialized_mixed_grid_slab_coupler(steps=2)
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     initial_sst = jnp.linspace(285.15, 287.15, 9, dtype=jnp.float64).reshape((3, 3))
     initial_state = _with_ocean_sst(initial_state, initial_sst)
 
@@ -894,15 +894,15 @@ def test_data_forcing_components_run_inside_runtime() -> None:
     coupler.exchanges = [
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         ),
         Exchange(
             source="LND",
-            destination="ATM",
-            field_names=["land_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ATM",
+            fields=["land_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         ),
     ]
     regridders = cast(
@@ -920,7 +920,7 @@ def test_data_forcing_components_run_inside_runtime() -> None:
         },
     )
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -984,9 +984,9 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
     coupler.exchanges = [
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         )
     ]
     key = ("OCN", "ATM", "_identity_factory")
@@ -996,7 +996,7 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
         fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
     )
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     ocean_state = initial_state.get_component_state("OCN")
     assert ocean_state.data.get("sea_surface_temperature").shape == monthly_ocean.shape
     assert ocean_state.outgoing.get("sea_surface_temperature").shape == grid.shape
@@ -1042,9 +1042,9 @@ def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridd
     coupler.exchanges = [
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=bilinear,
         )
     ]
     key = ("OCN", "ATM", "bilinear")
@@ -1062,7 +1062,7 @@ def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridd
         "sea_surface_temperature": jnp.zeros(grid.shape, dtype=jnp.float64),
     }
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -1116,9 +1116,9 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
     coupler.exchanges = [
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=bilinear,
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=bilinear,
         )
     ]
     key = ("OCN", "ATM", "bilinear")
@@ -1137,7 +1137,7 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
         "sea_surface_temperature": jnp.zeros(atmosphere_grid.shape, dtype=jnp.float64),
     }
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -1206,9 +1206,9 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
     coupler.exchanges = [
         Exchange(
             source="LND",
-            destination="ATM",
-            field_names=["land_surface_temperature"],
-            regridder_factory=bilinear,
+            target="ATM",
+            fields=["land_surface_temperature"],
+            regrid=bilinear,
         )
     ]
     key = ("LND", "ATM", "bilinear")
@@ -1218,7 +1218,7 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
         fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
     )
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -1287,9 +1287,9 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
     coupler.exchanges = [
         Exchange(
             source="LND",
-            destination="ATM",
-            field_names=["land_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ATM",
+            fields=["land_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         )
     ]
     key = ("LND", "ATM", "_identity_factory")
@@ -1299,7 +1299,7 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
         fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
     )
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -1367,9 +1367,9 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
     coupler.exchanges = [
         Exchange(
             source="LND",
-            destination="ATM",
-            field_names=["land_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ATM",
+            fields=["land_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         )
     ]
     key = ("LND", "ATM", "_identity_factory")
@@ -1386,7 +1386,7 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
     )
     expected_slice = forcing[expected_index]
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -1453,9 +1453,9 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
     coupler.exchanges = [
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         )
     ]
     key = ("OCN", "ATM", "_identity_factory")
@@ -1471,7 +1471,7 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
         n_rec=12,
     )
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -1518,7 +1518,7 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
     coupler.components = {"ATM": component}
     coupler.run_sequence = ("ATM",)
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -1571,7 +1571,7 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
     coupler.components = {"ATM": component}
     coupler.run_sequence = ("ATM",)
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -1611,9 +1611,9 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
     coupler.exchanges = [
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         )
     ]
     key = ("OCN", "ATM", "_identity_factory")
@@ -1623,7 +1623,7 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
         fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
     )
 
-    initial_state = coupler.create_runtime_state()
+    initial_state = coupler.state()
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
         initial_state
     )
@@ -1678,7 +1678,7 @@ def test_jax_gcm_runtime_requires_initialized_payload() -> None:
 
     component = _make_jax_gcm_component(grid)
     coupler.components = {"ATM": component}
-    state = coupler.create_runtime_state()
+    state = coupler.state()
     atmosphere = state.get_component_state("ATM").with_runtime_payload(None)
     state = state.set_component_state("ATM", atmosphere)
 
@@ -1710,14 +1710,12 @@ def test_run_accepts_default_runtime_component() -> None:
 
 def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
     grid = make_test_grid(name="camulator")
-    camulator_land = HostRuntimeComponent.from_model(
+    camulator_land = HostComponent.from_step(
         name="LND",
         grid=grid,
         step=lambda fields, context, payload: {},
         outputs=("land_surface_temperature",),
-        default_fields={
-            "land_surface_temperature": jnp.zeros(grid.shape, dtype=jnp.float64)
-        },
+        defaults={"land_surface_temperature": jnp.zeros(grid.shape, dtype=jnp.float64)},
     )
     camulator_land.seed_declared_defaults()
     coupler = Coupler(
@@ -1727,7 +1725,7 @@ def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
     coupler.run_sequence = ("LND",)
 
     assert isinstance(camulator_land.data["land_surface_temperature"], jax.Array)
-    state = coupler.create_runtime_state()
+    state = coupler.state()
 
     with pytest.raises(ComponentError, match="host-backed.*Coupler.run"):
         run_scanned_coupler(coupler, state)
@@ -1735,12 +1733,12 @@ def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
 
 def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
     grid = make_test_grid(name="camulator-gcm")
-    camulator = HostRuntimeComponent.from_model(
+    camulator = HostComponent.from_step(
         name="ATM",
         grid=grid,
         step=lambda fields, context, payload: {},
         outputs=("temperature",),
-        default_fields={"temperature": jnp.ones(grid.shape, dtype=jnp.float64)},
+        defaults={"temperature": jnp.ones(grid.shape, dtype=jnp.float64)},
     )
     camulator.seed_declared_defaults()
     coupler = Coupler(
@@ -1750,7 +1748,7 @@ def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
     coupler.run_sequence = ("ATM",)
 
     assert isinstance(camulator.data["temperature"], jax.Array)
-    state = coupler.create_runtime_state()
+    state = coupler.state()
 
     with pytest.raises(ComponentError, match="host-backed.*Coupler.run"):
         run_scanned_coupler(coupler, state)
@@ -1758,14 +1756,12 @@ def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
 
 def test_scanned_runtime_rejects_veros_runtime_boundary() -> None:
     grid = make_test_grid(name="veros")
-    veros = HostRuntimeComponent.from_model(
+    veros = HostComponent.from_step(
         name="OCN",
         grid=grid,
         step=lambda fields, context, payload: {},
         outputs=("sea_surface_temperature",),
-        default_fields={
-            "sea_surface_temperature": jnp.zeros(grid.shape, dtype=jnp.float64)
-        },
+        defaults={"sea_surface_temperature": jnp.zeros(grid.shape, dtype=jnp.float64)},
     )
     veros.seed_declared_defaults()
     coupler = Coupler(
@@ -1775,7 +1771,7 @@ def test_scanned_runtime_rejects_veros_runtime_boundary() -> None:
     coupler.run_sequence = ("OCN",)
 
     assert isinstance(veros.data["sea_surface_temperature"], jax.Array)
-    state = coupler.create_runtime_state()
+    state = coupler.state()
 
     with pytest.raises(ComponentError, match="host-backed.*Coupler.run"):
         run_scanned_coupler(coupler, state)
@@ -1859,7 +1855,7 @@ def test_run_validates_missing_jax_gcm_preseed_before_scan() -> None:
     )
     coupler.components = {"ATM": component}
     coupler.run_sequence = ("ATM",)
-    state = coupler.create_runtime_state()
+    state = coupler.state()
     atmosphere = state.get_component_state("ATM")
     atmosphere = atmosphere.with_data(_without_store_field(atmosphere.data, "pressure"))
     state = state.set_component_state("ATM", atmosphere)

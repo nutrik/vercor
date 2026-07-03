@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from vercor.components.contexts import ComponentStepContext
+    from vercor.components.contexts import StepContext
     from vercor.runtime.state import RuntimeComponentState
 
 
@@ -14,7 +14,7 @@ class HostRuntimeExecutionProtocol(Protocol):
     def step_host_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: "ComponentStepContext",
+        context: "StepContext",
     ) -> "RuntimeComponentState":
         """Return this component advanced by one Python host runtime step."""
         ...

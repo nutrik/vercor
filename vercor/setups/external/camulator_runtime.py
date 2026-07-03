@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 import jax.numpy as jnp
 import torch
 
-from vercor.components import ComponentStepContext
+from vercor.components import StepContext
 from vercor.jax_logging import LoggerLike
 import vercor.setups.external.camulator_fields as _camulator_fields
 import vercor.setups.external.camulator_output as _camulator_output
@@ -188,7 +188,7 @@ def record_camulator_prediction_output(
 def step_camulator_runtime(
     state: "CAMulatorGCMSetupState",
     fields: Mapping[str, Any],
-    context: ComponentStepContext,
+    context: StepContext,
     payload: Any | None,
 ) -> Mapping[str, Any]:
     """Advance the private host-backed CAMulator atmosphere boundary."""

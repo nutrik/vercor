@@ -34,7 +34,7 @@ from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact
 from vercor.calendar import DateTime360, DateTime365
 from vercor.components.data import DataComponent
-from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
+from vercor.components.contexts import SetupContext, StepContext
 from vercor.output.adapters import ComponentOutputAdapter, component_snapshot_writer
 from vercor.output.variables import OutputVariable
 from vercor.runtime.contracts import RuntimeComponentContract
@@ -250,8 +250,8 @@ def _make_coupler(
     dt_seconds: float,
     run_order: list[str],
     settings: VercorSettings | None = None,
-) -> ComponentSetupContext:
-    return ComponentSetupContext(
+) -> SetupContext:
+    return SetupContext(
         start=datetime(2000, 1, 1),
         dt_seconds=dt_seconds,
         logger=cast(Any, _RecordingLogger()),
@@ -914,7 +914,7 @@ def test_jax_gcm_step_maps_outputs_and_respects_output_gate(
             component
         ),
     )
-    step_context = ComponentStepContext(
+    step_context = StepContext(
         dt_seconds=timedelta(days=1).total_seconds(),
         settings=coupler.settings,
         time=datetime(2000, 1, 2),
@@ -1970,7 +1970,7 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
     component_state = _runtime_component_state("OCN", component.data)
-    step_context = ComponentStepContext(
+    step_context = StepContext(
         dt_seconds=20.0,
         settings=coupler.settings,
         time=datetime(2000, 1, 1),
@@ -2060,7 +2060,7 @@ def test_veros_step_records_selected_outputs_and_writes_on_gate(
         fake_record_veros_period_output,
     )
 
-    context = ComponentStepContext(
+    context = StepContext(
         dt_seconds=86400.0,
         settings=VercorSettings(),
         time=datetime(2000, 1, 2),
@@ -2117,7 +2117,7 @@ def test_veros_step_skips_output_when_no_variables_selected(
         lambda *args, **kwargs: pytest.fail("unexpected Veros output extraction"),
     )
 
-    context = ComponentStepContext(
+    context = StepContext(
         dt_seconds=86400.0,
         settings=VercorSettings(),
         time=datetime(2000, 1, 2),
@@ -2173,7 +2173,7 @@ def test_veros_step_nan_cleans_forcing_fields_before_set_variable(
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
     component_state = _runtime_component_state("OCN", component.data)
-    step_context = ComponentStepContext(
+    step_context = StepContext(
         dt_seconds=20.0,
         settings=coupler.settings,
         time=datetime(2000, 1, 1),

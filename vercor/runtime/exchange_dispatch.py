@@ -59,11 +59,11 @@ def dispatch_component_exchanges(
     for exchange in exchanges:
         source_component = state.get_component_state(exchange.source)
         source_fields = source_component.outgoing
-        key = (exchange.source, exchange.destination, exchange.interpolation_type)
+        key = (exchange.source, exchange.target, exchange.interpolation_type)
         regrid = regridders[key]
         fractional_mask = state.get_fractional_mask(*key)
 
-        for field_name in exchange.field_names:
+        for field_name in exchange.fields:
             if isinstance(field_name, tuple):
                 _dispatch_vector_exchange_field(
                     source_fields,

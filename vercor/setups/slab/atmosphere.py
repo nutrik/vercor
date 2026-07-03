@@ -87,11 +87,11 @@ def make_slab_atmosphere(grid: RectilinearGrid, name: str = "ATM") -> Component:
             "temperature_2m": updated_temperature_2m,
         }
 
-    return Component.from_model(
+    return Component.from_step(
         name=name,
         grid=grid,
         step=step,
         inputs=_ATMOSPHERE_INPUTS,
         outputs=_ATMOSPHERE_OUTPUTS,
-        default_fields=_ATMOSPHERE_DEFAULT_FIELDS,
+        defaults=_ATMOSPHERE_DEFAULT_FIELDS,
     )

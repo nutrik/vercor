@@ -17,7 +17,7 @@ from vercor.components.data import DataComponent
 from vercor.clock import Clock
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
-from vercor.components.contexts import ComponentSetupContext
+from vercor.components.contexts import SetupContext
 from vercor.settings import VercorSettings
 from vercor.setups.external.jax_gcm_runtime import JAXGCMRuntimePayload
 from vercor.runtime.contracts import RuntimeComponentContract
@@ -35,7 +35,7 @@ class _RuntimeSendComponent(DataComponent):
         super().__init__("DATA", make_test_grid(name="runtime-send"))
         self.settings = settings
 
-    def initialize(self, context: ComponentSetupContext) -> None:
+    def initialize(self, context: SetupContext) -> None:
         _ = context
 
 
@@ -206,8 +206,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         assert marker not in runtime_source
     assert "import_fields" not in coupler_source
     assert 'hasattr(component, "step_host_runtime_state")' not in coupler_source
-    assert "isinstance(component, HostRuntimeComponent)" not in coupler_source
-    assert "HostRuntimeComponent" not in runtime_driver_source
+    assert "isinstance(component, HostComponent)" not in coupler_source
+    assert "HostComponent" not in runtime_driver_source
     assert (
         "def component_requires_host_runtime(" not in component_runtime_execution_source
     )
@@ -220,7 +220,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "from vercor.components.base import Component" in (
         component_runtime_execution_source
     )
-    assert "from vercor.components.host import HostRuntimeComponent" not in (
+    assert "from vercor.components.host import HostComponent" not in (
         component_runtime_execution_source
     )
     assert "HostRuntimeExecutionProtocol" in component_runtime_execution_source
@@ -229,8 +229,7 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
         in component_runtime_execution_source
     )
     assert (
-        "isinstance(component, HostRuntimeComponent)"
-        not in component_runtime_execution_source
+        "isinstance(component, HostComponent)" not in component_runtime_execution_source
     )
     assert "time is not None and isinstance" not in runtime_driver_source
     assert "def _step_runtime_component" not in coupler_source
@@ -478,16 +477,17 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "compute_ocn_lnd_masks_on_atm_grid" not in coupler_source
     assert "check_total_lnd_ocn_mask_sum" not in coupler_source
     assert "jax_ones(" not in coupler_source
-    assert "class ComponentSetupContext" not in base_source
-    assert "class ComponentStepContext" not in base_source
-    assert "from vercor.components.contexts import ComponentStepContext" in base_source
+    assert "class SetupContext" not in base_source
+    assert "class StepContext" not in base_source
+    assert "from vercor.components.contexts import StepContext" in base_source
     assert "from vercor.runtime.contexts import" not in base_source
     assert "class SetupContext" in component_contexts_source
     assert "class StepContext" in component_contexts_source
-    assert "ComponentSetupContext = SetupContext" in component_contexts_source
-    assert "ComponentStepContext = StepContext" in component_contexts_source
-    assert "ComponentSetupContext" in components_source
-    assert "ComponentStepContext" in components_source
+    assert "ComponentSetupContext = SetupContext" not in component_contexts_source
+    assert "ComponentStepContext = StepContext" not in component_contexts_source
+    assert "__getattr__ = deprecated_getattr(" in component_contexts_source
+    assert "SetupContext" in components_source
+    assert "StepContext" in components_source
     assert "component.initialize(self)" not in coupler_source
     assert "dt_seconds: float,\n        runtime_settings" not in base_source
     assert "def write_runtime_component_to_netcdf" not in base_source
@@ -577,14 +577,14 @@ def test_runtime_contracts_refresh_after_exchange_changes() -> None:
         fields={"sea_surface_temperature": 281.0},
     )
     coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1))
-    coupler.register(cast(Any, atmosphere))
-    coupler.register(cast(Any, ocean))
+    coupler.add_component(cast(Any, atmosphere))
+    coupler.add_component(cast(Any, ocean))
     coupler.add_exchange(
         Exchange(
             source="ATM",
-            destination="OCN",
-            field_names=("temperature",),
-            regridder_factory=cast(Any, lambda source, destination: object()),
+            target="OCN",
+            fields=("temperature",),
+            regrid=cast(Any, lambda source, destination: object()),
         )
     )
 
@@ -596,9 +596,9 @@ def test_runtime_contracts_refresh_after_exchange_changes() -> None:
     coupler.add_exchange(
         Exchange(
             source="ATM",
-            destination="OCN",
-            field_names=("humidity",),
-            regridder_factory=cast(Any, lambda source, destination: object()),
+            target="OCN",
+            fields=("humidity",),
+            regrid=cast(Any, lambda source, destination: object()),
         )
     )
     runtime_state_from_coupler_components(coupler, prefill_missing=True)

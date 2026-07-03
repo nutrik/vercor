@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
-from vercor.components import ComponentStepContext
+from vercor.components import StepContext
 import vercor.setups.external.veros_fluxes as _veros_fluxes
 import vercor.setups.external.veros_output as _veros_output
 import vercor.setups.external.veros_state as _veros_state
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 def step_veros_runtime(
     state: "VerosGCMSetupState",
     fields: Mapping[str, Any],
-    context: ComponentStepContext,
+    context: StepContext,
     payload: Any | None,
 ) -> Mapping[str, Any]:
     """Advance the private host-backed Veros ocean boundary."""
@@ -60,7 +60,7 @@ def step_veros_runtime(
 
 def record_veros_output(
     state: "VerosGCMSetupState",
-    context: ComponentStepContext,
+    context: StepContext,
 ) -> None:
     """Record selected Veros variables and write optional period output."""
 

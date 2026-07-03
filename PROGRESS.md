@@ -339,6 +339,13 @@ historical commands, failure messages, or detailed validation notes.
   environment executable. Black emitted the recurring Python 3.13/target-3.14
   warning, and full pytest/coverage emitted the recurring JAX dtype-promotion
   `FutureWarning`.
+- Latest local API redesign implementation validation: focused API-boundary
+  pytest, affected runtime-exchange pytest, full fast pytest, Black check,
+  flake8, mypy, full pytest, coverage pytest at 90% total, and git diff
+  whitespace check passed as of 2026-07-03 using the direct `scipy`
+  environment executable. Black emitted the recurring Python 3.13/target-3.14
+  warning, and full pytest/coverage emitted the recurring JAX dtype-promotion
+  `FutureWarning`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -370,6 +377,22 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-03: API Redesign Implementation
+
+- Made short component names canonical in `vercor` and `vercor.components`;
+  legacy names such as `HostRuntimeComponent`, `ComponentFieldSpec`, and
+  component-prefixed contexts now resolve through deprecating `__getattr__`
+  aliases outside `__all__`.
+- Added shared `_deprecation` and `components._constructor_options` helpers,
+  centralized `defaults`/`default_fields` and lifecycle-hook normalization,
+  and moved setup/adapters/examples/tests to `from_step`, `HostComponent`,
+  `FieldSpec`, `StepResult`, `SetupContext`, and `StepContext`.
+- Canonicalized exchange and coupler workflows around `target`/`fields`/`regrid`
+  plus `Coupler.state/view/views`, leaving old setup helpers and long coupler
+  methods as warning wrappers for the deprecation window.
+- Updated `DESIGN.md`, `DEPENDENCIES.md`, examples, and API-boundary tests to
+  document the canonical public/private split.
 
 ### 2026-07-03: V2 Public API Facade Cleanup
 

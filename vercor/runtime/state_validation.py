@@ -58,14 +58,14 @@ def validate_runtime_state(
         )
 
     for exchange in exchanges:
-        key = (exchange.source, exchange.destination, exchange.interpolation_type)
+        key = (exchange.source, exchange.target, exchange.interpolation_type)
         if exchange.source not in runtime_component_names:
             raise CouplerError(
                 f"Exchange source component '{exchange.source}' is missing from runtime state"
             )
-        if exchange.destination not in runtime_component_names:
+        if exchange.target not in runtime_component_names:
             raise CouplerError(
-                f"Exchange destination component '{exchange.destination}' is missing from runtime state"
+                f"Exchange destination component '{exchange.target}' is missing from runtime state"
             )
         if key not in regridders:
             raise CouplerError(
@@ -79,7 +79,7 @@ def validate_runtime_state(
                 "Runtime requires an initialized fractional mask for exchange "
                 f"{exchange.name}"
             )
-        destination_shape = components[exchange.destination].grid.shape
+        destination_shape = components[exchange.target].grid.shape
         mask_shape = jnp.asarray(runtime_state.fractional_masks.get(mask_name)).shape
         if mask_shape != destination_shape:
             raise CouplerError(

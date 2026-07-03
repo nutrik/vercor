@@ -7,7 +7,7 @@ from vercor.components._protocols import HostRuntimeExecutionProtocol
 
 if TYPE_CHECKING:
     from vercor.components.base import Component
-    from vercor.components.contexts import ComponentStepContext
+    from vercor.components.contexts import StepContext
     from vercor.runtime.state import RuntimeComponentState
 
 
@@ -26,7 +26,7 @@ def host_component_names(
 def step_component_runtime_state(
     component: "Component",
     component_state: "RuntimeComponentState",
-    context: "ComponentStepContext",
+    context: "StepContext",
     *,
     allow_host_runtime: bool,
 ) -> "RuntimeComponentState":

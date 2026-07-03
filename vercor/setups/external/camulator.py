@@ -6,7 +6,7 @@ from datetime import timedelta
 from functools import partial
 from typing import Optional
 
-from vercor.components import HostRuntimeComponent
+from vercor.components import HostComponent
 from vercor.jax_logging import LoggerLike
 from vercor.output.adapters import register_component_snapshot_writer
 import vercor.setups.external.camulator_contracts as _camulator_contracts
@@ -27,7 +27,7 @@ def make_camulator_gcm(
     output_cpus_number: int = 8,
     output_frequency: str | None = None,
     logger: LoggerLike | None = None,
-) -> HostRuntimeComponent:
+) -> HostComponent:
     """Return a host-backed CAMulator atmosphere component."""
 
     state = CAMulatorGCMSetupState(
@@ -43,13 +43,13 @@ def make_camulator_gcm(
         output_frequency=output_frequency,
         logger=logger,
     )
-    component = HostRuntimeComponent.from_model(
+    component = HostComponent.from_step(
         name=name,
         grid=state.grid,
         step=partial(_camulator_runtime.step_camulator_runtime, state),
         inputs=("sea_surface_temperature", "land_surface_temperature"),
         outputs=_camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES,
-        default_fields=_camulator_contracts.camulator_runtime_field_defaults(),
+        defaults=_camulator_contracts.camulator_runtime_field_defaults(),
         initialize=state.initialize,
     )
     register_component_snapshot_writer(

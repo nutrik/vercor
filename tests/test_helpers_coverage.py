@@ -154,12 +154,12 @@ def test_exchange_stores_factory_and_formatting_without_create_wrapper() -> None
 
     exchange = Exchange(
         source="OCN",
-        destination="ATM",
-        field_names=["temperature", ("u_velocity", "v_velocity")],
-        regridder_factory=cast(Any, dummy_factory),
+        target="ATM",
+        fields=["temperature", ("u_velocity", "v_velocity")],
+        regrid=cast(Any, dummy_factory),
     )
 
-    created = exchange.regridder_factory(source_grid, destination_grid)
+    created = exchange.regrid(source_grid, destination_grid)
 
     assert not hasattr(exchange, "create")
     assert exchange.name is None
@@ -191,11 +191,11 @@ def test_exchange_uses_wrapped_factory_name_and_keeps_partial_options() -> None:
 
     exchange = Exchange(
         source="OCN",
-        destination="ATM",
-        field_names=["temperature"],
-        regridder_factory=regridder_factory,
+        target="ATM",
+        fields=["temperature"],
+        regrid=regridder_factory,
     )
-    created = exchange.regridder_factory(source_grid, destination_grid)
+    created = exchange.regrid(source_grid, destination_grid)
 
     assert not hasattr(exchange, "create")
     assert exchange.name is None

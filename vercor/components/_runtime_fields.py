@@ -5,12 +5,13 @@ from typing import TYPE_CHECKING
 
 from vercor.components.contracts import (
     AuthorFieldValues,
-    ComponentFieldSpec,
     KEEP_PAYLOAD,
-    ComponentStepResult,
     ComponentStepReturn,
+    FieldSpec,
     FieldNames,
+    StepResult,
 )
+from vercor.components._constructor_options import normalize_field_spec
 from vercor.components._contracts import (
     normalize_author_field_values,
 )
@@ -116,7 +117,7 @@ def with_runtime_fields(
             f"field '{missing_field}', but it is missing from runtime data. "
             "Seed the field with seed_field()/seed_fields(), include it in "
             "factory fields, declare it as an output/default in "
-            "from_model()/declare_fields(), or declare it through an "
+            "from_step()/declare_fields(), or declare it through an "
             "exchange before runtime execution."
         )
     return component_state.with_data(component_state.data.replace_many(fields))
@@ -127,9 +128,9 @@ def apply_step_result(
     component_state: "RuntimeComponentState",
     result: ComponentStepReturn,
 ) -> "RuntimeComponentState":
-    """Apply a field mapping or ``ComponentStepResult`` to runtime state."""
+    """Apply a field mapping or ``StepResult`` to runtime state."""
 
-    if isinstance(result, ComponentStepResult):
+    if isinstance(result, StepResult):
         updated_state = with_runtime_fields(component, component_state, result.fields)
         if result.payload is KEEP_PAYLOAD:
             return updated_state
@@ -141,22 +142,25 @@ def apply_step_result(
 def prefill_runtime_fields(
     component: "Component",
     data: dict[str, RuntimeArray],
-    field_spec: ComponentFieldSpec | None = None,
+    field_spec: FieldSpec | None = None,
     *,
     outputs: FieldNames = (),
+    defaults: AuthorFieldValues = None,
     default_fields: AuthorFieldValues = None,
     policy: PrecisionPolicy = None,
 ) -> None:
     """Prefill a mutable runtime data mapping with declared fields."""
 
-    declared = field_spec or ComponentFieldSpec(
+    declared = normalize_field_spec(
+        fields=field_spec,
         outputs=outputs,
-        default_fields=default_fields or {},
+        defaults=defaults,
+        default_fields=default_fields,
     )
     normalized_defaults = normalize_author_field_values(
         component_name=component.name,
         grid=component.grid,
-        fields=declared.default_fields,
+        fields=declared.defaults,
         policy=component.settings if policy is None else policy,
     )
     for field_name, field_value in (normalized_defaults or {}).items():

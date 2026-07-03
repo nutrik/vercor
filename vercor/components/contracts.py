@@ -4,9 +4,8 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Final, TypeAlias
 
+from vercor._deprecation import deprecated_getattr, warn_deprecated_name
 from vercor.components.contexts import (
-    ComponentSetupContext,
-    ComponentStepContext,
     SetupContext,
     StepContext,
 )
@@ -31,7 +30,6 @@ class StepResult:
     payload: Any = KEEP_PAYLOAD
 
 
-ComponentStepResult = StepResult
 ComponentStepReturn: TypeAlias = Mapping[str, RuntimeArray] | StepResult
 ComponentStepCallable: TypeAlias = Callable[
     [Mapping[str, RuntimeArray], StepContext, Any | None],
@@ -97,6 +95,8 @@ class FieldSpec:
         if defaults is not None and default_fields is not None:
             raise TypeError("Use either defaults or default_fields, not both")
         normalized_defaults = defaults if defaults is not None else default_fields
+        if default_fields is not None:
+            warn_deprecated_name("default_fields", "defaults", remove_in="0.2.0")
         object.__setattr__(self, "inputs", _unique_field_names(inputs))
         object.__setattr__(self, "outputs", _unique_field_names(outputs))
         object.__setattr__(self, "defaults", dict(normalized_defaults or {}))
@@ -108,21 +108,14 @@ class FieldSpec:
         return self.defaults
 
 
-ComponentFieldSpec = FieldSpec
-
-
 __all__ = [
     "AuthorFieldValues",
     "AuthorStepCallable",
     "ComponentCreatePayloadHook",
-    "ComponentFieldSpec",
     "ComponentHooks",
     "ComponentInitializeHook",
     "ComponentPrefillHook",
-    "ComponentSetupContext",
     "ComponentStepCallable",
-    "ComponentStepContext",
-    "ComponentStepResult",
     "ComponentStepReturn",
     "ComponentValidateHook",
     "FieldNames",
@@ -132,3 +125,21 @@ __all__ = [
     "StepContext",
     "StepResult",
 ]
+
+
+__getattr__ = deprecated_getattr(
+    __name__,
+    {
+        "ComponentFieldSpec": ("vercor.components.contracts.FieldSpec", FieldSpec),
+        "ComponentStepResult": ("vercor.components.contracts.StepResult", StepResult),
+        "ComponentSetupContext": (
+            "vercor.components.contexts.SetupContext",
+            SetupContext,
+        ),
+        "ComponentStepContext": (
+            "vercor.components.contexts.StepContext",
+            StepContext,
+        ),
+    },
+    remove_in="0.2.0",
+)

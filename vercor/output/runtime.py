@@ -31,7 +31,7 @@ def output_masks_for_component(
 
     masks = {}
     for exchange in exchanges:
-        if name != exchange.destination:
+        if name != exchange.target:
             continue
 
         key = (exchange.source, name, exchange.interpolation_type)

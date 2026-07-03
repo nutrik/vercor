@@ -26,7 +26,7 @@ import vercor.setups.external.camulator_tensors as camulator_tensors_module
 import vercor.setups.external.camulator_wind_filter as camulator_wind_filter_module
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact
-from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
+from vercor.components.contexts import SetupContext, StepContext
 from vercor.output.adapters import ComponentOutputAdapter, component_snapshot_writer
 from vercor.output.variables import OutputVariable
 from vercor.setups.external.camulator import make_camulator_gcm
@@ -88,8 +88,8 @@ def _make_camulator_output_adapter() -> ComponentOutputAdapter:
     )
 
 
-def _make_coupler(start: datetime) -> ComponentSetupContext:
-    return ComponentSetupContext(
+def _make_coupler(start: datetime) -> SetupContext:
+    return SetupContext(
         start=start,
         dt_seconds=21600,
         run_sequence=(),
@@ -1231,7 +1231,7 @@ def test_camulator_land_stores_jax_runtime_arrays(
 
     component.initialize(_make_coupler(start))
     assert component.field_spec.outputs == ("land_surface_temperature",)
-    assert set(component.field_spec.default_fields) == {"land_surface_temperature"}
+    assert set(component.field_spec.defaults) == {"land_surface_temperature"}
     assert isinstance(component.data["land_surface_temperature"], jax.Array)
     assert_allclose_compact(
         component.data["land_surface_temperature"], np.full((2, 2), 283.0)
@@ -1244,7 +1244,7 @@ def test_camulator_land_stores_jax_runtime_arrays(
             prefill_missing=True,
             contract=RuntimeComponentContract(),
         ),
-        ComponentStepContext(
+        StepContext(
             dt_seconds=(datetime(2000, 1, 1, 6, 0, 0) - start).total_seconds(),
             settings=coupler.settings,
             time=start,
@@ -1408,7 +1408,7 @@ def test_camulator_step_uses_jax_prepared_forcing_boundaries(
     )
 
     component_state = _runtime_component_state("ATM", component.data)
-    step_context = ComponentStepContext(
+    step_context = StepContext(
         dt_seconds=float((datetime(2000, 1, 1, 6, 0, 0) - start).total_seconds()),
         settings=VercorSettings(),
         time=start,

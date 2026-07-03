@@ -5,20 +5,25 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from vercor._deprecation import warn_deprecated_name
 from vercor.components.contracts import (
     AuthorFieldValues as _AuthorFieldValues,
     AuthorStepCallable as _AuthorStepCallable,
-    ComponentHooks as _ComponentHooks,
     ComponentCreatePayloadHook,
-    ComponentFieldSpec as _ComponentFieldSpec,
+    ComponentHooks as _ComponentHooks,
     ComponentInitializeHook,
     ComponentPrefillHook,
     ComponentStepReturn as _ComponentStepReturn,
     ComponentValidateHook,
+    FieldSpec as _FieldSpec,
     FieldNames as _FieldNames,
 )
 from vercor.components._callable_wrappers import (
     _CallableRuntimeMixin,
+)
+from vercor.components._constructor_options import (
+    normalize_field_spec,
+    normalize_lifecycle_hooks,
 )
 from vercor.components._field_authoring import ComponentFieldAuthoringMixin
 from vercor.components._lifecycle import ComponentLifecycleHooks
@@ -31,7 +36,7 @@ from vercor.settings import VercorSettings
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
-    from vercor.components.contexts import ComponentStepContext
+    from vercor.components.contexts import StepContext
     from vercor.runtime.state import RuntimeComponentState
 
 
@@ -55,7 +60,7 @@ class Component(
     :meth:`step_runtime_state` while preserving its signature. Data-only forcing
     adapters should inherit :class:`vercor.components.DataComponent`;
     non-differentiable adapters should inherit
-    :class:`vercor.components.HostRuntimeComponent`.
+    :class:`vercor.components.HostComponent`.
 
     Common exchange-field conventions:
         - fields use SI units
@@ -79,8 +84,8 @@ class Component(
     data: dict[str, RuntimeArray] = field(default_factory=dict)
     settings: VercorSettings = field(default_factory=VercorSettings)
     setup_metadata: dict[str, Any] = field(default_factory=dict)
-    _field_spec: _ComponentFieldSpec = field(
-        default_factory=_ComponentFieldSpec,
+    _field_spec: _FieldSpec = field(
+        default_factory=_FieldSpec,
         init=False,
         repr=False,
     )
@@ -97,12 +102,13 @@ class Component(
         grid: RectilinearGrid,
         step: _AuthorStepCallable,
         *,
-        fields: _ComponentFieldSpec | None = None,
+        fields: _FieldSpec | None = None,
         payload: Any | None = None,
         settings: VercorSettings | None = None,
         hooks: _ComponentHooks | None = None,
         inputs: _FieldNames = (),
         outputs: _FieldNames = (),
+        defaults: _AuthorFieldValues = None,
         default_fields: _AuthorFieldValues = None,
         initialize: ComponentInitializeHook | None = None,
         create_runtime_payload: ComponentCreatePayloadHook | None = None,
@@ -111,47 +117,24 @@ class Component(
     ) -> "Component":
         """Create a differentiable component from a user step callable.
 
-        This author-facing constructor mirrors normal Python alternate
-        constructors: ``inputs`` declare fields the model reads, ``outputs``
-        declare fields the model writes, and ``default_fields`` declares
-        concrete runtime defaults. Scalar default values expand to this
-        component's grid shape.
+        ``inputs`` declare fields the model reads, ``outputs`` declare fields
+        the model writes, and ``defaults`` declares concrete runtime defaults.
+        Scalar default values expand to this component's grid shape.
         """
 
-        if fields is not None and (
-            tuple(inputs) or tuple(outputs) or default_fields is not None
-        ):
-            raise TypeError(
-                "Use either fields=FieldSpec(...) or inputs/outputs/default_fields, not both"
-            )
-        field_spec = fields or _ComponentFieldSpec(
+        field_spec = normalize_field_spec(
+            fields=fields,
             inputs=inputs,
             outputs=outputs,
-            default_fields=default_fields or {},
+            defaults=defaults,
+            default_fields=default_fields,
         )
-        if hooks is not None and any(
-            hook is not None
-            for hook in (
-                initialize,
-                create_runtime_payload,
-                prefill_runtime_state_fields,
-                validate_runtime_state,
-            )
-        ):
-            raise TypeError(
-                "Use either hooks=ComponentHooks(...) or individual hook arguments, not both"
-            )
-        lifecycle_hooks = ComponentLifecycleHooks(
-            initialize=hooks.initialize if hooks is not None else initialize,
-            create_runtime_payload=(
-                hooks.create_payload if hooks is not None else create_runtime_payload
-            ),
-            prefill_runtime_state_fields=(
-                hooks.prefill if hooks is not None else prefill_runtime_state_fields
-            ),
-            validate_runtime_state=(
-                hooks.validate if hooks is not None else validate_runtime_state
-            ),
+        lifecycle_hooks = normalize_lifecycle_hooks(
+            hooks=hooks,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
         )
         return _CallableComponent(
             name=name,
@@ -174,6 +157,7 @@ class Component(
         settings: VercorSettings | None = None,
         inputs: _FieldNames = (),
         outputs: _FieldNames = (),
+        defaults: _AuthorFieldValues = None,
         default_fields: _AuthorFieldValues = None,
         initialize: ComponentInitializeHook | None = None,
         create_runtime_payload: ComponentCreatePayloadHook | None = None,
@@ -185,6 +169,11 @@ class Component(
         Deprecated compatibility wrapper for :meth:`from_step`.
         """
 
+        warn_deprecated_name(
+            f"{cls.__name__}.from_model()",
+            f"{cls.__name__}.from_step()",
+            remove_in="0.2.0",
+        )
         return cls.from_step(
             name=name,
             grid=grid,
@@ -193,6 +182,7 @@ class Component(
             settings=settings,
             inputs=inputs,
             outputs=outputs,
+            defaults=defaults,
             default_fields=default_fields,
             initialize=initialize,
             create_runtime_payload=create_runtime_payload,
@@ -204,7 +194,7 @@ class Component(
     def step_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> "RuntimeComponentState":
         """Return this differentiable component advanced by one runtime step."""
 
@@ -284,7 +274,7 @@ class Component(
         component_state: "RuntimeComponentState",
         result: _ComponentStepReturn,
     ) -> "RuntimeComponentState":
-        """Apply a field mapping or ``ComponentStepResult`` to runtime state."""
+        """Apply a field mapping or ``StepResult`` to runtime state."""
 
         return _runtime_field_adapters.apply_step_result(
             self,
@@ -308,9 +298,10 @@ class Component(
     def prefill_runtime_fields(
         self,
         data: dict[str, RuntimeArray],
-        field_spec: _ComponentFieldSpec | None = None,
+        field_spec: _FieldSpec | None = None,
         *,
         outputs: _FieldNames = (),
+        defaults: _AuthorFieldValues = None,
         default_fields: _AuthorFieldValues = None,
         policy: PrecisionPolicy = None,
     ) -> None:
@@ -321,6 +312,7 @@ class Component(
             data,
             field_spec,
             outputs=outputs,
+            defaults=defaults,
             default_fields=default_fields,
             policy=policy,
         )
@@ -349,7 +341,7 @@ class _CallableComponent(_CallableRuntimeMixin, Component):
         step: _AuthorStepCallable,
         payload: Any | None,
         settings: VercorSettings | None,
-        field_spec: _ComponentFieldSpec,
+        field_spec: _FieldSpec,
         lifecycle_hooks: ComponentLifecycleHooks,
     ) -> None:
         if settings is None:
@@ -371,7 +363,7 @@ class _CallableComponent(_CallableRuntimeMixin, Component):
     def step_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> "RuntimeComponentState":
         """Advance this callable-backed differentiable component one step."""
 

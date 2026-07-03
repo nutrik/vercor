@@ -31,11 +31,11 @@ def make_slab_seaice(grid: RectilinearGrid, name: str = "ICE") -> Component:
         ice_fraction = _diagnose_ice_fraction(sea_surface_temperature)
         return {"ice_fraction": ice_fraction}
 
-    return Component.from_model(
+    return Component.from_step(
         name=name,
         grid=grid,
         step=step,
         inputs=_SEAICE_INPUTS,
         outputs=_SEAICE_OUTPUTS,
-        default_fields=_SEAICE_DEFAULT_FIELDS,
+        defaults=_SEAICE_DEFAULT_FIELDS,
     )

@@ -8,7 +8,7 @@ from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components.base import Component
-    from vercor.components.contexts import ComponentSetupContext
+    from vercor.components.contexts import SetupContext
     from vercor.runtime.contracts import RuntimeComponentContract
     from vercor.runtime.state import RuntimeComponentState
 
@@ -18,7 +18,7 @@ class ComponentLifecycleMixin:
 
     def initialize(
         self,
-        context: "ComponentSetupContext",
+        context: "SetupContext",
     ) -> None:
         """Optionally initialize component-owned runtime data before coupling."""
 

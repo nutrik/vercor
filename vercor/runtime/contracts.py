@@ -69,16 +69,16 @@ def build_runtime_contracts(
                     f"Source component '{exchange.source}' not registered in coupler"
                 )
             continue
-        if exchange.destination not in known_components:
+        if exchange.target not in known_components:
             if validate_endpoints:
                 raise CouplerError(
-                    f"Destination component '{exchange.destination}' not registered in coupler"
+                    f"Destination component '{exchange.target}' not registered in coupler"
                 )
             continue
 
-        flattened_fields = flatten_exchange_fields(exchange.field_names)
+        flattened_fields = flatten_exchange_fields(exchange.fields)
         source_contract = contracts[exchange.source]
-        destination_contract = contracts[exchange.destination]
+        destination_contract = contracts[exchange.target]
         contracts[exchange.source] = RuntimeComponentContract(
             imports=source_contract.imports,
             exports=_extend_contract_fields(
@@ -86,7 +86,7 @@ def build_runtime_contracts(
                 flattened_fields,
             ),
         )
-        contracts[exchange.destination] = RuntimeComponentContract(
+        contracts[exchange.target] = RuntimeComponentContract(
             imports=_extend_contract_fields(
                 destination_contract.imports,
                 flattened_fields,

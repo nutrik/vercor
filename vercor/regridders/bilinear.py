@@ -1,5 +1,6 @@
 from typing import Any
 
+from vercor._deprecation import deprecated_getattr
 from vercor.exceptions import RegridderError
 from vercor.grid import RectilinearGrid
 from vercor.grid_geometry import grids_identical
@@ -87,4 +88,13 @@ def bilinear(
     )
 
 
-BilinearRegridder = BilinearRectilinearRegridder
+__getattr__ = deprecated_getattr(
+    __name__,
+    {
+        "BilinearRegridder": (
+            "vercor.regridders.bilinear.BilinearRectilinearRegridder",
+            BilinearRectilinearRegridder,
+        ),
+    },
+    remove_in="0.2.0",
+)

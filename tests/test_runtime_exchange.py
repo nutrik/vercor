@@ -47,9 +47,9 @@ def _component(
 def test_dispatch_component_exchanges_handles_scalar_masks_and_gradients() -> None:
     exchange = Exchange(
         source="OCN",
-        destination="ATM",
-        field_names=["temperature"],
-        regridder_factory=cast(Any, _factory),
+        target="ATM",
+        fields=["temperature"],
+        regrid=cast(Any, _factory),
     )
     regridders = {("OCN", "ATM", "_factory"): _ScalingRegridder(scale=2.0)}
 
@@ -91,9 +91,9 @@ def test_dispatch_component_exchanges_handles_scalar_masks_and_gradients() -> No
 def test_dispatch_component_exchanges_preserves_vector_regridding_behavior() -> None:
     exchange = Exchange(
         source="OCN",
-        destination="ATM",
-        field_names=[("u_velocity", "v_velocity")],
-        regridder_factory=cast(Any, _factory),
+        target="ATM",
+        fields=[("u_velocity", "v_velocity")],
+        regrid=cast(Any, _factory),
     )
     regridders = {("OCN", "ATM", "_factory"): _ScalingRegridder()}
     u_velocity = jnp.full((2, 2), 5.0)
@@ -133,15 +133,15 @@ def test_dispatch_component_exchanges_preserves_vector_regridding_behavior() -> 
 def test_runtime_dispatch_context_groups_exchanges_by_destination() -> None:
     atm_exchange = Exchange(
         source="OCN",
-        destination="ATM",
-        field_names=["temperature"],
-        regridder_factory=cast(Any, _factory),
+        target="ATM",
+        fields=["temperature"],
+        regrid=cast(Any, _factory),
     )
     land_exchange = Exchange(
         source="ATM",
-        destination="LND",
-        field_names=["temperature"],
-        regridder_factory=cast(Any, _factory),
+        target="LND",
+        fields=["temperature"],
+        regrid=cast(Any, _factory),
     )
 
     context = RuntimeDispatchContext(

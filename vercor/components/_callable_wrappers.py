@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, Any, Mapping, cast
 
 from vercor.components.contracts import (
     AuthorStepCallable,
-    ComponentFieldSpec,
     ComponentStepCallable,
     ComponentStepReturn,
+    FieldSpec,
 )
 from vercor.components._lifecycle import ComponentLifecycleHooks
 from vercor.components._runtime_fields import apply_step_result
@@ -16,7 +16,7 @@ from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components.base import Component
-    from vercor.components.contexts import ComponentStepContext
+    from vercor.components.contexts import StepContext
     from vercor.runtime.state import RuntimeComponentState
 
 
@@ -82,7 +82,7 @@ def normalize_component_step_callable(
 
         def step_fields_only(
             fields: Mapping[str, RuntimeArray],
-            context: ComponentStepContext,
+            context: StepContext,
             payload: Any | None,
         ) -> ComponentStepReturn:
             _ = context, payload
@@ -94,7 +94,7 @@ def normalize_component_step_callable(
 
         def step_fields_and_context(
             fields: Mapping[str, RuntimeArray],
-            context: ComponentStepContext,
+            context: StepContext,
             payload: Any | None,
         ) -> ComponentStepReturn:
             _ = payload
@@ -104,7 +104,7 @@ def normalize_component_step_callable(
 
     def step_fields_context_and_payload(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> ComponentStepReturn:
         return step(fields, context, payload)
@@ -132,7 +132,7 @@ class _CallableRuntimeMixin:
         *,
         step: AuthorStepCallable,
         payload: Any | None,
-        field_spec: ComponentFieldSpec,
+        field_spec: FieldSpec,
         lifecycle_hooks: ComponentLifecycleHooks,
     ) -> None:
         component = cast("Component", self)
@@ -149,7 +149,7 @@ class _CallableRuntimeMixin:
     def _step_callable_runtime_state(
         self,
         component_state: "RuntimeComponentState",
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> "RuntimeComponentState":
         """Advance callable-backed runtime state using the normalized step."""
 

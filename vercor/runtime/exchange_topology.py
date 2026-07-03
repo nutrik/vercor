@@ -33,19 +33,19 @@ def build_exchange_topology_maps(
         )
 
     for exchange in exchanges:
-        key = (exchange.source, exchange.destination, exchange.interpolation_type)
+        key = (exchange.source, exchange.target, exchange.interpolation_type)
 
         if key not in initialized_maps.regridders:
-            initialized_maps.regridders[key] = exchange.regridder_factory(
+            initialized_maps.regridders[key] = exchange.regrid(
                 components[exchange.source].grid,
-                components[exchange.destination].grid,
+                components[exchange.target].grid,
             )
             initialized_maps.binary_masks[key] = jax_ones(
-                components[exchange.destination].grid.shape,
+                components[exchange.target].grid.shape,
                 settings,
             )
             initialized_maps.fractional_masks[key] = jax_ones(
-                components[exchange.destination].grid.shape,
+                components[exchange.target].grid.shape,
                 settings,
             )
         else:

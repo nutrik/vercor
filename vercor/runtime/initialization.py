@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from vercor.clock import Clock
 from vercor.components.setup_validation import validate_component_setup
-from vercor.components.contexts import ComponentSetupContext
+from vercor.components.contexts import SetupContext
 from vercor.dtypes import as_jax_real_array
 from vercor.exchange import Exchange
 from vercor.jax_logging import LoggerLike
@@ -48,11 +48,11 @@ def apply_run_precision_to_component(
         for field_name, field_value in component.data.items()
     }
     field_spec = component.field_spec
-    if field_spec.default_fields:
+    if field_spec.defaults:
         component.declare_fields(
             inputs=field_spec.inputs,
             outputs=field_spec.outputs,
-            default_fields=field_spec.default_fields,
+            defaults=field_spec.defaults,
         )
 
 
@@ -89,7 +89,7 @@ def initialize_coupler_runtime(
     for component in components.values():
         apply_run_precision_to_component(component, settings)
 
-    init_context = ComponentSetupContext(
+    init_context = SetupContext(
         start=clock.start,
         dt_seconds=clock.dt_seconds,
         run_sequence=run_sequence,

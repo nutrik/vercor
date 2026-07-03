@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from vercor.components import (
     Component,
-    ComponentStepContext,
+    StepContext,
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grid import RectilinearGrid
@@ -33,7 +33,7 @@ def make_slab_land(grid: RectilinearGrid, name: str = "LND") -> Component:
 
     def step(
         fields: Mapping[str, Any],
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> Mapping[str, Any]:
         dt_seconds = context.dt_seconds
         soil_moisture = fields["soil_moisture"]
@@ -48,11 +48,11 @@ def make_slab_land(grid: RectilinearGrid, name: str = "LND") -> Component:
         )
         return {"soil_moisture": updated_soil_moisture}
 
-    return Component.from_model(
+    return Component.from_step(
         name=name,
         grid=grid,
         step=step,
         inputs=_LAND_INPUTS,
         outputs=_LAND_OUTPUTS,
-        default_fields=_LAND_DEFAULT_FIELDS,
+        defaults=_LAND_DEFAULT_FIELDS,
     )

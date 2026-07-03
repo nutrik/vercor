@@ -53,7 +53,7 @@ def make_jax_gcm(
         do_spinup=do_spinup,
         jitted=jitted,
     )
-    component = Component.from_model(
+    component = Component.from_step(
         name=name,
         grid=state.grid,
         step=partial(_jax_gcm_runtime.step_jax_gcm_component, state),
@@ -65,7 +65,7 @@ def make_jax_gcm(
             *_jax_gcm_fields.JAXGCM_OUTPUT_GRID_FIELD_NAMES,
             "pressure",
         ),
-        default_fields=_jax_gcm_runtime.jax_gcm_default_fields(),
+        defaults=_jax_gcm_runtime.jax_gcm_default_fields(),
         initialize=state.initialize,
         create_runtime_payload=partial(
             _jax_gcm_runtime.create_jax_gcm_runtime_payload,

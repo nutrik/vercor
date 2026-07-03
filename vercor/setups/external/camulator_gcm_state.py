@@ -10,8 +10,8 @@ import torch
 import xarray as xr
 
 from vercor.components import (
-    ComponentSetupContext,
-    HostRuntimeComponent,
+    HostComponent,
+    SetupContext,
 )
 from vercor.dtypes import jax_ones
 from vercor.grid import RectilinearGrid
@@ -118,8 +118,8 @@ class CAMulatorGCMSetupState:
 
     def initialize(
         self,
-        component: HostRuntimeComponent,
-        context: ComponentSetupContext,
+        component: HostComponent,
+        context: SetupContext,
     ) -> None:
         """Align timestep, initialize runtime forcing, and seed output fields."""
 

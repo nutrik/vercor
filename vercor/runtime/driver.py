@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from vercor.calendar import ModelDateTime
-from vercor.components.contexts import ComponentStepContext
+from vercor.components.contexts import StepContext
 from vercor.components.runtime_execution import step_component_runtime_state
 from vercor.jax_logging import LoggerLike
 from vercor.runtime.dispatch_context import RuntimeDispatchContext
@@ -39,7 +39,7 @@ def step_runtime_component(
         component_state,
         contract,
     )
-    step_context = ComponentStepContext(
+    step_context = StepContext(
         dt_seconds=dispatch_context.dt_seconds,
         settings=dispatch_context.settings,
         time=time,

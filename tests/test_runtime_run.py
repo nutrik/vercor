@@ -79,27 +79,27 @@ def _make_coupler(steps: int) -> Coupler:
     coupler.exchanges = [
         Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ATM",
+            fields=["sea_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         ),
         Exchange(
             source="ATM",
-            destination="OCN",
-            field_names=["sensible_heat_flux", "latent_heat_flux"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="OCN",
+            fields=["sensible_heat_flux", "latent_heat_flux"],
+            regrid=cast(Any, _identity_factory),
         ),
         Exchange(
             source="ATM",
-            destination="LND",
-            field_names=["latent_heat_flux"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="LND",
+            fields=["latent_heat_flux"],
+            regrid=cast(Any, _identity_factory),
         ),
         Exchange(
             source="OCN",
-            destination="ICE",
-            field_names=["sea_surface_temperature"],
-            regridder_factory=cast(Any, _identity_factory),
+            target="ICE",
+            fields=["sea_surface_temperature"],
+            regrid=cast(Any, _identity_factory),
         ),
     ]
     regridders = cast(

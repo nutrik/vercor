@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Callable, TypeAlias
 
+from vercor._deprecation import warn_deprecated_name
 from vercor.regridders.bilinear import BilinearRectilinearRegridder, bilinear
 from vercor.regridders.conservative import ConservativeRectilinearRegridder
 
@@ -68,6 +69,12 @@ class Exchange:
             raise TypeError("Use either fields or field_names, not both")
         if regridder_factory is not None and regrid is not bilinear:
             raise TypeError("Use either regrid or regridder_factory, not both")
+        if destination is not None:
+            warn_deprecated_name("destination", "target", remove_in="0.2.0")
+        if field_names is not None:
+            warn_deprecated_name("field_names", "fields", remove_in="0.2.0")
+        if regridder_factory is not None:
+            warn_deprecated_name("regridder_factory", "regrid", remove_in="0.2.0")
 
         resolved_target = target if target is not None else destination
         resolved_fields = fields if fields is not None else field_names
@@ -92,18 +99,33 @@ class Exchange:
     def destination(self) -> str:
         """Return legacy destination component name."""
 
+        warn_deprecated_name(
+            "Exchange.destination",
+            "Exchange.target",
+            remove_in="0.2.0",
+        )
         return self.target
 
     @property
     def field_names(self) -> Sequence[ExchangeField]:
         """Return legacy exchange field declaration."""
 
+        warn_deprecated_name(
+            "Exchange.field_names",
+            "Exchange.fields",
+            remove_in="0.2.0",
+        )
         return self.fields
 
     @property
     def regridder_factory(self) -> RegridderFactory:
         """Return legacy regridder factory."""
 
+        warn_deprecated_name(
+            "Exchange.regridder_factory",
+            "Exchange.regrid",
+            remove_in="0.2.0",
+        )
         return self.regrid
 
     @property

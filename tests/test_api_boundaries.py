@@ -23,7 +23,7 @@ from tests._architecture_support import package_import_cycles
 from tests._coverage_support import make_test_grid
 from vercor.components.base import Component
 from vercor.components.data import DataComponent
-from vercor.components.host import HostRuntimeComponent
+from vercor.components.host import HostComponent
 from vercor.clock import Clock
 from vercor.coupler import Coupler
 from vercor.exchange import Exchange
@@ -48,15 +48,17 @@ def test_v2_public_api_facade_exports_new_names_and_compatibility_aliases() -> N
         StepResult,
     )
 
-    assert vercor.HostRuntimeComponent is HostComponent
-    assert vercor.ComponentFieldSpec is FieldSpec
-    assert vercor.ComponentSetupContext is SetupContext
-    assert vercor.ComponentStepContext is StepContext
-    assert vercor.ComponentStepResult is StepResult
     assert vercor.Settings is Settings
     assert KEEP_PAYLOAD is vercor.KEEP_PAYLOAD
     assert ComponentView.__name__ == "ComponentView"
     assert CouplerState.__name__ == "CouplerState"
+    assert {
+        "ComponentFieldSpec",
+        "ComponentSetupContext",
+        "ComponentStepContext",
+        "ComponentStepResult",
+        "HostRuntimeComponent",
+    }.isdisjoint(vercor.__all__)
 
     spec = FieldSpec(
         inputs=("temperature", "temperature"),
@@ -68,11 +70,53 @@ def test_v2_public_api_facade_exports_new_names_and_compatibility_aliases() -> N
     assert spec.defaults == {"sea_surface_temperature": 280.0}
     assert spec.default_fields == spec.defaults
 
-    legacy_spec = vercor.ComponentFieldSpec(default_fields={"temperature": 280.0})
-    assert legacy_spec.defaults == {"temperature": 280.0}
-
     result = StepResult(fields={"temperature": jnp.asarray(281.0)})
     assert result.payload is KEEP_PAYLOAD
+
+    deprecated_aliases = (
+        (vercor, "ComponentFieldSpec", FieldSpec, "vercor.FieldSpec"),
+        (vercor, "ComponentSetupContext", SetupContext, "vercor.SetupContext"),
+        (vercor, "ComponentStepContext", StepContext, "vercor.StepContext"),
+        (vercor, "ComponentStepResult", StepResult, "vercor.StepResult"),
+        (vercor, "HostRuntimeComponent", HostComponent, "vercor.HostComponent"),
+        (
+            components_module,
+            "ComponentFieldSpec",
+            FieldSpec,
+            "vercor.components.FieldSpec",
+        ),
+        (
+            components_module,
+            "ComponentSetupContext",
+            SetupContext,
+            "vercor.components.SetupContext",
+        ),
+        (
+            components_module,
+            "ComponentStepContext",
+            StepContext,
+            "vercor.components.StepContext",
+        ),
+        (
+            components_module,
+            "ComponentStepResult",
+            StepResult,
+            "vercor.components.StepResult",
+        ),
+        (
+            components_module,
+            "HostRuntimeComponent",
+            HostComponent,
+            "vercor.components.HostComponent",
+        ),
+    )
+    for module, legacy_name, target, replacement in deprecated_aliases:
+        with pytest.warns(DeprecationWarning, match=f"use {replacement}"):
+            assert getattr(module, legacy_name) is target
+
+    with pytest.warns(DeprecationWarning, match="use defaults"):
+        legacy_spec = FieldSpec(default_fields={"temperature": 280.0})
+    assert legacy_spec.defaults == {"temperature": 280.0}
 
 
 @pytest.mark.fast_always
@@ -114,21 +158,30 @@ def test_v2_exchange_accepts_new_names_and_keeps_legacy_aliases() -> None:
 
     assert exchange.source == "ATM"
     assert exchange.target == "OCN"
-    assert exchange.destination == exchange.target
     assert exchange.fields == ("temperature", ("u_velocity", "v_velocity"))
-    assert exchange.field_names == exchange.fields
     assert exchange.regrid is bilinear
-    assert exchange.regridder_factory is exchange.regrid
     assert exchange.name is None
     assert exchange.label == "ATM --(bilinear)--> OCN"
     assert exchange.interpolation_type == "bilinear"
 
-    legacy_exchange = Exchange(
-        source="ATM",
-        destination="OCN",
-        field_names=("temperature",),
-        regridder_factory=bilinear,
-    )
+    with pytest.warns(DeprecationWarning, match="use Exchange.target"):
+        assert exchange.destination == exchange.target
+    with pytest.warns(DeprecationWarning, match="use Exchange.fields"):
+        assert exchange.field_names == exchange.fields
+    with pytest.warns(DeprecationWarning, match="use Exchange.regrid"):
+        assert exchange.regridder_factory is exchange.regrid
+
+    with pytest.warns(DeprecationWarning) as warning_records:
+        legacy_exchange = Exchange(
+            source="ATM",
+            destination="OCN",
+            field_names=("temperature",),
+            regridder_factory=bilinear,
+        )
+    warning_messages = [str(record.message) for record in warning_records]
+    assert any("use target" in message for message in warning_messages)
+    assert any("use fields" in message for message in warning_messages)
+    assert any("use regrid" in message for message in warning_messages)
     assert legacy_exchange.target == "OCN"
     assert legacy_exchange.fields == ("temperature",)
     assert legacy_exchange.regrid is bilinear
@@ -163,12 +216,12 @@ def test_v2_coupler_facade_wraps_runtime_state_and_views() -> None:
 
 @pytest.mark.fast_always
 def test_v2_shallow_setup_regridding_grid_and_exchange_imports() -> None:
-    from vercor.exchanges import OCEAN_TO_ATMOSPHERE_SURFACE
+    from vercor.exchanges import OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS
     from vercor.grids import RectilinearGrid as PublicRectilinearGrid
     from vercor.grids import rectilinear
     from vercor.regridding import (
-        BilinearRegridder,
-        ConservativeRegridder,
+        BilinearRectilinearRegridder as PublicBilinearRectilinearRegridder,
+        ConservativeRectilinearRegridder as PublicConservativeRectilinearRegridder,
         bilinear as public_bilinear,
         conservative as public_conservative,
     )
@@ -186,10 +239,14 @@ def test_v2_shallow_setup_regridding_grid_and_exchange_imports() -> None:
 
     assert isinstance(grid, PublicRectilinearGrid)
     assert public_bilinear is bilinear
-    assert issubclass(BilinearRectilinearRegridder, BilinearRegridder)
-    assert issubclass(ConservativeRectilinearRegridder, ConservativeRegridder)
+    assert PublicBilinearRectilinearRegridder is BilinearRectilinearRegridder
+    assert PublicConservativeRectilinearRegridder is ConservativeRectilinearRegridder
     assert callable(public_conservative)
-    assert OCEAN_TO_ATMOSPHERE_SURFACE == ("sea_surface_temperature",)
+    assert OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS == ("sea_surface_temperature",)
+    with pytest.warns(DeprecationWarning, match="OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS"):
+        from vercor.exchanges import OCEAN_TO_ATMOSPHERE_SURFACE
+
+        assert OCEAN_TO_ATMOSPHERE_SURFACE == ("sea_surface_temperature",)
     assert make_slab_ocean(grid).name == "OCN"
 
 
@@ -199,18 +256,18 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
         "Clock",
         "Component",
         "ComponentCreatePayloadHook",
-        "ComponentFieldSpec",
         "ComponentInitializeHook",
         "ComponentPrefillHook",
-        "ComponentSetupContext",
-        "ComponentStepContext",
-        "ComponentStepResult",
         "ComponentValidateHook",
         "Coupler",
         "DataComponent",
         "Exchange",
-        "HostRuntimeComponent",
+        "FieldSpec",
+        "HostComponent",
         "RectilinearGrid",
+        "SetupContext",
+        "StepContext",
+        "StepResult",
     }
     runtime_internal_names = {
         "ComponentInitContext",
@@ -243,7 +300,6 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
         vercor.ComponentCreatePayloadHook
         is component_contracts_module.ComponentCreatePayloadHook
     )
-    assert vercor.ComponentFieldSpec is component_contracts_module.ComponentFieldSpec
     assert (
         vercor.ComponentInitializeHook
         is component_contracts_module.ComponentInitializeHook
@@ -251,18 +307,17 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
     assert (
         vercor.ComponentPrefillHook is component_contracts_module.ComponentPrefillHook
     )
-    assert (
-        vercor.ComponentSetupContext is component_contexts_module.ComponentSetupContext
-    )
-    assert vercor.ComponentStepContext is component_contexts_module.ComponentStepContext
-    assert vercor.ComponentStepResult is component_contracts_module.ComponentStepResult
+    assert vercor.FieldSpec is component_contracts_module.FieldSpec
+    assert vercor.SetupContext is component_contexts_module.SetupContext
+    assert vercor.StepContext is component_contexts_module.StepContext
+    assert vercor.StepResult is component_contracts_module.StepResult
     assert (
         vercor.ComponentValidateHook is component_contracts_module.ComponentValidateHook
     )
     data_component_type = getattr(components_module, "DataComponent", None)
     assert data_component_type is not None
     assert getattr(vercor, "DataComponent", None) is data_component_type
-    assert vercor.HostRuntimeComponent is HostRuntimeComponent
+    assert vercor.HostComponent is host_module.HostComponent
     for name in (*runtime_internal_names, *removed_compatibility_names):
         assert not hasattr(vercor, name)
 
@@ -297,18 +352,13 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert components_module.__all__ == [
         "Component",
         "ComponentCreatePayloadHook",
-        "ComponentFieldSpec",
         "ComponentHooks",
         "ComponentInitializeHook",
         "ComponentPrefillHook",
-        "ComponentSetupContext",
-        "ComponentStepContext",
-        "ComponentStepResult",
         "ComponentValidateHook",
         "DataComponent",
         "FieldSpec",
         "HostComponent",
-        "HostRuntimeComponent",
         "KEEP_PAYLOAD",
         "SetupContext",
         "StepContext",
@@ -319,8 +369,6 @@ def test_components_package_exports_only_component_author_contracts() -> None:
         components_module.ComponentCreatePayloadHook
         is contracts_module.ComponentCreatePayloadHook
     )
-    assert components_module.ComponentFieldSpec is contracts_module.ComponentFieldSpec
-    assert components_module.ComponentFieldSpec is contracts_module.FieldSpec
     assert components_module.ComponentHooks is contracts_module.ComponentHooks
     assert (
         components_module.ComponentInitializeHook
@@ -330,23 +378,6 @@ def test_components_package_exports_only_component_author_contracts() -> None:
         components_module.ComponentPrefillHook is contracts_module.ComponentPrefillHook
     )
     assert (
-        components_module.ComponentSetupContext
-        is component_contexts_module.ComponentSetupContext
-    )
-    assert (
-        components_module.ComponentSetupContext
-        is component_contexts_module.SetupContext
-    )
-    assert (
-        components_module.ComponentStepContext
-        is component_contexts_module.ComponentStepContext
-    )
-    assert (
-        components_module.ComponentStepContext is component_contexts_module.StepContext
-    )
-    assert components_module.ComponentStepResult is contracts_module.ComponentStepResult
-    assert components_module.ComponentStepResult is contracts_module.StepResult
-    assert (
         components_module.ComponentValidateHook
         is contracts_module.ComponentValidateHook
     )
@@ -354,9 +385,43 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert host_module is imported_host_module
     assert components_module.DataComponent is data_module.DataComponent
     assert components_module.HostComponent is host_module.HostComponent
-    assert components_module.HostRuntimeComponent is host_module.HostRuntimeComponent
-    assert components_module.HostRuntimeComponent is host_module.HostComponent
+    assert components_module.FieldSpec is contracts_module.FieldSpec
+    assert components_module.SetupContext is component_contexts_module.SetupContext
+    assert components_module.StepContext is component_contexts_module.StepContext
+    assert components_module.StepResult is contracts_module.StepResult
     assert components_module.KEEP_PAYLOAD is contracts_module.KEEP_PAYLOAD
+
+    deprecated_aliases = (
+        (components_module, "ComponentFieldSpec", contracts_module.FieldSpec),
+        (
+            components_module,
+            "ComponentSetupContext",
+            component_contexts_module.SetupContext,
+        ),
+        (
+            components_module,
+            "ComponentStepContext",
+            component_contexts_module.StepContext,
+        ),
+        (components_module, "ComponentStepResult", contracts_module.StepResult),
+        (components_module, "HostRuntimeComponent", host_module.HostComponent),
+        (contracts_module, "ComponentFieldSpec", contracts_module.FieldSpec),
+        (contracts_module, "ComponentStepResult", contracts_module.StepResult),
+        (
+            component_contexts_module,
+            "ComponentSetupContext",
+            component_contexts_module.SetupContext,
+        ),
+        (
+            component_contexts_module,
+            "ComponentStepContext",
+            component_contexts_module.StepContext,
+        ),
+        (host_module, "HostRuntimeComponent", host_module.HostComponent),
+    )
+    for module, legacy_name, target in deprecated_aliases:
+        with pytest.warns(DeprecationWarning):
+            assert getattr(module, legacy_name) is target
     assert setup_validation_module.validate_component_setup is not None
     assert "FieldDefaults" not in contracts_module.__all__
     assert "FieldDefaults" not in private_contracts_module.__all__
@@ -515,8 +580,8 @@ def test_coupler_private_compatibility_aliases_are_removed() -> None:
 @pytest.mark.fast_always
 def test_callable_author_api_does_not_expose_legacy_field_seed_keyword() -> None:
     public_callables = (
-        components_module.Component.from_model,
-        components_module.HostRuntimeComponent.from_model,
+        components_module.Component.from_step,
+        components_module.HostComponent.from_step,
     )
     removed_keyword = "initial" + "_fields"
 
@@ -524,8 +589,28 @@ def test_callable_author_api_does_not_expose_legacy_field_seed_keyword() -> None
         parameters = signature(callable_factory).parameters
         assert removed_keyword not in parameters
         assert "required_fields" not in parameters
+        assert "defaults" in parameters
+        assert "default_fields" in parameters
         assert parameters["payload"].kind is parameters["payload"].KEYWORD_ONLY
         assert parameters["settings"].kind is parameters["settings"].KEYWORD_ONLY
+
+    grid = make_test_grid(name="deprecated-from-model")
+    with pytest.warns(DeprecationWarning, match="from_step"):
+        components_module.Component.from_model(
+            "ATM",
+            grid,
+            lambda fields: {},
+            outputs=("temperature",),
+            defaults={"temperature": 280.0},
+        )
+    with pytest.warns(DeprecationWarning, match="from_step"):
+        components_module.HostComponent.from_model(
+            "LND",
+            grid,
+            lambda fields: {},
+            outputs=("temperature",),
+            defaults={"temperature": 280.0},
+        )
 
 
 @pytest.mark.fast_always
@@ -560,22 +645,31 @@ def test_component_base_internals_are_private_modules() -> None:
     validation_source = Path("vercor/components/setup_validation.py").read_text(
         encoding="utf-8"
     )
+    constructor_options_source = Path(
+        "vercor/components/_constructor_options.py"
+    ).read_text(encoding="utf-8")
 
     assert "class FieldSpec" in public_contracts_source
-    assert "ComponentFieldSpec = FieldSpec" in public_contracts_source
     assert "class StepResult" in public_contracts_source
-    assert "ComponentStepResult = StepResult" in public_contracts_source
     assert "ComponentInitializeHook =" in public_contracts_source
     assert "ComponentCreatePayloadHook =" in public_contracts_source
     assert "ComponentPrefillHook =" in public_contracts_source
     assert "ComponentValidateHook =" in public_contracts_source
+    assert "__getattr__ = deprecated_getattr(" in public_contracts_source
+    assert "ComponentFieldSpec" not in component_contracts_module.__all__
+    assert "ComponentStepResult" not in component_contracts_module.__all__
     assert "class ComponentFieldSpec" not in contracts_source
     assert "class ComponentStepResult" not in contracts_source
     assert "class DataComponent" in data_source
     assert "class HostComponent" in host_source
-    assert "HostRuntimeComponent = HostComponent" in host_source
+    assert "HostRuntimeComponent = HostComponent" not in host_source
     assert "class DataComponent" not in base_source
     assert "class HostRuntimeComponent" not in base_source
+    assert "def normalize_field_spec(" in constructor_options_source
+    assert "def normalize_lifecycle_hooks(" in constructor_options_source
+    assert "normalize_field_spec(" in base_source
+    assert "normalize_field_spec(" in host_source
+    assert "normalize_lifecycle_hooks(" in data_source
     assert "def normalize_author_field_values" in contracts_source
     assert "class _CallableRuntimeMixin" in callable_source
     assert "def normalize_component_step_callable" in callable_source
@@ -628,7 +722,7 @@ def test_component_base_internals_are_private_modules() -> None:
     assert "class ComponentLifecycleOwner" not in lifecycle_source
     assert "def with_updates(" not in lifecycle_source
     assert "component._lifecycle_hooks = lifecycle_hooks" in callable_source
-    assert "ComponentLifecycleHooks(" in data_source
+    assert "normalize_lifecycle_hooks(" in data_source
     assert "ComponentInitializeHook =" not in lifecycle_source
     assert "ComponentCreatePayloadHook =" not in lifecycle_source
     assert "ComponentPrefillHook =" not in lifecycle_source
@@ -860,12 +954,16 @@ def test_setup_forcing_reader_facade_is_removed() -> None:
 @pytest.mark.fast_always
 def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
     from vercor.setups.coupler_helpers import (
-        ExchangeSpec,
         add_exchange_specs,
         add_exchanges,
         build_coupler,
         build_exchanges,
     )
+
+    with pytest.warns(DeprecationWarning, match="Exchange"):
+        from vercor.setups.coupler_helpers import ExchangeSpec as LegacyExchangeSpec
+
+    assert LegacyExchangeSpec is Exchange
 
     grid = make_test_grid(name="shared")
     ocean = DataComponent(name="OCN", grid=grid)
@@ -874,17 +972,19 @@ def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
     run_sequence = ("OCN", "ATM")
     exchange = Exchange(
         source="OCN",
-        destination="ATM",
-        field_names=["sea_surface_temperature"],
-        regridder_factory=bilinear,
+        target="ATM",
+        fields=["sea_surface_temperature"],
+        regrid=bilinear,
     )
 
-    coupler = build_coupler(
-        clock=clock,
-        components=(ocean, atmosphere),
-        run_sequence=run_sequence,
-    )
-    add_exchanges(coupler, (exchange,))
+    with pytest.warns(DeprecationWarning, match="Coupler.from_components"):
+        coupler = build_coupler(
+            clock=clock,
+            components=(ocean, atmosphere),
+            run_sequence=run_sequence,
+        )
+    with pytest.warns(DeprecationWarning, match="Coupler.add_exchanges"):
+        add_exchanges(coupler, (exchange,))
 
     assert coupler.clock is clock
     assert tuple(coupler.components) == ("OCN", "ATM")
@@ -892,28 +992,34 @@ def test_setup_coupler_helpers_register_components_and_add_exchanges() -> None:
     assert coupler.exchanges == [exchange]
 
     specs = (
-        ExchangeSpec(
+        Exchange(
             source="OCN",
-            destination="ATM",
-            field_names=("sea_surface_temperature",),
-            regridder_factory=bilinear,
+            target="ATM",
+            fields=("sea_surface_temperature",),
+            regrid=bilinear,
         ),
     )
-    built = build_exchanges(specs)
+    with pytest.warns(DeprecationWarning, match="tuple"):
+        built = build_exchanges(specs)
     assert len(built) == 1
     assert built[0].source == exchange.source
-    assert built[0].destination == exchange.destination
-    assert tuple(built[0].field_names) == tuple(exchange.field_names)
-    assert built[0].regridder_factory is exchange.regridder_factory
+    assert built[0].target == exchange.target
+    assert tuple(built[0].fields) == tuple(exchange.fields)
+    assert built[0].regrid is exchange.regrid
 
-    second_coupler = build_coupler(
-        clock=clock,
-        components=(ocean, atmosphere),
-        run_sequence=run_sequence,
-    )
-    add_exchange_specs(second_coupler, specs)
+    with pytest.warns(DeprecationWarning, match="Coupler.from_components"):
+        second_coupler = build_coupler(
+            clock=clock,
+            components=(ocean, atmosphere),
+            run_sequence=run_sequence,
+        )
+    with pytest.warns(DeprecationWarning) as warning_records:
+        add_exchange_specs(second_coupler, specs)
+    warning_messages = [str(record.message) for record in warning_records]
+    assert any("Coupler.add_exchanges" in message for message in warning_messages)
+    assert any("tuple" in message for message in warning_messages)
     assert len(second_coupler.exchanges) == 1
-    assert second_coupler.exchanges[0].field_names == ("sea_surface_temperature",)
+    assert second_coupler.exchanges[0].fields == ("sea_surface_temperature",)
 
 
 @pytest.mark.fast_always
@@ -934,7 +1040,6 @@ def test_coupler_accepts_plain_component_name_sequences() -> None:
     import numpy as np
 
     from tests._coverage_support import make_test_grid as _make_grid
-    from vercor.setups.coupler_helpers import build_coupler
 
     clock = Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1)
     grid = _make_grid("grid")
@@ -949,15 +1054,16 @@ def test_coupler_accepts_plain_component_name_sequences() -> None:
         fields={"sea_surface_temperature": np.zeros(grid.shape)},
     )
 
-    coupler = build_coupler(
+    coupler = Coupler.from_components(
         clock=clock,
         components=(ocean, atmosphere),
-        run_sequence=["OCN", "ATM"],
+        run_order=["OCN", "ATM"],
     )
 
     assert coupler.run_sequence == ("OCN", "ATM")
 
-    coupler.set_components_run_sequence(("ATM", "OCN"))
+    with pytest.warns(DeprecationWarning, match="set_run_order"):
+        coupler.set_components_run_sequence(("ATM", "OCN"))
     assert coupler.run_sequence == ("ATM", "OCN")
 
 
@@ -1073,7 +1179,12 @@ def test_old_concrete_component_packages_are_removed() -> None:
 
 @pytest.mark.fast_always
 def test_setup_modules_do_not_subclass_component_contracts() -> None:
-    forbidden_bases = {"Component", "DataComponent", "HostRuntimeComponent"}
+    forbidden_bases = {
+        "Component",
+        "DataComponent",
+        "HostComponent",
+        "HostRuntimeComponent",
+    }
     for path in Path("vercor/setups").rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
@@ -1793,23 +1904,32 @@ def test_common_exchange_recipes_are_centralized_for_examples() -> None:
     import vercor.exchanges as exchanges_module
 
     required_recipes = (
-        "ATMOSPHERE_TO_DATA_OCEAN",
         "ATMOSPHERE_TO_DATA_OCEAN_FIELDS",
-        "ATMOSPHERE_TO_LAND_RADIATION",
         "ATMOSPHERE_TO_LAND_RADIATION_FIELDS",
-        "ATMOSPHERE_TO_LAND_STATE",
         "ATMOSPHERE_TO_LAND_STATE_FIELDS",
-        "LAND_TO_ATMOSPHERE_SURFACE",
         "LAND_TO_ATMOSPHERE_SURFACE_FIELDS",
-        "OCEAN_TO_ATMOSPHERE_SURFACE",
         "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS",
-        "SLAB_ATMOSPHERE_TO_LAND_FLUX",
         "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS",
-        "SLAB_ATMOSPHERE_TO_OCEAN_FLUX",
         "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS",
     )
     for recipe_name in required_recipes:
         assert hasattr(exchanges_module, recipe_name)
+
+    deprecated_recipe_aliases = (
+        "ATMOSPHERE_TO_DATA_OCEAN",
+        "ATMOSPHERE_TO_LAND_RADIATION",
+        "ATMOSPHERE_TO_LAND_STATE",
+        "LAND_TO_ATMOSPHERE_SURFACE",
+        "OCEAN_TO_ATMOSPHERE_SURFACE",
+        "SLAB_ATMOSPHERE_TO_LAND_FLUX",
+        "SLAB_ATMOSPHERE_TO_OCEAN_FLUX",
+    )
+    for recipe_name in deprecated_recipe_aliases:
+        with pytest.warns(DeprecationWarning, match=f"{recipe_name}_FIELDS"):
+            assert getattr(exchanges_module, recipe_name) == getattr(
+                exchanges_module,
+                f"{recipe_name}_FIELDS",
+            )
 
     recipe_users = (
         Path("examples/run_jcm_with_verosdata.py"),
@@ -2009,7 +2129,7 @@ def test_data_and_host_factories_return_core_contract_instances() -> None:
     assert callable(make_era5_land)
     assert callable(make_camulator_gcm)
     assert issubclass(DataComponent, Component)
-    assert issubclass(HostRuntimeComponent, Component)
+    assert issubclass(HostComponent, Component)
 
 
 @pytest.mark.fast_always

@@ -27,7 +27,7 @@ from tests.assertions import assert_allclose_compact
 from vercor.forcing_data import read_forcing
 from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
 from vercor.clock import Clock
-from vercor.components.contexts import ComponentSetupContext, ComponentStepContext
+from vercor.components.contexts import SetupContext, StepContext
 from vercor.coupler import Coupler
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.output import write_runtime_component_view_to_netcdf
@@ -54,7 +54,7 @@ class _RuntimeOnlyComponent(base_module.Component):
     def step_runtime_state(
         self,
         component_state: RuntimeComponentState,
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> RuntimeComponentState:
         data = component_state.data.set(
             "temperature",
@@ -70,17 +70,17 @@ class _MissingSetupComponent(base_module.Component):
     def step_runtime_state(
         self,
         component_state: RuntimeComponentState,
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> RuntimeComponentState:
         _ = context
         return component_state
 
 
-class _HostStepOnlyComponent(host_module.HostRuntimeComponent):
+class _HostStepOnlyComponent(host_module.HostComponent):
     def step_host_runtime_state(
         self,
         component_state: RuntimeComponentState,
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> RuntimeComponentState:
         _ = context
         return component_state
@@ -112,7 +112,7 @@ def test_component_runtime_execution_policy_steps_selected_runtime_path() -> Non
         def step_runtime_state(
             self,
             component_state: RuntimeComponentState,
-            context: ComponentStepContext,
+            context: StepContext,
         ) -> RuntimeComponentState:
             _ = context
             return component_state.with_data(
@@ -122,11 +122,11 @@ def test_component_runtime_execution_policy_steps_selected_runtime_path() -> Non
                 )
             )
 
-    class HostMarkerComponent(host_module.HostRuntimeComponent):
+    class HostMarkerComponent(host_module.HostComponent):
         def step_host_runtime_state(
             self,
             component_state: RuntimeComponentState,
-            context: ComponentStepContext,
+            context: StepContext,
         ) -> RuntimeComponentState:
             _ = context
             return component_state.with_data(
@@ -137,7 +137,7 @@ def test_component_runtime_execution_policy_steps_selected_runtime_path() -> Non
             )
 
     grid = make_test_grid()
-    context = ComponentStepContext(dt_seconds=1.0, settings=VercorSettings())
+    context = StepContext(dt_seconds=1.0, settings=VercorSettings())
     state = RuntimeComponentState(
         data=RuntimeFieldStore.from_mapping({"marker": jnp.asarray(0.0)}),
         incoming=RuntimeFieldStore.empty(),
@@ -179,7 +179,7 @@ def test_active_component_requires_explicit_runtime_step() -> None:
 
 @pytest.mark.fast_always
 def test_host_runtime_component_requires_explicit_host_step() -> None:
-    class MissingHostStep(host_module.HostRuntimeComponent):
+    class MissingHostStep(host_module.HostComponent):
         pass
 
     with pytest.raises(TypeError, match="step_host_runtime_state"):
@@ -203,7 +203,7 @@ def test_data_component_uses_explicit_noop_runtime_step() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        ComponentStepContext(dt_seconds=60.0, settings=VercorSettings()),
+        StepContext(dt_seconds=60.0, settings=VercorSettings()),
     )
 
     assert stepped is state
@@ -235,9 +235,7 @@ def test_data_component_from_fields_accepts_lifecycle_hooks() -> None:
     grid = make_test_grid(name="data-facade-hooks")
     calls: list[str] = []
 
-    def initialize(
-        component: base_module.Component, context: ComponentSetupContext
-    ) -> None:
+    def initialize(component: base_module.Component, context: SetupContext) -> None:
         calls.append(f"initialize:{component.name}:{context.dt_seconds}")
         component.seed_field("temperature", 280.0)
 
@@ -272,7 +270,7 @@ def test_data_component_from_fields_accepts_lifecycle_hooks() -> None:
         prefill_runtime_state_fields=prefill_runtime_state_fields,
         validate_runtime_state=validate_runtime_state,
     )
-    context = ComponentSetupContext(
+    context = SetupContext(
         start=datetime(2000, 1, 1),
         dt_seconds=60.0,
         logger=cast(Any, None),
@@ -302,14 +300,14 @@ def test_data_component_from_fields_accepts_lifecycle_hooks() -> None:
 def test_legacy_wrapper_entrypoints_are_removed() -> None:
     assert not hasattr(base_module.Component, "wrap")
     assert not hasattr(data_module.DataComponent, "wrap")
-    assert not hasattr(host_module.HostRuntimeComponent, "wrap")
+    assert not hasattr(host_module.HostComponent, "wrap")
     assert not hasattr(base_module, "make_data_component")
     assert not hasattr(base_module, "make_differentiable_component")
     assert not hasattr(base_module, "make_host_component")
 
 
 @pytest.mark.fast_always
-def test_from_fields_and_from_model_facade_expand_scalar_defaults() -> None:
+def test_from_fields_and_from_step_facade_expand_scalar_defaults() -> None:
     grid = make_test_grid(name="facade")
 
     data_component = data_module.DataComponent.from_fields(
@@ -325,7 +323,7 @@ def test_from_fields_and_from_model_facade_expand_scalar_defaults() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = payload
@@ -334,12 +332,12 @@ def test_from_fields_and_from_model_facade_expand_scalar_defaults() -> None:
             "tendency": fields["tendency"] + context.dt_seconds,
         }
 
-    component = base_module.Component.from_model(
+    component = base_module.Component.from_step(
         name="ATM",
         grid=grid,
         step=step,
         outputs=("temperature", "tendency"),
-        default_fields={"temperature": 280.0, "forcing": 2.0},
+        defaults={"temperature": 280.0, "forcing": 2.0},
     )
     state = create_runtime_component_state(
         component,
@@ -354,7 +352,7 @@ def test_from_fields_and_from_model_facade_expand_scalar_defaults() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        ComponentStepContext(dt_seconds=3.0, settings=VercorSettings()),
+        StepContext(dt_seconds=3.0, settings=VercorSettings()),
     )
     assert_allclose_compact(
         stepped.data.get("temperature"),
@@ -411,13 +409,13 @@ def test_callable_facade_accepts_one_two_and_three_argument_steps() -> None:
 
     def fields_and_context(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> Mapping[str, RuntimeArray]:
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
     def fields_context_payload(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         assert isinstance(payload, Mapping)
@@ -428,27 +426,27 @@ def test_callable_facade_accepts_one_two_and_three_argument_steps() -> None:
         }
 
     components = (
-        base_module.Component.from_model(
+        base_module.Component.from_step(
             name="ONE",
             grid=grid,
             step=fields_only,
             outputs=("temperature",),
-            default_fields={"temperature": 280.0},
+            defaults={"temperature": 280.0},
         ),
-        base_module.Component.from_model(
+        base_module.Component.from_step(
             name="TWO",
             grid=grid,
             step=fields_and_context,
             outputs=("temperature",),
-            default_fields={"temperature": 280.0},
+            defaults={"temperature": 280.0},
         ),
-        base_module.Component.from_model(
+        base_module.Component.from_step(
             name="THREE",
             grid=grid,
             step=fields_context_payload,
             payload={"offset": 3.0},
             outputs=("temperature",),
-            default_fields={"temperature": 280.0},
+            defaults={"temperature": 280.0},
         ),
     )
 
@@ -464,7 +462,7 @@ def test_callable_facade_accepts_one_two_and_three_argument_steps() -> None:
         )
         stepped = component.step_runtime_state(
             state,
-            ComponentStepContext(dt_seconds=2.0, settings=VercorSettings()),
+            StepContext(dt_seconds=2.0, settings=VercorSettings()),
         )
         assert_allclose_compact(
             stepped.data.get("temperature"),
@@ -478,7 +476,7 @@ def test_callable_facade_rejects_unsupported_step_signature() -> None:
 
     def too_many_arguments(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
         extra: object,
     ) -> Mapping[str, RuntimeArray]:
@@ -489,7 +487,7 @@ def test_callable_facade_rejects_unsupported_step_signature() -> None:
         ComponentError,
         match="step callable.*1, 2, or 3 positional arguments",
     ):
-        base_module.Component.from_model(
+        base_module.Component.from_step(
             name="ATM",
             grid=grid,
             step=too_many_arguments,
@@ -505,7 +503,7 @@ def test_callable_facade_rejects_removed_legacy_field_seed_keyword() -> None:
 
     removed_keyword = "initial" + "_fields"
     with pytest.raises(TypeError, match=removed_keyword):
-        cast(Any, base_module.Component.from_model)(
+        cast(Any, base_module.Component.from_step)(
             name="ATM",
             grid=grid,
             step=step,
@@ -520,7 +518,7 @@ def test_seed_declared_defaults_and_field_names_expose_author_state() -> None:
     component = _RuntimeOnlyComponent(name="ATM", grid=grid)
     component.declare_fields(
         outputs=("temperature", "humidity"),
-        default_fields={"temperature": 280.0, "humidity": 0.5},
+        defaults={"temperature": 280.0, "humidity": 0.5},
     )
 
     returned = component.seed_declared_defaults()
@@ -537,11 +535,11 @@ def test_base_initialize_seeds_declared_defaults() -> None:
     component = _RuntimeOnlyComponent(name="ATM", grid=grid)
     component.declare_fields(
         outputs=("temperature", "humidity"),
-        default_fields={"temperature": 280.0, "humidity": 0.5},
+        defaults={"temperature": 280.0, "humidity": 0.5},
     )
 
     component.initialize(
-        ComponentSetupContext(
+        SetupContext(
             start=datetime(2000, 1, 1),
             dt_seconds=60.0,
             logger=cast(Any, None),
@@ -598,7 +596,7 @@ def test_apply_step_result_updates_fields_and_payload() -> None:
 
     updated = component.apply_step_result(
         state,
-        contracts_module.ComponentStepResult(
+        contracts_module.StepResult(
             fields={"temperature": jnp.full(grid.shape, 281.0)},
             payload={"counter": 1},
         ),
@@ -626,10 +624,10 @@ def test_data_component_seeding_updates_declared_outputs() -> None:
 
 @pytest.mark.fast_always
 def test_merge_component_outputs_is_pure_and_preserves_contract_details() -> None:
-    field_spec = contracts_module.ComponentFieldSpec(
+    field_spec = contracts_module.FieldSpec(
         inputs=("forcing",),
         outputs=("temperature",),
-        default_fields={"temperature": 280.0},
+        defaults={"temperature": 280.0},
     )
 
     merged = merge_component_outputs(field_spec, ("humidity", "temperature"))
@@ -638,7 +636,7 @@ def test_merge_component_outputs_is_pure_and_preserves_contract_details() -> Non
     assert field_spec.outputs == ("temperature",)
     assert merged.inputs == ("forcing",)
     assert merged.outputs == ("temperature", "humidity")
-    assert merged.default_fields == {"temperature": 280.0}
+    assert merged.defaults == {"temperature": 280.0}
 
 
 @pytest.mark.fast_always
@@ -647,14 +645,14 @@ def test_data_component_seeding_preserves_inputs_and_defaults() -> None:
     component = data_module.DataComponent(name="DATA", grid=grid)
     component.declare_fields(
         inputs=("forcing",),
-        default_fields={"temperature": 280.0},
+        defaults={"temperature": 280.0},
     )
 
     component.seed_fields({"humidity": 0.5})
 
     assert component.field_spec.inputs == ("forcing",)
     assert component.field_spec.outputs == ("humidity",)
-    assert "temperature" in component.field_spec.default_fields
+    assert "temperature" in component.field_spec.defaults
 
 
 @pytest.mark.fast_always
@@ -665,7 +663,7 @@ def test_constructor_lifecycle_hooks_are_stored_in_single_private_container() ->
     def step(fields: Mapping[str, RuntimeArray]) -> Mapping[str, RuntimeArray]:
         return {"temperature": fields["temperature"] + 1.0}
 
-    def initialize(component: Any, context: ComponentSetupContext) -> None:
+    def initialize(component: Any, context: SetupContext) -> None:
         _ = context
         events.append(f"initialize:{component.name}")
 
@@ -702,7 +700,7 @@ def test_constructor_lifecycle_hooks_are_stored_in_single_private_container() ->
             prefill_runtime_state_fields=prefill,
             validate_runtime_state=validate,
         ),
-        base_module.Component.from_model(
+        base_module.Component.from_step(
             name="ATM",
             grid=grid,
             step=step,
@@ -711,7 +709,7 @@ def test_constructor_lifecycle_hooks_are_stored_in_single_private_container() ->
             prefill_runtime_state_fields=prefill,
             validate_runtime_state=validate,
         ),
-        host_module.HostRuntimeComponent.from_model(
+        host_module.HostComponent.from_step(
             name="HOST",
             grid=grid,
             step=step,
@@ -720,7 +718,7 @@ def test_constructor_lifecycle_hooks_are_stored_in_single_private_container() ->
             prefill_runtime_state_fields=prefill,
             validate_runtime_state=validate,
         ),
-        base_module.Component.from_model(
+        base_module.Component.from_step(
             name="DIRECT",
             grid=grid,
             step=step,
@@ -729,7 +727,7 @@ def test_constructor_lifecycle_hooks_are_stored_in_single_private_container() ->
             prefill_runtime_state_fields=prefill,
             validate_runtime_state=validate,
         ),
-        host_module.HostRuntimeComponent.from_model(
+        host_module.HostComponent.from_step(
             name="DIRECT_HOST",
             grid=grid,
             step=step,
@@ -745,7 +743,7 @@ def test_constructor_lifecycle_hooks_are_stored_in_single_private_container() ->
         assert not hasattr(component, "_initialize_hook")
         assert not hasattr(component, "_create_runtime_payload_hook")
         component.initialize(
-            ComponentSetupContext(
+            SetupContext(
                 start=datetime(2000, 1, 1),
                 dt_seconds=60.0,
                 logger=cast(Any, None),
@@ -792,15 +790,15 @@ def test_seed_helpers_accept_scalar_author_values_and_expose_field_spec() -> Non
     returned_spec = component.declare_fields(
         inputs=("forcing",),
         outputs=("temperature",),
-        default_fields={"pressure": 101325.0},
+        defaults={"pressure": 101325.0},
     )
     assert component.field_spec == returned_spec
     assert component.field_spec.inputs == ("forcing",)
     assert component.field_spec.outputs == ("temperature",)
     assert not hasattr(component.field_spec, "required_fields")
-    assert "pressure" in component.field_spec.default_fields
+    assert "pressure" in component.field_spec.defaults
     with pytest.raises(AttributeError):
-        component.field_spec = contracts_module.ComponentFieldSpec()  # type: ignore[misc]
+        component.field_spec = contracts_module.FieldSpec()  # type: ignore[misc]
 
     component.seed_field("temperature", 280.0)
     component.seed_fields({"humidity": 0.5, "forcing": jnp.ones(grid.shape)})
@@ -841,21 +839,21 @@ def test_required_fields_declaration_api_is_removed() -> None:
         return {"temperature": fields["temperature"]}
 
     rejected_callables: tuple[tuple[Any, dict[str, Any]], ...] = (
-        (contracts_module.ComponentFieldSpec, {}),
+        (contracts_module.FieldSpec, {}),
         (
-            base_module.Component.from_model,
+            base_module.Component.from_step,
             {"name": "ATM", "grid": grid, "step": step},
         ),
         (
-            host_module.HostRuntimeComponent.from_model,
+            host_module.HostComponent.from_step,
             {"name": "HOST", "grid": grid, "step": step},
         ),
         (
-            base_module.Component.from_model,
+            base_module.Component.from_step,
             {"name": "ATM", "grid": grid, "step": step},
         ),
         (
-            host_module.HostRuntimeComponent.from_model,
+            host_module.HostComponent.from_step,
             {"name": "HOST", "grid": grid, "step": step},
         ),
     )
@@ -869,24 +867,24 @@ def test_required_fields_declaration_api_is_removed() -> None:
 
 
 @pytest.mark.fast_always
-def test_from_model_inputs_validate_missing_fields_without_zero_prefill() -> None:
+def test_from_step_inputs_validate_missing_fields_without_zero_prefill() -> None:
     grid = make_test_grid(name="facade-inputs")
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = context, payload
         return {"temperature": fields["temperature"] + fields["forcing"]}
 
-    component = base_module.Component.from_model(
+    component = base_module.Component.from_step(
         name="ATM",
         grid=grid,
         step=step,
         inputs=("forcing",),
         outputs=("temperature",),
-        default_fields={"temperature": 280.0},
+        defaults={"temperature": 280.0},
     )
     state = create_runtime_component_state(
         component,
@@ -902,23 +900,23 @@ def test_from_model_inputs_validate_missing_fields_without_zero_prefill() -> Non
 
 
 @pytest.mark.fast_always
-def test_host_runtime_component_from_model_uses_author_friendly_names() -> None:
+def test_host_runtime_component_from_step_uses_author_friendly_names() -> None:
     grid = make_test_grid(name="facade-host")
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = payload
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
-    component = host_module.HostRuntimeComponent.from_model(
+    component = host_module.HostComponent.from_step(
         name="HOST",
         grid=grid,
         step=step,
         outputs=("temperature",),
-        default_fields={"temperature": 1.0},
+        defaults={"temperature": 1.0},
     )
     state = create_runtime_component_state(
         component,
@@ -928,7 +926,7 @@ def test_host_runtime_component_from_model_uses_author_friendly_names() -> None:
 
     stepped = component.step_host_runtime_state(
         state,
-        ComponentStepContext(dt_seconds=5.0, settings=VercorSettings()),
+        StepContext(dt_seconds=5.0, settings=VercorSettings()),
     )
     assert_allclose_compact(
         stepped.data.get("temperature"),
@@ -944,17 +942,17 @@ def test_subclasses_can_declare_fields_with_author_spec() -> None:
         def __init__(self, name: str, grid: Any) -> None:
             super().__init__(name, grid)
             self.declare_fields(
-                contracts_module.ComponentFieldSpec(
+                contracts_module.FieldSpec(
                     inputs=("forcing",),
                     outputs=("temperature",),
-                    default_fields={"temperature": 280.0},
+                    defaults={"temperature": 280.0},
                 )
             )
 
         def step_runtime_state(
             self,
             component_state: RuntimeComponentState,
-            context: ComponentStepContext,
+            context: StepContext,
         ) -> RuntimeComponentState:
             _ = context
             return self.with_runtime_fields(
@@ -1024,7 +1022,7 @@ def test_callable_component_prefills_and_validates_declared_fields() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = payload
@@ -1033,12 +1031,12 @@ def test_callable_component_prefills_and_validates_declared_fields() -> None:
             "wind": fields["wind"],
         }
 
-    component = base_module.Component.from_model(
+    component = base_module.Component.from_step(
         name="ATM",
         grid=grid,
         step=step,
         outputs=("temperature", "wind"),
-        default_fields={"temperature": jnp.full(grid.shape, 280.0)},
+        defaults={"temperature": jnp.full(grid.shape, 280.0)},
     )
     assert not hasattr(component, "_required_fields")
     assert not hasattr(component, "_prefill_fields")
@@ -1055,7 +1053,7 @@ def test_callable_component_prefills_and_validates_declared_fields() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        ComponentStepContext(dt_seconds=2.0, settings=VercorSettings()),
+        StepContext(dt_seconds=2.0, settings=VercorSettings()),
     )
     assert_allclose_compact(
         stepped.data.get("temperature"),
@@ -1069,13 +1067,13 @@ def test_callable_component_reports_missing_declared_inputs() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = context, payload
         return {"temperature": fields["temperature"]}
 
-    component = base_module.Component.from_model(
+    component = base_module.Component.from_step(
         name="ATM",
         grid=grid,
         step=step,
@@ -1246,18 +1244,18 @@ def test_differentiable_component_applies_callable_field_updates() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         assert payload is None
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
-    component = base_module.Component.from_model(
+    component = base_module.Component.from_step(
         name="ATM",
         grid=grid,
         step=step,
         outputs=("temperature",),
-        default_fields={"temperature": jnp.ones(grid.shape)},
+        defaults={"temperature": jnp.ones(grid.shape)},
     )
     state = create_runtime_component_state(
         component,
@@ -1267,7 +1265,7 @@ def test_differentiable_component_applies_callable_field_updates() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        ComponentStepContext(dt_seconds=3.0, settings=VercorSettings()),
+        StepContext(dt_seconds=3.0, settings=VercorSettings()),
     )
 
     assert_allclose_compact(
@@ -1282,20 +1280,20 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
 
     def preserve_payload(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = context
         assert isinstance(payload, Mapping)
         return {"temperature": fields["temperature"] + payload["offset"]}
 
-    preserve_component = base_module.Component.from_model(
+    preserve_component = base_module.Component.from_step(
         name="ATM",
         grid=grid,
         payload={"offset": jnp.asarray(2.0)},
         step=preserve_payload,
         outputs=("temperature",),
-        default_fields={"temperature": jnp.ones(grid.shape)},
+        defaults={"temperature": jnp.ones(grid.shape)},
     )
     preserve_state = create_runtime_component_state(
         preserve_component,
@@ -1304,7 +1302,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
     )
     preserved = preserve_component.step_runtime_state(
         preserve_state,
-        ComponentStepContext(dt_seconds=1.0, settings=VercorSettings()),
+        StepContext(dt_seconds=1.0, settings=VercorSettings()),
     )
 
     assert preserved.runtime_payload is preserve_state.runtime_payload
@@ -1315,23 +1313,23 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
 
     def replace_payload(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
-    ) -> contracts_module.ComponentStepResult:
+    ) -> contracts_module.StepResult:
         _ = context
         assert isinstance(payload, Mapping)
-        return contracts_module.ComponentStepResult(
+        return contracts_module.StepResult(
             fields={"temperature": fields["temperature"] + 1.0},
             payload={"offset": payload["offset"] + 1.0},
         )
 
-    replace_component = base_module.Component.from_model(
+    replace_component = base_module.Component.from_step(
         name="ATM",
         grid=grid,
         payload={"offset": jnp.asarray(2.0)},
         step=replace_payload,
         outputs=("temperature",),
-        default_fields={"temperature": jnp.ones(grid.shape)},
+        defaults={"temperature": jnp.ones(grid.shape)},
     )
     replace_state = create_runtime_component_state(
         replace_component,
@@ -1340,7 +1338,7 @@ def test_callable_component_preserves_and_replaces_payload() -> None:
     )
     replaced = replace_component.step_runtime_state(
         replace_state,
-        ComponentStepContext(dt_seconds=1.0, settings=VercorSettings()),
+        StepContext(dt_seconds=1.0, settings=VercorSettings()),
     )
 
     assert replaced.runtime_payload is not replace_state.runtime_payload
@@ -1360,13 +1358,13 @@ def test_callable_payload_default_can_be_overridden_by_lifecycle_hook() -> None:
         return {"temperature": fields["temperature"] + 1.0}
 
     payload = {"offset": 2}
-    component = base_module.Component.from_model(
+    component = base_module.Component.from_step(
         name="ATM",
         grid=grid,
         payload=payload,
         step=step,
         outputs=("temperature",),
-        default_fields={"temperature": jnp.ones(grid.shape)},
+        defaults={"temperature": jnp.ones(grid.shape)},
     )
 
     assert component.create_runtime_payload() is payload
@@ -1374,13 +1372,13 @@ def test_callable_payload_default_can_be_overridden_by_lifecycle_hook() -> None:
     def create_runtime_payload(owner: Any) -> dict[str, str]:
         return {"owner": owner.name}
 
-    hooked_component = base_module.Component.from_model(
+    hooked_component = base_module.Component.from_step(
         name="HOOKED",
         grid=grid,
         payload=payload,
         step=step,
         outputs=("temperature",),
-        default_fields={"temperature": jnp.ones(grid.shape)},
+        defaults={"temperature": jnp.ones(grid.shape)},
         create_runtime_payload=create_runtime_payload,
     )
 
@@ -1393,22 +1391,22 @@ def test_host_component_runs_through_coupler_host_runtime() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = payload
         return {"temperature": fields["temperature"] + context.dt_seconds}
 
-    component = host_module.HostRuntimeComponent.from_model(
+    component = host_module.HostComponent.from_step(
         name="HOST",
         grid=grid,
         step=step,
         outputs=("temperature",),
-        default_fields={"temperature": jnp.ones(grid.shape)},
+        defaults={"temperature": jnp.ones(grid.shape)},
     )
     coupler = Coupler(clock=Clock(start=datetime(2000, 1, 1), dt_seconds=5.0, steps=1))
-    coupler.register(component)
-    coupler.set_components_run_sequence(("HOST",))
+    coupler.add_component(component)
+    coupler.set_run_order(("HOST",))
 
     final_state = coupler.run()
 
@@ -1424,17 +1422,17 @@ def test_callable_component_rejects_unseeded_field_updates() -> None:
 
     def step(
         fields: Mapping[str, RuntimeArray],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
     ) -> Mapping[str, RuntimeArray]:
         _ = fields, context, payload
         return {"created_during_step": jnp.zeros(grid.shape)}
 
-    component = base_module.Component.from_model(
+    component = base_module.Component.from_step(
         name="ATM",
         grid=grid,
         step=step,
-        default_fields={"temperature": jnp.ones(grid.shape)},
+        defaults={"temperature": jnp.ones(grid.shape)},
     )
     state = create_runtime_component_state(
         component,
@@ -1448,7 +1446,7 @@ def test_callable_component_rejects_unseeded_field_updates() -> None:
     ):
         component.step_runtime_state(
             state,
-            ComponentStepContext(dt_seconds=1.0, settings=VercorSettings()),
+            StepContext(dt_seconds=1.0, settings=VercorSettings()),
         )
 
 
@@ -1479,7 +1477,7 @@ def test_coupler_register_validates_component_setup_before_name_lookup() -> None
         ComponentError,
         match="missing required setup attribute.*name.*grid.*data.*settings",
     ):
-        coupler.register(cast(Any, _MissingSetupComponent()))
+        coupler.add_component(cast(Any, _MissingSetupComponent()))
 
 
 @pytest.mark.fast_always
@@ -1554,7 +1552,7 @@ def test_host_component_rejects_scanned_runtime_with_clear_error() -> None:
     )
     coupler.components = {"ATM": component}
     coupler.run_sequence = ("ATM",)
-    state = coupler.create_runtime_state()
+    state = coupler.state()
 
     with pytest.raises(ComponentError, match="host-backed.*Coupler.run"):
         run_scanned_coupler(coupler, state)
@@ -1632,7 +1630,7 @@ def test_runtime_state_creation_receive_and_send() -> None:
 
     stepped = component.step_runtime_state(
         state,
-        ComponentStepContext(
+        StepContext(
             dt_seconds=3.0,
             settings=VercorSettings(),
         ),

@@ -141,23 +141,25 @@ immutable runtime containers used during traced integration.
   configuring a coupled run. `Coupler` and setup helpers accept plain
   component-name sequences for run order and normalize them internally to
   immutable tuples.
-- Component-author API: `Component`, `DataComponent`, and
-  `HostRuntimeComponent` are the stable extension points. Custom adapters should
-  use the class-level authoring constructors where possible:
-  `DataComponent.from_fields()` for data-only fields, `Component.from_model()`
-  for pure callable JAX models, and `HostRuntimeComponent.from_model()` for
-  Python host-side models. These constructors use author-facing field names:
-  `inputs` declare fields the model reads, `outputs` declare fields the model
-  writes, and `default_fields` declare concrete runtime defaults for fields
-  the model reads or updates. Scalar default and seeded values expand
-  to grid-shaped constants. `ComponentSetupContext` and `ComponentStepContext`
-  are public setup and step context payloads passed to author callbacks, with
-  canonical ownership in `vercor.components.contexts`.
+- Component-author API: `Component`, `DataComponent`, and `HostComponent` are
+  the stable extension points. Custom adapters should use the class-level
+  authoring constructors where possible: `DataComponent.from_fields()` for
+  data-only fields, `Component.from_step()` for pure callable JAX models, and
+  `HostComponent.from_step()` for Python host-side models. These constructors
+  use author-facing field names: `inputs` declare fields the model reads,
+  `outputs` declare fields the model writes, and `defaults` declare concrete
+  runtime defaults for fields the model reads or updates. Scalar default and
+  seeded values expand to grid-shaped constants. `SetupContext` and
+  `StepContext` are public setup and step context payloads passed to author
+  callbacks, with canonical ownership in `vercor.components.contexts`.
+  `from_model()`, `default_fields`, `HostRuntimeComponent`, and
+  component-prefixed context names remain deprecated compatibility aliases for
+  one deprecation window.
   Lifecycle hook type aliases (`ComponentInitializeHook`,
   `ComponentCreatePayloadHook`, `ComponentPrefillHook`, and
   `ComponentValidateHook`) are public component-author contracts and are
   reexported from `vercor.components` and `vercor`.
-  `ComponentFieldSpec`, `field_spec`, and `declare_fields()` provide the same
+  `FieldSpec`, `field_spec`, and `declare_fields()` provide the same
   vocabulary and read-only introspection for subclasses. `field_names` exposes
   setup-time seeded field names in insertion order. Subclass constructors can
   use `update_settings(...)` for chainable updates to existing component
@@ -170,13 +172,13 @@ immutable runtime containers used during traced integration.
   `make_*_component()` factory functions have been removed. The module-level
   `data_component()`, `differentiable_component()`, and `host_component()`
   factory helpers have also been removed. Component authors should use
-  class-level `from_fields()` / `from_model()` constructors, or subclasses with
+  class-level `from_fields()` / `from_step()` constructors, or subclasses with
   `declare_fields(...)`. `vercor.components` and `vercor` reexport the
   component-author facade.
   `vercor.components.contracts` owns public author-facing contract types and
-  context aliases, `vercor.components.base` owns only the abstract
+  deprecated context aliases, `vercor.components.base` owns only the abstract
   differentiable `Component` contract, `vercor.components.data` owns
-  `DataComponent`, and `vercor.components.host` owns `HostRuntimeComponent`.
+  `DataComponent`, and `vercor.components.host` owns `HostComponent`.
   Field-name de-duplication lives in private
   `vercor.components._field_names`, and component authoring methods for field
   declarations, setup seeding, and settings updates live in private
@@ -187,7 +189,9 @@ immutable runtime containers used during traced integration.
   `vercor.components._lifecycle_api`, and constructor-installed hooks are
   stored in one private container rather than as ad-hoc component attributes.
   Author-value normalization lives in private
-  `vercor.components._contracts`; callable signature adaptation, shared
+  `vercor.components._contracts`; public constructor option normalization lives
+  in private `vercor.components._constructor_options`, and deprecated public
+  spelling plumbing lives in private `vercor._deprecation`; callable signature adaptation, shared
   callable construction metadata, and shared callable runtime mechanics live in
   private `vercor.components._callable_wrappers`, which carries lifecycle hooks
   as that container and delegates hook precedence/default payload fallback to
@@ -229,8 +233,8 @@ immutable runtime containers used during traced integration.
   existing-field replacement mechanics owned by the runtime; default fallback
   normalization stays in the component adapter layer.
   When a step also needs to replace runtime payload, `apply_step_result()`
-  applies either a field mapping or `ComponentStepResult` through the same
-  validated update path used by callable wrappers.
+  applies either a field mapping or `StepResult` through the same validated
+  update path used by callable wrappers.
   `seed_declared_defaults()` seeds fields from a component's declared
   defaults, and the base `initialize()` hook now does this automatically when
   subclasses do not need custom setup. Prefill hooks should use
@@ -246,24 +250,24 @@ immutable runtime containers used during traced integration.
   that intentionally keep the shared no-op runtime step and do not create
   plotting-only runtime fields. Derived diagnostics, such as a combined land/sea
   surface temperature used only for plots, belong in diagnostics or setups.
-  Use `HostRuntimeComponent` for non-differentiable adapters and implement
+  Use `HostComponent` for non-differentiable adapters and implement
   `step_host_runtime_state()`; host-backed adapters must run through
   `Coupler.run()` so VerCOR can select the Python host runtime path. Optional
   hooks include `initialize()`, `create_runtime_payload()`,
   `prefill_runtime_state_fields()`, and `validate_runtime_state()`. Callable
   wrappers may accept `(fields)`, `(fields, context)`, or
   `(fields, context, payload)` and return either a field-update mapping or
-  `ComponentStepResult(fields, payload)` when the runtime payload must
+  `StepResult(fields, payload)` when the runtime payload must
   be replaced. Callable-backed differentiable and host components share
   signature normalization and step-result application helpers. Internal
   normalized callable adapters use names that spell out which author arguments
   they forward, while
-  `Component.from_model()` and `HostRuntimeComponent.from_model()` construct
-  their own private runtime-kind wrappers directly. Both declare their runtime
-  contract with the same `ComponentFieldSpec` path used by subclasses, and
-  apply step results through the runtime-owned field replacement helpers.
+  `Component.from_step()` and `HostComponent.from_step()` construct their own
+  private runtime-kind wrappers directly. Both declare their runtime contract
+  with the same `FieldSpec` path used by subclasses, and apply step results
+  through the runtime-owned field replacement helpers.
   Runtime prefill and validation depend only on `inputs`, `outputs`, and
-  `default_fields`.
+  `defaults`.
   These helpers still enforce the same stable runtime-state
   contract: updated fields must already exist through seeded data, declared
   outputs/defaults, or exchange prefill, and scanned payload pytrees must keep
@@ -330,8 +334,10 @@ immutable runtime containers used during traced integration.
   resolution for diagnostics/output live in `vercor.runtime.views`;
   `RuntimeComponentView`, `runtime_field_candidates(...)`, and
   `runtime_field(...)` own data/incoming/outgoing lookup for explicit views and
-  compatible runtime states. `Coupler` exposes `runtime_component_view()` and
-  `runtime_component_views()` as the public facade for creating those views.
+  compatible runtime states. `Coupler` exposes `state()`, `view()`, and
+  `views()` as the public facade for runtime-state and component-view
+  creation; the longer runtime-component method names remain deprecated
+  compatibility wrappers.
   Final runtime output iteration, output-mask naming/selection, and
   view writing live in `vercor.output.runtime`, with direct top-level
   `vercor.output` reexports for the small public runtime-output facade and
@@ -352,13 +358,16 @@ immutable runtime containers used during traced integration.
 Reusable concrete adapters live under the canonical packaged namespace
 `vercor.setups`. Runnable assembly scripts live under `examples/`; in-repo code
 should not depend on a top-level `setups` package. Setup adapters use
-`ComponentSetupContext`, `ComponentStepContext`, and plain runtime-array
-mappings at their author boundary instead of importing runtime context/store
-internals directly. Shared setup orchestration helpers in
-`vercor.setups.coupler_helpers` own component registration and compact
-`ExchangeSpec` recipes, so examples share source/destination/regridder wiring
-instead of repeating raw `Exchange(...)` construction. Public exchange
-configuration types, including `ExchangeField` and `RegridderFactory`, are
+`SetupContext`, `StepContext`, and plain runtime-array mappings at their author
+boundary instead of importing runtime context/store internals directly.
+Examples and setup factories assemble runs through `Coupler.from_components(...)`,
+`Coupler.add_exchange(...)`, and direct
+`Exchange(source, target, fields, regrid=...)` declarations. Shared exchange
+field recipes live in `vercor.exchanges` with `*_FIELDS` names; short recipe
+aliases and setup orchestration helpers such as `ExchangeSpec`,
+`build_coupler()`, `build_exchanges()`, and `add_exchange_specs()` are
+deprecated compatibility wrappers. Public exchange configuration types,
+including `ExchangeField` and `RegridderFactory`, are
 owned by `vercor.exchange` and imported by setup helper modules rather than
 duplicated beside recipes.
 

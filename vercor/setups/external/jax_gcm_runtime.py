@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import jax
 import jax.numpy as jnp
 
-from vercor.components import Component, ComponentStepContext, ComponentStepResult
+from vercor.components import Component, StepContext, StepResult
 from vercor.dtypes import as_jax_real_array, jax_zeros
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.pytree import PyTreeNodeMixin
@@ -107,7 +107,7 @@ def prefill_jax_gcm_runtime_fields(
 
     component.prefill_runtime_fields(
         data,
-        default_fields=component.grid_field_defaults(
+        defaults=component.grid_field_defaults(
             jax_gcm_default_field_names(
                 include_total_surface_temperature=True,
             ),
@@ -166,7 +166,7 @@ def step_jax_gcm_runtime(
     fields: Mapping[str, Any],
     payload: Any | None,
     settings: VercorSettings,
-) -> tuple[ComponentStepResult, Any, Any]:
+) -> tuple[StepResult, Any, Any]:
     """Advance JAXGCM runtime state and return raw prediction details."""
 
     if not isinstance(payload, JAXGCMRuntimePayload):
@@ -223,7 +223,7 @@ def step_jax_gcm_runtime(
         averaged_prediction.dynamics.specific_humidity,
     )
 
-    step_result = ComponentStepResult(
+    step_result = StepResult(
         fields={
             "land_surface_temperature": land_surface_temperature,
             "sea_surface_temperature": sea_surface_temperature,
@@ -246,10 +246,10 @@ def step_jax_gcm_runtime(
 def record_jax_gcm_host_step(
     state: "JAXGCMSetupState",
     *,
-    step_result: ComponentStepResult,
+    step_result: StepResult,
     prediction: Any,
     applied_forcing: Any,
-    context: ComponentStepContext,
+    context: StepContext,
 ) -> None:
     """Record host-side JAXGCM mirrors and optional period output."""
 
@@ -284,9 +284,9 @@ def record_jax_gcm_host_step(
 def step_jax_gcm_component(
     state: "JAXGCMSetupState",
     fields: Mapping[str, Any],
-    context: ComponentStepContext,
+    context: StepContext,
     payload: Any | None,
-) -> ComponentStepResult:
+) -> StepResult:
     """Advance JAXGCM on immutable runtime state."""
 
     time = context.time
