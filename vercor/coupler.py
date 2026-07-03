@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -85,6 +85,61 @@ class Coupler:
         if callable(set_level):
             set_level(self.log_level)
 
+    @classmethod
+    def from_components(
+        cls,
+        *,
+        clock: Clock,
+        components: Iterable["Component"],
+        exchanges: Iterable[Exchange] = (),
+        run_order: Sequence[str] = (),
+        settings: VercorSettings | None = None,
+        log_level: int | str = "INFO",
+        logger: LoggerLike | None = None,
+    ) -> "Coupler":
+        """Create a coupler with components, exchanges, and run order configured."""
+
+        if logger is None:
+            coupler = cls(
+                clock=clock,
+                log_level=log_level,
+                settings=settings or VercorSettings(),
+            )
+        else:
+            coupler = cls(
+                clock=clock,
+                log_level=log_level,
+                settings=settings or VercorSettings(),
+                logger=logger,
+            )
+        for component in components:
+            coupler.add_component(component)
+        for exchange in exchanges:
+            coupler.add_exchange(exchange)
+        if run_order:
+            coupler.set_run_order(run_order)
+        return coupler
+
+    @property
+    def run_order(self) -> tuple[str, ...]:
+        """Return component names in runtime execution order."""
+
+        return tuple(self.run_sequence)
+
+    @run_order.setter
+    def run_order(self, run_order: Sequence[str]) -> None:
+        """Set component names in runtime execution order."""
+
+        self.run_sequence = normalize_run_sequence(run_order)
+
+    def add_component(
+        self,
+        component: "Component",
+    ) -> None:
+        """Register a component with the coupler."""
+
+        self.register(component)
+
     def register(
         self,
         component: "Component",
@@ -117,7 +172,28 @@ class Coupler:
             for item in exchange.field_names
         )
         self.logger.info(
-            f" Added exchange {exchange.name}: Fields ({formatted_field_names})"
+            f" Added exchange {exchange.label}: Fields ({formatted_field_names})"
+        )
+
+    def add_exchanges(self, exchanges: Iterable[Exchange]) -> None:
+        """Add multiple exchange definitions to the coupler."""
+
+        for exchange in exchanges:
+            self.add_exchange(exchange)
+
+    def set_run_order(
+        self,
+        run_order: Sequence[str],
+    ) -> None:
+        """Set the run order for coupler components."""
+
+        normalized_run_sequence = normalize_run_sequence(run_order)
+        for cname in normalized_run_sequence:
+            if cname not in self.components.keys():
+                raise CouplerError(f"Component {cname} not registered in coupler")
+        self.run_sequence = normalized_run_sequence
+        self.logger.info(
+            f" Set coupler components run sequence: {', '.join(self.run_sequence)}"
         )
 
     def set_components_run_sequence(
@@ -131,14 +207,7 @@ class Coupler:
             run_sequence: component names defining the order of components execution
         """
 
-        normalized_run_sequence = normalize_run_sequence(run_sequence)
-        for cname in normalized_run_sequence:
-            if cname not in self.components.keys():
-                raise CouplerError(f"Component {cname} not registered in coupler")
-        self.run_sequence = normalized_run_sequence
-        self.logger.info(
-            f" Set coupler components run sequence: {', '.join(self.run_sequence)}"
-        )
+        self.set_run_order(run_sequence)
 
     def _runtime_inputs(self) -> _runtime_facade.RuntimeFacadeInputs:
         """Return the repeated runtime facade input bundle for this coupler."""
@@ -180,6 +249,11 @@ class Coupler:
             prefill_missing=prefill_missing,
         )
 
+    def state(self, *, prefill: bool = True) -> _runtime_state_module.CouplerState:
+        """Create and validate the coupled runtime state."""
+
+        return self.create_runtime_state(prefill_missing=prefill)
+
     def runtime_component_view(
         self,
         runtime_state: _runtime_state_module.RuntimeCouplerState,
@@ -192,6 +266,15 @@ class Coupler:
             runtime_state=runtime_state,
             name=name,
         )
+
+    def view(
+        self,
+        state: _runtime_state_module.CouplerState,
+        name: str,
+    ) -> _runtime_views_module.ComponentView:
+        """Return a component view for diagnostics and output."""
+
+        return self.runtime_component_view(state, name)
 
     def runtime_component_views(
         self,
@@ -206,10 +289,21 @@ class Coupler:
             names=names,
         )
 
+    def views(
+        self,
+        state: _runtime_state_module.CouplerState,
+        names: Sequence[str] | None = None,
+    ) -> dict[str, _runtime_views_module.ComponentView]:
+        """Return component views for diagnostics and output."""
+
+        return self.runtime_component_views(state, names=names)
+
     def finalize(
         self,
         final_state: _runtime_state_module.RuntimeCouplerState,
         output_file_mask: Optional[Path] = None,
+        *,
+        output: Optional[Path] = None,
     ) -> None:
         """
         Write final runtime component state to component output files.
@@ -219,6 +313,10 @@ class Coupler:
             output_file_mask: optional path mask for output files
         """
 
+        if output is not None:
+            if output_file_mask is not None:
+                raise TypeError("Use either output or output_file_mask, not both")
+            output_file_mask = output
         self.logger.info(" ------------ Finalizing coupler and components ------------")
         _runtime_facade.finalize(
             final_state=final_state,
@@ -237,7 +335,7 @@ class Coupler:
                 for name, component in self.components.items()
             )
             + "\n"
-            f"├── Exchanges: {', '.join(exchange.name for exchange in self.exchanges)}\n"
+            f"├── Exchanges: {', '.join(exchange.label for exchange in self.exchanges)}\n"
             f"└── Run sequence: {', '.join(self.run_sequence)}"
         )
 
@@ -246,6 +344,8 @@ class Coupler:
 
     def run(
         self,
+        state: _runtime_state_module.RuntimeCouplerState | None = None,
+        *,
         initial_state: _runtime_state_module.RuntimeCouplerState | None = None,
     ) -> _runtime_state_module.RuntimeCouplerState:
         """
@@ -255,9 +355,11 @@ class Coupler:
         Host-backed components run through the Python host bridge.
         """
 
+        if state is not None and initial_state is not None:
+            raise TypeError("Use either state or initial_state, not both")
         inputs = self._runtime_inputs()
         runtime_state = _runtime_facade.prepare_runtime_state(
-            initial_state,
+            state if state is not None else initial_state,
             inputs=inputs,
         )
         return _runtime_facade.run(

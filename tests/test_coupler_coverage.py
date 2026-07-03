@@ -569,67 +569,66 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
     for component in components.values():
         coupler.register(cast(Any, component))
 
+    created_keys: list[tuple[str, str]] = []
+
+    def recording_regridder_factory(
+        interpolation_type: str,
+    ) -> Any:
+        def factory(source_grid: Any, destination_grid: Any) -> RecordingRegridder:
+            created_keys.append((source_grid.name, destination_grid.name))
+            return RecordingRegridder()
+
+        factory.__name__ = interpolation_type
+        return cast(Any, factory)
+
+    bilinear_recording = recording_regridder_factory("bilinear")
+    conservative_recording = recording_regridder_factory("conservative")
+
     exchanges = [
         Exchange(
             source="OCN",
             destination="ATM",
             field_names=["temperature"],
-            regridder_factory=bilinear,
+            regridder_factory=bilinear_recording,
         ),
         Exchange(
             source="OCN",
             destination="ATM",
             field_names=["specific_humidity"],
-            regridder_factory=bilinear,
+            regridder_factory=bilinear_recording,
         ),
         Exchange(
             source="ATM",
             destination="OCN",
             field_names=["downward_longwave_radiation_flux"],
-            regridder_factory=conservative,
+            regridder_factory=conservative_recording,
         ),
         Exchange(
             source="LND",
             destination="ATM",
             field_names=["soil_moisture"],
-            regridder_factory=bilinear,
+            regridder_factory=bilinear_recording,
         ),
         Exchange(
             source="ATM",
             destination="LND",
             field_names=["temperature_2m"],
-            regridder_factory=bilinear,
+            regridder_factory=bilinear_recording,
         ),
         Exchange(
             source="ICE",
             destination="ATM",
             field_names=["ice_fraction"],
-            regridder_factory=bilinear,
+            regridder_factory=bilinear_recording,
         ),
         Exchange(
             source="ATM",
             destination="ICE",
             field_names=["sensible_heat_flux"],
-            regridder_factory=bilinear,
+            regridder_factory=bilinear_recording,
         ),
     ]
-    created_keys: list[tuple[str, str]] = []
     for exchange in exchanges:
-
-        def fake_regridder_factory(
-            source_grid: Any,
-            destination_grid: Any,
-            exchange_name: str = exchange.name,
-        ) -> RecordingRegridder:
-            _ = exchange_name
-            created_keys.append((source_grid.name, destination_grid.name))
-            return RecordingRegridder()
-
-        monkeypatch.setattr(
-            exchange,
-            "regridder_factory",
-            cast(Any, fake_regridder_factory),
-        )
         coupler.add_exchange(exchange)
 
     def fake_create_surface_exchange_masks(

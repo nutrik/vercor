@@ -1,22 +1,17 @@
 from datetime import datetime, timedelta
 
-from vercor import Clock
-from vercor.setups.coupler_helpers import (
-    ExchangeSpec,
-    add_exchange_specs,
-    build_coupler,
-)
-from vercor.setups.external.camulator import make_camulator_gcm
-from vercor.setups.external.camulator_land import make_camulator_land
-from vercor.setups.external.veros_gcm import make_veros_gcm
-from vercor.setups.exchange_recipes import (
+from vercor import Clock, Coupler, Exchange
+from vercor.setups import make_camulator_gcm
+from vercor.setups import make_camulator_land
+from vercor.setups import make_veros_gcm
+from vercor.exchanges import (
     ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
     ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
     LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
 
-from vercor.regridders import bilinear
+from vercor.regridding import bilinear
 
 if __name__ == "__main__":
     ocn = make_veros_gcm(
@@ -57,39 +52,38 @@ if __name__ == "__main__":
     run_sequence = ["OCN", "LND", "ATM"]
 
     components = [ocn, lnd, atm]
-    cpl = build_coupler(
+    cpl = Coupler.from_components(
         clock=clock,
         components=components,
-        run_sequence=run_sequence,
+        run_order=run_sequence,
     )
 
     # Exchanges
-    add_exchange_specs(
-        cpl,
+    cpl.add_exchanges(
         (
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="OCN",
-                field_names=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
-                regridder_factory=bilinear,
+                target="OCN",
+                fields=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="OCN",
-                destination="ATM",
-                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="LND",
-                destination="ATM",
-                field_names=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="LND",
-                field_names=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
-                regridder_factory=bilinear,
+                target="LND",
+                fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
+                regrid=bilinear,
             ),
         ),
     )

@@ -247,7 +247,8 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "class RuntimeFieldStore" in runtime_stores_source
     assert "class RuntimeFieldStore" not in runtime_source
     assert "class RuntimeComponentState" in runtime_source
-    assert "class RuntimeCouplerState" in runtime_source
+    assert "class CouplerState" in runtime_source
+    assert "RuntimeCouplerState = CouplerState" in runtime_source
     assert "class RuntimeStepInfo" in runtime_time_source
     assert "class RuntimeStepInfo" not in runtime_source
     assert "def dispatch_component_exchanges" in runtime_exchange_dispatch_source
@@ -481,8 +482,10 @@ def test_runtime_module_does_not_own_component_specific_steps() -> None:
     assert "class ComponentStepContext" not in base_source
     assert "from vercor.components.contexts import ComponentStepContext" in base_source
     assert "from vercor.runtime.contexts import" not in base_source
-    assert "class ComponentSetupContext" in component_contexts_source
-    assert "class ComponentStepContext" in component_contexts_source
+    assert "class SetupContext" in component_contexts_source
+    assert "class StepContext" in component_contexts_source
+    assert "ComponentSetupContext = SetupContext" in component_contexts_source
+    assert "ComponentStepContext = StepContext" in component_contexts_source
     assert "ComponentSetupContext" in components_source
     assert "ComponentStepContext" in components_source
     assert "component.initialize(self)" not in coupler_source
@@ -763,7 +766,7 @@ def test_examples_use_coupler_runtime_component_view_factory() -> None:
 
     for source in (slab_driver_source, data_driver_source, jcm_slab_source):
         assert "RuntimeComponentView.from_coupler_state" not in source
-        assert "cpl.runtime_component_views(final_state" in source
+        assert "cpl.views(final_state" in source
 
 
 def test_examples_import_concrete_components_directly() -> None:

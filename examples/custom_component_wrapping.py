@@ -6,13 +6,13 @@ from typing import Any
 
 from vercor import (
     Component,
-    ComponentStepContext,
-    ComponentStepResult,
     DataComponent,
-    HostRuntimeComponent,
+    HostComponent,
+    RectilinearGrid,
+    StepContext,
+    StepResult,
 )
 from vercor.dtypes import as_jax_real_array
-from vercor.grid import RectilinearGrid
 
 
 def make_example_grid() -> RectilinearGrid:
@@ -43,7 +43,7 @@ def make_differentiable_model(grid: RectilinearGrid) -> Component:
 
     def step(
         fields: Mapping[str, Any],
-        context: ComponentStepContext,
+        context: StepContext,
     ) -> Mapping[str, Any]:
         heat_capacity = 1025.0 * 3990.0 * 30.0
         tendency = fields["net_surface_heat_flux"] / heat_capacity
@@ -53,7 +53,7 @@ def make_differentiable_model(grid: RectilinearGrid) -> Component:
             )
         }
 
-    return Component.from_model(
+    return Component.from_step(
         name="OCN",
         grid=grid,
         step=step,
@@ -77,23 +77,23 @@ class ToyHostModel:
         return as_jax_real_array(temperature) + self.offset
 
 
-def make_host_model(grid: RectilinearGrid) -> HostRuntimeComponent:
+def make_host_model(grid: RectilinearGrid) -> HostComponent:
     """Wrap a Python host-side model while keeping VerCOR runtime fields explicit."""
 
     def step(
         fields: Mapping[str, Any],
-        context: ComponentStepContext,
+        context: StepContext,
         payload: Any | None,
-    ) -> ComponentStepResult:
+    ) -> StepResult:
         if not isinstance(payload, ToyHostModel):
             raise TypeError("Host wrapper payload must be a ToyHostModel")
         updated_temperature = payload.advance(fields["temperature"], context.dt_seconds)
-        return ComponentStepResult(
+        return StepResult(
             fields={"temperature": updated_temperature},
             payload=payload,
         )
 
-    return HostRuntimeComponent.from_model(
+    return HostComponent.from_step(
         name="LND",
         grid=grid,
         step=step,

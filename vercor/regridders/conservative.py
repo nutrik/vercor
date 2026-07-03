@@ -96,3 +96,6 @@ def conservative(
         normalize=normalize,
         radius=radius,
     )
+
+
+ConservativeRegridder = ConservativeRectilinearRegridder

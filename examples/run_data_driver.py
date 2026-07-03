@@ -2,7 +2,7 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 
-from vercor import Clock, Component
+from vercor import Clock, Component, Coupler, Exchange
 from vercor.diagnostics import (
     ComponentMetric,
     component_vector_speed,
@@ -10,16 +10,11 @@ from vercor.diagnostics import (
     print_component_field_means_table,
     total_surface_temperature,
 )
-from vercor.regridders import bilinear, conservative
-from vercor.setups.coupler_helpers import (
-    ExchangeSpec,
-    add_exchange_specs,
-    build_coupler,
-)
-from vercor.setups.data.era5_atmosphere import make_era5_atmosphere
-from vercor.setups.data.era5_land import make_era5_land
-from vercor.setups.data.erainterim_ocean import make_erainterim_ocean
-from vercor.setups.exchange_recipes import (
+from vercor.regridding import bilinear, conservative
+from vercor.setups import make_era5_atmosphere
+from vercor.setups import make_era5_land
+from vercor.setups import make_erainterim_ocean
+from vercor.exchanges import (
     ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
     ATMOSPHERE_TO_LAND_STATE_FIELDS,
     ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
@@ -40,53 +35,52 @@ if __name__ == "__main__":
 
     # Coupler
     components: list[Component] = [atm, ocn, lnd]
-    cpl = build_coupler(
+    cpl = Coupler.from_components(
         clock=clock,
         components=components,
-        run_sequence=run_sequence,
+        run_order=run_sequence,
     )
 
     # Exchanges
     # scalar fields (vector field))
     # ["qbot", "zbot", ("ubot", "vbot")]
-    add_exchange_specs(
-        cpl,
+    cpl.add_exchanges(
         (
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="OCN",
-                field_names=ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
-                regridder_factory=bilinear,
+                target="OCN",
+                fields=ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="OCN",
-                field_names=ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
-                regridder_factory=conservative,
+                target="OCN",
+                fields=ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
+                regrid=conservative,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="LND",
-                field_names=ATMOSPHERE_TO_LAND_STATE_FIELDS,
-                regridder_factory=bilinear,
+                target="LND",
+                fields=ATMOSPHERE_TO_LAND_STATE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="LND",
-                field_names=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
-                regridder_factory=conservative,
+                target="LND",
+                fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
+                regrid=conservative,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="OCN",
-                destination="ATM",
-                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="LND",
-                destination="ATM",
-                field_names=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
+                regrid=bilinear,
             ),
         ),
     )
@@ -94,7 +88,7 @@ if __name__ == "__main__":
     cpl.initialize()
     final_state = cpl.run()
     cpl.finalize(final_state)
-    views = cpl.runtime_component_views(final_state, names=("ATM", "OCN"))
+    views = cpl.views(final_state, names=("ATM", "OCN"))
 
     variables: list[tuple[ComponentMetric, str]] = [
         ("sea_surface_temperature", "sst"),

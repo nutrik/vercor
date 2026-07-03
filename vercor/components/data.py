@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, final
 
 from vercor.components.contracts import (
     AuthorFieldValues,
+    ComponentHooks,
     ComponentCreatePayloadHook,
     ComponentInitializeHook,
     ComponentPrefillHook,
@@ -43,6 +44,7 @@ class DataComponent(Component):
         fields: AuthorFieldValues = None,
         settings: VercorSettings | None = None,
         *,
+        hooks: ComponentHooks | None = None,
         initialize: ComponentInitializeHook | None = None,
         create_runtime_payload: ComponentCreatePayloadHook | None = None,
         prefill_runtime_state_fields: ComponentPrefillHook | None = None,
@@ -55,6 +57,18 @@ class DataComponent(Component):
         the callable component constructors for setup and runtime customization.
         """
 
+        if hooks is not None and any(
+            hook is not None
+            for hook in (
+                initialize,
+                create_runtime_payload,
+                prefill_runtime_state_fields,
+                validate_runtime_state,
+            )
+        ):
+            raise TypeError(
+                "Use either hooks=ComponentHooks(...) or individual hook arguments, not both"
+            )
         if settings is None:
             component = cls(name=name, grid=grid)
         else:
@@ -62,10 +76,16 @@ class DataComponent(Component):
         if fields is not None:
             component.seed_fields(fields)
         component._lifecycle_hooks = ComponentLifecycleHooks(
-            initialize=initialize,
-            create_runtime_payload=create_runtime_payload,
-            prefill_runtime_state_fields=prefill_runtime_state_fields,
-            validate_runtime_state=validate_runtime_state,
+            initialize=hooks.initialize if hooks is not None else initialize,
+            create_runtime_payload=(
+                hooks.create_payload if hooks is not None else create_runtime_payload
+            ),
+            prefill_runtime_state_fields=(
+                hooks.prefill if hooks is not None else prefill_runtime_state_fields
+            ),
+            validate_runtime_state=(
+                hooks.validate if hooks is not None else validate_runtime_state
+            ),
         )
         return component
 

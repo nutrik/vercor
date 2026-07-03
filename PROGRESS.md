@@ -332,6 +332,13 @@ historical commands, failure messages, or detailed validation notes.
   whitespace check passed as of 2026-07-03 using `conda run -n scipy`.
   Black emitted the recurring Python 3.13/target-3.14 warning, and full
   pytest/coverage emitted the recurring JAX dtype-promotion `FutureWarning`.
+- Latest local v2 public API facade cleanup validation: focused v2 API-boundary
+  pytest, focused regression pytest, Black, flake8, mypy, example py_compile,
+  full fast pytest, full pytest, coverage pytest at 90% total, and git diff
+  whitespace check passed as of 2026-07-03 using the direct `scipy`
+  environment executable. Black emitted the recurring Python 3.13/target-3.14
+  warning, and full pytest/coverage emitted the recurring JAX dtype-promotion
+  `FutureWarning`.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus
@@ -363,6 +370,30 @@ historical commands, failure messages, or detailed validation notes.
   helper APIs are still public or boundary-tested surfaces.
 
 ## Recent Work
+
+### 2026-07-03: V2 Public API Facade Cleanup
+
+- Added the v2 orchestration facade: `Coupler.from_components(...)`,
+  `run_order`, `state()`, `view()`, `views()`, `add_component()`, and
+  `add_exchanges()` while retaining compatibility wrappers for the old runtime
+  and run-sequence names.
+- Collapsed exchange declarations onto `Exchange(source, target, fields,
+  regrid, name=None)`, added a stable derived `label`, and kept
+  `ExchangeSpec`, `destination`, `field_names`, and `regridder_factory` as
+  migration aliases.
+- Added the component-author facade names `FieldSpec`, `StepContext`,
+  `SetupContext`, `StepResult`, `KEEP_PAYLOAD`, `Component.from_step(...)`,
+  `DataComponent.from_fields(...)`, and `HostComponent.from_step(...)`, with
+  old component/runtime names left as compatibility aliases.
+- Added shallow public facades for `vercor.exchanges`, `vercor.grids`,
+  `vercor.regridding`, and `vercor.setups`; updated examples to use the new
+  public APIs instead of setup-helper and runtime-view wiring.
+- Validation run for this change: focused v2 API-boundary pytest, focused
+  regression pytest, Black, flake8, mypy, example py_compile, full fast
+  pytest, full pytest, coverage pytest at 90% total, and `git diff --check`
+  passed using the direct `scipy` environment executable. Black emitted the
+  recurring Python 3.13/target-3.14 warning, and full pytest/coverage emitted
+  the recurring JAX dtype-promotion warning.
 
 ### 2026-07-03: Remaining Legacy API Cleanup
 

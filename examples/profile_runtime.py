@@ -8,17 +8,17 @@ from typing import Sequence
 
 import jax
 
-from vercor import Clock, Coupler
-from vercor.setups.coupler_helpers import ExchangeSpec, add_exchange_specs
-from vercor.setups.slab.atmosphere import make_slab_atmosphere
-from vercor.setups.slab.land import make_slab_land
-from vercor.setups.slab.ocean import make_slab_ocean
-from vercor.setups.slab.seaice import make_slab_seaice
+from vercor import Clock, Coupler, CouplerState, Exchange
 from vercor.dtypes import jax_ones
-from vercor.grid_geometry import make_rectilinear_grid
-from vercor.regridders import bilinear, conservative
-from vercor.runtime.state import RuntimeCouplerState
-from vercor.setups.exchange_recipes import (
+from vercor.grids import rectilinear
+from vercor.regridding import bilinear, conservative
+from vercor.setups import (
+    make_slab_atmosphere,
+    make_slab_land,
+    make_slab_ocean,
+    make_slab_seaice,
+)
+from vercor.exchanges import (
     LAND_TO_ATMOSPHERE_SOIL_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_SEAICE_SURFACE_FIELDS,
@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _block_until_ready(value: RuntimeCouplerState) -> RuntimeCouplerState:
+def _block_until_ready(value: CouplerState) -> CouplerState:
     for leaf in jax.tree_util.tree_leaves(value):
         if hasattr(leaf, "block_until_ready"):
             leaf.block_until_ready()
@@ -81,7 +81,7 @@ def build_slab_coupler(
 ) -> Coupler:
     """Build and initialize a small pure-JAX slab coupler for profiling."""
 
-    atm_grid = make_rectilinear_grid(
+    atm_grid = rectilinear(
         "profile-atm-grid",
         grid_nx,
         grid_ny,
@@ -91,7 +91,7 @@ def build_slab_coupler(
         90.0,
     )
     ocn_mask = jax_ones((grid_ny, grid_nx)).at[:2, :].set(0.0)
-    ocn_grid = make_rectilinear_grid(
+    ocn_grid = rectilinear(
         "profile-ocn-grid",
         grid_nx,
         grid_ny,
@@ -101,7 +101,7 @@ def build_slab_coupler(
         90.0,
         mask=ocn_mask,
     )
-    lnd_grid = make_rectilinear_grid(
+    lnd_grid = rectilinear(
         "profile-lnd-grid",
         grid_nx,
         grid_ny,
@@ -110,7 +110,7 @@ def build_slab_coupler(
         -90.0,
         90.0,
     )
-    ice_grid = make_rectilinear_grid(
+    ice_grid = rectilinear(
         "profile-ice-grid",
         grid_nx,
         grid_ny,
@@ -120,56 +120,54 @@ def build_slab_coupler(
         90.0,
     )
 
-    coupler = Coupler(
+    coupler = Coupler.from_components(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=steps),
+        components=(
+            make_slab_atmosphere(atm_grid),
+            make_slab_ocean(ocn_grid),
+            make_slab_land(lnd_grid),
+            make_slab_seaice(ice_grid),
+        ),
+        run_order=("OCN", "ATM", "LND", "ICE"),
         log_level=log_level,
     )
-    for component in (
-        make_slab_atmosphere(atm_grid),
-        make_slab_ocean(ocn_grid),
-        make_slab_land(lnd_grid),
-        make_slab_seaice(ice_grid),
-    ):
-        coupler.register(component)
-    coupler.set_components_run_sequence(["OCN", "ATM", "LND", "ICE"])
-    add_exchange_specs(
-        coupler,
+    coupler.add_exchanges(
         (
-            ExchangeSpec(
+            Exchange(
                 source="OCN",
-                destination="ATM",
-                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="OCN",
-                field_names=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
-                regridder_factory=bilinear,
+                target="OCN",
+                fields=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="LND",
-                field_names=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-                regridder_factory=conservative,
+                target="LND",
+                fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+                regrid=conservative,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="LND",
-                destination="ATM",
-                field_names=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="OCN",
-                destination="ICE",
-                field_names=OCEAN_TO_SEAICE_SURFACE_FIELDS,
-                regridder_factory=bilinear,
+                target="ICE",
+                fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ICE",
-                destination="OCN",
-                field_names=SEAICE_TO_OCEAN_FIELDS,
-                regridder_factory=conservative,
+                target="OCN",
+                fields=SEAICE_TO_OCEAN_FIELDS,
+                regrid=conservative,
             ),
         ),
     )

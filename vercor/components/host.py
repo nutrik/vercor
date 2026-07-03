@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, final
 from vercor.components.contracts import (
     AuthorFieldValues,
     AuthorStepCallable,
+    ComponentHooks,
     ComponentCreatePayloadHook,
     ComponentFieldSpec,
     ComponentInitializeHook,
@@ -27,8 +28,74 @@ if TYPE_CHECKING:
     from vercor.runtime.state import RuntimeComponentState
 
 
-class HostRuntimeComponent(Component):
+class HostComponent(Component):
     """Base class for host-backed adapters that cannot run inside JAX scan."""
+
+    @classmethod
+    def from_step(
+        cls,
+        name: str,
+        grid: RectilinearGrid,
+        step: AuthorStepCallable,
+        *,
+        fields: ComponentFieldSpec | None = None,
+        payload: Any | None = None,
+        settings: VercorSettings | None = None,
+        hooks: ComponentHooks | None = None,
+        inputs: FieldNames = (),
+        outputs: FieldNames = (),
+        default_fields: AuthorFieldValues = None,
+        initialize: ComponentInitializeHook | None = None,
+        create_runtime_payload: ComponentCreatePayloadHook | None = None,
+        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+        validate_runtime_state: ComponentValidateHook | None = None,
+    ) -> "HostComponent":
+        """Create a host-runtime component from a Python step callable."""
+
+        if fields is not None and (
+            tuple(inputs) or tuple(outputs) or default_fields is not None
+        ):
+            raise TypeError(
+                "Use either fields=FieldSpec(...) or inputs/outputs/default_fields, not both"
+            )
+        field_spec = fields or ComponentFieldSpec(
+            inputs=inputs,
+            outputs=outputs,
+            default_fields=default_fields or {},
+        )
+        if hooks is not None and any(
+            hook is not None
+            for hook in (
+                initialize,
+                create_runtime_payload,
+                prefill_runtime_state_fields,
+                validate_runtime_state,
+            )
+        ):
+            raise TypeError(
+                "Use either hooks=ComponentHooks(...) or individual hook arguments, not both"
+            )
+        lifecycle_hooks = ComponentLifecycleHooks(
+            initialize=hooks.initialize if hooks is not None else initialize,
+            create_runtime_payload=(
+                hooks.create_payload if hooks is not None else create_runtime_payload
+            ),
+            prefill_runtime_state_fields=(
+                hooks.prefill if hooks is not None else prefill_runtime_state_fields
+            ),
+            validate_runtime_state=(
+                hooks.validate if hooks is not None else validate_runtime_state
+            ),
+        )
+        return _CallableHostRuntimeComponent(
+            name=name,
+            grid=grid,
+            step=step,
+            payload=payload,
+            settings=settings,
+            field_spec=field_spec,
+            lifecycle_hooks=lifecycle_hooks,
+        )
 
     @classmethod
     def from_model(
@@ -46,28 +113,25 @@ class HostRuntimeComponent(Component):
         create_runtime_payload: ComponentCreatePayloadHook | None = None,
         prefill_runtime_state_fields: ComponentPrefillHook | None = None,
         validate_runtime_state: ComponentValidateHook | None = None,
-    ) -> "HostRuntimeComponent":
-        """Create a host-runtime component from a Python model callable."""
+    ) -> "HostComponent":
+        """Create a host component from a Python model callable.
 
-        field_spec = ComponentFieldSpec(
-            inputs=inputs,
-            outputs=outputs,
-            default_fields=default_fields or {},
-        )
-        lifecycle_hooks = ComponentLifecycleHooks(
-            initialize=initialize,
-            create_runtime_payload=create_runtime_payload,
-            prefill_runtime_state_fields=prefill_runtime_state_fields,
-            validate_runtime_state=validate_runtime_state,
-        )
-        return _CallableHostRuntimeComponent(
+        Deprecated compatibility wrapper for :meth:`from_step`.
+        """
+
+        return cls.from_step(
             name=name,
             grid=grid,
             step=step,
             payload=payload,
             settings=settings,
-            field_spec=field_spec,
-            lifecycle_hooks=lifecycle_hooks,
+            inputs=inputs,
+            outputs=outputs,
+            default_fields=default_fields,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
         )
 
     @final
@@ -95,7 +159,7 @@ class HostRuntimeComponent(Component):
         """Advance this non-differentiable host adapter by one runtime step."""
 
 
-class _CallableHostRuntimeComponent(_CallableRuntimeMixin, HostRuntimeComponent):
+class _CallableHostRuntimeComponent(_CallableRuntimeMixin, HostComponent):
     """Host-runtime component backed by an author-provided step callable."""
 
     def __init__(
@@ -135,4 +199,7 @@ class _CallableHostRuntimeComponent(_CallableRuntimeMixin, HostRuntimeComponent)
         return self._step_callable_runtime_state(component_state, context)
 
 
-__all__ = ["HostRuntimeComponent"]
+HostRuntimeComponent = HostComponent
+
+
+__all__ = ["HostComponent", "HostRuntimeComponent"]

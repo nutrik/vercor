@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from vercor.components.contracts import (
     AuthorFieldValues as _AuthorFieldValues,
     AuthorStepCallable as _AuthorStepCallable,
+    ComponentHooks as _ComponentHooks,
     ComponentCreatePayloadHook,
     ComponentFieldSpec as _ComponentFieldSpec,
     ComponentInitializeHook,
@@ -90,6 +91,79 @@ class Component(
     )
 
     @classmethod
+    def from_step(
+        cls,
+        name: str,
+        grid: RectilinearGrid,
+        step: _AuthorStepCallable,
+        *,
+        fields: _ComponentFieldSpec | None = None,
+        payload: Any | None = None,
+        settings: VercorSettings | None = None,
+        hooks: _ComponentHooks | None = None,
+        inputs: _FieldNames = (),
+        outputs: _FieldNames = (),
+        default_fields: _AuthorFieldValues = None,
+        initialize: ComponentInitializeHook | None = None,
+        create_runtime_payload: ComponentCreatePayloadHook | None = None,
+        prefill_runtime_state_fields: ComponentPrefillHook | None = None,
+        validate_runtime_state: ComponentValidateHook | None = None,
+    ) -> "Component":
+        """Create a differentiable component from a user step callable.
+
+        This author-facing constructor mirrors normal Python alternate
+        constructors: ``inputs`` declare fields the model reads, ``outputs``
+        declare fields the model writes, and ``default_fields`` declares
+        concrete runtime defaults. Scalar default values expand to this
+        component's grid shape.
+        """
+
+        if fields is not None and (
+            tuple(inputs) or tuple(outputs) or default_fields is not None
+        ):
+            raise TypeError(
+                "Use either fields=FieldSpec(...) or inputs/outputs/default_fields, not both"
+            )
+        field_spec = fields or _ComponentFieldSpec(
+            inputs=inputs,
+            outputs=outputs,
+            default_fields=default_fields or {},
+        )
+        if hooks is not None and any(
+            hook is not None
+            for hook in (
+                initialize,
+                create_runtime_payload,
+                prefill_runtime_state_fields,
+                validate_runtime_state,
+            )
+        ):
+            raise TypeError(
+                "Use either hooks=ComponentHooks(...) or individual hook arguments, not both"
+            )
+        lifecycle_hooks = ComponentLifecycleHooks(
+            initialize=hooks.initialize if hooks is not None else initialize,
+            create_runtime_payload=(
+                hooks.create_payload if hooks is not None else create_runtime_payload
+            ),
+            prefill_runtime_state_fields=(
+                hooks.prefill if hooks is not None else prefill_runtime_state_fields
+            ),
+            validate_runtime_state=(
+                hooks.validate if hooks is not None else validate_runtime_state
+            ),
+        )
+        return _CallableComponent(
+            name=name,
+            grid=grid,
+            step=step,
+            payload=payload,
+            settings=settings,
+            field_spec=field_spec,
+            lifecycle_hooks=lifecycle_hooks,
+        )
+
+    @classmethod
     def from_model(
         cls,
         name: str,
@@ -108,32 +182,22 @@ class Component(
     ) -> "Component":
         """Create a differentiable component from a user model callable.
 
-        This author-facing constructor mirrors normal Python alternate
-        constructors: ``inputs`` declare fields the model reads, ``outputs``
-        declare fields the model writes, and ``default_fields`` declares
-        concrete runtime defaults. Scalar default values expand to this
-        component's grid shape.
+        Deprecated compatibility wrapper for :meth:`from_step`.
         """
 
-        field_spec = _ComponentFieldSpec(
-            inputs=inputs,
-            outputs=outputs,
-            default_fields=default_fields or {},
-        )
-        lifecycle_hooks = ComponentLifecycleHooks(
-            initialize=initialize,
-            create_runtime_payload=create_runtime_payload,
-            prefill_runtime_state_fields=prefill_runtime_state_fields,
-            validate_runtime_state=validate_runtime_state,
-        )
-        return _CallableComponent(
+        return cls.from_step(
             name=name,
             grid=grid,
             step=step,
             payload=payload,
             settings=settings,
-            field_spec=field_spec,
-            lifecycle_hooks=lifecycle_hooks,
+            inputs=inputs,
+            outputs=outputs,
+            default_fields=default_fields,
+            initialize=initialize,
+            create_runtime_payload=create_runtime_payload,
+            prefill_runtime_state_fields=prefill_runtime_state_fields,
+            validate_runtime_state=validate_runtime_state,
         )
 
     @abstractmethod

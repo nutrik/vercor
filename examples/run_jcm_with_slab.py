@@ -3,19 +3,14 @@ from datetime import datetime
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from vercor import Clock
-from vercor.setups.coupler_helpers import (
-    ExchangeSpec,
-    add_exchange_specs,
-    build_coupler,
-)
-from vercor.setups.external.jax_gcm import make_jax_gcm
-from vercor.setups.slab.land import make_slab_land
-from vercor.setups.slab.ocean import make_slab_ocean
+from vercor import Clock, Coupler, Exchange
+from vercor.setups import make_jax_gcm
+from vercor.setups import make_slab_land
+from vercor.setups import make_slab_ocean
 from vercor.dtypes import as_jax_real_array
-from vercor.grid import RectilinearGrid
-from vercor.regridders import bilinear, conservative
-from vercor.setups.exchange_recipes import (
+from vercor import RectilinearGrid
+from vercor.regridding import bilinear, conservative
+from vercor.exchanges import (
     ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
     ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
     JCM_LAND_TO_ATMOSPHERE_FIELDS,
@@ -74,41 +69,40 @@ if __name__ == "__main__":
 
     # Coupler
     components = [atm, ocn, lnd]
-    cpl = build_coupler(
+    cpl = Coupler.from_components(
         clock=clock,
         components=components,
-        run_sequence=run_sequence,
+        run_order=run_sequence,
     )
 
     # Exchanges
     # scalar fields (vector field))
     # ["SHF", "LHF", ("u10m", "v10m")]
-    add_exchange_specs(
-        cpl,
+    cpl.add_exchanges(
         (
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="OCN",
-                field_names=ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
-                regridder_factory=bilinear,
+                target="OCN",
+                fields=ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="OCN",
-                destination="ATM",
-                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="LND",
-                destination="ATM",
-                field_names=JCM_LAND_TO_ATMOSPHERE_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="LND",
-                field_names=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
-                regridder_factory=conservative,
+                target="LND",
+                fields=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
+                regrid=conservative,
             ),
         ),
     )
@@ -116,7 +110,7 @@ if __name__ == "__main__":
     cpl.initialize()
     final_state = cpl.run()
     cpl.finalize(final_state)
-    views = cpl.runtime_component_views(final_state, names=("ATM", "OCN", "LND"))
+    views = cpl.views(final_state, names=("ATM", "OCN", "LND"))
 
     # Inspect a few fields in a component-wise table.
     print_component_field_means_table(

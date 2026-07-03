@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from vercor.components.contracts import (
     AuthorFieldValues,
     ComponentFieldSpec,
+    KEEP_PAYLOAD,
     ComponentStepResult,
     ComponentStepReturn,
     FieldNames,
@@ -130,6 +131,8 @@ def apply_step_result(
 
     if isinstance(result, ComponentStepResult):
         updated_state = with_runtime_fields(component, component_state, result.fields)
+        if result.payload is KEEP_PAYLOAD:
+            return updated_state
         return updated_state.with_runtime_payload(result.payload)
 
     return with_runtime_fields(component, component_state, result)

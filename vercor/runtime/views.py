@@ -10,7 +10,7 @@ from vercor.types import RuntimeArray
 
 
 @dataclass(frozen=True)
-class RuntimeComponentView:
+class ComponentView:
     """Explicit component metadata plus runtime fields for diagnostics/output."""
 
     name: str
@@ -55,7 +55,7 @@ class RuntimeComponentView:
         name: str,
         grid: RectilinearGrid,
         component_state: RuntimeComponentState,
-    ) -> "RuntimeComponentView":
+    ) -> "ComponentView":
         """Create a field view from component metadata and runtime state."""
 
         return cls(
@@ -67,7 +67,10 @@ class RuntimeComponentView:
         )
 
 
-RuntimeFieldSource = RuntimeComponentView | RuntimeComponentState
+RuntimeComponentView = ComponentView
+
+
+RuntimeFieldSource = ComponentView | RuntimeComponentState
 
 
 def runtime_field_candidates(

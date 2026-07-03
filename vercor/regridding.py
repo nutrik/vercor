@@ -1,21 +1,21 @@
-from vercor.regridders.base import Regridder
-from vercor.regridders.bilinear import (
-    BilinearRectilinearRegridder,
+"""Public regridding facade for VerCOR grid-to-grid transfers."""
+
+from vercor.regridders import (
     BilinearRegridder,
-    bilinear,
-)
-from vercor.regridders.conservative import (
-    ConservativeRectilinearRegridder,
+    BilinearRectilinearRegridder,
     ConservativeRegridder,
+    ConservativeRectilinearRegridder,
+    Regridder,
+    bilinear,
     conservative,
 )
 
 __all__ = [
-    "Regridder",
     "BilinearRegridder",
     "BilinearRectilinearRegridder",
     "ConservativeRegridder",
     "ConservativeRectilinearRegridder",
+    "Regridder",
     "bilinear",
     "conservative",
 ]

@@ -1,9 +1,9 @@
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import partial
 from typing import Callable, TypeAlias
 
-from vercor.regridders.bilinear import BilinearRectilinearRegridder
+from vercor.regridders.bilinear import BilinearRectilinearRegridder, bilinear
 from vercor.regridders.conservative import ConservativeRectilinearRegridder
 
 ExchangeField: TypeAlias = str | tuple[str, str]
@@ -27,45 +27,103 @@ def _regridder_factory_name(regridder_factory: Callable[..., object]) -> str:
     return regridder_factory.__class__.__name__
 
 
-@dataclass
+@dataclass(frozen=True, init=False)
 class Exchange:
     """Public exchange declaration connecting source fields to a destination.
 
     Exchange objects are static configuration. The coupler converts them into
     runtime contracts and dispatch metadata before execution so traced runtime
     state only carries arrays and stable field-store metadata.
-
-    Attributes:
-        source, destination: component names
-        name: exchange name (automatically setup from source, destination, and regridder_factory)
-        field_names: sequence of scalar field names and
-            tuples of vectors (u-component, v-component)
-        regridder_factory: callable that returns a Regridder instance
-        interpolation_type: type of interpolation used (automatically set from regridder_factory)
     """
 
     source: str
-    destination: str
-    name: str = field(init=False)
-    field_names: Sequence[ExchangeField]
-    regridder_factory: RegridderFactory
-    interpolation_type: str = field(init=False)
+    target: str
+    fields: Sequence[ExchangeField]
+    regrid: RegridderFactory
+    name: str | None
+    interpolation_type: str
 
-    def __post_init__(self) -> None:
-        factory_name = _regridder_factory_name(self.regridder_factory)
-        self.name = f"{self.source} --({factory_name})--> {self.destination}"
-        self.interpolation_type = factory_name
+    def __init__(
+        self,
+        source: str,
+        target: str | None = None,
+        fields: Sequence[ExchangeField] | None = None,
+        regrid: RegridderFactory = bilinear,
+        name: str | None = None,
+        *,
+        destination: str | None = None,
+        field_names: Sequence[ExchangeField] | None = None,
+        regridder_factory: RegridderFactory | None = None,
+    ) -> None:
+        """Create an exchange declaration.
+
+        ``destination``, ``field_names``, and ``regridder_factory`` are legacy
+        names kept as migration aliases for ``target``, ``fields``, and
+        ``regrid``.
+        """
+
+        if target is not None and destination is not None:
+            raise TypeError("Use either target or destination, not both")
+        if fields is not None and field_names is not None:
+            raise TypeError("Use either fields or field_names, not both")
+        if regridder_factory is not None and regrid is not bilinear:
+            raise TypeError("Use either regrid or regridder_factory, not both")
+
+        resolved_target = target if target is not None else destination
+        resolved_fields = fields if fields is not None else field_names
+        resolved_regrid = regridder_factory or regrid
+        if resolved_target is None:
+            raise TypeError("Exchange target is required")
+        if resolved_fields is None:
+            raise TypeError("Exchange fields are required")
+
+        object.__setattr__(self, "source", source)
+        object.__setattr__(self, "target", resolved_target)
+        object.__setattr__(self, "fields", tuple(resolved_fields))
+        object.__setattr__(self, "regrid", resolved_regrid)
+        object.__setattr__(self, "name", name)
+        object.__setattr__(
+            self,
+            "interpolation_type",
+            _regridder_factory_name(resolved_regrid),
+        )
+
+    @property
+    def destination(self) -> str:
+        """Return legacy destination component name."""
+
+        return self.target
+
+    @property
+    def field_names(self) -> Sequence[ExchangeField]:
+        """Return legacy exchange field declaration."""
+
+        return self.fields
+
+    @property
+    def regridder_factory(self) -> RegridderFactory:
+        """Return legacy regridder factory."""
+
+        return self.regrid
+
+    @property
+    def label(self) -> str:
+        """Return explicit name or a stable derived logging label."""
+
+        if self.name is not None:
+            return self.name
+        return f"{self.source} --({self.interpolation_type})--> {self.target}"
 
     def __str__(self) -> str:
         return (
             f"{self.__class__.__name__}:\n"
-            f"├── Name: {self.name}\n"
+            f"├── Name: {self.label}\n"
             f"├── Source component: {self.source}\n"
-            f"└── Destination component: {self.destination}\n"
+            f"└── Target component: {self.target}\n"
         )
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(name={self.name}, source={self.source},"
-            f" destination={self.destination}, fields={self.field_names})"
+            f" target={self.target}, fields={self.fields})"
         )

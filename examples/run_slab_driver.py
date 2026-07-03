@@ -4,20 +4,17 @@ from typing import Any, cast
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from vercor import Clock
-from vercor.setups.coupler_helpers import (
-    ExchangeSpec,
-    add_exchange_specs,
-    build_coupler,
-)
-from vercor.setups.slab.atmosphere import make_slab_atmosphere
-from vercor.setups.slab.land import make_slab_land
-from vercor.setups.slab.ocean import make_slab_ocean
-from vercor.setups.slab.seaice import make_slab_seaice
+from vercor import Clock, Coupler, Exchange
 from vercor.dtypes import jax_ones
-from vercor.grid_geometry import make_rectilinear_grid
-from vercor.regridders import bilinear, conservative
-from vercor.setups.exchange_recipes import (
+from vercor.grids import rectilinear
+from vercor.regridding import bilinear, conservative
+from vercor.setups import (
+    make_slab_atmosphere,
+    make_slab_land,
+    make_slab_ocean,
+    make_slab_seaice,
+)
+from vercor.exchanges import (
     LAND_TO_ATMOSPHERE_SOIL_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_SEAICE_SURFACE_FIELDS,
@@ -32,18 +29,16 @@ from vercor.diagnostics import (
 
 if __name__ == "__main__":
     # Build grids
-    atm_grid = make_rectilinear_grid("atm-grid", 128, 64, 0.0, 360.0, -90.0, 90.0)
+    atm_grid = rectilinear("atm-grid", 128, 64, 0.0, 360.0, -90.0, 90.0)
 
     ocn_grid_shape = (64, 32)
     binary_mask = jax_ones(ocn_grid_shape).T.at[:2, :].set(0.0)  # land points
-    ocn_grid = make_rectilinear_grid(
+    ocn_grid = rectilinear(
         "ocn-grid", *ocn_grid_shape, 0.0, 360.0, -90.0, 90.0, mask=binary_mask
     )
 
-    ice_grid = make_rectilinear_grid(
-        "ice-grid", *ocn_grid_shape, 0.0, 360.0, -90.0, 90.0
-    )
-    lnd_grid = make_rectilinear_grid("lnd-grid", 128, 64, 0.0, 360.0, -90.0, 90.0)
+    ice_grid = rectilinear("ice-grid", *ocn_grid_shape, 0.0, 360.0, -90.0, 90.0)
+    lnd_grid = rectilinear("lnd-grid", 128, 64, 0.0, 360.0, -90.0, 90.0)
 
     # Build components
     atm = make_slab_atmosphere(atm_grid)
@@ -57,59 +52,58 @@ if __name__ == "__main__":
 
     # Coupler
     components: list[Any] = [atm, ocn, ice, lnd]
-    cpl = build_coupler(
+    cpl = Coupler.from_components(
         clock=clock,
         components=components,
-        run_sequence=run_sequence,
+        run_order=run_sequence,
     )
 
     # Exchanges
     # scalar fields (vector field))
     # ["SHF", "LHF", ("u10m", "v10m")]
-    add_exchange_specs(
-        cpl,
+    cpl.add_exchanges(
         (
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="OCN",
-                field_names=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
-                regridder_factory=bilinear,
+                target="OCN",
+                fields=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="OCN",
-                destination="ATM",
-                field_names=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="OCN",
-                destination="ICE",
-                field_names=OCEAN_TO_SEAICE_SURFACE_FIELDS,
-                regridder_factory=bilinear,
+                target="ICE",
+                fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="LND",
-                destination="ATM",
-                field_names=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
-                regridder_factory=bilinear,
+                target="ATM",
+                fields=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
+                regrid=bilinear,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ATM",
-                destination="LND",
-                field_names=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-                regridder_factory=conservative,
+                target="LND",
+                fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+                regrid=conservative,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="OCN",
-                destination="ICE",
-                field_names=OCEAN_TO_SEAICE_SURFACE_FIELDS,
-                regridder_factory=conservative,
+                target="ICE",
+                fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
+                regrid=conservative,
             ),
-            ExchangeSpec(
+            Exchange(
                 source="ICE",
-                destination="OCN",
-                field_names=SEAICE_TO_OCEAN_FIELDS,
-                regridder_factory=conservative,
+                target="OCN",
+                fields=SEAICE_TO_OCEAN_FIELDS,
+                regrid=conservative,
             ),
         ),
     )
@@ -117,7 +111,7 @@ if __name__ == "__main__":
     cpl.initialize()
     final_state = cpl.run()
     cpl.finalize(final_state)
-    views = cpl.runtime_component_views(final_state, names=("ATM", "OCN", "LND", "ICE"))
+    views = cpl.views(final_state, names=("ATM", "OCN", "LND", "ICE"))
 
     # Inspect a few fields in a component-wise table.
     print_component_field_means_table(

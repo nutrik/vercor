@@ -85,3 +85,6 @@ def bilinear(
         idw_eps=idw_eps,
         fill_value=fill_value,
     )
+
+
+BilinearRegridder = BilinearRectilinearRegridder
