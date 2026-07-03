@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.13",]
+        python-version: ["3.12", "3.13",]
 
     steps:
     - uses: actions/checkout@v4
@@ -40,6 +40,7 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
         python -m pip install torch torchvision
+        python -m pip install dinosaur==1.3.5
         pip install vendor/jax-gcm -r vendor/jax-gcm/requirements.txt
         pip install vendor/veros -r vendor/veros/requirements.txt
         pip install .
