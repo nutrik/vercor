@@ -566,6 +566,29 @@ def test_component_base_owns_runtime_access_methods_directly() -> None:
 
 
 @pytest.mark.fast_always
+def test_runtime_field_state_only_helpers_do_not_accept_unused_component() -> None:
+    runtime_fields_module = importlib.import_module("vercor.components._runtime_fields")
+
+    assert tuple(signature(runtime_fields_module.runtime_fields).parameters) == (
+        "component_state",
+    )
+    assert tuple(signature(runtime_fields_module.has_runtime_field).parameters) == (
+        "component_state",
+        "name",
+    )
+
+
+@pytest.mark.fast_always
+def test_lifecycle_mixin_has_no_cast_accessor_indirection() -> None:
+    lifecycle_source = Path("vercor/components/_lifecycle_api.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def _lifecycle_component(" not in lifecycle_source
+    assert "_lifecycle_component()" not in lifecycle_source
+
+
+@pytest.mark.fast_always
 def test_component_contract_modules_share_field_name_deduplication_owner() -> None:
     field_names_module = importlib.import_module("vercor.components._field_names")
     private_contracts_module = importlib.import_module("vercor.components._contracts")

@@ -1213,6 +1213,34 @@ def test_component_helpers_seed_and_update_runtime_fields() -> None:
 
 
 @pytest.mark.fast_always
+def test_public_runtime_field_mapping_and_membership_helpers_are_stable() -> None:
+    grid = make_test_grid(name="public-runtime-fields")
+    component = _RuntimeOnlyComponent(name="ATM", grid=grid)
+    component.seed_fields(
+        {
+            "temperature": jnp.full(grid.shape, 280.0),
+            "humidity": jnp.full(grid.shape, 0.25),
+        }
+    )
+    state = create_runtime_component_state(
+        component,
+        contract=RuntimeComponentContract(),
+    )
+
+    fields = component.runtime_fields(state)
+    assert tuple(fields) == ("temperature", "humidity")
+    assert component.has_runtime_field(state, "temperature")
+    assert component.has_runtime_field(state, "humidity")
+    assert not component.has_runtime_field(state, "missing")
+
+    fields["temperature"] = jnp.zeros(grid.shape)
+    assert_allclose_compact(
+        state.data.get("temperature"),
+        np.full(grid.shape, 280.0),
+    )
+
+
+@pytest.mark.fast_always
 def test_differentiable_component_applies_callable_field_updates() -> None:
     grid = make_test_grid(name="factory-active")
 

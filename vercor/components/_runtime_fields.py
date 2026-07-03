@@ -24,12 +24,10 @@ if TYPE_CHECKING:
 
 
 def runtime_fields(
-    component: "Component",
     component_state: "RuntimeComponentState",
 ) -> dict[str, RuntimeArray]:
     """Return runtime data fields as a plain name-to-array mapping."""
 
-    _ = component
     return component_state.data.to_mapping()
 
 
@@ -49,13 +47,11 @@ def runtime_field(
 
 
 def has_runtime_field(
-    component: "Component",
     component_state: "RuntimeComponentState",
     name: str,
 ) -> bool:
     """Return whether one runtime data field exists."""
 
-    _ = component
     return name in component_state.data
 
 

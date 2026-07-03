@@ -311,6 +311,13 @@ historical commands, failure messages, or detailed validation notes.
   environment executable. The session-start `conda run -n scipy pytest tests/
   -v --fast 2>&1 | tail -20` smoke still failed before pytest with the known
   Conda/Rattler `PanicException`.
+- Latest local component helper indirection simplification validation:
+  baseline fast pytest, focused red/green pytest, focused affected fast pytest,
+  Black, flake8, mypy, full fast pytest, full pytest, git diff whitespace
+  check, and `conda run -n scipy` fast pytest passed as of 2026-07-03 using
+  the direct `scipy` environment executable for the full validation. Full
+  pytest emitted the known JAX dtype-promotion `FutureWarning` in the JAXGCM
+  runtime gradient test.
 - No active `IN PROGRESS` task is recorded in the archived log.
 - No current blocker is recorded in the archived log.
 - Recurring known warning: Black may emit the existing Python 3.13 versus

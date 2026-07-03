@@ -16,18 +16,13 @@ if TYPE_CHECKING:
 class ComponentLifecycleMixin:
     """Default component lifecycle hook dispatch used by factory and subclasses."""
 
-    def _lifecycle_component(self) -> "Component":
-        """Return this mixin instance as the concrete component type."""
-
-        return cast("Component", self)
-
     def initialize(
         self,
         context: "ComponentSetupContext",
     ) -> None:
         """Optionally initialize component-owned runtime data before coupling."""
 
-        component = self._lifecycle_component()
+        component = cast("Component", self)
         hook = component._lifecycle_hooks.initialize
         if hook is not None:
             hook(component, context)
@@ -37,7 +32,7 @@ class ComponentLifecycleMixin:
     def create_runtime_payload(self) -> Any | None:
         """Return optional immutable payload carried by runtime component state."""
 
-        component = self._lifecycle_component()
+        component = cast("Component", self)
         hook = component._lifecycle_hooks.create_runtime_payload
         if hook is not None:
             return hook(component)
@@ -57,7 +52,7 @@ class ComponentLifecycleMixin:
     ) -> None:
         """Optionally pre-seed fields required by runtime execution."""
 
-        component = self._lifecycle_component()
+        component = cast("Component", self)
         hook = component._lifecycle_hooks.prefill_runtime_state_fields
         if hook is not None:
             hook(component, data, incoming, outgoing, contract)
@@ -72,7 +67,7 @@ class ComponentLifecycleMixin:
     ) -> None:
         """Optionally validate component-specific runtime fields before execution."""
 
-        component = self._lifecycle_component()
+        component = cast("Component", self)
         hook = component._lifecycle_hooks.validate_runtime_state
         if hook is not None:
             hook(component, component_state, contract)

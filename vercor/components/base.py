@@ -150,7 +150,7 @@ class Component(
     ) -> dict[str, RuntimeArray]:
         """Return runtime data fields as a plain name-to-array mapping."""
 
-        return _runtime_field_adapters.runtime_fields(self, component_state)
+        return _runtime_field_adapters.runtime_fields(component_state)
 
     def runtime_field(
         self,
@@ -168,7 +168,7 @@ class Component(
     ) -> bool:
         """Return whether one runtime data field exists."""
 
-        return _runtime_field_adapters.has_runtime_field(self, component_state, name)
+        return _runtime_field_adapters.has_runtime_field(component_state, name)
 
     def runtime_field_or(
         self,
