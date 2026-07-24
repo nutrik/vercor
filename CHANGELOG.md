@@ -3,6 +3,16 @@
 All notable changes to VerCOR are recorded here. The project follows semantic
 versioning; pre-releases may still refine new contracts.
 
+## [0.4.1] - 2026-07-24
+
+### Fixed
+
+- GitHub Actions now proves its effective `contents: write` capability through
+  the non-mutating Release notes-generation endpoint instead of interpreting
+  repository `permissions.push` for an installation token.
+- The failed immutable `v0.4.0` workflow remains preserved; publication
+  recovery proceeds through the new `v0.4.1` patch tag.
+
 ## [0.4.0] - 2026-07-23
 
 ### Added
@@ -80,5 +90,6 @@ versioning; pre-releases may still refine new contracts.
 This alpha does not ship legacy adapters. Follow
 `docs/migration-0.3-to-0.4.md` to migrate 0.3-only workflows directly.
 
+[0.4.1]: https://github.com/nutrik/vercor/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/nutrik/vercor/compare/v0.4.0a1...v0.4.0
 [0.4.0a1]: https://github.com/Roman-N/VerCOR/compare/v0.3.2...v0.4.0a1

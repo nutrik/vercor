@@ -28,20 +28,20 @@ jobs:
           shopt -s nullglob dotglob
           DIST_ARTIFACTS=(dist/*)
           test "${#DIST_ARTIFACTS[@]}" -eq 2
-          test -f dist/vercor-0.4.0-py3-none-any.whl
-          test -f dist/vercor-0.4.0.tar.gz
+          test -f dist/vercor-0.4.1-py3-none-any.whl
+          test -f dist/vercor-0.4.1.tar.gz
           mkdir -p release-manifest
           (
             cd dist
-            sha256sum vercor-0.4.0-py3-none-any.whl vercor-0.4.0.tar.gz > ../release-manifest/SHA256SUMS
+            sha256sum vercor-0.4.1-py3-none-any.whl vercor-0.4.1.tar.gz > ../release-manifest/SHA256SUMS
             sha256sum -c ../release-manifest/SHA256SUMS
           )
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # upload-artifact major 4
         with:
           name: vercor-distributions
           path: |
-            dist/vercor-0.4.0-py3-none-any.whl
-            dist/vercor-0.4.0.tar.gz
+            dist/vercor-0.4.1-py3-none-any.whl
+            dist/vercor-0.4.1.tar.gz
           if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # upload-artifact major 4
         with:
@@ -108,8 +108,8 @@ jobs:
       - name: Install selected artifact environment
         run: |
           python -m pip install --upgrade pip pytest "pytest-xdist>=3.7" mypy pyyaml build "flit_core<4"
-          WHEEL_PATH="${GITHUB_WORKSPACE}/dist/vercor-0.4.0-py3-none-any.whl"
-          SDIST_PATH="${GITHUB_WORKSPACE}/dist/vercor-0.4.0.tar.gz"
+          WHEEL_PATH="${GITHUB_WORKSPACE}/dist/vercor-0.4.1-py3-none-any.whl"
+          SDIST_PATH="${GITHUB_WORKSPACE}/dist/vercor-0.4.1.tar.gz"
           if [ "${{ matrix.artifact }}" = "sdist" ]; then
             ARTIFACT_PATH="${SDIST_PATH}"
           else
@@ -151,7 +151,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip build mypy
           python -m build --wheel --outdir "$RUNNER_TEMP/external-extension-fixture-dist" tests/fixtures/external_extension_test_fixture
-          python -m pip install "${GITHUB_WORKSPACE}/dist/vercor-0.4.0-py3-none-any.whl"
+          python -m pip install "${GITHUB_WORKSPACE}/dist/vercor-0.4.1-py3-none-any.whl"
           python -m pip install "$RUNNER_TEMP/external-extension-fixture-dist/external_extension_test_fixture-0.1.0-py3-none-any.whl"
           cd "$RUNNER_TEMP"
           python -m external_extension_test_fixture.smoke --output-dir "$RUNNER_TEMP/extension-output"
@@ -180,7 +180,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip build
           python -m build --wheel --outdir "$RUNNER_TEMP/external-extension-fixture-dist" tests/fixtures/external_extension_test_fixture
-          python -m pip install "dist/vercor-0.4.0-py3-none-any.whl"
+          python -m pip install "dist/vercor-0.4.1-py3-none-any.whl"
           python -m pip install "$RUNNER_TEMP/external-extension-fixture-dist/external_extension_test_fixture-0.1.0-py3-none-any.whl"
           cd "$RUNNER_TEMP"
           python -m external_extension_test_fixture.smoke --output-dir "$RUNNER_TEMP/extension-output"
