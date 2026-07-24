@@ -169,16 +169,19 @@ publishes the tested artifact bundle.
 
 The workflow file runs validation on pushes to `main`, pull requests targeting
 `main`, and version tags. Only a version tag can satisfy the deployment job's
-condition. A push to `release/vercor-0.4.1` alone does not run it. Before CI or a push,
-fetch the current protected branch, prove it is an ancestor of the reviewed
-release commit, prove the same token can invoke the non-mutating Release
-notes-generation endpoint and then enumerate every release page so an
-exact-tag draft cannot be mistaken for absence. PyPI 0.4.1 must also be absent:
+condition. A push to `release/vercor-0.4.1` alone does not run it. Before any
+GitHub preflight or pull-request creation, fetch the protected branch, prove it
+is an ancestor of the reviewed release commit, push that exact commit to the
+release branch, and verify the remote branch SHA. Then prove the same token can
+invoke the non-mutating Release notes-generation endpoint and enumerate every
+release page so an exact-tag draft cannot be mistaken for absence. PyPI 0.4.1
+must also be absent:
 
 ```text
 set -euo pipefail
 RELEASE_BRANCH="release/vercor-0.4.1"
 export RELEASE_BRANCH
+test "$(git branch --show-current)" = "$RELEASE_BRANCH"
 test -n "${RELEASE_COMMIT:-}"
 test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 git fetch --no-tags origin main
@@ -186,6 +189,10 @@ MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"
 export MAIN_COMMIT
 test -n "${MAIN_COMMIT:-}"
 git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"
+git push --set-upstream origin "$RELEASE_BRANCH"
+REMOTE_RELEASE_COMMIT="$(git ls-remote origin "refs/heads/${RELEASE_BRANCH}" | awk '{print $1}')"
+export REMOTE_RELEASE_COMMIT
+test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"
 GH_TOKEN="$(gh auth token)"
 export GH_TOKEN
 test -n "${GH_TOKEN:-}"
@@ -216,14 +223,18 @@ git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"
 gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" --draft --title "Release VerCOR 0.4.1" --body "Fix the GitHub Release capability preflight and prepare the immutable VerCOR 0.4.1 recovery release. The existing v0.4.0 tag is unchanged."
 ```
 
-Confirm exactly one open matching pull request, push the reviewed commit, select
-the `pull_request` run of `python-package.yml` at the exact SHA, watch it, and
-mechanically recheck the run:
+Confirm exactly one open matching pull request, reverify the remote branch SHA,
+select the `pull_request` run of `python-package.yml` at the exact SHA, watch
+it, and mechanically recheck the PR and run. After those checks pass, mark the
+draft ready, merge through the repository's normal mechanism, bind
+`RELEASE_COMMIT` to the fetched protected `main` merge commit, and detach the
+worktree at that exact commit:
 
 ```text
 set -euo pipefail
 RELEASE_BRANCH="release/vercor-0.4.1"
 export RELEASE_BRANCH
+test "$(git branch --show-current)" = "$RELEASE_BRANCH"
 test -n "${RELEASE_COMMIT:-}"
 test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 test -z "$(git status --porcelain --untracked-files=all)"
@@ -232,10 +243,17 @@ MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"
 export MAIN_COMMIT
 test -n "${MAIN_COMMIT:-}"
 git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"
+REMOTE_RELEASE_COMMIT="$(git ls-remote origin "refs/heads/${RELEASE_BRANCH}" | awk '{print $1}')"
+export REMOTE_RELEASE_COMMIT
+test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"
 RELEASE_PR_NUMBER="$(gh pr list --repo nutrik/vercor --state open --base main --head "$RELEASE_BRANCH" --json number --jq 'if length == 1 then .[0].number else empty end')"
 export RELEASE_PR_NUMBER
 test -n "${RELEASE_PR_NUMBER:-}"
-git push origin "$RELEASE_BRANCH"
+test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json state --jq .state)" = "OPEN"
+test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json isDraft --jq .isDraft)" = "true"
+test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json baseRefName --jq .baseRefName)" = "main"
+test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json headRefName --jq .headRefName)" = "$RELEASE_BRANCH"
+test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json headRefOid --jq .headRefOid)" = "$RELEASE_COMMIT"
 RELEASE_RUN_ID="$(gh run list --repo nutrik/vercor --workflow python-package.yml --event pull_request --branch "$RELEASE_BRANCH" --commit "$RELEASE_COMMIT" --limit 20 --json databaseId,event,headSha --jq 'map(select(.event == "pull_request" and .headSha == env.RELEASE_COMMIT)) | sort_by(.databaseId) | last | .databaseId // empty')"
 export RELEASE_RUN_ID
 test -n "${RELEASE_RUN_ID:-}"
@@ -244,10 +262,26 @@ test "$(gh run view "$RELEASE_RUN_ID" --repo nutrik/vercor --json headSha --jq .
 test "$(gh run view "$RELEASE_RUN_ID" --repo nutrik/vercor --json event --jq .event)" = "pull_request"
 test "$(gh run view "$RELEASE_RUN_ID" --repo nutrik/vercor --json conclusion --jq .conclusion)" = "success"
 (cd dist && shasum -a 256 -c SHA256SUMS)
+gh pr ready "$RELEASE_PR_NUMBER" --repo nutrik/vercor
+gh pr merge "$RELEASE_PR_NUMBER" --repo nutrik/vercor --merge
+test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json state --jq .state)" = "MERGED"
+MERGE_COMMIT="$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json mergeCommit --jq '.mergeCommit.oid // empty')"
+export MERGE_COMMIT
+test -n "${MERGE_COMMIT:-}"
+git fetch --no-tags origin main
+RELEASE_COMMIT="$(git rev-parse refs/remotes/origin/main)"
+export RELEASE_COMMIT
+test -n "${RELEASE_COMMIT:-}"
+test "$MERGE_COMMIT" = "$RELEASE_COMMIT"
+git switch --detach "$RELEASE_COMMIT"
+test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+test -z "$(git status --porcelain --untracked-files=all)"
 ```
 
 If the run has not appeared yet, stop and rerun the selection transcript later.
 Do not select a `push` run, a run for another workflow, or a run at another SHA.
+Do not mark the PR ready or merge until every exact PR and workflow check above
+has passed.
 
 ## 6. Create and verify the annotated tag
 

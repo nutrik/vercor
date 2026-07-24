@@ -730,8 +730,147 @@ def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
         "gh pr list --repo nutrik/vercor --state open --base main "
         '--head "$RELEASE_BRANCH" --json number'
     ) in prepare
-    assert 'git push origin "$RELEASE_BRANCH"' in prepare
+    assert 'git push --set-upstream origin "$RELEASE_BRANCH"' in prepare
     assert '--event pull_request --branch "$RELEASE_BRANCH"' in prepare
+
+
+@pytest.mark.fast_always
+def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
+    """Publish and reauthenticate the exact release branch before GitHub queries."""
+
+    guide = RELEASING_PATH.read_text(encoding="utf-8")
+    prepare = _section(guide, "## 5. Prepare the required release pull request")
+    transcripts = tuple(
+        source
+        for language, source in _markdown_fences(prepare, owner="release PR section")
+        if language == "text"
+    )
+    push = 'git push --set-upstream origin "$RELEASE_BRANCH"'
+    remote_query = (
+        'REMOTE_RELEASE_COMMIT="$(git ls-remote origin '
+        '"refs/heads/${RELEASE_BRANCH}" | awk \'{print $1}\')"'
+    )
+    remote_check = 'test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"'
+    capability = "gh api --method POST repos/nutrik/vercor/releases/generate-notes"
+    enumeration = (
+        'gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100"'
+    )
+    absence = "tools/validate_release_state.py github-tag-absent"
+    pypi_absence = 'test "$PYPI_STATUS" = "404"'
+    draft_pr = (
+        'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" '
+        "--draft"
+    )
+
+    for required in (
+        'RELEASE_BRANCH="release/vercor-0.4.1"',
+        'test "$(git branch --show-current)" = "$RELEASE_BRANCH"',
+        'test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"',
+        'git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"',
+        push,
+        remote_query,
+        remote_check,
+        capability,
+        enumeration,
+        absence,
+        pypi_absence,
+        draft_pr,
+    ):
+        assert required in prepare
+    assert prepare.index(push) < prepare.index(remote_query)
+    assert prepare.index(remote_query) < prepare.index(remote_check)
+    assert prepare.index(remote_check) < prepare.index(capability)
+    assert prepare.index(capability) < prepare.index(enumeration)
+    assert prepare.index(enumeration) < prepare.index(absence)
+    assert prepare.index(absence) < prepare.index(pypi_absence)
+    assert prepare.index(pypi_absence) < prepare.index(draft_pr)
+    assert prepare.count("git push ") == 1
+
+    selection = transcripts[-1]
+    assert "git push " not in selection
+    assert remote_query in selection
+    assert remote_check in selection
+    assert selection.index(remote_query) < selection.index(remote_check)
+    assert selection.index(remote_check) < selection.index("gh pr list")
+    assert selection.index(remote_check) < selection.index("gh run list")
+
+
+@pytest.mark.fast_always
+def test_release_pr_merge_rebinds_main_before_tag_preflight() -> None:
+    """Merge the verified PR and detach at the protected-main commit before tagging."""
+
+    guide = RELEASING_PATH.read_text(encoding="utf-8")
+    prepare = _section(guide, "## 5. Prepare the required release pull request")
+    tag = _section(guide, "## 6. Create and verify the annotated tag")
+    draft_pr = (
+        'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" '
+        "--draft"
+    )
+    exact_pr_check = (
+        'test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
+        '--json headRefOid --jq .headRefOid)" = "$RELEASE_COMMIT"'
+    )
+    successful_run = (
+        'test "$(gh run view "$RELEASE_RUN_ID" --repo nutrik/vercor '
+        '--json conclusion --jq .conclusion)" = "success"'
+    )
+    ready = 'gh pr ready "$RELEASE_PR_NUMBER" --repo nutrik/vercor'
+    merge = 'gh pr merge "$RELEASE_PR_NUMBER" --repo nutrik/vercor --merge'
+    merged_state = (
+        'test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
+        '--json state --jq .state)" = "MERGED"'
+    )
+    merge_commit = (
+        'MERGE_COMMIT="$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
+        "--json mergeCommit --jq '.mergeCommit.oid // empty')\""
+    )
+    main_binding = 'RELEASE_COMMIT="$(git rev-parse refs/remotes/origin/main)"'
+    merged_main_check = 'test "$MERGE_COMMIT" = "$RELEASE_COMMIT"'
+    detach = 'git switch --detach "$RELEASE_COMMIT"'
+    detached_check = 'test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"'
+
+    for required in (
+        draft_pr,
+        exact_pr_check,
+        successful_run,
+        ready,
+        merge,
+        merged_state,
+        merge_commit,
+        "git fetch --no-tags origin main",
+        main_binding,
+        "export RELEASE_COMMIT",
+        merged_main_check,
+        detach,
+        detached_check,
+    ):
+        assert required in prepare
+    assert prepare.index(draft_pr) < prepare.index(exact_pr_check)
+    assert prepare.index(exact_pr_check) < prepare.index(successful_run)
+    assert prepare.index(successful_run) < prepare.index(ready)
+    assert prepare.index(ready) < prepare.index(merge)
+    assert prepare.index(merge) < prepare.index(merged_state)
+    assert prepare.index(merged_state) < prepare.index(merge_commit)
+    assert prepare.index(merge_commit) < prepare.rindex(
+        "git fetch --no-tags origin main"
+    )
+    assert prepare.rindex("git fetch --no-tags origin main") < prepare.index(
+        main_binding
+    )
+    assert prepare.index(main_binding) < prepare.index(merged_main_check)
+    assert prepare.index(merged_main_check) < prepare.index(detach)
+    assert prepare.index(detach) < prepare.rindex(detached_check)
+    assert guide.index(ready) < guide.index("## 6. Create and verify the annotated tag")
+
+    assert "git fetch --no-tags origin main" in tag
+    assert 'MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"' in tag
+    assert 'test "$MAIN_COMMIT" = "$RELEASE_COMMIT"' in tag
+    assert tag.index("git fetch --no-tags origin main") < tag.index(
+        'test "$MAIN_COMMIT" = "$RELEASE_COMMIT"'
+    )
+    assert tag.index('test "$MAIN_COMMIT" = "$RELEASE_COMMIT"') < tag.index(
+        "git tag -a"
+    )
 
 
 @pytest.mark.fast_always

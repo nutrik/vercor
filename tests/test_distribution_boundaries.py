@@ -7,6 +7,7 @@ import inspect
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -810,6 +811,37 @@ def test_release_bundle_contains_only_vercor_distributions() -> None:
     assert "python -m twine upload" not in publish
     assert "gh release create" not in publish
     assert "dist/external_extension_test_fixture" not in releasing
+
+
+@pytest.mark.fast_always
+def test_progress_records_refreshed_corrected_release_artifacts() -> None:
+    """Reject package evidence that predates the active README and runbook fixes."""
+
+    progress = (PROJECT_ROOT / "PROGRESS.md").read_text(encoding="utf-8")
+    current_status = _section(progress, "## Current Status")
+    current_entry = re.search(
+        r"^- .*?(?=^- |\Z)",
+        current_status,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    assert current_entry is not None
+    evidence = current_entry.group()
+
+    assert (
+        "evidence was refreshed after the README and release-runbook corrections"
+        in evidence
+    )
+    assert "commit `32b8276`" not in evidence
+    for artifact in (EXPECTED_WHEEL_NAME, EXPECTED_SDIST_NAME):
+        assert re.search(
+            rf"`{re.escape(artifact)}`, [1-9][0-9]* B, SHA-256 `[0-9a-f]{{64}}`",
+            evidence,
+        )
+    for stale_digest in (
+        "653adb66c1507aa3ead8abb34a7f18a7dfe243ee8c11500e28a8fa33ea042112",
+        "5ae1cf3146fb4aae9b289f1da6bcf228a18d534183cd38108f5d15f16dd5d71f",
+    ):
+        assert stale_digest not in evidence
 
 
 @pytest.mark.fast_always
