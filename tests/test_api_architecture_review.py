@@ -558,7 +558,9 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
     release_enumeration = (
         'gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100"'
     )
-    capability_probe = "gh api --method POST repos/nutrik/vercor/releases/generate-notes"
+    capability_probe = (
+        "gh api --method POST repos/nutrik/vercor/releases/generate-notes"
+    )
     pypi_url = "https://pypi.org/pypi/vercor/0.4.0/json"
 
     for section in (prepare, tag):
@@ -651,6 +653,34 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
     assert "> SHA256SUMS" not in publish_commands
     assert "pip install --upgrade pip twine" not in publish_commands
     assert "python -m build" not in publish_commands
+
+
+@pytest.mark.fast_always
+def test_release_recovery_preflight_proves_capability_before_enumerating() -> None:
+    """Keep exact-state recovery bound to the non-mutating capability probe."""
+
+    guide = RELEASING_PATH.read_text(encoding="utf-8")
+    recovery_state = _section(guide, "## 9. Query exact public state before recovery")
+    normalized_lines = tuple(
+        line.strip() for line in recovery_state.splitlines() if line.strip()
+    )
+    capability_output = '> "$RECOVERY_STATE_DIR/release-capability.json"'
+    release_enumeration = (
+        'gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100" '
+        '> "$RECOVERY_STATE_DIR/releases.json"'
+    )
+
+    for required in (
+        "gh api --method POST repos/nutrik/vercor/releases/generate-notes",
+        "-f tag_name=v0.4.1",
+        '-f target_commitish="$RELEASE_COMMIT"',
+        capability_output,
+        release_enumeration,
+    ):
+        assert required in recovery_state
+    assert normalized_lines[normalized_lines.index(capability_output) + 1] == (
+        release_enumeration
+    )
 
 
 @pytest.mark.fast_always

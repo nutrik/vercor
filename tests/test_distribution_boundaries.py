@@ -591,6 +591,9 @@ def test_version_tag_deploys_exact_tested_distributions() -> None:
     )
     assert len(capability_preflights) == 2
     for preflight in capability_preflights:
+        normalized_lines = tuple(
+            line.strip() for line in preflight.splitlines() if line.strip()
+        )
         assert "gh api --method POST" in preflight
         assert capability_endpoint in preflight
         assert '-f tag_name="$GITHUB_REF_NAME"' in preflight
@@ -599,6 +602,9 @@ def test_version_tag_deploys_exact_tested_distributions() -> None:
         assert preflight.index(capability_endpoint) < preflight.index(
             release_enumeration
         )
+        assert normalized_lines[
+            normalized_lines.index(capability_output) + 1
+        ].startswith(release_enumeration)
         assert "github-repository-push" not in preflight
         assert 'repos/${GITHUB_REPOSITORY}" >' not in preflight
 
