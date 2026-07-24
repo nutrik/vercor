@@ -303,9 +303,11 @@ jobs:
             --directory dist \
             --manifest "$RELEASE_MANIFEST" \
             --expect "$RELEASE_WHEEL_NAME" "$RELEASE_SDIST_NAME"
-          gh api "repos/${GITHUB_REPOSITORY}" > "$STATE_DIR/repository.json"
-          python tools/validate_release_state.py github-repository-push \
-            --json "$STATE_DIR/repository.json"
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" \
+            -f target_commitish="$GITHUB_SHA" \
+            > "$STATE_DIR/release-capability.json"
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > "$STATE_DIR/releases.json"
           python tools/validate_release_state.py github-releases \
             --json "$STATE_DIR/releases.json" \
@@ -343,9 +345,11 @@ jobs:
             --expect "$RELEASE_WHEEL_NAME" "$RELEASE_SDIST_NAME"
           PYPI_STATUS="$(curl -sS -L -o "$STATE_DIR/pypi.json" -w '%{http_code}' "https://pypi.org/pypi/vercor/${VERSION}/json")"
           test "$PYPI_STATUS" = "404"
-          gh api "repos/${GITHUB_REPOSITORY}" > "$STATE_DIR/repository.json"
-          python tools/validate_release_state.py github-repository-push \
-            --json "$STATE_DIR/repository.json"
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" \
+            -f target_commitish="$GITHUB_SHA" \
+            > "$STATE_DIR/release-capability.json"
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > "$STATE_DIR/releases.json"
           python tools/validate_release_state.py github-releases \
             --json "$STATE_DIR/releases.json" \

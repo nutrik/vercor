@@ -29,8 +29,9 @@ must fail when PyPI or any exact-tag draft/published release already exists.
 The release re-review adds draft-aware pre-tag enumeration and a canonical `https://uploads.github.com` request target
 generated with a safely encoded asset name; bounded missing-file recovery polling
 requires PyPI's final exact two-file producer-manifest state.
-Both pre-tag transcripts accept release absence only after repository `permissions.push` is true,
-proving authenticated enumeration can see drafts.
+Both pre-tag transcripts accept release absence only after the same token successfully calls the
+non-mutating Release notes-generation endpoint requiring `contents: write`, then enumerates
+releases so the authenticated request can see drafts.
 
 ## Non-negotiable boundaries
 

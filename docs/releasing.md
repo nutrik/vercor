@@ -165,10 +165,9 @@ The workflow file runs validation on pushes to `main`, pull requests targeting
 `main`, and version tags. Only a version tag can satisfy the deployment job's
 condition. A push to `refactor` alone does not run it. Before CI or a push,
 fetch the current protected branch, prove it is an ancestor of the reviewed
-release commit, prove the authenticated identity has repository push
-permission (and therefore receives drafts from release enumeration), and
-enumerate every release page so an exact-tag draft cannot be mistaken for
-absence. PyPI 0.4.0 must also be absent:
+release commit, prove the same token can invoke the non-mutating Release
+notes-generation endpoint and then enumerate every release page so an
+exact-tag draft cannot be mistaken for absence. PyPI 0.4.0 must also be absent:
 
 ```text
 set -euo pipefail
@@ -183,8 +182,10 @@ GH_TOKEN="$(gh auth token)"
 export GH_TOKEN
 test -n "${GH_TOKEN:-}"
 PREFLIGHT_DIR="$(mktemp -d)"
-gh api repos/nutrik/vercor > "$PREFLIGHT_DIR/repository.json"
-python tools/validate_release_state.py github-repository-push --json "$PREFLIGHT_DIR/repository.json"
+gh api --method POST repos/nutrik/vercor/releases/generate-notes \
+  -f tag_name=v0.4.1 \
+  -f target_commitish="$RELEASE_COMMIT" \
+  > "$PREFLIGHT_DIR/release-capability.json"
 gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100" > "$PREFLIGHT_DIR/releases.json"
 python tools/validate_release_state.py github-tag-absent --json "$PREFLIGHT_DIR/releases.json" --tag v0.4.0
 PYPI_STATUS="$(curl -sS -L -o "$PREFLIGHT_DIR/pypi.json" -w '%{http_code}' https://pypi.org/pypi/vercor/0.4.0/json)"
@@ -240,7 +241,8 @@ Do not select a `push` run, a run for another workflow, or a run at another SHA.
 
 Immediately before tagging, fetch `main` again, repeat the ancestry and
 authenticated public-namespace preflights, and confirm the local and remote tag
-are absent. The repository permission check must prove push access before the
+are absent. The same token must successfully call the non-mutating Release
+notes-generation endpoint and then enumerate every release page before the
 manifest-free exact-tag validator accepts a well-formed authenticated release
 listing with zero exact-tag draft or published matches:
 
@@ -262,8 +264,10 @@ GH_TOKEN="$(gh auth token)"
 export GH_TOKEN
 test -n "${GH_TOKEN:-}"
 TAG_PREFLIGHT_DIR="$(mktemp -d)"
-gh api repos/nutrik/vercor > "$TAG_PREFLIGHT_DIR/repository.json"
-python tools/validate_release_state.py github-repository-push --json "$TAG_PREFLIGHT_DIR/repository.json"
+gh api --method POST repos/nutrik/vercor/releases/generate-notes \
+  -f tag_name=v0.4.1 \
+  -f target_commitish="$RELEASE_COMMIT" \
+  > "$TAG_PREFLIGHT_DIR/release-capability.json"
 gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100" > "$TAG_PREFLIGHT_DIR/releases.json"
 python tools/validate_release_state.py github-tag-absent --json "$TAG_PREFLIGHT_DIR/releases.json" --tag v0.4.0
 PYPI_STATUS="$(curl -sS -L -o "$TAG_PREFLIGHT_DIR/pypi.json" -w '%{http_code}' https://pypi.org/pypi/vercor/0.4.0/json)"
@@ -408,7 +412,10 @@ case "$PYPI_STATUS" in 200|404) ;; *) printf 'Unexpected PyPI HTTP status: %s\n'
 GITHUB_TOKEN="$(gh auth token)"
 export GITHUB_TOKEN
 test -n "${GITHUB_TOKEN:-}"
-gh api repos/nutrik/vercor > "$RECOVERY_STATE_DIR/repository.json"
+gh api --method POST repos/nutrik/vercor/releases/generate-notes \
+  -f tag_name=v0.4.1 \
+  -f target_commitish="$RELEASE_COMMIT" \
+  > "$RECOVERY_STATE_DIR/release-capability.json"
 gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100" > "$RECOVERY_STATE_DIR/releases.json"
 python tools/validate_release_state.py github-releases --json "$RECOVERY_STATE_DIR/releases.json" --manifest "$CI_MANIFEST" --tag v0.4.0 --title "VerCOR 0.4.0" --notes-file docs/release-notes-0.4.0.md --expect vercor-0.4.0-py3-none-any.whl vercor-0.4.0.tar.gz --allow-state absent draft published --state-output "$RECOVERY_STATE_DIR/release-state.json"
 printf 'PyPI status: %s\n' "$PYPI_STATUS"

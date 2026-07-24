@@ -141,15 +141,6 @@ def _validate_github_tag_absent(arguments: argparse.Namespace) -> None:
         raise ValueError(f"{arguments.tag}: exact-tag release already exists")
 
 
-def _validate_github_repository_push(arguments: argparse.Namespace) -> None:
-    """Require repository JSON to prove authenticated draft visibility."""
-
-    payload = _read_json(arguments.json)
-    permissions = payload.get("permissions")
-    if not isinstance(permissions, dict) or permissions.get("push") is not True:
-        raise ValueError("repository permissions.push must be true")
-
-
 def _github_upload_url(arguments: argparse.Namespace) -> None:
     """Print one canonical, safely encoded GitHub release-asset upload URL."""
 
@@ -315,10 +306,6 @@ def _parser() -> argparse.ArgumentParser:
     github_tag_absent.add_argument("--json", type=Path, required=True)
     github_tag_absent.add_argument("--tag", required=True)
     github_tag_absent.set_defaults(run=_validate_github_tag_absent)
-
-    github_repository_push = subparsers.add_parser("github-repository-push")
-    github_repository_push.add_argument("--json", type=Path, required=True)
-    github_repository_push.set_defaults(run=_validate_github_repository_push)
 
     github_upload_url = subparsers.add_parser("github-upload-url")
     github_upload_url.add_argument("--repository", required=True)

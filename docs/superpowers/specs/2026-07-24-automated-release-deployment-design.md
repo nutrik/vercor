@@ -19,9 +19,10 @@ The release re-review additionally requires draft-aware pre-tag enumeration, a
 canonical `https://uploads.github.com` request target for every raw asset
 upload, and bounded missing-file recovery polling that proves PyPI eventually
 contains the exact two producer-manifest digests.
-Pre-tag absence is trustworthy only after authenticated repository JSON proves
-repository `permissions.push` is true, because that permission makes draft
-releases visible to enumeration.
+Pre-tag absence is trustworthy only after the same token successfully calls the
+non-mutating Release notes-generation endpoint requiring `contents: write`,
+then enumerates releases so draft releases are visible to the authenticated
+request.
 
 ## Purpose
 

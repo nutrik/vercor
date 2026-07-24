@@ -752,9 +752,10 @@ def test_release_design_and_plan_describe_the_final_review_state_machine() -> No
             "canonical `https://uploads.github.com` request target",
             "draft-aware pre-tag",
             "bounded missing-file recovery polling",
-            "repository `permissions.push` is true",
+            "non-mutating Release notes-generation",
         ):
             assert required in document
+        assert "repository `permissions.push` is true" not in document
         for stale in (
             "actions/checkout@v4",
             "actions/setup-python@v5",

@@ -558,6 +558,7 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
     release_enumeration = (
         'gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100"'
     )
+    capability_probe = "gh api --method POST repos/nutrik/vercor/releases/generate-notes"
     pypi_url = "https://pypi.org/pypi/vercor/0.4.0/json"
 
     for section in (prepare, tag):
@@ -567,8 +568,10 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
             'git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"' in section
         )
         assert 'GH_TOKEN="$(gh auth token)"' in section
-        assert "gh api repos/nutrik/vercor" in section
-        assert "tools/validate_release_state.py github-repository-push" in section
+        assert capability_probe in section
+        assert "-f tag_name=v0.4.1" in section
+        assert '-f target_commitish="$RELEASE_COMMIT"' in section
+        assert "release-capability.json" in section
         assert release_enumeration in section
         assert "tools/validate_release_state.py github-tag-absent" in section
         assert "--tag v0.4.0" in section
@@ -576,15 +579,12 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
         assert "RELEASE_STATUS" not in section
         assert pypi_url in section
         assert 'test "$PYPI_STATUS" = "404"' in section
-        repository_index = section.index("gh api repos/nutrik/vercor")
-        permission_index = section.index(
-            "tools/validate_release_state.py github-repository-push"
-        )
+        capability_index = section.index(capability_probe)
         enumeration_index = section.index(release_enumeration)
         absence_index = section.index(
             "tools/validate_release_state.py github-tag-absent"
         )
-        assert repository_index < permission_index < enumeration_index < absence_index
+        assert capability_index < enumeration_index < absence_index
 
     assert prepare.index(release_enumeration) < guide.index("git tag -a")
 
@@ -608,7 +608,9 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
 
     assert "https://pypi.org/pypi/vercor/${VERSION}/json" in publish_commands
     assert 'test "$PYPI_STATUS" = "404"' in publish_commands
-    assert 'gh api "repos/${GITHUB_REPOSITORY}"' in publish_commands
+    assert publish_commands.count("releases/generate-notes") == 2
+    assert "github-repository-push" not in publish_commands
+    assert "repository.json" not in publish_commands
     assert (
         'gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100"'
         in publish_commands
