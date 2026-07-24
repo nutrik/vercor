@@ -482,6 +482,21 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
 
 
 @pytest.mark.fast_always
+def test_readme_installation_metadata_matches_project_version() -> None:
+    """Keep active installation guidance bound to the packaged release version."""
+
+    project = tomllib.loads(
+        (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]
+    version = project["version"]
+    readme = README_PATH.read_text(encoding="utf-8")
+
+    assert readme.count(f"Version `{version}` is the current release.") == 2
+    assert f'python -m pip install "vercor=={version}"' in readme
+    assert f'python -m pip install --upgrade "vercor=={version}"' in readme
+
+
+@pytest.mark.fast_always
 def test_release_transcripts_are_well_formed_and_shell_syntax_valid() -> None:
     """Keep active release transcripts syntactically executable and unambiguous."""
 
@@ -562,13 +577,12 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
         "gh api --method POST repos/nutrik/vercor/releases/generate-notes"
     )
     pypi_url = "https://pypi.org/pypi/vercor/0.4.1/json"
+    ancestry_check = 'git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"'
+    exact_main_check = 'test "$MAIN_COMMIT" = "$RELEASE_COMMIT"'
 
     for section in (prepare, tag):
         assert "git fetch --no-tags origin main" in section
         assert 'MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"' in section
-        assert (
-            'git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"' in section
-        )
         assert 'GH_TOKEN="$(gh auth token)"' in section
         assert capability_probe in section
         assert "-f tag_name=v0.4.1" in section
@@ -588,6 +602,17 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
         )
         assert capability_index < enumeration_index < absence_index
 
+    assert ancestry_check in prepare
+    assert exact_main_check not in prepare
+    assert ancestry_check not in tag
+    assert exact_main_check in tag
+    assert tag.index("git fetch --no-tags origin main") < tag.index(
+        'MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"'
+    )
+    assert tag.index(
+        'MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"'
+    ) < tag.index(exact_main_check)
+    assert tag.index(exact_main_check) < tag.index("git tag -a")
     assert prepare.index(release_enumeration) < guide.index("git tag -a")
 
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
@@ -647,12 +672,66 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
     )
     assert initial_validation_index < twine_install_index < pre_publish_index
     assert "tools/validate_release_state.py files" in pre_publish
+    assert "git fetch --no-tags origin main" in pre_publish
+    assert 'MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"' in pre_publish
+    assert 'test "$MAIN_COMMIT" = "$GITHUB_SHA"' in pre_publish
     assert pre_publish.rstrip().endswith('test "$REMOTE_TAG_COMMIT" = "$GITHUB_SHA"')
     assert publish_action_index < post_publish_index < github_release_index
     assert "python -m build" not in publish_commands
     assert "> SHA256SUMS" not in publish_commands
     assert "pip install --upgrade pip twine" not in publish_commands
     assert "python -m build" not in publish_commands
+
+
+@pytest.mark.fast_always
+def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
+    """Bind the active release PR transcript to the approved branch and copy."""
+
+    guide = RELEASING_PATH.read_text(encoding="utf-8")
+    prepare = _section(guide, "## 5. Prepare the required release pull request")
+    release_branch = "release/vercor-0.4.1"
+    branch_assignment = f'RELEASE_BRANCH="{release_branch}"'
+    exact_title = '--title "Release VerCOR 0.4.1"'
+    exact_body = (
+        '--body "Fix the GitHub Release capability preflight and prepare the '
+        "immutable VerCOR 0.4.1 recovery release. The existing v0.4.0 tag is "
+        'unchanged."'
+    )
+
+    assert "refactor" not in guide
+    branch_checks = tuple(
+        line for line in guide.splitlines() if "git branch --show-current)" in line
+    )
+    assert branch_checks
+    assert all('"$RELEASE_BRANCH"' in line for line in branch_checks)
+
+    transcripts = tuple(
+        source
+        for language, source in _markdown_fences(prepare, owner="release PR section")
+        if language == "text"
+    )
+    assert len(transcripts) == 3
+    for transcript in transcripts:
+        assert branch_assignment in transcript
+        assert "export RELEASE_BRANCH" in transcript
+
+    assert (
+        "gh pr list --repo nutrik/vercor --state open --base main "
+        '--head "$RELEASE_BRANCH" '
+        "--json number,url,headRefName,baseRefName,headRefOid"
+    ) in prepare
+    assert (
+        'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" '
+        "--draft"
+    ) in prepare
+    assert exact_title in prepare
+    assert exact_body in prepare
+    assert (
+        "gh pr list --repo nutrik/vercor --state open --base main "
+        '--head "$RELEASE_BRANCH" --json number'
+    ) in prepare
+    assert 'git push origin "$RELEASE_BRANCH"' in prepare
+    assert '--event pull_request --branch "$RELEASE_BRANCH"' in prepare
 
 
 @pytest.mark.fast_always

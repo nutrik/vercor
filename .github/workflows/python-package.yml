@@ -360,6 +360,9 @@ jobs:
             --expect "$RELEASE_WHEEL_NAME" "$RELEASE_SDIST_NAME" \
             --allow-state absent \
             --state-output "$STATE_DIR/release-state.json"
+          git fetch --no-tags origin main
+          MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"
+          test "$MAIN_COMMIT" = "$GITHUB_SHA"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           REMOTE_TAG_COMMIT="$(git ls-remote origin "refs/tags/${GITHUB_REF_NAME}^{}" | awk '{print $1}')"
           test -n "${REMOTE_TAG_COMMIT:-}"

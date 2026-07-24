@@ -632,6 +632,14 @@ def test_version_tag_deploys_exact_tested_distributions() -> None:
     pre_publish = publish["steps"][pre_publish_index]["run"]
     assert "tools/validate_release_state.py files" in pre_publish
     assert 'test "$PYPI_STATUS" = "404"' in pre_publish
+    main_fetch = "git fetch --no-tags origin main"
+    main_binding = 'MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"'
+    exact_main_check = 'test "$MAIN_COMMIT" = "$GITHUB_SHA"'
+    assert main_fetch in pre_publish
+    assert main_binding in pre_publish
+    assert exact_main_check in pre_publish
+    assert pre_publish.index(main_fetch) < pre_publish.index(main_binding)
+    assert pre_publish.index(main_binding) < pre_publish.index(exact_main_check)
     assert pre_publish.rstrip().endswith('test "$REMOTE_TAG_COMMIT" = "$GITHUB_SHA"')
 
     post_pypi_index = next(

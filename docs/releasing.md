@@ -17,7 +17,7 @@ token only in the tag-only `publish-release` job.
 
 ## 1. Confirm and review the candidate
 
-- Work from the intended `refactor` branch with complete history.
+- Work from the intended `release/vercor-0.4.1` branch with complete history.
 - Confirm `pyproject.toml` and `CHANGELOG.md` use the intended version.
 - Confirm the package root and canonical owner manifests match live signatures.
 - Confirm optional JCM and Veros versions in the verification environment.
@@ -28,7 +28,9 @@ Perform the read-only review before requesting commit authority:
 
 ```bash
 set -euo pipefail
-test "$(git branch --show-current)" = "refactor"
+RELEASE_BRANCH="release/vercor-0.4.1"
+export RELEASE_BRANCH
+test "$(git branch --show-current)" = "$RELEASE_BRANCH"
 git status --short --untracked-files=all
 git diff --check
 git diff
@@ -43,7 +45,9 @@ shell so later gates retain `RELEASE_COMMIT`:
 
 ```text
 set -euo pipefail
-test "$(git branch --show-current)" = "refactor"
+RELEASE_BRANCH="release/vercor-0.4.1"
+export RELEASE_BRANCH
+test "$(git branch --show-current)" = "$RELEASE_BRANCH"
 git add -A
 git diff --cached --check
 git diff --cached
@@ -65,8 +69,10 @@ the recorded commit:
 
 ```bash
 set -euo pipefail
+RELEASE_BRANCH="release/vercor-0.4.1"
+export RELEASE_BRANCH
 test -n "${RELEASE_COMMIT:-}"
-test "$(git branch --show-current)" = "refactor"
+test "$(git branch --show-current)" = "$RELEASE_BRANCH"
 test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 test -z "$(git status --porcelain --untracked-files=all)"
 python -m black --check vercor examples tests
@@ -163,7 +169,7 @@ publishes the tested artifact bundle.
 
 The workflow file runs validation on pushes to `main`, pull requests targeting
 `main`, and version tags. Only a version tag can satisfy the deployment job's
-condition. A push to `refactor` alone does not run it. Before CI or a push,
+condition. A push to `release/vercor-0.4.1` alone does not run it. Before CI or a push,
 fetch the current protected branch, prove it is an ancestor of the reviewed
 release commit, prove the same token can invoke the non-mutating Release
 notes-generation endpoint and then enumerate every release page so an
@@ -171,6 +177,8 @@ exact-tag draft cannot be mistaken for absence. PyPI 0.4.1 must also be absent:
 
 ```text
 set -euo pipefail
+RELEASE_BRANCH="release/vercor-0.4.1"
+export RELEASE_BRANCH
 test -n "${RELEASE_COMMIT:-}"
 test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 git fetch --no-tags origin main
@@ -191,7 +199,7 @@ python tools/validate_release_state.py github-tag-absent --json "$PREFLIGHT_DIR/
 PYPI_STATUS="$(curl -sS -L -o "$PREFLIGHT_DIR/pypi.json" -w '%{http_code}' https://pypi.org/pypi/vercor/0.4.1/json)"
 export PYPI_STATUS
 test "$PYPI_STATUS" = "404"
-gh pr list --repo nutrik/vercor --state open --base main --head refactor --json number,url,headRefName,baseRefName,headRefOid
+gh pr list --repo nutrik/vercor --state open --base main --head "$RELEASE_BRANCH" --json number,url,headRefName,baseRefName,headRefOid
 ```
 
 If no authorized pull request exists, this is the exact preparation command.
@@ -199,11 +207,13 @@ Run it only with explicit pull-request creation authority:
 
 ```text
 set -euo pipefail
+RELEASE_BRANCH="release/vercor-0.4.1"
+export RELEASE_BRANCH
 test -n "${RELEASE_COMMIT:-}"
 test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 test -n "${MAIN_COMMIT:-}"
 git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"
-gh pr create --repo nutrik/vercor --base main --head refactor --title "Release 0.4.1" --body "Prepare VerCOR 0.4.1 from commit $RELEASE_COMMIT."
+gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" --draft --title "Release VerCOR 0.4.1" --body "Fix the GitHub Release capability preflight and prepare the immutable VerCOR 0.4.1 recovery release. The existing v0.4.0 tag is unchanged."
 ```
 
 Confirm exactly one open matching pull request, push the reviewed commit, select
@@ -212,6 +222,8 @@ mechanically recheck the run:
 
 ```text
 set -euo pipefail
+RELEASE_BRANCH="release/vercor-0.4.1"
+export RELEASE_BRANCH
 test -n "${RELEASE_COMMIT:-}"
 test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 test -z "$(git status --porcelain --untracked-files=all)"
@@ -220,11 +232,11 @@ MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"
 export MAIN_COMMIT
 test -n "${MAIN_COMMIT:-}"
 git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"
-RELEASE_PR_NUMBER="$(gh pr list --repo nutrik/vercor --state open --base main --head refactor --json number --jq 'if length == 1 then .[0].number else empty end')"
+RELEASE_PR_NUMBER="$(gh pr list --repo nutrik/vercor --state open --base main --head "$RELEASE_BRANCH" --json number --jq 'if length == 1 then .[0].number else empty end')"
 export RELEASE_PR_NUMBER
 test -n "${RELEASE_PR_NUMBER:-}"
-git push origin refactor
-RELEASE_RUN_ID="$(gh run list --repo nutrik/vercor --workflow python-package.yml --event pull_request --branch refactor --commit "$RELEASE_COMMIT" --limit 20 --json databaseId,event,headSha --jq 'map(select(.event == "pull_request" and .headSha == env.RELEASE_COMMIT)) | sort_by(.databaseId) | last | .databaseId // empty')"
+git push origin "$RELEASE_BRANCH"
+RELEASE_RUN_ID="$(gh run list --repo nutrik/vercor --workflow python-package.yml --event pull_request --branch "$RELEASE_BRANCH" --commit "$RELEASE_COMMIT" --limit 20 --json databaseId,event,headSha --jq 'map(select(.event == "pull_request" and .headSha == env.RELEASE_COMMIT)) | sort_by(.databaseId) | last | .databaseId // empty')"
 export RELEASE_RUN_ID
 test -n "${RELEASE_RUN_ID:-}"
 gh run watch "$RELEASE_RUN_ID" --repo nutrik/vercor --exit-status
@@ -239,9 +251,10 @@ Do not select a `push` run, a run for another workflow, or a run at another SHA.
 
 ## 6. Create and verify the annotated tag
 
-Immediately before tagging, fetch `main` again, repeat the ancestry and
-authenticated public-namespace preflights, and confirm the local and remote tag
-are absent. The same token must successfully call the non-mutating Release
+Immediately before tagging, fetch `main` again, require the reviewed release
+commit to equal the remote `main` commit, repeat the authenticated
+public-namespace preflights, and confirm the local and remote tag are absent.
+The same token must successfully call the non-mutating Release
 notes-generation endpoint and then enumerate every release page before the
 manifest-free exact-tag validator accepts a well-formed authenticated release
 listing with zero exact-tag draft or published matches:
@@ -259,7 +272,7 @@ git fetch --no-tags origin main
 MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"
 export MAIN_COMMIT
 test -n "${MAIN_COMMIT:-}"
-git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"
+test "$MAIN_COMMIT" = "$RELEASE_COMMIT"
 GH_TOKEN="$(gh auth token)"
 export GH_TOKEN
 test -n "${GH_TOKEN:-}"
