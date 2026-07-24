@@ -10,7 +10,7 @@ import tomllib
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CURRENT_VERSION = "0.4.0"
+CURRENT_VERSION = "0.4.1"
 TEXT_SUFFIXES = {".json", ".md", ".py", ".toml", ".yaml", ".yml"}
 FORBIDDEN_RELEASE_LABELS = (
     ".".join(("1", "0", "0")),

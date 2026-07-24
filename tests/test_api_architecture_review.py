@@ -450,13 +450,13 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
     project = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     )["project"]
-    assert project["version"] == "0.4.0"
+    assert project["version"] == "0.4.1"
     assert "Development Status :: 5 - Production/Stable" in project["classifiers"]
     assert "Development Status :: 3 - Alpha" not in project["classifiers"]
     assert "Development Status :: 4 - Beta" not in project["classifiers"]
 
     changelog = CHANGELOG_PATH.read_text(encoding="utf-8")
-    assert re.search(r"^## \[0\.4\.0\] - 2026-07-23$", changelog, re.MULTILINE)
+    assert re.search(r"^## \[0\.4\.1\] - 2026-07-24$", changelog, re.MULTILINE)
     releasing = RELEASING_PATH.read_text(encoding="utf-8")
     commands = "\n".join(re.findall(r"```bash\n(.*?)```", releasing, re.DOTALL))
     for command in (
@@ -475,8 +475,8 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
     assert "twine upload" not in commands
 
     for artifact in (
-        "vercor-0.4.0-py3-none-any.whl",
-        "vercor-0.4.0.tar.gz",
+        "vercor-0.4.1-py3-none-any.whl",
+        "vercor-0.4.1.tar.gz",
     ):
         assert artifact in commands
 
@@ -554,14 +554,14 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
     prepare = _section(guide, "## 5. Prepare the required release pull request")
     tag = _section(guide, "## 6. Create and verify the annotated tag")
     repo_url = "https://api.github.com/repos/nutrik/vercor"
-    published_only_release_url = f"{repo_url}/releases/tags/v0.4.0"
+    published_only_release_url = f"{repo_url}/releases/tags/v0.4.1"
     release_enumeration = (
         'gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100"'
     )
     capability_probe = (
         "gh api --method POST repos/nutrik/vercor/releases/generate-notes"
     )
-    pypi_url = "https://pypi.org/pypi/vercor/0.4.0/json"
+    pypi_url = "https://pypi.org/pypi/vercor/0.4.1/json"
 
     for section in (prepare, tag):
         assert "git fetch --no-tags origin main" in section
@@ -576,7 +576,7 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
         assert "release-capability.json" in section
         assert release_enumeration in section
         assert "tools/validate_release_state.py github-tag-absent" in section
-        assert "--tag v0.4.0" in section
+        assert "--tag v0.4.1" in section
         assert published_only_release_url not in section
         assert "RELEASE_STATUS" not in section
         assert pypi_url in section
@@ -725,8 +725,8 @@ def test_release_recovery_commands_verify_exact_state_before_mutation() -> None:
         'CI_DIST_DIR="$CI_RECOVERY_ROOT/dist"',
         'CI_MANIFEST="$CI_RECOVERY_ROOT/manifest/SHA256SUMS"',
         "tools/validate_release_state.py files",
-        "vercor-0.4.0-py3-none-any.whl",
-        "vercor-0.4.0.tar.gz",
+        "vercor-0.4.1-py3-none-any.whl",
+        "vercor-0.4.1.tar.gz",
     ):
         assert required in recovery
     assert "The local `dist/SHA256SUMS` is not authoritative" in guide
@@ -737,7 +737,7 @@ def test_release_recovery_commands_verify_exact_state_before_mutation() -> None:
         assert 'test -n "${RELEASE_RUN_ID:-}"' in section
         assert "$CI_MANIFEST" in section
         assert "$CI_DIST_DIR" in section
-        assert "https://pypi.org/pypi/vercor/0.4.0/json" in section
+        assert "https://pypi.org/pypi/vercor/0.4.1/json" in section
         assert section.count("tools/validate_release_state.py pypi") == 3
         assert "for attempt in {1..12}" in section
         assert 'case "$FINAL_PYPI_STATUS" in' in section
@@ -745,7 +745,7 @@ def test_release_recovery_commands_verify_exact_state_before_mutation() -> None:
         assert 'test "$PYPI_RECOVERY_VERIFIED" = "true"' in section
         assert (
             'REMOTE_TAG_COMMIT="$(git ls-remote origin '
-            "'refs/tags/v0.4.0^{}' | awk '{print $1}')\""
+            "'refs/tags/v0.4.1^{}' | awk '{print $1}')\""
         ) in section
         assert 'test "$REMOTE_TAG_COMMIT" = "$RELEASE_COMMIT"' in section
         assert (
@@ -766,11 +766,11 @@ def test_release_recovery_commands_verify_exact_state_before_mutation() -> None:
         "--allow-state absent draft",
         "--allow-state draft",
         "--allow-state published",
-        "gh release create v0.4.0",
+        "gh release create v0.4.1",
         "--draft",
         "tools/validate_release_state.py github-upload-url",
         "https://uploads.github.com/repos/nutrik/vercor/releases/",
-        "gh release edit v0.4.0",
+        "gh release edit v0.4.1",
         "--draft=false",
     ):
         assert required in github
