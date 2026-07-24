@@ -126,21 +126,6 @@ def _run_github_tag_absent_validator(
     )
 
 
-def _run_github_repository_push_validator(
-    tmp_path: Path,
-    repository: object,
-) -> subprocess.CompletedProcess[str]:
-    """Run the explicit repository push-permission validator."""
-
-    payload = tmp_path / "repository.json"
-    payload.write_text(json.dumps(repository), encoding="utf-8")
-    return _run_validator(
-        "github-repository-push",
-        "--json",
-        str(payload),
-    )
-
-
 def _run_isolated_gh_request(
     tmp_path: Path,
     *arguments: str,
@@ -179,39 +164,24 @@ def _run_isolated_gh_request(
 
 
 @pytest.mark.fast_always
-def test_github_repository_push_permission_accepts_explicit_true(
+def test_cli_rejects_obsolete_github_repository_push_command(
     tmp_path: Path,
 ) -> None:
-    """Accept only repository JSON proving the caller can see draft releases."""
-
-    completed = _run_github_repository_push_validator(
-        tmp_path,
-        {"permissions": {"push": True}},
+    payload = tmp_path / "repository.json"
+    payload.write_text(
+        json.dumps({"permissions": {"push": True}}),
+        encoding="utf-8",
     )
 
-    assert completed.returncode == 0, completed.stderr
+    completed = _run_validator(
+        "github-repository-push",
+        "--json",
+        str(payload),
+    )
 
-
-@pytest.mark.fast_always
-@pytest.mark.parametrize(
-    "repository",
-    [
-        {"permissions": {"push": False}},
-        {},
-        {"permissions": []},
-        {"permissions": {"push": "true"}},
-    ],
-)
-def test_github_repository_push_permission_rejects_unproven_state(
-    tmp_path: Path,
-    repository: object,
-) -> None:
-    """Reject false, missing, and malformed repository permission state."""
-
-    completed = _run_github_repository_push_validator(tmp_path, repository)
-
-    assert completed.returncode != 0
-    assert "repository permissions.push must be true" in completed.stderr
+    assert completed.returncode == 2
+    assert "invalid choice" in completed.stderr
+    assert "github-repository-push" in completed.stderr
 
 
 @pytest.mark.fast_always

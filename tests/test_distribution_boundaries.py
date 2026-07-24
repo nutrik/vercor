@@ -574,18 +574,13 @@ def test_version_tag_deploys_exact_tested_distributions() -> None:
     assert "> SHA256SUMS" not in commands
     assert "python -m build" not in commands
 
-    repository_query = (
-        'gh api "repos/${GITHUB_REPOSITORY}" > "$STATE_DIR/repository.json"'
-    )
-    repository_push_check = (
-        "python tools/validate_release_state.py github-repository-push"
-    )
-    repository_json_argument = '--json "$STATE_DIR/repository.json"'
+    capability_endpoint = '"repos/${GITHUB_REPOSITORY}/releases/generate-notes"'
+    capability_output = '> "$STATE_DIR/release-capability.json"'
     release_enumeration = (
         "gh api --paginate --slurp "
         '"repos/${GITHUB_REPOSITORY}/releases?per_page=100"'
     )
-    draft_visibility_preflights = tuple(
+    capability_preflights = tuple(
         step["run"]
         for step in publish["steps"]
         if step.get("name")
@@ -594,15 +589,22 @@ def test_version_tag_deploys_exact_tested_distributions() -> None:
             "Revalidate immediately before PyPI mutation",
         }
     )
-    assert len(draft_visibility_preflights) == 2
-    for preflight in draft_visibility_preflights:
-        assert repository_push_check in preflight
-        assert (
-            preflight.index(repository_query)
-            < preflight.index(repository_push_check)
-            < preflight.index(repository_json_argument)
-            < preflight.index(release_enumeration)
+    assert len(capability_preflights) == 2
+    for preflight in capability_preflights:
+        assert "gh api --method POST" in preflight
+        assert capability_endpoint in preflight
+        assert '-f tag_name="$GITHUB_REF_NAME"' in preflight
+        assert '-f target_commitish="$GITHUB_SHA"' in preflight
+        assert capability_output in preflight
+        assert preflight.index(capability_endpoint) < preflight.index(
+            release_enumeration
         )
+        assert "github-repository-push" not in preflight
+        assert 'repos/${GITHUB_REPOSITORY}" >' not in preflight
+
+    assert workflow_source.count("releases/generate-notes") == 2
+    assert "github-repository-push" not in workflow_source
+    assert "repository.json" not in workflow_source
 
     pypi_publish_steps = tuple(
         (index, step)
