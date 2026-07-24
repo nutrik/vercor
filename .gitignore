@@ -121,6 +121,7 @@ ENV/
 
 # Superpowers task execution ledger
 .superpowers/
+.worktrees/
 
 # linting cache
 .ruff_cache/
