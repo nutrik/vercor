@@ -299,6 +299,46 @@ def test_current_external_extension_fixture_uses_canonical_owners_and_v0_4_workf
 
 
 @pytest.mark.fast_always
+def test_tag_release_rejects_version_mismatch_before_build() -> None:
+    workflow = yaml.safe_load(
+        (PROJECT_ROOT / ".github/workflows/python-package.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    steps = workflow["jobs"]["build-artifacts"]["steps"]
+    guard_index, guard = next(
+        (index, step)
+        for index, step in enumerate(steps)
+        if step.get("name") == "Reject mismatched release tag"
+    )
+    build_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "Build VerCOR distributions once"
+    )
+    assert guard_index < build_index
+    assert guard["if"] == "startsWith(github.ref, 'refs/tags/v')"
+
+    version = tomllib.loads(
+        (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]["version"]
+    for tag, returncode in ((f"v{version}", 0), ("v0.4.0", 1)):
+        completed = subprocess.run(
+            ["bash"],
+            input=guard["run"],
+            cwd=PROJECT_ROOT,
+            env={**os.environ, "GITHUB_REF_NAME": tag},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert completed.returncode == returncode
+        if returncode:
+            assert "Release tag/version mismatch" in completed.stdout
+            assert f"package version {version}" in completed.stdout
+
+
+@pytest.mark.fast_always
 def test_ci_validates_installed_artifacts_across_supported_environments() -> None:
     workflow_path = PROJECT_ROOT / ".github/workflows/python-package.yml"
     workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
