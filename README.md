@@ -12,7 +12,7 @@ computing library that supports compilation and automatic differentiation.
 Output-free JAX workflows can be differentiated end to end, making VerCOR
 suitable for sensitivity analysis and gradient-based experiments.
 
-> **Stable release:** Version `0.4.1` is the current release. VerCOR 0.3
+> **Stable release:** Version `0.4.2` is the current release. VerCOR 0.3
 > applications must use the
 > [0.3-to-0.4 migration guide](docs/migration-0.3-to-0.4.md).
 
@@ -47,7 +47,7 @@ release has not yet been confirmed or pinned.
 Install the current stable core package with pip:
 
 ```bash
-python -m pip install "vercor==0.4.1"
+python -m pip install "vercor==0.4.2"
 ```
 
 Install the relevant optional extra before using a bundled JCM or Veros setup:
@@ -377,11 +377,11 @@ in their subject modules, including `vercor.components`, `vercor.output`,
 
 ### The installed package does not provide the 0.4 API
 
-Version `0.4.1` is the current release. Check the installed version and upgrade
+Version `0.4.2` is the current release. Check the installed version and upgrade
 to the stable release before following this README:
 
 ```bash
-python -m pip install --upgrade "vercor==0.4.1"
+python -m pip install --upgrade "vercor==0.4.2"
 ```
 
 ### An optional setup cannot be imported

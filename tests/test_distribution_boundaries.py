@@ -101,7 +101,7 @@ def test_active_sources_do_not_use_retired_public_plugin_fixture_name() -> None:
         PROJECT_ROOT / "DESIGN.md",
         PROJECT_ROOT / "DEPENDENCIES.md",
         PROJECT_ROOT / "CHANGELOG.md",
-        PROJECT_ROOT / "docs" / "release-notes-0.4.1.md",
+        PROJECT_ROOT / "docs" / "release-notes-0.4.2.md",
         PROJECT_ROOT / "docs" / "plugin-authoring.md",
         PROJECT_ROOT / "docs" / "api-architecture-review.md",
         PROJECT_ROOT / "docs" / "releasing.md",
@@ -169,7 +169,7 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
     runtime_dependencies = tuple(project["dependencies"])
     extras = project["optional-dependencies"]
 
-    assert project["version"] == "0.4.1"
+    assert project["version"] == "0.4.2"
     assert not any(
         dependency.lower().startswith("pytest") for dependency in runtime_dependencies
     )
@@ -831,8 +831,8 @@ def test_release_bundle_contains_only_vercor_distributions() -> None:
     )
 
     assert checksum_line == (
-        "shasum -a 256 vercor-0.4.1-py3-none-any.whl "
-        "vercor-0.4.1.tar.gz > SHA256SUMS"
+        "shasum -a 256 vercor-0.4.2-py3-none-any.whl "
+        "vercor-0.4.2.tar.gz > SHA256SUMS"
     )
     assert "shopt -s nullglob dotglob" in releasing
     assert "DIST_ARTIFACTS=(dist/*)" in releasing
@@ -844,7 +844,7 @@ def test_release_bundle_contains_only_vercor_distributions() -> None:
         releasing,
         "## 7. Publish packages and create the hosted release",
     )
-    assert "Pushing the annotated `v0.4.1` tag" in publish
+    assert "Pushing the annotated `v0.4.2` tag" in publish
     assert "`PYPI_API_TOKEN`" in publish
     assert "python-package.yml" in publish
     assert "gh run watch" in publish
@@ -920,16 +920,16 @@ def test_release_guide_binds_tag_authority_workflow_selection_and_hosted_state()
         assert required in prepare_text
 
     authority = "explicit tag-push and package-publication authority"
-    tag_push = "git push origin refs/tags/v0.4.1"
+    tag_push = "git push origin refs/tags/v0.4.2"
     assert authority in tag_text
     assert tag_text.index(authority) < tag_text.index(tag_push)
-    assert "Pushing the annotated `v0.4.1` tag starts `python-package.yml`." in tag_text
+    assert "Pushing the annotated `v0.4.2` tag starts `python-package.yml`." in tag_text
     assert tag_text.count("Never overwrite or repoint a published release tag.") == 1
 
     for required in (
         '--event push --commit "$RELEASE_COMMIT"',
         '.event == "push"',
-        '.headBranch == "v0.4.1"',
+        '.headBranch == "v0.4.2"',
         ".headSha == env.RELEASE_COMMIT",
         'gh run watch "$RELEASE_RUN_ID" --repo nutrik/vercor --exit-status',
         "--json headSha --jq .headSha)",
@@ -951,11 +951,11 @@ def test_release_guide_binds_tag_authority_workflow_selection_and_hosted_state()
         "name",
         "isDraft",
         "isPrerelease",
-        '"v0.4.1"',
-        '"VerCOR 0.4.1"',
+        '"v0.4.2"',
+        '"VerCOR 0.4.2"',
         "tools/validate_release_state.py assets",
-        "vercor-0.4.1-py3-none-any.whl",
-        "vercor-0.4.1.tar.gz",
+        "vercor-0.4.2-py3-none-any.whl",
+        "vercor-0.4.2.tar.gz",
     ):
         assert required in verify
 
