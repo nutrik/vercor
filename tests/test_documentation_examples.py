@@ -15,6 +15,7 @@ EXAMPLE_NAMES = (
     "data_component.py",
     "host_component.py",
     "jax_component.py",
+    "coupled_components.py",
 )
 
 

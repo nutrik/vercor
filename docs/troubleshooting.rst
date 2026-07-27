@@ -1,34 +1,58 @@
 Troubleshooting
 ===============
 
-This page summarizes common failures and points to the learning path that
-explains each contract. Task 4 expands these summaries into symptom, cause,
-and action entries.
+An optional setup cannot be imported
+------------------------------------
 
-Optional JCM, Veros, or CAMulator dependency is missing
--------------------------------------------------------
+**Symptom.** Importing an optional JCM, Veros, or CAMulator setup fails.
 
-Follow the researcher path to choose and install the bundled model dependencies
-needed for the run you want to perform.
+**Cause.** The selected setup needs its optional model package or its required
+external data. CAMulator has no documented compatible dependency pin.
 
-Exchange field is not declared by both endpoints
--------------------------------------------------
+**Action.** Install and configure the dependency required by the selected
+driver; see :doc:`how-to/examples` for the repository examples and their data
+requirements.
 
-Follow the developer path for the field declarations and exchange contracts
-required by both connected components.
+An exchange field is rejected
+-----------------------------
 
-Host component is forced onto the JAX backend
-----------------------------------------------
+**Symptom.** Coupler construction rejects a field or reports ambiguous target
+field fan-in.
 
-Follow the developer path for backend selection and host-component execution.
+**Cause.** An exchange field is not declared by both endpoints, or multiple
+routes write one target field.
 
-Payload PyTree structure, shape, or dtype changes in compiled execution
------------------------------------------------------------------------
+**Action.** Declare the field as a source output and target input, then give
+each route a unique identity; see :doc:`developers/coupling`.
 
-Follow the developer path for the compiled-execution payload contracts.
+A host component fails with the JAX backend
+--------------------------------------------
 
-File output is requested inside a transformed JAX computation
---------------------------------------------------------------
+**Symptom.** A graph containing a host component is rejected before stepping.
 
-Follow the researcher path for output configuration and the limits of
-transformed JAX workflows.
+**Cause.** ``RuntimeOptions(backend="jax")`` permits only JAX components.
+
+**Action.** Use ``RuntimeOptions(backend="auto")`` for a mixed graph, or use
+``backend="host"``; see :doc:`how-to/backends`.
+
+A compiled payload changes structure
+------------------------------------
+
+**Symptom.** A compiled run fails after a component step returns its payload.
+
+**Cause.** JAX compilation requires stable payload PyTree structure, array
+shapes, and dtypes from step to step.
+
+**Action.** Keep the payload structure fixed and return replacement values
+with unchanged layouts; see :doc:`developers/jax-components`.
+
+Output fails under JIT or differentiation
+-----------------------------------------
+
+**Symptom.** A transformed run fails when file output is enabled.
+
+**Cause.** File output is a host-side effect and cannot consume traced runtime
+state.
+
+**Action.** Run with ``output=None`` under JIT or differentiation, then write
+results in ordinary Python; see :doc:`how-to/output`.

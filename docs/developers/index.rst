@@ -11,4 +11,5 @@ connect them through explicit exchanges.
    data-components
    host-components
    jax-components
+   coupling
    ../api/index

@@ -9,4 +9,5 @@ coupled state and requested output.
 
    getting-started
    running
+   ../how-to/output
    ../troubleshooting

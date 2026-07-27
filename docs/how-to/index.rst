@@ -7,4 +7,7 @@ configure output, and diagnose common integration problems.
 .. toctree::
    :maxdepth: 1
 
-   ../introduction
+   examples
+   backends
+   output
+   ../troubleshooting
