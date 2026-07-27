@@ -7,4 +7,8 @@ connect them through explicit exchanges.
 .. toctree::
    :maxdepth: 1
 
-   ../introduction
+   concepts
+   data-components
+   host-components
+   jax-components
+   ../api/index

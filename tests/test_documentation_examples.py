@@ -10,7 +10,12 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES_ROOT = PROJECT_ROOT / "docs" / "_examples"
-EXAMPLE_NAMES = ("quickstart.py",)
+EXAMPLE_NAMES = (
+    "quickstart.py",
+    "data_component.py",
+    "host_component.py",
+    "jax_component.py",
+)
 
 
 @pytest.mark.fast_always
