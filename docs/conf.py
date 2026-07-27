@@ -46,7 +46,6 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    "sphinx.ext.intersphinx",
     #    'sphinx_fontawesome',
     #    'IPython.sphinxext.ipython_console_highlighting',
     #    'IPython.sphinxext.ipython_directive',
@@ -118,21 +117,6 @@ ipython_savefig_dir = "_generated"
 #
 html_theme = "furo"
 
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-#
-html_theme_options = {
-    "light_logo": "vercor-logo-400px.png",
-    "dark_logo": "vercor-logo-bright-400px.png",
-    "sidebar_hide_name": True,
-}
-
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
-
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
@@ -192,9 +176,6 @@ texinfo_documents = [
 autodoc_member_order = "bysource"
 autodoc_default_options = {"show-inheritance": None}
 autodoc_mock_imports = ["numpy", "scipy", "h5netcdf"]
-
-# -- Options for intersphinx ----------------------------------------------
-intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
 
 # -- Custom directives ----------------------------------------------------
 
