@@ -46,6 +46,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
+    "myst_parser",
     #    'sphinx_fontawesome',
     #    'IPython.sphinxext.ipython_console_highlighting',
     #    'IPython.sphinxext.ipython_directive',
@@ -57,8 +58,10 @@ templates_path = ["_templates"]
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-# source_suffix = ['.rst', '.md']
-source_suffix = ".rst"
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
 
 # The master toctree document.
 master_doc = "index"
@@ -99,6 +102,10 @@ exclude_patterns = [
     "_generated",
     "superpowers",
     "*.ipynb_checkpoints",
+    "README.md",
+    "api-architecture-review.md",
+    "over-engineering-*.md",
+    "progress-archive-*.md",
 ]
 
 # The name of the Pygments (syntax highlighting) style to use.

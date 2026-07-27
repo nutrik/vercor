@@ -9,3 +9,4 @@ xarray==2026.2.0
 matplotlib==3.11.1
 cmocean==4.0.3
 pickleshare==0.7.5
+myst-parser==5.1.0
