@@ -15,13 +15,131 @@
 - Do not retain the `0+untagged` to `main` fallback.
 - Missing `pyproject.toml`, invalid TOML, missing `[project]`, or missing `version` must fail explicitly.
 - Do not change package metadata, runtime exports, release automation, or the current project version.
-- Preserve the user's existing untracked documentation files except for the requested `docs/conf.py` edit.
+- Include every current and newly created untracked documentation file in the implementation commit.
 
 ---
 
-### Task 1: Read the Sphinx version from pyproject metadata
+### Task 1: Allow the official Read the Docs configuration URL
 
 **Files:**
+- Modify: `tests/test_versioning_policy.py`
+
+**Interfaces:**
+- Consumes: the official root `.readthedocs.yaml` reference URL `https://docs.readthedocs.io/en/stable/config-file/v2.html`.
+- Produces: `_forbidden_api_tokens(relative_path: Path, line: str) -> tuple[str, ...]` that ignores only an API-like token whose span is inside that exact external URL.
+
+- [ ] **Step 1: Write the failing policy tests**
+
+Add these tests after the existing numerical-vector API-token tests in
+`tests/test_versioning_policy.py`:
+
+```python
+@pytest.mark.fast_always
+def test_integrated_scanner_allows_official_readthedocs_config_reference(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _run_integrated_scanner_for_line(
+        monkeypatch,
+        tmp_path,
+        relative_path=Path(".readthedocs.yaml"),
+        line=(
+            "# See https://docs.readthedocs.io/en/stable/config-file/"
+            + "v"
+            + "2.html for details"
+        ),
+    )
+
+
+@pytest.mark.fast_always
+def test_readthedocs_reference_does_not_hide_a_stale_api_token() -> None:
+    line = (
+        "# See https://docs.readthedocs.io/en/stable/config-file/"
+        + "v"
+        + "2.html; stale "
+        + "v"
+        + "2 API"
+    )
+
+    assert _forbidden_api_tokens(Path(".readthedocs.yaml"), line) == ("v" + "2",)
+```
+
+- [ ] **Step 2: Run the policy tests and verify RED**
+
+Run:
+
+```bash
+/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest \
+  tests/test_versioning_policy.py::test_integrated_scanner_allows_official_readthedocs_config_reference \
+  tests/test_versioning_policy.py::test_readthedocs_reference_does_not_hide_a_stale_api_token \
+  -q -n0 --tb=short
+```
+
+Expected: the integrated scanner test fails because `/v2.html` is reported as
+a forbidden API token. The same-line test reports both tokens instead of only
+the genuinely stale token.
+
+- [ ] **Step 3: Implement the narrow span-aware exception**
+
+Add these constants below `_NUMERICAL_VECTOR_LINES`:
+
+```python
+_READTHEDOCS_CONFIG_PATH = Path(".readthedocs.yaml")
+_READTHEDOCS_CONFIG_REFERENCE = re.compile(
+    r"https://docs\.readthedocs\.io/en/stable/config-file/v2\.html"
+)
+```
+
+At the start of `_forbidden_api_tokens`, retain match spans and remove only a
+match enclosed by the exact reference URL:
+
+```python
+matches = tuple(FORBIDDEN_API_TOKEN.finditer(line))
+if relative_path == _READTHEDOCS_CONFIG_PATH:
+    reference_spans = tuple(
+        (match.start(), match.end())
+        for match in _READTHEDOCS_CONFIG_REFERENCE.finditer(line)
+    )
+    matches = tuple(
+        match
+        for match in matches
+        if not any(
+            start <= match.start() and match.end() <= end
+            for start, end in reference_spans
+        )
+    )
+tokens = tuple(match.group() for match in matches)
+```
+
+Keep the existing numerical-vector exception after this new filtering.
+
+- [ ] **Step 4: Run the policy tests and verify GREEN**
+
+Run:
+
+```bash
+/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest \
+  tests/test_versioning_policy.py -q -n0 --tb=short
+```
+
+Expected: all version-policy tests pass.
+
+- [ ] **Step 5: Commit the policy correction**
+
+```bash
+git add tests/test_versioning_policy.py
+git diff --cached --check
+git commit -m "test: allow Read the Docs config reference"
+```
+
+---
+
+### Task 2: Read the Sphinx version from pyproject metadata
+
+**Files:**
+- Create: `.readthedocs.yaml`
+- Create: `docs/Makefile`
+- Create: `docs/requirements.txt`
 - Create: `tests/test_docs_conf.py`
 - Modify: `docs/conf.py:18-21,68-76`
 - Modify: `PROGRESS.md`
@@ -165,9 +283,7 @@ Run:
   -q --fast --tb=short
 ```
 
-Expected: the new tests and existing relevant contracts pass. If the
-pre-existing `.readthedocs.yaml` version-policy failure remains, record it as
-unrelated rather than modifying that user file.
+Expected: the new tests and existing relevant contracts pass.
 
 - [ ] **Step 6: Update the progress log**
 
@@ -201,16 +317,17 @@ Run:
 git diff --check
 ```
 
-Expected: static checks and new focused tests pass. Report the already observed
-version-policy failure separately if `.readthedocs.yaml` still triggers it.
+Expected: static checks, new focused tests, and the fast suite pass.
 
 - [ ] **Step 8: Commit the implementation**
 
 Review and stage only the files in this task:
 
 ```bash
-git diff -- docs/conf.py tests/test_docs_conf.py PROGRESS.md
-git add docs/conf.py tests/test_docs_conf.py PROGRESS.md
+git diff -- .readthedocs.yaml docs/Makefile docs/conf.py docs/requirements.txt \
+  tests/test_docs_conf.py PROGRESS.md
+git add .readthedocs.yaml docs/Makefile docs/conf.py docs/requirements.txt \
+  tests/test_docs_conf.py PROGRESS.md
 git diff --cached --check
 git commit -m "docs: read Sphinx version from pyproject"
 ```

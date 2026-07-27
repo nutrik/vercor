@@ -33,11 +33,21 @@ that:
 
 The test will be observed failing before `docs/conf.py` is changed, then passing
 after the minimal implementation. Existing focused documentation/version
-contracts and the repository's fast suite will be run afterward. Any
-pre-existing unrelated failure will be reported separately.
+contracts and the repository's fast suite will be run afterward.
+
+The new `.readthedocs.yaml` follows Read the Docs' official template and links
+to its external configuration reference ending in `/v2.html`. The repository
+version-policy scanner currently mistakes that URL segment for a stale VerCOR
+API label. Add a focused policy test first, then exempt only a matching token
+whose character span is inside that exact official Read the Docs URL in the
+root configuration file. A stale API token elsewhere on the same line must
+remain rejected.
 
 ## Scope
 
-This change affects only Sphinx version configuration and its focused test.
-It does not change package metadata, runtime exports, release automation, or
-the current project version.
+This change affects Sphinx version configuration, the narrow Read the Docs URL
+policy correction, and their focused tests. Include all current and newly
+created untracked documentation files in the implementation commit:
+`.readthedocs.yaml`, `docs/Makefile`, `docs/conf.py`, and
+`docs/requirements.txt`. Do not change package metadata, runtime exports,
+release automation, or the current project version.
