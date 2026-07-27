@@ -10,4 +10,5 @@ coupled state and requested output.
    getting-started
    running
    ../how-to/output
+   ../how-to/index
    ../troubleshooting

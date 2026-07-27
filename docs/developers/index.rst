@@ -13,3 +13,5 @@ connect them through explicit exchanges.
    jax-components
    coupling
    ../api/index
+   ../how-to/index
+   ../troubleshooting
