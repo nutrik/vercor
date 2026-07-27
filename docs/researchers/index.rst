@@ -7,4 +7,6 @@ coupled state and requested output.
 .. toctree::
    :maxdepth: 1
 
-   ../introduction
+   getting-started
+   running
+   ../troubleshooting
