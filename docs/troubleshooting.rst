@@ -22,8 +22,11 @@ field fan-in.
 **Cause.** An exchange field is not declared by both endpoints, or multiple
 routes write one target field.
 
-**Action.** Declare the field as a source output and target input, then give
-each route a unique identity; see :doc:`developers/coupling`.
+**Action.** Declare the field as a source output and target input. Give routes
+between the same component pair distinct IDs when their identities collide,
+but do not use distinct IDs to bypass fan-in rejection: only one route may
+write a target field. Combine multiple values in an explicit component step;
+see :doc:`developers/coupling`.
 
 A host component fails with the JAX backend
 --------------------------------------------

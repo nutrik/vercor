@@ -21,8 +21,8 @@ python -m pip install --upgrade "vercor==0.4.0"
 ## Compatibility and migration
 
 VerCOR requires Python 3.12 or 3.13. Version 0.4 is intentionally
-source-breaking for 0.3 applications; follow
-`docs/migration-0.3-to-0.4.md`. Third-party plugins should depend on
+source-breaking for 0.3 applications; follow the
+[migration guide](migration-0.3-to-0.4.md). Third-party plugins should depend on
 `vercor>=0.4.0,<0.5` and use the documented stable extension modules.
 
 ## Known limitations

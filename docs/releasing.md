@@ -7,8 +7,10 @@ publication, merge, or hosted release.
 The historical `v0.4.0`, `v0.4.1`, and `v0.4.2` tags remain immutable. The
 `v0.4.2` publication failed because PyPI rejected its invalid license
 classifier; no PyPI 0.4.2 version or GitHub Release exists. VerCOR 0.4.3 is
-the active recovery candidate. Do not delete, overwrite, or repoint a
-historical tag.
+the current published release. The version-specific commands below preserve
+its verified recovery procedure as an operational record; do not rerun them to
+republish 0.4.3. A future release must use a new version, tag, and release
+branch throughout. Do not delete, overwrite, or repoint a historical tag.
 
 ## Repository deployment configuration
 

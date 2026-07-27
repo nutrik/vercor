@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from vercor import Clock, Coupler, RectilinearGrid
 from vercor.setups import make_slab_ocean
 
-
 grid = RectilinearGrid.uniform(
     "quickstart",
     nlon=2,

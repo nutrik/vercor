@@ -1,8 +1,8 @@
 Getting started
 ===============
 
-Requirements
-------------
+Prerequisites
+-------------
 
 Use Python 3.12 or 3.13. This first run uses VerCOR's bundled slab ocean, so
 it needs no external data or optional model packages.
@@ -26,8 +26,8 @@ same Python environment used for installation:
    :language: python
    :linenos:
 
-Inspect the result
-------------------
+Expected result
+---------------
 
 ``RectilinearGrid`` defines the longitude-latitude locations for a component's
 fields. ``Clock`` defines the shared start time, time step, and number of

@@ -32,6 +32,24 @@ API_PAGES = (
     "advanced.rst",
 )
 
+TUTORIAL_PAGES = (
+    "researchers/getting-started.rst",
+    "developers/data-components.rst",
+    "developers/host-components.rst",
+    "developers/jax-components.rst",
+    "developers/coupling.rst",
+)
+
+PROJECT_RESOURCE_PAGES = (
+    "migration-0.3-to-0.4",
+    "plugin-authoring",
+    "release-notes-0.4.3",
+    "release-notes-0.4.2",
+    "release-notes-0.4.1",
+    "release-notes-0.4.0",
+    "releasing",
+)
+
 
 @pytest.mark.fast_always
 def test_documentation_has_two_learning_paths_and_reference_sections() -> None:
@@ -43,6 +61,26 @@ def test_documentation_has_two_learning_paths_and_reference_sections() -> None:
 
     assert "For Earth-system researchers" in index_source
     assert "For Python and JAX developers" in index_source
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("page", TUTORIAL_PAGES)
+def test_tutorials_state_prerequisites_result_and_next_steps(page: str) -> None:
+    """Keep each executable tutorial independently usable and navigable."""
+    source = (DOCS_ROOT / page).read_text(encoding="utf-8")
+
+    for section in ("Prerequisites", "Expected result", "Next steps"):
+        assert section in source
+
+
+@pytest.mark.fast_always
+def test_exchange_troubleshooting_does_not_confuse_route_ids_with_fan_in() -> None:
+    """Keep the route-identity remedy separate from unsupported field fan-in."""
+    source = (DOCS_ROOT / "troubleshooting.rst").read_text(encoding="utf-8")
+
+    assert "do not use distinct IDs to bypass fan-in rejection" in source
+    assert "only one route may" in source
+    assert "write a target field" in source
 
 
 @pytest.mark.fast_always
@@ -94,24 +132,35 @@ def test_readme_is_a_concise_gateway_to_canonical_documentation() -> None:
     ):
         assert canonical_link in readme
     assert len(readme.splitlines()) <= 180
-    assert "### Create a custom JAX component" not in readme
-    assert "### Run a host-side component" not in readme
+    for removed_heading in (
+        "### Create a custom JAX component",
+        "### Run a host-side component",
+        "### Couple components on different grids",
+        "### Write output",
+        "## Configuration",
+        "## Troubleshooting",
+    ):
+        assert removed_heading not in readme
 
 
 @pytest.mark.fast_always
 def test_project_resources_publish_maintained_markdown() -> None:
     """Expose active project guides without publishing archives."""
     source = (DOCS_ROOT / "project-resources.rst").read_text(encoding="utf-8")
-    for page in (
-        "migration-0.3-to-0.4",
-        "plugin-authoring",
-        "release-notes-0.4.3",
-        "release-notes-0.4.2",
-        "release-notes-0.4.1",
-        "release-notes-0.4.0",
-        "releasing",
+    published_pages = tuple(
+        line.strip()
+        for line in source.splitlines()
+        if line.startswith("   ") and not line.lstrip().startswith(":")
+    )
+
+    assert published_pages == PROJECT_RESOURCE_PAGES
+    for excluded_resource in (
+        "api-architecture-review",
+        "over-engineering-",
+        "progress-archive-",
+        "superpowers/",
     ):
-        assert page in source
+        assert excluded_resource not in source
 
 
 def test_sphinx_builds_html_with_warnings_as_errors(tmp_path: Path) -> None:
