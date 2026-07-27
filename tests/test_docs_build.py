@@ -23,6 +23,15 @@ EXPECTED_ROOT_PAGES = (
     "project-resources",
 )
 
+API_PAGES = (
+    "assembly.rst",
+    "components.rst",
+    "grids-exchanges.rst",
+    "output-diagnostics.rst",
+    "setups-physics-types.rst",
+    "advanced.rst",
+)
+
 
 @pytest.mark.fast_always
 def test_documentation_has_two_learning_paths_and_reference_sections() -> None:
@@ -34,6 +43,23 @@ def test_documentation_has_two_learning_paths_and_reference_sections() -> None:
 
     assert "For Earth-system researchers" in index_source
     assert "For Python and JAX developers" in index_source
+
+
+@pytest.mark.fast_always
+def test_api_reference_is_curated_and_separates_advanced_contracts() -> None:
+    """Document public owners explicitly and keep private modules absent."""
+    sources = []
+    for name in API_PAGES:
+        source = (DOCS_ROOT / "api" / name).read_text(encoding="utf-8")
+        assert ".. auto" in source
+        assert "vercor._" not in source
+        sources.append(source)
+
+    stable_source = "\n".join(sources[:-1])
+    advanced_source = sources[-1]
+    assert "vercor.runtime" not in stable_source
+    assert ".. automodule:: vercor.runtime" in advanced_source
+    assert ".. automodule:: vercor.topology" in advanced_source
 
 
 @pytest.mark.fast_always

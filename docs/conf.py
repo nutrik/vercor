@@ -182,7 +182,6 @@ texinfo_documents = [
 # -- Options for autodoc --------------------------------------------------
 autodoc_member_order = "bysource"
 autodoc_default_options = {"show-inheritance": None}
-autodoc_mock_imports = ["numpy", "scipy", "h5netcdf"]
 
 # -- Custom directives ----------------------------------------------------
 

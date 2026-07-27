@@ -8,3 +8,19 @@ identify stable entry points without navigating implementation details. Private
 Runtime and topology extension points are documented separately for advanced
 integrations that need to define execution, workflow, backend, or topology
 contracts.
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Stable user-facing API
+
+   assembly
+   components
+   grids-exchanges
+   output-diagnostics
+   setups-physics-types
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Advanced extension API
+
+   advanced

@@ -52,6 +52,21 @@ def test_conf_reads_version_relative_to_its_own_project(
     assert config["release"] == "9.8.7"
 
 
+def test_conf_does_not_mock_installed_core_dependencies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Let autodoc import the real numerical stack required by JAX."""
+    config = _run_copied_conf(
+        tmp_path,
+        monkeypatch,
+        '[project]\nname = "synthetic-vercor"\nversion = "9.8.7"\n',
+    )
+
+    mocked_imports = set(config.get("autodoc_mock_imports", ()))
+    assert mocked_imports.isdisjoint({"numpy", "scipy", "h5netcdf", "jax"})
+
+
 def test_conf_rejects_missing_project_version(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
