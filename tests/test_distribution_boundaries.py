@@ -1095,6 +1095,31 @@ def test_release_guide_binds_tag_authority_workflow_selection_and_hosted_state()
 
 
 @pytest.mark.fast_always
+def test_ci_quality_job_installs_canonical_docs_environment() -> None:
+    """Install the dependencies required by the documentation tests in CI."""
+
+    workflow = yaml.safe_load(
+        (PROJECT_ROOT / ".github/workflows/python-package.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    quality_steps = workflow["jobs"]["quality"]["steps"]
+    install_index, install = next(
+        (index, step)
+        for index, step in enumerate(quality_steps)
+        if step.get("name") == "Install quality and optional-model dependencies"
+    )
+    test_index = next(
+        index
+        for index, step in enumerate(quality_steps)
+        if step.get("name") == "Run full test suite"
+    )
+
+    assert install_index < test_index
+    assert "python -m pip install -r docs/requirements.txt" in install["run"]
+
+
+@pytest.mark.fast_always
 def test_ci_quality_job_enforces_static_full_and_coverage_gates() -> None:
     workflow = yaml.safe_load(
         (PROJECT_ROOT / ".github/workflows/python-package.yml").read_text(
