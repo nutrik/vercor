@@ -79,6 +79,36 @@ def test_sphinx_builds_rst_and_selected_markdown_sources() -> None:
     assert "path: ." in readthedocs
 
 
+@pytest.mark.fast_always
+def test_readme_is_a_concise_gateway_to_canonical_documentation() -> None:
+    """Keep detailed guidance on Read the Docs instead of in the README."""
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "https://vercor.readthedocs.io/" in readme
+    assert "Researcher guide" in readme
+    assert "Developer guide" in readme
+    assert "Python API" in readme
+    assert len(readme.splitlines()) <= 180
+    assert "### Create a custom JAX component" not in readme
+    assert "### Run a host-side component" not in readme
+
+
+@pytest.mark.fast_always
+def test_project_resources_publish_maintained_markdown() -> None:
+    """Expose active project guides without publishing archives."""
+    source = (DOCS_ROOT / "project-resources.rst").read_text(encoding="utf-8")
+    for page in (
+        "migration-0.3-to-0.4",
+        "plugin-authoring",
+        "release-notes-0.4.3",
+        "release-notes-0.4.2",
+        "release-notes-0.4.1",
+        "release-notes-0.4.0",
+        "releasing",
+    ):
+        assert page in source
+
+
 def test_sphinx_builds_html_with_warnings_as_errors(tmp_path: Path) -> None:
     """Build the committed documentation without warnings or network access."""
     output_path = tmp_path / "html"

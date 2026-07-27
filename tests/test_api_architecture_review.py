@@ -14,6 +14,7 @@ import subprocess
 import tomllib
 from typing import Any, cast, get_type_hints
 
+import numpy as np
 import pytest
 import yaml
 
@@ -422,8 +423,10 @@ def test_readme_python_snippets_run_as_one_public_quick_start(
     namespace: dict[str, object] = {}
     exec(compile(source, str(README_PATH), "exec"), namespace)
 
-    assert (tmp_path / "output" / "output.snapshot.nc").is_file()
-    assert tuple((tmp_path / "output").glob("output.averages.*.nc"))
+    sea_surface_temperature = np.asarray(namespace["sea_surface_temperature"])
+    assert sea_surface_temperature.shape == (2, 2)
+    assert np.all(np.isfinite(sea_surface_temperature))
+    assert not tuple(tmp_path.iterdir())
 
 
 @pytest.mark.fast_always
