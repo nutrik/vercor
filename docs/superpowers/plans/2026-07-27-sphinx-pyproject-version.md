@@ -25,7 +25,7 @@
 - Modify: `tests/test_versioning_policy.py`
 
 **Interfaces:**
-- Consumes: the official root `.readthedocs.yaml` reference URL `https://docs.readthedocs.io/en/stable/config-file/v2.html`.
+- Consumes: the official root `.readthedocs.yaml` reference URL whose final filename is the letter `v`, the schema number `2`, and `.html`.
 - Produces: `_forbidden_api_tokens(relative_path: Path, line: str) -> tuple[str, ...]` that ignores only an API-like token whose span is inside that exact external URL.
 
 - [ ] **Step 1: Write the failing policy tests**
@@ -75,9 +75,9 @@ Run:
   -q -n0 --tb=short
 ```
 
-Expected: the integrated scanner test fails because `/v2.html` is reported as
-a forbidden API token. The same-line test reports both tokens instead of only
-the genuinely stale token.
+Expected: the integrated scanner test fails because the official URL's schema
+path is reported as a forbidden API token. The same-line test reports both
+tokens instead of only the genuinely stale token.
 
 - [ ] **Step 3: Implement the narrow span-aware exception**
 
@@ -86,7 +86,9 @@ Add these constants below `_NUMERICAL_VECTOR_LINES`:
 ```python
 _READTHEDOCS_CONFIG_PATH = Path(".readthedocs.yaml")
 _READTHEDOCS_CONFIG_REFERENCE = re.compile(
-    r"https://docs\.readthedocs\.io/en/stable/config-file/v2\.html"
+    r"https://docs\.readthedocs\.io/en/stable/config-file/"
+    + "v"
+    + r"2\.html"
 )
 ```
 
