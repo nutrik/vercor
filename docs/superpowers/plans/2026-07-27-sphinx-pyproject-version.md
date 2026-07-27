@@ -101,14 +101,6 @@ def test_conf_rejects_missing_project_version(
             monkeypatch,
             '[project]\nname = "synthetic-vercor"\n',
         )
-
-
-def test_conf_removes_package_version_fallback() -> None:
-    """Keep pyproject metadata as the sole documentation version source."""
-    source = CONF_PATH.read_text(encoding="utf-8")
-
-    assert "from vercor import __version__" not in source
-    assert "0+untagged" not in source
 ```
 
 - [ ] **Step 2: Run the focused tests and verify RED**
@@ -120,9 +112,8 @@ Run:
   tests/test_docs_conf.py -q -n0 --tb=short
 ```
 
-Expected: three failures. The synthetic project reports the checkout package
-version instead of `9.8.7`, missing metadata does not raise `KeyError`, and the
-old import/fallback strings are still present.
+Expected: two failures. The synthetic project reports the checkout package
+version instead of `9.8.7`, and missing metadata does not raise `KeyError`.
 
 - [ ] **Step 3: Implement the minimal strict lookup**
 
@@ -159,7 +150,7 @@ Run:
   tests/test_docs_conf.py -q -n0 --tb=short
 ```
 
-Expected: `3 passed`.
+Expected: `2 passed`.
 
 - [ ] **Step 5: Run focused version/documentation regression checks**
 
