@@ -85,9 +85,14 @@ def test_readme_is_a_concise_gateway_to_canonical_documentation() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "https://vercor.readthedocs.io/" in readme
-    assert "Researcher guide" in readme
-    assert "Developer guide" in readme
-    assert "Python API" in readme
+    for canonical_link in (
+        "[Researcher guide](https://vercor.readthedocs.io/en/latest/researchers/)",
+        "[Developer guide](https://vercor.readthedocs.io/en/latest/developers/)",
+        "[Python API](https://vercor.readthedocs.io/en/latest/api/)",
+        "[Migration guide](https://vercor.readthedocs.io/en/latest/migration-0.3-to-0.4.html)",
+        "[Plugin authoring](https://vercor.readthedocs.io/en/latest/plugin-authoring.html)",
+    ):
+        assert canonical_link in readme
     assert len(readme.splitlines()) <= 180
     assert "### Create a custom JAX component" not in readme
     assert "### Run a host-side component" not in readme
