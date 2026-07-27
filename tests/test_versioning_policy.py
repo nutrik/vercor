@@ -26,6 +26,10 @@ _NUMERICAL_VECTOR_LINES = (
     re.compile(r"^\s*" + "v" + r"3\s*="),
     re.compile(r"^\s*v(?:00|10|01|11)\s*=\s*" + "v" + r"3\["),
 )
+_READTHEDOCS_CONFIG_PATH = Path(".readthedocs.yaml")
+_READTHEDOCS_CONFIG_REFERENCE = re.compile(
+    r"https://docs\.readthedocs\.io/en/stable/config-file/" + "v" + r"2\.html"
+)
 FORBIDDEN_VERCOR_MAJOR = re.compile(r"\bVerCOR [" + "1234" + r"](?:\b|\.)")
 _RELEASE_SHORTHAND = r"(?<![\d.])(?:[12]\.0|3\." + r"[01]|4\.0|[1234]\.x)(?![\d.])"
 _RELEASE_SHORTHAND_TOKEN = re.compile(_RELEASE_SHORTHAND, flags=re.IGNORECASE)
@@ -163,7 +167,21 @@ def _forbidden_release_shorthand_labels(line: str) -> tuple[str, ...]:
 def _forbidden_api_tokens(relative_path: Path, line: str) -> tuple[str, ...]:
     """Return stale API tokens while preserving the interpolator's numeric vector."""
 
-    tokens = tuple(FORBIDDEN_API_TOKEN.findall(line))
+    matches = tuple(FORBIDDEN_API_TOKEN.finditer(line))
+    if relative_path == _READTHEDOCS_CONFIG_PATH:
+        reference_spans = tuple(
+            (match.start(), match.end())
+            for match in _READTHEDOCS_CONFIG_REFERENCE.finditer(line)
+        )
+        matches = tuple(
+            match
+            for match in matches
+            if not any(
+                start <= match.start() and match.end() <= end
+                for start, end in reference_spans
+            )
+        )
+    tokens = tuple(match.group() for match in matches)
     if relative_path != _NUMERICAL_VECTOR_PATH:
         return tokens
     if not any(pattern.search(line) for pattern in _NUMERICAL_VECTOR_LINES):
@@ -457,6 +475,36 @@ def test_integrated_scanner_still_rejects_stale_api_in_interpolator(
             relative_path=Path("vercor/_interpolators/bilinear_rectilinear.py"),
             line="# stale " + "v" + "4 API",
         )
+
+
+@pytest.mark.fast_always
+def test_integrated_scanner_allows_official_readthedocs_config_reference(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _run_integrated_scanner_for_line(
+        monkeypatch,
+        tmp_path,
+        relative_path=Path(".readthedocs.yaml"),
+        line=(
+            "# See https://docs.readthedocs.io/en/stable/config-file/"
+            + "v"
+            + "2.html for details"
+        ),
+    )
+
+
+@pytest.mark.fast_always
+def test_readthedocs_reference_does_not_hide_a_stale_api_token() -> None:
+    line = (
+        "# See https://docs.readthedocs.io/en/stable/config-file/"
+        + "v"
+        + "2.html; stale "
+        + "v"
+        + "2 API"
+    )
+
+    assert _forbidden_api_tokens(Path(".readthedocs.yaml"), line) == ("v" + "2",)
 
 
 @pytest.mark.fast_always
