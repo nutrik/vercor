@@ -38,13 +38,14 @@ def host_step(
     context: StepContext,
     payload: object | None,
 ) -> StepResult:
-    """Increment the declared field and replace the runtime payload."""
+    """Use and replace payload state while evolving the declared field."""
 
     _ = context
     if not isinstance(payload, HostPayload):
         raise TypeError("host payload was not initialized")
+    increment = payload.calls + 1
     return StepResult(
-        fields={"counter": fields["counter"] + 1.0},
+        fields={"counter": fields["counter"] + increment},
         payload=HostPayload(payload.calls + 1),
     )
 
@@ -76,4 +77,4 @@ coupler = Coupler(
 )
 final_state = coupler.run(output=None)
 
-assert bool(jnp.all(final_state.component("HOST").field("counter") == jnp.asarray(2.0)))
+assert bool(jnp.all(final_state.component("HOST").field("counter") == jnp.asarray(3.0)))

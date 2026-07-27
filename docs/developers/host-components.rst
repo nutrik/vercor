@@ -13,10 +13,10 @@ A component that needs ordinary Python or host-library execution declares
 host driver when that component is scheduled.
 
 The setup hook returns the first payload and each step functionally replaces
-it in ``StepResult``.  The example increments a counter while returning a new
-``HostPayload`` each time.  Never place evolving hidden mutable state on the
-component author object: it would be shared configuration rather than
-per-runtime state.
+it in ``StepResult``.  The example uses ``HostPayload.calls`` to add ``1`` on
+the first step and ``2`` on the second while returning a new payload each time.
+Never place evolving hidden mutable state on the component author object: it
+would be shared configuration rather than per-runtime state.
 
 .. literalinclude:: ../_examples/host_component.py
    :language: python
@@ -26,8 +26,9 @@ Expected result
 ---------------
 
 The program completes without output after two host steps. Its assertion
-confirms that every value in the final ``counter`` field is ``2.0`` while each
-step has returned a replacement ``HostPayload``.
+confirms that every value in the final ``counter`` field is ``3.0``. The
+second increment depends on receiving the replacement payload from the first
+step.
 
 Next steps
 ----------

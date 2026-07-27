@@ -84,6 +84,30 @@ def test_exchange_troubleshooting_does_not_confuse_route_ids_with_fan_in() -> No
 
 
 @pytest.mark.fast_always
+def test_daily_data_uses_one_365_record_climatology_for_all_calendars() -> None:
+    """Document the runtime's leap-day and 360-day daily-forcing mappings."""
+    source = (DOCS_ROOT / "developers" / "data-components.rst").read_text(
+        encoding="utf-8"
+    )
+    prose = " ".join(source.split())
+
+    assert "365 records for every supported calendar" in prose
+    assert "February 29 uses the same record as February 28" in prose
+    assert "360-day month onto the corresponding no-leap month" in prose
+    assert "360 records" not in prose
+
+
+@pytest.mark.fast_always
+def test_running_guide_does_not_claim_run_state_advances_the_clock_window() -> None:
+    """Keep supplied-state reuse distinct from an unimplemented clock cursor."""
+    source = (DOCS_ROOT / "researchers" / "running.rst").read_text(encoding="utf-8")
+
+    assert "replays the configured ``Clock`` window" in source
+    assert "does not store a clock cursor" in source
+    assert "To continue a simulation" not in source
+
+
+@pytest.mark.fast_always
 def test_api_reference_is_curated_and_separates_advanced_contracts() -> None:
     """Document public owners explicitly and keep private modules absent."""
     sources = []
@@ -98,6 +122,33 @@ def test_api_reference_is_curated_and_separates_advanced_contracts() -> None:
     assert "vercor.runtime" not in stable_source
     assert ".. automodule:: vercor.runtime" in advanced_source
     assert ".. automodule:: vercor.topology" in advanced_source
+    assert ".. automodule:: vercor.dtypes" in stable_source
+    assert ":members: DTypePolicy" in stable_source
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("page", API_PAGES)
+def test_api_groups_introduce_their_usage_before_generated_members(page: str) -> None:
+    """Give readers purpose and context before each page's generated API."""
+    source = (DOCS_ROOT / "api" / page).read_text(encoding="utf-8")
+    lines = source.splitlines()
+    generated_group_count = 0
+
+    for directive_index, line in enumerate(lines):
+        if not line.startswith(".. automodule::"):
+            continue
+        generated_group_count += 1
+        heading_underline_index = max(
+            index
+            for index, candidate in enumerate(lines[:directive_index])
+            if candidate and set(candidate) <= {"=", "-", "^"}
+        )
+        introduction = lines[slice(heading_underline_index + 1, directive_index)]
+        assert any(
+            candidate.strip() for candidate in introduction
+        ), f"{page} has no usage introduction before {line}"
+
+    assert generated_group_count > 0
 
 
 @pytest.mark.fast_always

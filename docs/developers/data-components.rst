@@ -13,8 +13,11 @@ axis is preserved.  The executable example defines both forms.
 
 ``TransferPolicy("current")`` exports the stored field as-is.  ``linear``
 selects adjacent monthly records and interpolates during exchange.  ``daily``
-selects daily records; it expects 365 records for the Gregorian and no-leap
-calendars, or 360 records for the 360-day calendar.
+selects from one no-leap climatology with 365 records for every supported
+calendar.  In a Gregorian leap year, February 29 uses the same record as
+February 28.  For a 360-day clock, VerCOR maps the relative position of each
+day in a 360-day month onto the corresponding no-leap month; it does not
+expect a separate 360-record dataset.
 
 .. literalinclude:: ../_examples/data_component.py
    :language: python

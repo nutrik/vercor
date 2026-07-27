@@ -1158,8 +1158,14 @@ Fix wording, cross-references, and navigation defects with focused edits.
 Run:
 
 ```bash
-rg -n 'vercor\\._|TBD|TODO|FIXME|placeholder|implement later' \
-  docs --glob '!superpowers/**' --glob '!progress-archive-*.md'
+rg -n --pcre2 \
+  'vercor\._(?!\*`` modules are excluded from this reference\.)|TBD|TODO|FIXME|placeholder|implement later' \
+  docs \
+  --glob '!docs/superpowers/**' \
+  --glob '!docs/progress-archive-*.md' \
+  --glob '!docs/*audit*.md' \
+  --glob '!docs/api-architecture-review.md' \
+  --glob '!docs/README.md'
 git diff --check
 ```
 

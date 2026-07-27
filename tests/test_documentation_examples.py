@@ -27,6 +27,18 @@ def test_documentation_example_executes(name: str) -> None:
 
 
 @pytest.mark.fast_always
+def test_host_example_observes_replacement_payload_in_final_field() -> None:
+    """Make payload replacement affect an observable public field."""
+    namespace = runpy.run_path(
+        str(EXAMPLES_ROOT / "host_component.py"),
+        run_name="__main__",
+    )
+
+    final_counter = namespace["final_state"].component("HOST").field("counter")
+    assert bool((final_counter == 3.0).all())
+
+
+@pytest.mark.fast_always
 @pytest.mark.parametrize("name", EXAMPLE_NAMES)
 def test_documentation_example_uses_only_public_vercor_imports(name: str) -> None:
     """Reject private VerCOR imports in published examples."""

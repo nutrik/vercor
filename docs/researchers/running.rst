@@ -12,18 +12,18 @@ exchanges, runtime policy, or run order.
 Choose component order
 ----------------------
 
-The ``run_order`` passed to ``Coupler`` names the components that run at each
-clock step, in order. Put a component after the components whose received
-fields it needs for that step. The quick start has one ocean component, so its
-order contains only the ocean name; a multi-component configuration uses each
-configured name once in its intended sequence.
+For the default sequential workflow, the ``run_order`` passed to ``Coupler``
+is the unique subset of configured components scheduled at each clock step, in
+order. Put a component after the components whose received fields it needs for
+that step. The quick start schedules only the ocean name. An empty order is
+valid, and a custom workflow may schedule registered components differently.
 
 Run from a new or existing state
 --------------------------------
 
 Ask the coupler for its initialized state when you want to inspect or retain
-the exact state used as the run input. Pass that state to ``run`` to advance it;
-the returned state is a new immutable ``RunState``.
+the exact state used as the run input. Pass that state to ``run`` to reuse its
+fields and payload; the returned state is a new immutable ``RunState``.
 
 .. code-block:: python
 
@@ -31,8 +31,9 @@ the returned state is a new immutable ``RunState``.
    final_state = coupler.run(initial_state)
 
 Calling ``coupler.run()`` without an argument also creates and advances a new
-initial state. To continue a simulation, pass the prior ``RunState`` to the
-same configured coupler.
+initial state. A ``RunState`` does not store a clock cursor, so every call to
+``run`` replays the configured ``Clock`` window. Passing a prior state changes
+the input fields and payload, not the run's start time or step indices.
 
 Inspect component fields
 ------------------------
