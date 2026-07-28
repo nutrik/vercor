@@ -44,9 +44,6 @@ PROJECT_RESOURCE_PAGES = (
     "migration-0.3-to-0.4",
     "plugin-authoring",
     "release-notes-0.4.3",
-    "release-notes-0.4.2",
-    "release-notes-0.4.1",
-    "release-notes-0.4.0",
     "releasing",
 )
 
@@ -102,7 +99,7 @@ def test_running_guide_does_not_claim_run_state_advances_the_clock_window() -> N
     """Keep supplied-state reuse distinct from an unimplemented clock cursor."""
     source = (DOCS_ROOT / "researchers" / "running.rst").read_text(encoding="utf-8")
 
-    assert "replays the configured ``Clock`` window" in source
+    assert "replays the configured :class:`~vercor.Clock` window" in source
     assert "does not store a clock cursor" in source
     assert "To continue a simulation" not in source
 
