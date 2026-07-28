@@ -1,11 +1,14 @@
 # VerCOR
 
 <p align="center">
+  <a href="http://vercor.readthedocs.io/?badge=latest">
+    <img src="https://readthedocs.org/projects/vercor/badge/?version=latest" alt="Documentation status">
+  </a>
   <a href="https://github.com/nutrik/vercor/actions/workflows/python-package.yml">
     <img src="https://github.com/nutrik/vercor/actions/workflows/python-package.yml/badge.svg" alt="Test status">
   </a>
-  <a href="https://codecov.io/github/nutrik/vercor">
-    <img src="https://codecov.io/github/nutrik/vercor/graph/badge.svg?token=A960MY4GXH" alt="Code Coverage">
+  <a href="https://codecov.io/github/nutrik/vercor" > 
+    <img src="https://codecov.io/github/nutrik/vercor/graph/badge.svg"/> 
   </a>
 </p>
 
