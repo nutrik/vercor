@@ -7,14 +7,16 @@ Prerequisites
 Install the core VerCOR package on Python 3.12 or 3.13. This tutorial uses no
 optional model package or external data.
 
-Use ``DataComponent`` for forcing or observations that have no active model
-step.  A scalar field expands to the component grid, while a leading record
-axis is preserved.  The executable example defines both forms.
+Use :class:`~vercor.components.DataComponent` for forcing or observations 
+that have no active model step.  A scalar field expands to the component grid,
+while a leading record axis is preserved.  The executable example defines both
+forms.
 
-``TransferPolicy("current")`` exports the stored field as-is.  ``linear``
-selects adjacent monthly records and interpolates during exchange.  ``daily``
-selects from one no-leap climatology with 365 records for every supported
-calendar.  In a Gregorian leap year, February 29 uses the same record as
+:class:`~vercor.components.TransferPolicy` ``("current")`` exports the stored
+field as-is.  ``linear`` selects adjacent monthly records and interpolates 
+during exchange.  ``daily`` selects from one no-leap climatology with 365
+records for every supported calendar. 
+In a Gregorian leap year, February 29 uses the same record as
 February 28.  For a 360-day clock, VerCOR maps the relative position of each
 day in a 360-day month onto the corresponding no-leap month; it does not
 expect a separate 360-record dataset.

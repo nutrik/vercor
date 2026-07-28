@@ -12,6 +12,3 @@ connect them through explicit exchanges.
    host-components
    jax-components
    coupling
-   ../api/index
-   ../how-to/index
-   ../troubleshooting

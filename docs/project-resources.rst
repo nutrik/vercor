@@ -16,7 +16,4 @@ extension authoring, and released versions.
    :caption: Releases
 
    release-notes-0.4.3
-   release-notes-0.4.2
-   release-notes-0.4.1
-   release-notes-0.4.0
    releasing

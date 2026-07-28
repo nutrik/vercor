@@ -8,7 +8,7 @@ the run suitable for compilation and differentiation.
 Choose run-level output kinds
 -----------------------------
 
-Pass an :class:`vercor.output.OutputTarget` to enable selected files beneath a
+Pass an :class:`~vercor.output.OutputTarget` to enable selected files beneath a
 directory. Its flags independently enable or disable period files, final
 fields, and component snapshots:
 
@@ -31,8 +31,8 @@ written only by components that declare a snapshot writer.
 Choose component output policy
 ------------------------------
 
-:class:`vercor.output.OutputSpec` belongs in a component's specification. Its
-``period`` policy uses :class:`vercor.output.PeriodOutput`; select ``"step"``
+:class:`~vercor.output.OutputSpec` belongs in a component's specification. Its
+``period`` policy uses :class:`~vercor.output.PeriodOutput`; select ``"step"``
 with ``PeriodOutput(frequency="step")`` for every-step period output, or use
 ``PeriodOutput(frequency="month")`` for monthly output.
 

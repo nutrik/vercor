@@ -8,10 +8,11 @@ Install the core VerCOR package and read :doc:`data-components` and
 :doc:`jax-components` for the two component styles used here. The example uses
 the built-in bilinear regridder and needs no optional model package.
 
-An ``Exchange`` transfers named fields from a source component to a target
-component. Both endpoints must declare every exchanged field: the source as
-an output and the target as an input. The following complete example sends a
-static heat flux to a model and verifies that the model uses it.
+An :class:`~vercor.exchanges.Exchange` transfers named fields from a source
+component to a target component. Both endpoints must declare every exchanged
+field: the source as an output and the target as an input. The following
+complete example sends a static heat flux to a model and verifies that the
+model uses it.
 
 .. literalinclude:: ../_examples/coupled_components.py
    :language: python

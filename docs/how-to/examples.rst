@@ -12,7 +12,9 @@ repository root, for example:
 
 The table identifies the extra dependency and input-data expectation for each
 driver. ``None`` means that the example has no model-specific optional package
-or external input requirement, although plotting examples need Matplotlib.
+or external input requirement, although plotting examples need
+`Matplotlib <https://matplotlib.org>`_.
+
 
 .. list-table:: Repository examples
    :header-rows: 1

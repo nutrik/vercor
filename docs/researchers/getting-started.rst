@@ -29,12 +29,12 @@ same Python environment used for installation:
 Expected result
 ---------------
 
-``RectilinearGrid`` defines the longitude-latitude locations for a component's
-fields. ``Clock`` defines the shared start time, time step, and number of
-steps. ``Coupler`` assembles the configured components and advances them in
-the requested order.
+:class:`~vercor.grids.RectilinearGrid` defines the longitude-latitude locations
+for a component's fields. :class:`~vercor.Clock` defines the shared start time,
+time step, and number of steps. :class:`~vercor.Coupler` assembles the configured components
+and advances them in the requested order.
 
-``coupler.run()`` returns an immutable ``RunState``. Use
+``coupler.run()`` returns an immutable :class:`~vercor.RunState`. Use
 ``RunState.component(name)`` to select a component and then ``field(name)`` to
 read one of its fields. The assertions in the program verify that the slab
 ocean's sea-surface-temperature field has the grid shape and finite values.

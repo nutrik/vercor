@@ -20,10 +20,10 @@ How a run fits together
 -----------------------
 
 A clock advances the shared model time and determines when components are due
-to run. VerCOR stores the evolving coupled system in an immutable ``RunState``:
-each step returns a new state rather than changing the old one. Output is
-opt-in, so simulations only write files or diagnostics when an output session
-is configured.
+to run. VerCOR stores the evolving coupled system in an immutable
+:class:`~vercor.RunState`: each step returns a new state rather than changing
+the old one. Output is opt-in, so simulations only write files or diagnostics
+when an output session is configured.
 
 Execution and differentiation
 ------------------------------

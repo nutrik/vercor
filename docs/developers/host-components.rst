@@ -9,11 +9,11 @@ between fixed author configuration and per-run payload state. This tutorial
 uses no optional model package.
 
 A component that needs ordinary Python or host-library execution declares
-``execution="host"``.  ``RuntimeOptions(backend="auto")`` then selects the
-host driver when that component is scheduled.
+``execution="host"``.  :class:`~vercor.runtime.RuntimeOptions` ``(backend="auto")``
+then selects the host driver when that component is scheduled.
 
 The setup hook returns the first payload and each step functionally replaces
-it in ``StepResult``.  The example uses ``HostPayload.calls`` to add ``1`` on
+it in :class:`~vercor.components.StepResult`.  The example uses ``HostPayload.calls`` to add ``1`` on
 the first step and ``2`` on the second while returning a new payload each time.
 Never place evolving hidden mutable state on the component author object: it
 would be shared configuration rather than per-runtime state.

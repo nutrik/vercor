@@ -10,4 +10,3 @@ configure output, and diagnose common integration problems.
    examples
    backends
    output
-   ../troubleshooting
