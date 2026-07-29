@@ -26,6 +26,21 @@ def test_run_executes_python_file_with_current_interpreter() -> None:
         assert Path("interpreter.txt").read_text(encoding="utf-8") == sys.executable
 
 
+def test_run_executes_option_like_local_python_filename() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("-c.py").write_text(
+            "from pathlib import Path\n"
+            "Path('ran.txt').write_text('ran', encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(cli, ["run", "--", "-c.py"])
+
+        assert result.exit_code == 0, result.output
+        assert Path("ran.txt").read_text(encoding="utf-8") == "ran"
+
+
 def test_run_propagates_script_exit_status() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -101,22 +116,33 @@ def test_copy_setup_preserves_existing_destination() -> None:
 
 
 @pytest.mark.parametrize(
-    "name",
+    ("name", "diagnostic"),
     (
-        "",
-        ".py",
-        "../run_slab_driver",
-        "nested/run_slab_driver",
-        r"nested\run_slab_driver",
-        "run_slab_driver.txt",
-        "__init__",
-        "not_a_setup",
+        ("", "must be a direct setup name"),
+        (".py", "must name a Python setup"),
+        ("../run_slab_driver", "must be a direct setup name"),
+        ("nested/run_slab_driver", "must be a direct setup name"),
+        (r"nested\run_slab_driver", "must be a direct setup name"),
+        ("run_slab_driver.txt", "must name a Python setup"),
+        ("__init__", "must name a public setup"),
     ),
 )
-def test_copy_setup_rejects_invalid_or_unknown_name(name: str) -> None:
+def test_copy_setup_rejects_malformed_name(
+    name: str,
+    diagnostic: str,
+) -> None:
     result = CliRunner().invoke(cli, ["copy-setup", name])
 
-    assert result.exit_code != 0
+    assert result.exit_code == 2
+    assert "Invalid value for NAME" in result.output
+    assert diagnostic in result.output
+
+
+def test_copy_setup_rejects_unknown_name_as_unknown_resource() -> None:
+    result = CliRunner().invoke(cli, ["copy-setup", "not_a_setup"])
+
+    assert result.exit_code == 1
+    assert "Error: unknown setup: not_a_setup" in result.output
 
 
 @pytest.mark.fast_always
@@ -127,9 +153,6 @@ def test_copy_setup_rejects_private_names_during_normalization(
     runner = CliRunner()
 
     private_result = runner.invoke(cli, ["copy-setup", private_name])
-    unknown_result = runner.invoke(cli, ["copy-setup", "ordinary_unknown"])
 
     assert private_result.exit_code == 2
     assert "must name a public setup" in private_result.output
-    assert unknown_result.exit_code == 1
-    assert "unknown setup" in unknown_result.output

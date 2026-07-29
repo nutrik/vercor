@@ -23,6 +23,8 @@ def _normalize_setup_name(name: str) -> str:
 
     if not name or name != name.strip() or "/" in name or "\\" in name:
         raise click.BadParameter("must be a direct setup name", param_hint="NAME")
+    if name == ".py":
+        raise click.BadParameter("must name a Python setup", param_hint="NAME")
     if name.startswith("_"):
         raise click.BadParameter("must name a public setup", param_hint="NAME")
     suffix = Path(name).suffix
@@ -79,7 +81,7 @@ def run(setup_file: Path) -> None:
             param_hint="SETUP_FILE",
         )
     completed = subprocess.run(
-        [sys.executable, str(setup_file)],
+        [sys.executable, str(setup_file.resolve())],
         check=False,
     )
     if completed.returncode:
