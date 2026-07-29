@@ -117,3 +117,19 @@ def test_copy_setup_rejects_invalid_or_unknown_name(name: str) -> None:
     result = CliRunner().invoke(cli, ["copy-setup", name])
 
     assert result.exit_code != 0
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("private_name", ("_internal", "_internal.py"))
+def test_copy_setup_rejects_private_names_during_normalization(
+    private_name: str,
+) -> None:
+    runner = CliRunner()
+
+    private_result = runner.invoke(cli, ["copy-setup", private_name])
+    unknown_result = runner.invoke(cli, ["copy-setup", "ordinary_unknown"])
+
+    assert private_result.exit_code == 2
+    assert "must name a public setup" in private_result.output
+    assert unknown_result.exit_code == 1
+    assert "unknown setup" in unknown_result.output
