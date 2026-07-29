@@ -220,6 +220,7 @@ vercor.components.contracts
 vercor.components.data
 vercor.components.runtime_execution
 vercor.components.setup_validation
+vercor.cli
 vercor.diagnostics.fields
 vercor.diagnostics.plotting
 vercor.diagnostics.tables
