@@ -14,16 +14,42 @@ def cli() -> None:
     """Copy and run VerCOR setup scripts."""
 
 
+def _normalize_setup_name(name: str) -> str:
+    """Validate a direct packaged setup name and return its Python filename."""
+
+    if not name or name != name.strip() or "/" in name or "\\" in name:
+        raise click.BadParameter("must be a direct setup name", param_hint="NAME")
+    suffix = Path(name).suffix
+    if suffix not in ("", ".py"):
+        raise click.BadParameter("must name a Python setup", param_hint="NAME")
+    filename = name if suffix else f"{name}.py"
+    if filename in (".py", "__init__.py"):
+        raise click.BadParameter("must name a Python setup", param_hint="NAME")
+    return filename
+
+
 @cli.command("copy-setup")
 @click.argument("name")
 def copy_setup(name: str) -> None:
     """Copy bundled setup NAME into the current directory."""
 
-    filename = name if name.endswith(".py") else f"{name}.py"
+    filename = _normalize_setup_name(name)
     source = resources.files("vercor.setups.gallery").joinpath(filename)
+    if not source.is_file():
+        raise click.ClickException(f"unknown setup: {name}")
     destination = Path.cwd() / filename
-    with source.open("rb") as source_stream, destination.open("xb") as target_stream:
-        shutil.copyfileobj(source_stream, target_stream)
+    created = False
+    try:
+        with source.open("rb") as source_stream:
+            with destination.open("xb") as target_stream:
+                created = True
+                shutil.copyfileobj(source_stream, target_stream)
+    except FileExistsError as error:
+        raise click.ClickException(f"{filename} already exists") from error
+    except OSError as error:
+        if created:
+            destination.unlink(missing_ok=True)
+        raise click.ClickException(f"could not copy {filename}: {error}") from error
     click.echo(f"Copied {filename}")
 
 
