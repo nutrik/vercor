@@ -10,7 +10,7 @@ An optional setup cannot be imported
 external data. CAMulator has no documented compatible dependency pin.
 
 **Action.** Install and configure the dependency required by the selected
-driver; see :doc:`how-to/examples` for the repository examples and their data
+driver; see :doc:`how-to/examples` for the packaged setup gallery and its data
 requirements.
 
 An exchange field is rejected
