@@ -593,7 +593,9 @@ def test_prepared_runtime_fields_are_frozen_and_read_only() -> None:
     )
     assert "runtime_resources" not in runtime_facade_source
 
-    profile_source = Path("examples/profile_runtime.py").read_text(encoding="utf-8")
+    profile_source = Path("vercor/setups/gallery/profile_runtime.py").read_text(
+        encoding="utf-8"
+    )
     assert "coupler._runtime_resources" not in profile_source
 
 
@@ -647,9 +649,15 @@ def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:
 
 
 def test_examples_use_coupler_runtime_component_view_factory() -> None:
-    slab_driver_source = Path("examples/run_slab_driver.py").read_text(encoding="utf-8")
-    data_driver_source = Path("examples/run_data_driver.py").read_text(encoding="utf-8")
-    jcm_slab_source = Path("examples/run_jcm_with_slab.py").read_text(encoding="utf-8")
+    slab_driver_source = Path("vercor/setups/gallery/run_slab_driver.py").read_text(
+        encoding="utf-8"
+    )
+    data_driver_source = Path("vercor/setups/gallery/run_data_driver.py").read_text(
+        encoding="utf-8"
+    )
+    jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
+        encoding="utf-8"
+    )
 
     for source in (slab_driver_source, data_driver_source, jcm_slab_source):
         assert "ComponentRuntimeState.from_coupler_state" not in source
@@ -657,7 +665,7 @@ def test_examples_use_coupler_runtime_component_view_factory() -> None:
 
 
 def test_examples_import_component_contracts_from_canonical_owner() -> None:
-    for path in Path("examples").glob("run_*.py"):
+    for path in Path("vercor/setups/gallery").glob("run_*.py"):
         source = path.read_text(encoding="utf-8")
         assert "from vercor import Component" not in source
         assert "from vercor import DataComponent" not in source

@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 import pytest
 
-from examples import custom_component_wrapping
+from vercor.setups.gallery import custom_component_wrapping
 import vercor._host_arrays as host_arrays_module
 from vercor.diagnostics import component_vector_speed
 from vercor.grids import RectilinearGrid

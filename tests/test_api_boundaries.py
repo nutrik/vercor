@@ -1010,11 +1010,11 @@ def test_setup_state_reads_run_order_as_plain_sequence() -> None:
 @pytest.mark.fast_always
 def test_multi_exchange_setup_scripts_use_constructor_assembly() -> None:
     multi_exchange_scripts = (
-        Path("examples/run_data_driver.py"),
-        Path("examples/run_jcm_with_verosdata.py"),
-        Path("examples/run_jcm_with_veros.py"),
-        Path("examples/run_jcm_with_slab.py"),
-        Path("examples/run_slab_driver.py"),
+        Path("vercor/setups/gallery/run_data_driver.py"),
+        Path("vercor/setups/gallery/run_jcm_with_verosdata.py"),
+        Path("vercor/setups/gallery/run_jcm_with_veros.py"),
+        Path("vercor/setups/gallery/run_jcm_with_slab.py"),
+        Path("vercor/setups/gallery/run_slab_driver.py"),
     )
 
     for path in multi_exchange_scripts:
@@ -1026,7 +1026,9 @@ def test_multi_exchange_setup_scripts_use_constructor_assembly() -> None:
 
 @pytest.mark.fast_always
 def test_slab_driver_uses_runtime_views_for_ice_diagnostics() -> None:
-    slab_source = Path("examples/run_slab_driver.py").read_text(encoding="utf-8")
+    slab_source = Path("vercor/setups/gallery/run_slab_driver.py").read_text(
+        encoding="utf-8"
+    )
 
     assert 'final_state.components(("ATM", "OCN", "LND", "ICE"))' in slab_source
     assert 'views["ICE"].field("ice_fraction")' in slab_source
@@ -1402,13 +1404,13 @@ def test_common_exchange_recipes_are_centralized_for_examples() -> None:
         assert f"{recipe_name}: tuple[_ExchangeField, ...]" in recipes_source
 
     recipe_users = (
-        Path("examples/run_jcm_with_verosdata.py"),
-        Path("examples/run_jcm_with_era5data.py"),
-        Path("examples/run_jcm_with_slab.py"),
-        Path("examples/run_camulator_with_veros.py"),
-        Path("examples/run_data_driver.py"),
-        Path("examples/run_veros_with_era5data.py"),
-        Path("examples/profile_runtime.py"),
+        Path("vercor/setups/gallery/run_jcm_with_verosdata.py"),
+        Path("vercor/setups/gallery/run_jcm_with_era5data.py"),
+        Path("vercor/setups/gallery/run_jcm_with_slab.py"),
+        Path("vercor/setups/gallery/run_camulator_with_veros.py"),
+        Path("vercor/setups/gallery/run_data_driver.py"),
+        Path("vercor/setups/gallery/run_veros_with_era5data.py"),
+        Path("vercor/setups/gallery/profile_runtime.py"),
     )
     for path in recipe_users:
         source = path.read_text(encoding="utf-8")
@@ -1421,7 +1423,9 @@ def test_common_exchange_recipes_are_centralized_for_examples() -> None:
     ) == _flatten_field_items(
         (*ATMOSPHERE_TO_DATA_OCEAN_FIELDS, *SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS)
     )
-    jcm_slab_source = Path("examples/run_jcm_with_slab.py").read_text(encoding="utf-8")
+    jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
+        encoding="utf-8"
+    )
     assert "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS" in jcm_slab_source
 
 
@@ -1576,17 +1580,21 @@ def test_jax_gcm_factory_does_not_attach_test_only_setup_state() -> None:
 
     assert "_setup_state" not in runtime_test_source
 
-    jcm_slab_source = Path("examples/run_jcm_with_slab.py").read_text(encoding="utf-8")
+    jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
+        encoding="utf-8"
+    )
     assert 'getattr(atm, "model")' not in jcm_slab_source
 
 
 @pytest.mark.fast_always
 def test_jcm_examples_use_public_input_loader_facade() -> None:
-    jcm_slab_source = Path("examples/run_jcm_with_slab.py").read_text(encoding="utf-8")
+    jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
+        encoding="utf-8"
+    )
     assert "vercor.setups._external.jax_gcm_tools" not in jcm_slab_source
     assert "load_jcm_inputs" in jcm_slab_source
 
-    jcm_veros_source = Path("examples/run_jcm_with_veros.py").read_text(
+    jcm_veros_source = Path("vercor/setups/gallery/run_jcm_with_veros.py").read_text(
         encoding="utf-8"
     )
     assert "generate_jcm_coords_forcing_topography_files" not in jcm_veros_source

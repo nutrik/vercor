@@ -840,7 +840,7 @@ def test_run_preserves_runtime_treedef() -> None:
 
 
 def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
-    profile_runtime = importlib.import_module("examples.profile_runtime")
+    profile_runtime = importlib.import_module("vercor.setups.gallery.profile_runtime")
 
     assert callable(profile_runtime.main)
     parser = profile_runtime.build_parser()
@@ -851,7 +851,7 @@ def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
 
 
 def test_runtime_profile_harness_runs_small_slab_profile() -> None:
-    profile_runtime = importlib.import_module("examples.profile_runtime")
+    profile_runtime = importlib.import_module("vercor.setups.gallery.profile_runtime")
 
     result = profile_runtime.profile_runtime(
         steps=1,

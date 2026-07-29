@@ -247,7 +247,9 @@ def test_component_can_receive_step_and_send_the_same_field() -> None:
 
 @pytest.mark.fast_always
 def test_slab_driver_has_one_bilinear_ocean_to_seaice_temperature_route() -> None:
-    source = Path("examples/run_slab_driver.py").read_text(encoding="utf-8")
+    source = Path("vercor/setups/gallery/run_slab_driver.py").read_text(
+        encoding="utf-8"
+    )
 
     assert source.count("fields=OCEAN_TO_SEAICE_SURFACE_FIELDS") == 1
     exchange_block = source.split(
