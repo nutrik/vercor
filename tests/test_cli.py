@@ -2,11 +2,68 @@ from __future__ import annotations
 
 from importlib import resources
 from pathlib import Path
+import sys
 
 from click.testing import CliRunner
 import pytest
 
 from vercor.cli import cli
+
+
+def test_run_executes_python_file_with_current_interpreter() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("setup.py").write_text(
+            "from pathlib import Path\n"
+            "import sys\n"
+            "Path('interpreter.txt').write_text(sys.executable, encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(cli, ["run", "setup.py"])
+
+        assert result.exit_code == 0, result.output
+        assert Path("interpreter.txt").read_text(encoding="utf-8") == sys.executable
+
+
+def test_run_propagates_script_exit_status() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("setup.py").write_text("raise SystemExit(7)\n", encoding="utf-8")
+
+        result = runner.invoke(cli, ["run", "setup.py"])
+
+        assert result.exit_code == 7
+
+
+@pytest.mark.parametrize("target", ("missing.py", "notes.txt"))
+def test_run_rejects_missing_or_non_python_file(target: str) -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        if target == "notes.txt":
+            Path(target).write_text("text", encoding="utf-8")
+
+        result = runner.invoke(cli, ["run", target])
+
+        assert result.exit_code != 0
+
+
+def test_run_rejects_directory() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("setup.py").mkdir()
+
+        result = runner.invoke(cli, ["run", "setup.py"])
+
+        assert result.exit_code != 0
+
+
+def test_cli_help_lists_copy_and_run_commands() -> None:
+    result = CliRunner().invoke(cli, ["--help"])
+
+    assert result.exit_code == 0
+    assert "copy-setup" in result.output
+    assert "run" in result.output
 
 
 def test_copy_setup_by_stem_copies_packaged_bytes() -> None:

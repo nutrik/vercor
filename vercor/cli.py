@@ -5,6 +5,8 @@ from __future__ import annotations
 from importlib import resources
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 
 import click
 
@@ -51,6 +53,33 @@ def copy_setup(name: str) -> None:
             destination.unlink(missing_ok=True)
         raise click.ClickException(f"could not copy {filename}: {error}") from error
     click.echo(f"Copied {filename}")
+
+
+@cli.command("run")
+@click.argument(
+    "setup_file",
+    type=click.Path(
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        path_type=Path,
+    ),
+)
+def run(setup_file: Path) -> None:
+    """Run local Python SETUP_FILE with the active interpreter."""
+
+    if setup_file.suffix != ".py":
+        raise click.BadParameter(
+            "must be a .py file",
+            param_hint="SETUP_FILE",
+        )
+    completed = subprocess.run(
+        [sys.executable, str(setup_file)],
+        check=False,
+    )
+    if completed.returncode:
+        raise click.exceptions.Exit(completed.returncode)
 
 
 if __name__ == "__main__":
