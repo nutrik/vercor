@@ -20,6 +20,7 @@ dependencies = [
 "jax",
 "jax-datetime",
 "tree-math",
+"click>=8.1",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -56,6 +57,9 @@ dev = [
   "pytest-xdist>=3.7",
   "types-PyYAML",
 ]
+
+[project.scripts]
+vercor = "vercor.cli:cli"
 
 [build-system]
 requires = ["flit_core<4"]
