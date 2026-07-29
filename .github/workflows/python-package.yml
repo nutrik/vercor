@@ -248,13 +248,13 @@ jobs:
           python -m pip install flit_core==3.12.0
           python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
       - name: Check formatting
-        run: python -m black --check vercor examples tests
+        run: python -m black --check vercor tests
       - name: Run strict lint
         run: python -m flake8 . --count --max-line-length=120 --statistics
       - name: Run static type checks
-        run: python -m mypy vercor examples tests
+        run: python -m mypy vercor tests
       - name: Compile Python sources
-        run: python -m compileall -q vercor examples tests
+        run: python -m compileall -q vercor tests
       - name: Run full test suite
         run: python -m pytest tests/ -q --tb=short
       - name: Enforce branch coverage

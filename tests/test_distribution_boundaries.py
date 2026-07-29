@@ -1151,11 +1151,11 @@ def test_ci_quality_job_enforces_static_full_and_coverage_gates() -> None:
     assert checkout.get("with", {}).get("fetch-depth") == 0
     assert setup["with"]["python-version"] == "3.12"
     assert 'pip install ".[dev,jcm,veros]"' in commands
-    assert "black --check vercor examples tests" in commands
+    assert "black --check vercor tests" in commands
     assert "flake8 ." in commands
     assert "--exit-zero" not in commands
-    assert "mypy vercor examples tests" in commands
-    assert "compileall" in commands
+    assert "mypy vercor tests" in commands
+    assert "compileall -q vercor tests" in commands
     assert "pytest tests/ -q --tb=short" in commands
     assert "--cov=vercor" in commands
     assert "--cov-branch" in commands

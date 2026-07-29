@@ -914,7 +914,7 @@ def test_examples_and_current_plugin_use_direct_constructor_assembly() -> None:
     )
     assert extension_plugin.is_file()
     paths = (
-        *sorted((PROJECT_ROOT / "examples").glob("*.py")),
+        *sorted((PROJECT_ROOT / "vercor" / "setups" / "gallery").glob("*.py")),
         extension_plugin,
     )
     forbidden = (

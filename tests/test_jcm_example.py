@@ -18,7 +18,10 @@ import pytest
 from vercor import Clock
 from vercor.setups import JCMInputs
 
-EXAMPLES_DIRECTORY = Path(__file__).resolve().parents[1] / "examples"
+GALLERY_DIRECTORY = (
+    Path(__file__).resolve().parents[1] / "vercor" / "setups" / "gallery"
+)
+GALLERY_MODULE = "vercor.setups.gallery.run_jcm_with_era5data"
 
 
 class _FakeCoupler:
@@ -43,15 +46,15 @@ def blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
     return real_import(name, globals, locals, fromlist, level)
 
 builtins.__import__ = blocked_import
-import examples.run_jcm_with_era5data as example
+from vercor.setups.gallery import run_jcm_with_era5data as example
 assert callable(example.build_coupler)
 """
     environment = os.environ.copy()
-    environment["PYTHONPATH"] = str(EXAMPLES_DIRECTORY.parent)
+    environment["PYTHONPATH"] = str(GALLERY_DIRECTORY.parents[2])
 
     subprocess.run(
         [sys.executable, "-c", script],
-        cwd=EXAMPLES_DIRECTORY.parent,
+        cwd=GALLERY_DIRECTORY.parents[2],
         env=environment,
         check=True,
         capture_output=True,
@@ -63,7 +66,7 @@ assert callable(example.build_coupler)
 def test_build_coupler_uses_injected_ocean_inputs_and_clock(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    example = importlib.import_module("examples.run_jcm_with_era5data")
+    example = importlib.import_module(GALLERY_MODULE)
     ocean = SimpleNamespace(name="OCN", grid=object())
     jcm_inputs = JCMInputs(coords=object(), terrain=object(), forcing=object())
     clock = Clock(
@@ -116,7 +119,7 @@ def test_build_coupler_uses_injected_ocean_inputs_and_clock(
 def test_build_coupler_default_workflow_keeps_historic_clock(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    example = importlib.import_module("examples.run_jcm_with_era5data")
+    example = importlib.import_module(GALLERY_MODULE)
     ocean = SimpleNamespace(name="OCN", grid=object())
     setup = SimpleNamespace(
         land=SimpleNamespace(name="LND"),
@@ -172,7 +175,7 @@ def test_cli_modes_use_requested_step_count_and_state_path(
     expected_steps: int,
     expected_events: tuple[str, ...],
 ) -> None:
-    example = importlib.import_module("examples.run_jcm_with_era5data")
+    example = importlib.import_module(GALLERY_MODULE)
     coupler = _RecordingRunCoupler()
     clocks: list[Clock] = []
 
@@ -196,7 +199,7 @@ def test_cli_modes_use_requested_step_count_and_state_path(
 def test_examples_do_not_discard_initial_state_results() -> None:
     discarded: list[str] = []
 
-    for path in sorted(EXAMPLES_DIRECTORY.glob("*.py")):
+    for path in sorted(GALLERY_DIRECTORY.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
