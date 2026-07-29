@@ -64,6 +64,7 @@ PUBLIC_MODULE_EXPORTS = {
         "year_type_for_calendar",
     ),
     "vercor.clock": ("Clock",),
+    "vercor.cli": ("cli",),
     "vercor.components": (
         "CallableComponent",
         "Component",
@@ -326,6 +327,14 @@ def test_public_module_namespaces_do_not_leak_non_exported_vercor_objects() -> N
         for name, value in vars(module).items():
             if name.startswith("_") or name in exports:
                 continue
+            if (
+                module_name == "vercor.setups"
+                and name == "gallery"
+                and getattr(value, "__name__", None) == "vercor.setups.gallery"
+            ):
+                # The packaged resource child is attached by Python's import
+                # machinery but is deliberately absent from the facade API.
+                continue
             origin = (
                 value.__name__
                 if isinstance(value, ModuleType)
@@ -370,6 +379,14 @@ def test_manifested_symbols_are_absent_from_every_non_owner_public_module() -> N
                 if module_name == owner_name:
                     continue
                 if module_name == "vercor" and symbol in ROOT_EXPORTS:
+                    continue
+                # Importing the direct public module binds ``vercor.cli`` on
+                # the root package.  Its command shares that required name.
+                if (owner_name, symbol, module_name) == (
+                    "vercor.cli",
+                    "cli",
+                    "vercor",
+                ):
                     continue
                 if symbol in vars(module):
                     violations.append(f"{symbol}: {owner_name} -> {module_name}")
@@ -1049,6 +1066,12 @@ for owner_name, exports in module_exports.items():
             if module_name == owner_name:
                 continue
             if module_name == "vercor" and symbol in root_exports:
+                continue
+            if (owner_name, symbol, module_name) == (
+                "vercor.cli",
+                "cli",
+                "vercor",
+            ):
                 continue
             assert symbol not in vars(module), (symbol, owner_name, module_name)
 

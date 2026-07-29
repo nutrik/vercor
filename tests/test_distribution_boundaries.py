@@ -197,6 +197,7 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
 
     coverage = metadata["tool"]["coverage"]
     assert coverage["run"]["branch"] is True
+    assert coverage["run"]["omit"] == ["vercor/setups/gallery/*"]
     assert coverage["report"]["fail_under"] == 90
 
 
