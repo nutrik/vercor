@@ -48,7 +48,7 @@
 - Consumes: the existing runnable scripts and their public VerCOR imports.
 - Produces: importable modules below `vercor.setups.gallery`; no top-level `examples` package.
 
-- [ ] **Step 1: Point the existing behavioral tests at the future gallery**
+- [x] **Step 1: Point the existing behavioral tests at the future gallery**
 
 In `tests/test_jcm_example.py`, replace the old directory and module owner:
 
@@ -81,7 +81,7 @@ Replace every live `Path("examples/<name>.py")` source inspection in
 from vercor.setups.gallery import custom_component_wrapping
 ```
 
-- [ ] **Step 2: Run the focused tests and record the intended RED**
+- [x] **Step 2: Run the focused tests and record the intended RED**
 
 Run:
 
@@ -91,7 +91,7 @@ conda run -n scipy pytest tests/test_jcm_example.py tests/test_example_jax_helpe
 
 Expected: FAIL because `vercor.setups.gallery` does not exist.
 
-- [ ] **Step 3: Move every file with `apply_patch`**
+- [x] **Step 3: Move every file with `apply_patch`**
 
 Use one move hunk per file:
 
@@ -103,7 +103,7 @@ Use one move hunk per file:
 Do not alter setup logic during the move. Confirm `rg --files examples`
 returns no paths and the now-empty directory is absent.
 
-- [ ] **Step 4: Update active quality commands**
+- [x] **Step 4: Update active quality commands**
 
 Change the three workflow commands to:
 
@@ -116,7 +116,7 @@ python -m compileall -q vercor tests
 Update the corresponding literals in
 `test_ci_quality_job_enforces_static_full_and_coverage_gates`.
 
-- [ ] **Step 5: Run the focused gallery and workflow tests**
+- [x] **Step 5: Run the focused gallery and workflow tests**
 
 Run:
 
@@ -126,7 +126,7 @@ conda run -n scipy pytest tests/test_jcm_example.py tests/test_example_jax_helpe
 
 Expected: PASS.
 
-- [ ] **Step 6: Run the required pre-commit fast suite and commit**
+- [x] **Step 6: Run the required pre-commit fast suite and commit**
 
 Run:
 
@@ -153,7 +153,7 @@ directory left.
 - Consumes: `importlib.resources.files("vercor.setups.gallery")` and the current directory.
 - Produces: Click group `cli() -> None` and command `copy_setup(name: str) -> None`.
 
-- [ ] **Step 1: Write the first copy behavior test**
+- [x] **Step 1: Write the first copy behavior test**
 
 Create `tests/test_cli.py`:
 
@@ -183,7 +183,7 @@ def test_copy_setup_by_stem_copies_packaged_bytes() -> None:
 The break this catches is resolving the wrong package resource, destination, or
 copy contents.
 
-- [ ] **Step 2: Run the test and record the intended RED**
+- [x] **Step 2: Run the test and record the intended RED**
 
 Run:
 
@@ -193,7 +193,7 @@ conda run -n scipy pytest tests/test_cli.py::test_copy_setup_by_stem_copies_pack
 
 Expected: FAIL because `vercor.cli` does not exist.
 
-- [ ] **Step 3: Add Click packaging and the minimal copy implementation**
+- [x] **Step 3: Add Click packaging and the minimal copy implementation**
 
 Add to `[project].dependencies`:
 
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     cli()
 ```
 
-- [ ] **Step 4: Run the focused test and confirm GREEN**
+- [x] **Step 4: Run the focused test and confirm GREEN**
 
 Run:
 
@@ -254,7 +254,7 @@ conda run -n scipy pytest tests/test_cli.py::test_copy_setup_by_stem_copies_pack
 
 Expected: PASS.
 
-- [ ] **Step 5: Add and pass the explicit-suffix behavior**
+- [x] **Step 5: Add and pass the explicit-suffix behavior**
 
 Add:
 
@@ -271,7 +271,7 @@ def test_copy_setup_accepts_python_filename() -> None:
 Run the individual test before and after any minimal normalization correction,
 then run all of `tests/test_cli.py`.
 
-- [ ] **Step 6: Run the required pre-commit fast suite and commit**
+- [x] **Step 6: Run the required pre-commit fast suite and commit**
 
 Run:
 
@@ -294,7 +294,7 @@ git commit -m "feat: copy packaged setup from CLI"
 - Consumes: an untrusted setup name.
 - Produces: private `_normalize_setup_name(name: str) -> str`; controlled Click errors; exclusive, cleanup-safe copying.
 
-- [ ] **Step 1: Add the collision regression**
+- [x] **Step 1: Add the collision regression**
 
 ```python
 def test_copy_setup_preserves_existing_destination() -> None:
@@ -313,7 +313,7 @@ def test_copy_setup_preserves_existing_destination() -> None:
 Run it and record RED because raw `FileExistsError` does not produce the
 required Click diagnostic.
 
-- [ ] **Step 2: Add name-validation regressions**
+- [x] **Step 2: Add name-validation regressions**
 
 ```python
 @pytest.mark.parametrize(
@@ -338,7 +338,7 @@ def test_copy_setup_rejects_invalid_or_unknown_name(name: str) -> None:
 Add `import pytest`. Run the parameters and confirm the intended failures are
 input-boundary failures rather than collection errors.
 
-- [ ] **Step 3: Implement strict normalization and controlled copying**
+- [x] **Step 3: Implement strict normalization and controlled copying**
 
 Add:
 
@@ -382,7 +382,7 @@ except OSError as error:
 Unknown resources raise `click.ClickException(f"unknown setup: {name}")` before
 opening either path.
 
-- [ ] **Step 4: Run the CLI tests and confirm GREEN**
+- [x] **Step 4: Run the CLI tests and confirm GREEN**
 
 Run:
 
@@ -392,7 +392,7 @@ conda run -n scipy pytest tests/test_cli.py -q --tb=short
 
 Expected: all copy and validation tests pass.
 
-- [ ] **Step 5: Run the required pre-commit fast suite and commit**
+- [x] **Step 5: Run the required pre-commit fast suite and commit**
 
 Run:
 
@@ -415,7 +415,7 @@ git commit -m "fix: preserve existing setup copies"
 - Consumes: existing readable local `Path` ending in `.py`.
 - Produces: `run(setup_file: Path) -> None`, child execution with `sys.executable`, and exact nonzero status propagation.
 
-- [ ] **Step 1: Write the real execution behavior test**
+- [x] **Step 1: Write the real execution behavior test**
 
 ```python
 def test_run_executes_python_file_with_current_interpreter() -> None:
@@ -436,7 +436,7 @@ def test_run_executes_python_file_with_current_interpreter() -> None:
 
 Add `import sys`. Run it and record RED because `run` is not registered.
 
-- [ ] **Step 2: Implement minimal child-process execution**
+- [x] **Step 2: Implement minimal child-process execution**
 
 Add `import subprocess` and `import sys`, then:
 
@@ -468,7 +468,7 @@ def run(setup_file: Path) -> None:
         raise click.exceptions.Exit(completed.returncode)
 ```
 
-- [ ] **Step 3: Confirm the execution test is GREEN**
+- [x] **Step 3: Confirm the execution test is GREEN**
 
 Run:
 
@@ -476,7 +476,7 @@ Run:
 conda run -n scipy pytest tests/test_cli.py::test_run_executes_python_file_with_current_interpreter -q --tb=short
 ```
 
-- [ ] **Step 4: Add exit and invalid-target tests**
+- [x] **Step 4: Add exit and invalid-target tests**
 
 ```python
 def test_run_propagates_script_exit_status() -> None:
@@ -514,7 +514,7 @@ def test_run_rejects_directory() -> None:
 Run each new behavior first to observe RED if the current boundary does not
 already enforce it, then run the whole CLI file.
 
-- [ ] **Step 5: Verify help exposes only the intended commands**
+- [x] **Step 5: Verify help exposes only the intended commands**
 
 Add:
 
@@ -529,7 +529,7 @@ def test_cli_help_lists_copy_and_run_commands() -> None:
 
 Run `pytest tests/test_cli.py -q --tb=short`.
 
-- [ ] **Step 6: Run the required pre-commit fast suite and commit**
+- [x] **Step 6: Run the required pre-commit fast suite and commit**
 
 Run:
 
@@ -682,7 +682,7 @@ Expected: all commands exit zero.
 - Consumes: the final source tree and all project quality gates.
 - Produces: concise durable verification evidence and a clean committed tree.
 
-- [ ] **Step 1: Run the final fast suite**
+- [x] **Step 1: Run the final fast suite**
 
 Run:
 
@@ -692,7 +692,7 @@ conda run -n scipy pytest tests/ -q --fast --tb=short
 
 Record exact pass/warning counts.
 
-- [ ] **Step 2: Run the final full suite**
+- [x] **Step 2: Run the final full suite**
 
 Run:
 
@@ -702,7 +702,7 @@ conda run -n scipy pytest tests/ -q --tb=short
 
 Record exact pass/warning counts.
 
-- [ ] **Step 3: Run branch coverage**
+- [x] **Step 3: Run branch coverage**
 
 Run:
 
@@ -712,7 +712,7 @@ conda run -n scipy pytest tests/ -q --cov=vercor --cov-branch --cov-report=term-
 
 Record the exact percentage and test counts.
 
-- [ ] **Step 4: Build fresh distributions**
+- [x] **Step 4: Build fresh distributions**
 
 Run:
 
@@ -725,7 +725,7 @@ Confirm the wheel and source distribution contain the gallery and console
 entry-point metadata and the installed probe copies a resource outside the
 checkout.
 
-- [ ] **Step 5: Update the durable progress record**
+- [x] **Step 5: Update the durable progress record**
 
 Add a dated top entry to `PROGRESS.md` summarizing:
 
@@ -737,12 +737,12 @@ Add a dated top entry to `PROGRESS.md` summarizing:
 
 Mark every completed checkbox in this plan.
 
-- [ ] **Step 6: Invoke verification-before-completion and re-run its required evidence**
+- [x] **Step 6: Invoke verification-before-completion and re-run its required evidence**
 
 Use `superpowers:verification-before-completion`. Do not claim success from
 earlier output if any final source or documentation file changed afterward.
 
-- [ ] **Step 7: Stage intentionally, inspect, and commit**
+- [x] **Step 7: Stage intentionally, inspect, and commit**
 
 Run:
 
@@ -759,7 +759,7 @@ git status --short
 
 Expected: the commit succeeds and the working tree is clean.
 
-- [ ] **Step 8: Report the result**
+- [x] **Step 8: Report the result**
 
 Return the committed hashes, command examples, moved gallery location, collision
 policy, verification counts, and any known third-party warnings. Do not push,

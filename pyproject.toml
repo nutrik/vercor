@@ -75,6 +75,7 @@ filterwarnings = [
 [tool.coverage.run]
 branch = true
 source = ["vercor"]
+omit = ["vercor/setups/gallery/*"]
 
 [tool.coverage.report]
 fail_under = 90

@@ -213,10 +213,11 @@ lightweight factory; JCM/Dinosaur, Veros, CREDIT, Torch, TensorFlow, and runtime
 configuration are deferred until invocation. Missing optional dependencies
 produce factory-oriented errors without affecting core import.
 
-`vercor.setups.gallery` owns the packaged runnable setup scripts. The private
-`vercor.cli` module exposes the installed ``vercor`` command, which copies one
-gallery script into the current directory without overwriting an existing file
-and runs only local ``.py`` scripts with the active Python interpreter.
+`vercor.setups.gallery` owns the packaged runnable setup scripts. The public
+`vercor.cli` owner module exposes the installed ``vercor`` command, which
+copies one gallery script into the current directory without overwriting an
+existing file and runs only local ``.py`` scripts with the active Python
+interpreter.
 
 Bundled slab, data, JCM, Veros, and CAMulator factories return the same
 structural components used by external plugins. JAXGCM/Veros spinup is

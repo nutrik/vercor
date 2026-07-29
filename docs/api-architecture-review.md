@@ -94,6 +94,7 @@ signatures from installed artifacts.
   "vercor": ["Clock", "Coupler", "Exchange", "RectilinearGrid", "RunState", "RuntimeOptions"],
   "vercor.assets": ["VERCOR_ASSETS_BASE_URL", "ensure_registered_asset"],
   "vercor.calendar": ["CalendarDate", "DAYS_PER_MONTH_360", "DAYS_PER_MONTH_GREGORIAN_LEAP", "DAYS_PER_MONTH_GREGORIAN_NO_LEAP", "DateTime360", "DateTime365", "ModelDateTime", "YearType", "day_of_year_from_month_day", "is_leap_year", "model_year_seconds", "month_day_from_day_of_year", "year_type_for_calendar"],
+  "vercor.cli": ["cli"],
   "vercor.clock": ["Clock"],
   "vercor.components": ["CallableComponent", "Component", "ComponentSpec", "DataComponent", "LifecycleHooks", "PrefillContext", "PrefillResult", "SetupContext", "SetupResult", "StepContext", "StepResult", "TransferPolicy", "ValidationContext"],
   "vercor.coupler": ["Coupler"],
@@ -220,7 +221,6 @@ vercor.components.contracts
 vercor.components.data
 vercor.components.runtime_execution
 vercor.components.setup_validation
-vercor.cli
 vercor.diagnostics.fields
 vercor.diagnostics.plotting
 vercor.diagnostics.tables
@@ -451,6 +451,7 @@ The stable workflow-facing subset is:
 | `vercor.output` | Providers, frames, variables, cadence/specification, targets, and snapshot contexts. |
 | `vercor.state`, `vercor.physics`, `vercor.grids`, `vercor.types` | Opaque immutable state, traced physical constants, canonical grids, and runtime array typing. |
 | `vercor.setups` | Frozen setup configurations and lazy built-in factories; retained public inventory rather than an additional plugin tier. |
+| `vercor.cli` | Click command group for copying a packaged setup or running a local setup file. |
 
 The built-in path remains a small constructor workflow:
 
