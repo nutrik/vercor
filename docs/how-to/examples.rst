@@ -1,26 +1,29 @@
-Run repository examples
-=======================
+Run packaged setup gallery
+==========================
 
-The ``examples`` package contains longer drivers in addition to the small,
-dependency-light programs in the learning paths. Run a module from the
-repository root, for example:
+VerCOR packages longer runnable setup scripts in ``vercor.setups.gallery`` in
+addition to the small, dependency-light programs in the learning paths. Copy a
+setup into a working directory, then run the copied script:
 
 .. code-block:: console
 
-   python -m examples.run_slab_driver
-   python -m examples.custom_component_wrapping
+   vercor copy-setup run_jcm_with_veros
+   vercor run run_jcm_with_veros.py
+
+``copy-setup`` never overwrites an existing destination. The copied script is
+your local, user-editable setup; modify it before running it again as needed.
 
 The table identifies the extra dependency and input-data expectation for each
-driver. ``None`` means that the example has no model-specific optional package
+setup. ``None`` means that the setup has no model-specific optional package
 or external input requirement, although plotting examples need
 `Matplotlib <https://matplotlib.org>`_.
 
 
-.. list-table:: Repository examples
+.. list-table:: Packaged setup gallery
    :header-rows: 1
    :widths: 29 39 16 16
 
-   * - Module
+   * - Setup
      - Purpose
      - Optional dependency
      - External data

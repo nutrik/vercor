@@ -83,10 +83,10 @@ test -n "${RELEASE_COMMIT:-}"
 test "$(git branch --show-current)" = "$RELEASE_BRANCH"
 test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 test -z "$(git status --porcelain --untracked-files=all)"
-python -m black --check vercor examples tests
+python -m black --check vercor tests
 python -m flake8 . --count --max-line-length=120 --statistics
-python -m mypy vercor examples tests
-python -m compileall -q vercor examples tests
+python -m mypy vercor tests
+python -m compileall -q vercor tests
 python -m pytest tests/ -q --fast --tb=short
 python -m pytest tests/ -q --tb=short
 python -m pytest tests/ -q --cov=vercor --cov-branch --cov-report=term-missing --cov-fail-under=90

@@ -3,6 +3,13 @@
 All notable changes to VerCOR are recorded here. The project follows semantic
 versioning; pre-releases may still refine new contracts.
 
+## [Unreleased]
+
+### Added
+
+- Packaged the runnable setup gallery and added the installed ``vercor`` CLI
+  for safely copying and running local setup scripts.
+
 ## [0.4.3] - 2026-07-25
 
 ### Fixed
