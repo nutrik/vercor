@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import configparser
 import inspect
 import json
 import os
@@ -1248,6 +1249,18 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     distributions = built_distributions
+    gallery_names = {
+        "vercor/setups/gallery/custom_component_wrapping.py",
+        "vercor/setups/gallery/profile_runtime.py",
+        "vercor/setups/gallery/run_camulator_with_veros.py",
+        "vercor/setups/gallery/run_data_driver.py",
+        "vercor/setups/gallery/run_jcm_with_era5data.py",
+        "vercor/setups/gallery/run_jcm_with_slab.py",
+        "vercor/setups/gallery/run_jcm_with_veros.py",
+        "vercor/setups/gallery/run_jcm_with_verosdata.py",
+        "vercor/setups/gallery/run_slab_driver.py",
+        "vercor/setups/gallery/run_veros_with_era5data.py",
+    }
 
     assert distributions.wheel.name == EXPECTED_WHEEL_NAME
     assert distributions.sdist.name == EXPECTED_SDIST_NAME
@@ -1261,7 +1274,15 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
             name for name in wheel_names if name.endswith(".dist-info/METADATA")
         )
         metadata = wheel.read(metadata_name).decode("utf-8")
+        entry_points_name = next(
+            name for name in wheel_names if name.endswith(".dist-info/entry_points.txt")
+        )
+        entry_points = wheel.read(entry_points_name).decode("utf-8")
     assert "vercor/py.typed" in wheel_names
+    assert gallery_names.issubset(wheel_names)
+    entry_points_config = configparser.ConfigParser()
+    entry_points_config.read_string(entry_points)
+    assert entry_points_config["console_scripts"]["vercor"] == "vercor.cli:cli"
     assert _forbidden_archive_members(wheel_names) == ()
     assert f"Version: {EXPECTED_VERSION}" in metadata
     pytest_requirements = [
@@ -1287,6 +1308,9 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     with tarfile.open(distributions.sdist, "r:gz") as sdist:
         sdist_names = set(sdist.getnames())
     assert f"vercor-{EXPECTED_VERSION}/vercor/py.typed" in sdist_names
+    assert {
+        f"vercor-{EXPECTED_VERSION}/{gallery_name}" for gallery_name in gallery_names
+    }.issubset(sdist_names)
     assert _forbidden_archive_members(sdist_names) == ()
 
     target = tmp_path / "installed-target"
@@ -1297,6 +1321,22 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     )
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(target)
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vercor.cli",
+            "copy-setup",
+            "custom_component_wrapping",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert (tmp_path / "custom_component_wrapping.py").is_file()
+    assert "custom_component_wrapping.py" in probe.stdout
     probe_source = f"""
 import importlib
 import importlib.metadata

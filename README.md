@@ -99,6 +99,16 @@ assert sea_surface_temperature.shape == grid.shape
 assert bool(jnp.all(jnp.isfinite(sea_surface_temperature)))
 ```
 
+## Setup gallery
+
+VerCOR packages runnable setup scripts with the installed distribution. Copy a
+setup into your working directory, then run the user-editable copy:
+
+```console
+vercor copy-setup run_jcm_with_veros
+vercor run run_jcm_with_veros.py
+```
+
 ## Documentation
 
 Read the canonical documentation at
@@ -112,6 +122,5 @@ Read the canonical documentation at
 
 Repository resources:
 
-- [Examples](examples)
 - [Changelog](CHANGELOG.md)
 - [License](LICENSE)

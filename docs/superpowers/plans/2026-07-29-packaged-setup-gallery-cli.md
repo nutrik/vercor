@@ -560,7 +560,7 @@ git commit -m "feat: run local setup files from CLI"
 - Consumes: Flit metadata and the built wheel/source distribution.
 - Produces: installed `vercor` console entry point, packaged gallery resources, and current user/developer instructions.
 
-- [ ] **Step 1: Extend the built-artifact regression and record RED**
+- [x] **Step 1: Extend the built-artifact regression and record RED**
 
 In `test_built_distributions_run_external_extension_fixture_outside_checkout`,
 define the ten public script names as literal expected inventory and assert:
@@ -590,7 +590,7 @@ Assert the corresponding version-prefixed paths are in `sdist_names`. Run the
 test before rebuilding and record the intended failure against the old cached
 or pre-change artifact state.
 
-- [ ] **Step 2: Add an installed-resource copy probe**
+- [x] **Step 2: Add an installed-resource copy probe**
 
 After `install_local_target(...)`, run a child interpreter outside the checkout
 with `PYTHONPATH=target`:
@@ -616,7 +616,7 @@ assert "custom_component_wrapping.py" in probe.stdout
 
 This checks the installed package resource without importing from the checkout.
 
-- [ ] **Step 3: Update user documentation**
+- [x] **Step 3: Update user documentation**
 
 In `README.md`, replace the `Examples` repository link with a short Setup
 gallery section showing:
@@ -631,7 +631,7 @@ is non-overwriting, and the copied script is user-editable. Keep the dependency
 table, rename its first column from module to setup, and use the same two CLI
 commands as the canonical workflow.
 
-- [ ] **Step 4: Update active development and architecture records**
+- [x] **Step 4: Update active development and architecture records**
 
 Replace active `examples` validation paths in `docs/releasing.md` with
 `vercor tests`. Make the same source-path correction in `AGENTS.md`. Update:
@@ -645,7 +645,7 @@ Replace active `examples` validation paths in `docs/releasing.md` with
 
 Do not rewrite archived progress or historical specifications.
 
-- [ ] **Step 5: Run focused documentation, architecture, CLI, and artifact tests**
+- [x] **Step 5: Run focused documentation, architecture, CLI, and artifact tests**
 
 Run:
 
@@ -656,7 +656,7 @@ conda run -n scipy pytest tests/test_cli.py tests/test_jcm_example.py tests/test
 Expected: PASS, including a fresh distribution build and installed-resource
 probe.
 
-- [ ] **Step 6: Run static checks**
+- [x] **Step 6: Run static checks**
 
 Run:
 

@@ -26,10 +26,10 @@ conda activate scipy
 
 # Run linters and formatters during development
 flake8 . --count --exit-zero --max-line-length=120 --statistics
-black vercor examples tests
+black vercor tests
 
 # Do static type checking during development
-mypy vercor examples tests
+mypy vercor tests
 
 # Run Python tests
 pytest tests/ -v -n4 --dist=loadscope --max-worker-restart=0 --durations=25 --tb=short
