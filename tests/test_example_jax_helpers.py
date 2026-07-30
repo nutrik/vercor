@@ -36,6 +36,62 @@ def test_custom_component_example_runs_behaviorally() -> None:
     assert callable(custom_component_wrapping.run_setup)
 
 
+@pytest.mark.fast_always
+def test_custom_component_run_setup_maps_cli_options_without_running_models(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    grid = object()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(custom_component_wrapping, "make_example_grid", lambda: grid)
+    monkeypatch.setattr(
+        custom_component_wrapping,
+        "make_data_forcing",
+        lambda actual_grid: ("forcing", actual_grid),
+    )
+    monkeypatch.setattr(
+        custom_component_wrapping,
+        "make_differentiable_model",
+        lambda actual_grid: ("model", actual_grid),
+    )
+    monkeypatch.setattr(
+        custom_component_wrapping,
+        "make_host_model",
+        lambda actual_grid: ("host", actual_grid),
+    )
+
+    def fake_make_custom_coupler(
+        actual_grid: object,
+        *,
+        log_level: int | str,
+        dtype: DTypePolicy,
+    ) -> str:
+        captured.update(
+            grid=actual_grid,
+            log_level=log_level,
+            dtype=dtype,
+        )
+        return "coupler"
+
+    monkeypatch.setattr(
+        custom_component_wrapping,
+        "make_custom_coupler",
+        fake_make_custom_coupler,
+    )
+
+    result = custom_component_wrapping.run_setup(
+        loglevel="error",
+        float_type="float32",
+    )
+
+    assert result is None
+    assert captured == {
+        "grid": grid,
+        "log_level": "error",
+        "dtype": DTypePolicy(enable_x64=False),
+    }
+
+
 def test_runtime_array_to_host_is_canonical_host_transfer() -> None:
     host_array = runtime_array_to_host(jnp.asarray([[1.0, 2.0], [3.0, 4.0]]))
 
