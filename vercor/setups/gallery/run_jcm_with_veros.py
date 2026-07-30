@@ -6,6 +6,7 @@ from vercor import (
     Exchange,
     RuntimeOptions,
 )
+from vercor.dtypes import DTypePolicy
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.setups import (
     JAXGCMConfig,
@@ -43,7 +44,10 @@ def _default_jcm_parameter_values(
     return output
 
 
-if __name__ == "__main__":
+def run_setup(*, loglevel: str, float_type: str) -> None:
+    """Run this setup through the shared VerCOR CLI contract."""
+
+    dtype = DTypePolicy(enable_x64=float_type == "float64")
     optimized_parameters: list = [
         "surface_flux.vgust",
         "convection.rhbl",
@@ -142,7 +146,12 @@ if __name__ == "__main__":
         components=components,
         exchanges=exchanges,
         run_order=run_order,
-        runtime=RuntimeOptions(topology=SurfaceMaskPolicy()),
+        runtime=RuntimeOptions(dtype=dtype, topology=SurfaceMaskPolicy()),
+        log_level=loglevel,
     )
 
     cpl.run(output=OutputTarget("."))
+
+
+if __name__ == "__main__":
+    run_setup(loglevel="info", float_type="float64")

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+import importlib
 from importlib import metadata
 from importlib import resources
+import inspect
 import os
 from pathlib import Path
 import sys
@@ -11,6 +13,39 @@ from click.testing import CliRunner
 import pytest
 
 from vercor.cli import cli
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    (
+        "custom_component_wrapping",
+        "profile_runtime",
+        "run_camulator_with_veros",
+        "run_data_driver",
+        "run_jcm_with_era5data",
+        "run_jcm_with_slab",
+        "run_jcm_with_veros",
+        "run_jcm_with_verosdata",
+        "run_slab_driver",
+        "run_veros_with_era5data",
+    ),
+)
+def test_every_bundled_setup_exposes_keyword_only_run_contract(
+    module_name: str,
+) -> None:
+    module = importlib.import_module(f"vercor.setups.gallery.{module_name}")
+
+    run_setup = module.run_setup
+    parameters = tuple(inspect.signature(run_setup).parameters.values())
+
+    assert callable(run_setup)
+    assert tuple(parameter.name for parameter in parameters) == (
+        "loglevel",
+        "float_type",
+    )
+    assert all(
+        parameter.kind is inspect.Parameter.KEYWORD_ONLY for parameter in parameters
+    )
 
 
 @pytest.fixture(autouse=True)
