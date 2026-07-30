@@ -15,6 +15,8 @@ def normalize_log_level(level: int | str) -> int:
     """Return a standard ``logging`` integer level from a string or integer."""
 
     if isinstance(level, str):
+        if level.casefold() == "trace":
+            return 5
         normalized = logging.getLevelName(level.upper())
         if not isinstance(normalized, int):
             raise ValueError(f"Unknown logging level: {level}")

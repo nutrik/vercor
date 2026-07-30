@@ -14,6 +14,7 @@ from vercor import (
     RuntimeOptions,
 )
 from vercor.components import DataComponent
+from vercor.dtypes import DTypePolicy
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.recipes import (
     ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
@@ -49,6 +50,8 @@ def build_coupler(
     ocean: DataComponent | None = None,
     jcm_inputs: JCMInputs | None = None,
     clock: Clock | None = None,
+    log_level: int | str = "INFO",
+    dtype: DTypePolicy | None = None,
 ) -> Coupler:
     """Build the example coupler, reusing supplied model/data objects."""
 
@@ -97,8 +100,22 @@ def build_coupler(
             ),
         ),
         run_order=[ocn.name, lnd.name, atm.name],
-        runtime=RuntimeOptions(topology=SurfaceMaskPolicy()),
+        runtime=RuntimeOptions(
+            dtype=DTypePolicy() if dtype is None else dtype,
+            topology=SurfaceMaskPolicy(),
+        ),
+        log_level=log_level,
     )
+
+
+def run_setup(*, loglevel: str, float_type: str) -> None:
+    """Run the setup through the shared VerCOR CLI contract."""
+
+    coupler = build_coupler(
+        log_level=loglevel,
+        dtype=DTypePolicy(enable_x64=float_type == "float64"),
+    )
+    coupler.run(output=OutputTarget("."))
 
 
 def _parse_args(arguments: Sequence[str] | None) -> argparse.Namespace:

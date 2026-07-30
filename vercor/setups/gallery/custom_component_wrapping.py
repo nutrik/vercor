@@ -19,6 +19,7 @@ from vercor.components import (
 from vercor.coupler import Coupler
 from vercor.exchanges import Exchange
 from vercor.grids import RectilinearGrid
+from vercor.dtypes import DTypePolicy, as_jax_real_array
 from vercor.runtime import (
     ExecutionChunk,
     ExecutionContext,
@@ -26,7 +27,6 @@ from vercor.runtime import (
     RuntimeOptions,
 )
 from vercor.state import RunState
-from vercor.dtypes import as_jax_real_array
 
 
 def make_example_grid() -> RectilinearGrid:
@@ -174,7 +174,12 @@ class SequentialBackend:
         return state
 
 
-def make_custom_coupler(grid: RectilinearGrid) -> Coupler:
+def make_custom_coupler(
+    grid: RectilinearGrid,
+    *,
+    log_level: int | str = "INFO",
+    dtype: DTypePolicy | None = None,
+) -> Coupler:
     """Assemble custom-named components without the built-in surface-mask policy."""
 
     source = DataComponent("FORCING", grid, {"custom_flux": 1.0})
@@ -185,16 +190,32 @@ def make_custom_coupler(grid: RectilinearGrid) -> Coupler:
         components=(source, model),
         exchanges=(Exchange("FORCING", "MODEL", ("custom_flux",)),),
         run_order=("FORCING", "MODEL"),
-        runtime=RuntimeOptions(backend=SequentialBackend()),
+        runtime=RuntimeOptions(
+            backend=SequentialBackend(),
+            dtype=DTypePolicy() if dtype is None else dtype,
+        ),
+        log_level=log_level,
+    )
+
+
+def run_setup(*, loglevel: str, float_type: str) -> None:
+    """Run the custom-component demonstration through the CLI contract."""
+
+    grid = make_example_grid()
+    for component in (
+        make_data_forcing(grid),
+        make_differentiable_model(grid),
+        make_host_model(grid),
+    ):
+        print(component)
+    print(
+        make_custom_coupler(
+            grid,
+            log_level=loglevel,
+            dtype=DTypePolicy(enable_x64=float_type == "float64"),
+        )
     )
 
 
 if __name__ == "__main__":
-    example_grid = make_example_grid()
-    for component in (
-        make_data_forcing(example_grid),
-        make_differentiable_model(example_grid),
-        make_host_model(example_grid),
-    ):
-        print(component)
-    print(make_custom_coupler(example_grid))
+    run_setup(loglevel="info", float_type="float64")

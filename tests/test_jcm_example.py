@@ -16,6 +16,7 @@ from typing import Any, cast
 import pytest
 
 from vercor import Clock
+from vercor.dtypes import DTypePolicy
 from vercor.setups import JCMInputs
 
 GALLERY_DIRECTORY = (
@@ -106,6 +107,8 @@ def test_build_coupler_uses_injected_ocean_inputs_and_clock(
         ocean=ocean,
         jcm_inputs=jcm_inputs,
         clock=clock,
+        log_level="warning",
+        dtype=DTypePolicy(enable_x64=True),
     )
 
     assert isinstance(coupler, _FakeCoupler)
@@ -113,6 +116,8 @@ def test_build_coupler_uses_injected_ocean_inputs_and_clock(
     assert coupler.kwargs["components"] == [ocean, setup.land, setup.atmosphere]
     assert setup_calls == [(ocean.grid, jcm_inputs)]
     assert len(coupler.exchanges) == 4
+    assert coupler.kwargs["log_level"] == "warning"
+    assert coupler.kwargs["runtime"].dtype == DTypePolicy(enable_x64=True)
 
 
 @pytest.mark.fast_always
@@ -155,6 +160,28 @@ class _RecordingRunCoupler:
         state = object()
         self.events.append(("run", output))
         return state
+
+
+@pytest.mark.fast_always
+def test_run_setup_maps_cli_values_to_coupler_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    example = importlib.import_module(GALLERY_MODULE)
+    coupler = _RecordingRunCoupler()
+    captured: dict[str, object] = {}
+
+    def fake_build_coupler(**kwargs: object) -> _RecordingRunCoupler:
+        captured.update(kwargs)
+        return coupler
+
+    monkeypatch.setattr(example, "build_coupler", fake_build_coupler)
+
+    result = example.run_setup(loglevel="error", float_type="float32")
+
+    assert result is None
+    assert captured["log_level"] == "error"
+    assert captured["dtype"] == DTypePolicy(enable_x64=False)
+    assert [name for name, _ in coupler.events] == ["run"]
 
 
 @pytest.mark.fast_always

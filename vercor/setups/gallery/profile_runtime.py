@@ -14,7 +14,7 @@ from vercor import (
     Exchange,
     RuntimeOptions,
 )
-from vercor.dtypes import jax_ones
+from vercor.dtypes import DTypePolicy, jax_ones
 from vercor import RectilinearGrid
 from vercor.regridding import bilinear, conservative
 from vercor.setups import (
@@ -84,6 +84,7 @@ def build_slab_coupler(
     grid_nx: int,
     grid_ny: int,
     log_level: int | str,
+    dtype: DTypePolicy | None = None,
 ) -> Coupler:
     """Build and initialize a small pure-JAX slab coupler for profiling."""
 
@@ -166,7 +167,10 @@ def build_slab_coupler(
         ),
         exchanges=exchanges,
         run_order=("OCN", "ATM", "LND", "ICE"),
-        runtime=RuntimeOptions(topology=SurfaceMaskPolicy()),
+        runtime=RuntimeOptions(
+            dtype=DTypePolicy() if dtype is None else dtype,
+            topology=SurfaceMaskPolicy(),
+        ),
         log_level=log_level,
     )
 
@@ -177,6 +181,7 @@ def profile_runtime(
     grid_nx: int,
     grid_ny: int,
     log_level: int | str,
+    dtype: DTypePolicy | None = None,
 ) -> RuntimeProfileResult:
     """Run a small timing profile for the scanned runtime."""
 
@@ -185,6 +190,7 @@ def profile_runtime(
         grid_nx=grid_nx,
         grid_ny=grid_ny,
         log_level=log_level,
+        dtype=dtype,
     )
     runtime_state = coupler.initial_state()
 
@@ -204,6 +210,21 @@ def _format_result(result: RuntimeProfileResult) -> Sequence[str]:
         f"final_state_leaves={result.final_state_leaves}",
     ]
     return lines
+
+
+def run_setup(*, loglevel: str, float_type: str) -> int:
+    """Run the default profile through the shared CLI contract."""
+
+    result = profile_runtime(
+        steps=24,
+        grid_nx=32,
+        grid_ny=16,
+        log_level=loglevel,
+        dtype=DTypePolicy(enable_x64=float_type == "float64"),
+    )
+    for line in _format_result(result):
+        print(line)
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:

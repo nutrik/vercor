@@ -40,6 +40,7 @@ from vercor.jax_logging import (
     DEFAULT_LOGGER_NAME,
     JaxCallbackLogger,
     get_default_logger,
+    normalize_log_level,
     setup_logger,
 )
 from vercor._regridders.bilinear import bilinear
@@ -412,6 +413,17 @@ def test_coupler_accepts_log_level_at_instantiation() -> None:
 
     assert not coupler.logger.isEnabledFor(logging.INFO)
     assert coupler.logger.isEnabledFor(logging.WARNING)
+
+
+def test_normalize_log_level_accepts_trace_as_level_five() -> None:
+    assert normalize_log_level("trace") == 5
+    coupler = Coupler(
+        Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
+        log_level="trace",
+    )
+
+    assert coupler.logger.isEnabledFor(5)
+    assert coupler.logger.isEnabledFor(logging.DEBUG)
 
 
 @pytest.mark.fast_always
