@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -133,3 +134,48 @@ def test_invoke_setup_skips_main_guard_and_supports_adjacent_imports(
 
     assert status == 0
     assert marker.read_text(encoding="utf-8") == "9"
+
+
+def test_invoke_setup_supports_lazy_adjacent_import_and_restores_sys_path(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "lazy_setup_helper.py").write_text("VALUE = 11\n", encoding="utf-8")
+    marker = tmp_path / "lazy-marker.txt"
+    setup = tmp_path / "setup.py"
+    setup.write_text(
+        "from pathlib import Path\n"
+        "def run_setup(*, loglevel, float_type):\n"
+        "    from lazy_setup_helper import VALUE\n"
+        f"    Path({str(marker)!r}).write_text(str(VALUE), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    original_sys_path = list(sys.path)
+
+    status = _setup_runner._invoke_setup(
+        setup,
+        loglevel="info",
+        float_type="float64",
+    )
+
+    assert status == 0
+    assert marker.read_text(encoding="utf-8") == "11"
+    assert sys.path == original_sys_path
+
+
+def test_invoke_setup_restores_sys_path_when_run_setup_raises(tmp_path: Path) -> None:
+    setup = tmp_path / "setup.py"
+    setup.write_text(
+        "def run_setup(*, loglevel, float_type):\n"
+        "    raise RuntimeError('setup failed')\n",
+        encoding="utf-8",
+    )
+    original_sys_path = list(sys.path)
+
+    with pytest.raises(RuntimeError, match="setup failed"):
+        _setup_runner._invoke_setup(
+            setup,
+            loglevel="info",
+            float_type="float64",
+        )
+
+    assert sys.path == original_sys_path

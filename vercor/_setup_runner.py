@@ -36,13 +36,7 @@ def _validate_setup_signature(path: Path, run_setup: Any) -> None:
 
 
 def _load_setup(path: Path) -> dict[str, Any]:
-    setup_directory = str(path.parent)
-    original_sys_path = list(sys.path)
-    sys.path.insert(0, setup_directory)
-    try:
-        return runpy.run_path(str(path), run_name="_vercor_setup")
-    finally:
-        sys.path[:] = original_sys_path
+    return runpy.run_path(str(path), run_name="_vercor_setup")
 
 
 def _invoke_setup(
@@ -51,19 +45,24 @@ def _invoke_setup(
     loglevel: str,
     float_type: str,
 ) -> int:
-    namespace = _load_setup(path)
-    run_setup = namespace.get("run_setup")
-    if not callable(run_setup):
-        raise SetupContractError(
-            f"{path} must define callable run_setup(*, loglevel, float_type)"
-        )
-    _validate_setup_signature(path, run_setup)
-    result = run_setup(loglevel=loglevel, float_type=float_type)
-    if result is None:
-        return 0
-    if isinstance(result, bool) or not isinstance(result, int):
-        raise SetupContractError("run_setup must return int or None")
-    return result
+    original_sys_path = list(sys.path)
+    sys.path.insert(0, str(path.parent))
+    try:
+        namespace = _load_setup(path)
+        run_setup = namespace.get("run_setup")
+        if not callable(run_setup):
+            raise SetupContractError(
+                f"{path} must define callable run_setup(*, loglevel, float_type)"
+            )
+        _validate_setup_signature(path, run_setup)
+        result = run_setup(loglevel=loglevel, float_type=float_type)
+        if result is None:
+            return 0
+        if isinstance(result, bool) or not isinstance(result, int):
+            raise SetupContractError("run_setup must return int or None")
+        return result
+    finally:
+        sys.path[:] = original_sys_path
 
 
 def _parser() -> argparse.ArgumentParser:

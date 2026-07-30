@@ -226,14 +226,20 @@ The setup-gallery command boundary has explicit owners:
 packaged gallery and direct external directories named by an ``os.pathsep``-
 separated ``VERCOR_SETUP_DIR`` list, rejects duplicate template names, and
 creates or reuses a requested ``--to`` directory while exclusively copying a
-single file without overwrite. ``run`` accepts only local ``.py`` files and
-uses the active interpreter to invoke the private child runner. That child
-loads the setup without its main guard and requires exactly
-``run_setup(*, loglevel, float_type)``; ``None`` means success and an integer
-is the process status. CLI choices are lowercase ``trace``, ``debug``,
-``info``, ``warning``, and ``error`` (default ``info``), plus ``float64`` and
-``float32`` (default ``float64``). Gallery templates translate those choices to
-the Coupler log level and ``DTypePolicy``/``RuntimeOptions`` dtype policy.
+single file without overwrite. Copy references resolve against both the public
+stem shown by ``show-setups`` and the canonical ``.py`` filename; a reference
+shared by one template's stem and another's filename is rejected as ambiguous.
+Every failure after exclusive creation removes the partial destination.
+``run`` accepts only local ``.py`` files and uses the active interpreter with
+``-P`` to execute the resolved private runner file from the already imported
+package. That child keeps the setup's parent importable while loading and
+invoking the setup, restores ``sys.path`` afterward, skips the main guard, and
+requires exactly ``run_setup(*, loglevel, float_type)``; ``None`` means success
+and an integer is the process status. CLI choices are lowercase ``trace``,
+``debug``, ``info``, ``warning``, and ``error`` (default ``info``), plus
+``float64`` and ``float32`` (default ``float64``). Gallery templates translate
+those choices to the Coupler log level and ``DTypePolicy``/``RuntimeOptions``
+dtype policy.
 
 Bundled slab, data, JCM, Veros, and CAMulator factories return the same
 structural components used by external plugins. JAXGCM/Veros spinup is

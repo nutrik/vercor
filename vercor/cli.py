@@ -97,10 +97,10 @@ def _discover_setups() -> tuple[_SetupTemplate, ...]:
     return tuple(sorted(candidates, key=lambda item: item.stem))
 
 
-@click.group(name="vercor")
+@click.group(name="vercor", help="Vercor command-line tools")
 @click.version_option(package_name="vercor")
 def cli() -> None:
-    """Vercor command-line tools."""
+    """Provide Vercor command-line tools."""
 
 
 @cli.command("show-setups")
@@ -111,15 +111,27 @@ def show_setups() -> None:
         click.echo(setup.stem)
 
 
-def _normalize_setup_name(name: str) -> str:
-    """Validate a direct setup name and return its Python filename."""
+def _validate_setup_reference(name: str) -> None:
+    """Reject path-like, private, and empty setup references."""
 
-    if not name or name != name.strip() or "/" in name or "\\" in name:
+    if (
+        not name
+        or name != name.strip()
+        or "/" in name
+        or "\\" in name
+        or name in (".", "..")
+    ):
         raise click.BadParameter("must be a direct setup name", param_hint="SETUP")
     if name == ".py":
         raise click.BadParameter("must name a Python setup", param_hint="SETUP")
     if name.startswith("_"):
         raise click.BadParameter("must name a public setup", param_hint="SETUP")
+
+
+def _normalize_setup_name(name: str) -> str:
+    """Validate an uncataloged setup name and return its Python filename."""
+
+    _validate_setup_reference(name)
     suffix = Path(name).suffix
     if suffix not in ("", ".py"):
         raise click.BadParameter("must name a Python setup", param_hint="SETUP")
@@ -162,12 +174,19 @@ class _CopySetupCommand(click.Command):
 def _copy_setup(setup: str, destination: Path) -> None:
     """Copy a standard setup to another directory."""
 
-    filename = _normalize_setup_name(setup)
-    catalog = {item.filename: item for item in _discover_setups()}
-    try:
-        template = catalog[filename]
-    except KeyError as error:
-        raise click.ClickException(f"unknown setup: {setup}") from error
+    _validate_setup_reference(setup)
+    catalog: dict[str, list[_SetupTemplate]] = {}
+    for item in _discover_setups():
+        for reference in (item.stem, item.filename):
+            catalog.setdefault(reference, []).append(item)
+    matches = catalog.get(setup, [])
+    if not matches:
+        _normalize_setup_name(setup)
+        raise click.ClickException(f"unknown setup: {setup}")
+    if len(matches) > 1:
+        details = ", ".join(item.origin for item in matches)
+        raise click.ClickException(f"ambiguous setup reference: {setup}: {details}")
+    template = matches[0]
 
     try:
         destination.mkdir(parents=True, exist_ok=True)
@@ -181,15 +200,18 @@ def _copy_setup(setup: str, destination: Path) -> None:
     target = destination / template.filename
     created = False
     try:
-        with template.source.open("rb") as source_stream:
-            with target.open("xb") as target_stream:
-                created = True
-                shutil.copyfileobj(source_stream, target_stream)
+        try:
+            with template.source.open("rb") as source_stream:
+                with target.open("xb") as target_stream:
+                    created = True
+                    shutil.copyfileobj(source_stream, target_stream)
+        except BaseException:
+            if created:
+                target.unlink(missing_ok=True)
+            raise
     except FileExistsError as error:
         raise click.ClickException(f"{target} already exists") from error
     except OSError as error:
-        if created:
-            target.unlink(missing_ok=True)
         raise click.ClickException(
             f"could not copy {template.filename}: {error}"
         ) from error
@@ -228,13 +250,13 @@ def run(setup_file: Path, loglevel: str, float_type: str) -> None:
     completed = subprocess.run(
         [
             sys.executable,
-            "-m",
-            "vercor._setup_runner",
+            "-P",
+            str(Path(__file__).with_name("_setup_runner.py").resolve()),
             str(setup_file.resolve()),
             "--loglevel",
-            loglevel.lower(),
+            loglevel,
             "--float-type",
-            float_type.lower(),
+            float_type,
         ],
         check=False,
     )

@@ -59,12 +59,15 @@ CAMulator additionally requires NCAR's
 [MILES-CREDIT](https://github.com/NCAR/miles-credit). A compatible CREDIT
 release has not yet been confirmed or pinned.
 
-Version `0.4.3` is the current release. Upgrade an older installation before
-following the current documentation:
+Version `0.4.3` is the current release. Upgrade an older installation for the
+published stable API:
 
 ```bash
 python -m pip install --upgrade "vercor==0.4.3"
 ```
+
+Features explicitly marked development-only require a current source checkout
+and are not part of `0.4.3`.
 
 ## Quick start
 
@@ -101,9 +104,14 @@ assert bool(jnp.all(jnp.isfinite(sea_surface_temperature)))
 
 ## Setup gallery
 
-VerCOR packages runnable setup scripts with the installed distribution. List
-the available templates, copy one into a user-editable directory, then run that
-local copy:
+> **Development-only:** The setup-gallery CLI is currently unreleased and is
+> not included in the PyPI `0.4.3` distribution. The commands below apply to a
+> current development-source installation until a later release publishes
+> them.
+
+The development version packages runnable setup scripts with its distribution.
+List the available templates, copy one into a user-editable directory, then run
+that local copy:
 
 ```console
 vercor show-setups

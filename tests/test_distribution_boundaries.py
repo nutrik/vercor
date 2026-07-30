@@ -1325,51 +1325,126 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     )
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(target)
-    installed_python = Path(sys.executable)
-    probe = subprocess.run(
+    console_venv = tmp_path / "installed-console-venv"
+    subprocess.run(
         [
             sys.executable,
             "-m",
-            "vercor.cli",
-            "copy-setup",
-            "custom_component_wrapping",
+            "venv",
+            "--system-site-packages",
+            str(console_venv),
         ],
         cwd=tmp_path,
-        env=environment,
         check=True,
         capture_output=True,
         text=True,
     )
-    assert (tmp_path / "custom_component_wrapping.py").is_file()
-    assert "custom_component_wrapping.py" in probe.stdout
+    scripts_directory = console_venv / ("Scripts" if os.name == "nt" else "bin")
+    venv_python = scripts_directory / ("python.exe" if os.name == "nt" else "python")
+    installed_console = scripts_directory / (
+        "vercor.exe" if os.name == "nt" else "vercor"
+    )
+    console_environment = os.environ.copy()
+    console_environment.pop("PYTHONPATH", None)
+    subprocess.run(
+        [
+            str(venv_python),
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-deps",
+            "--only-binary=:all:",
+            str(distributions.wheel),
+        ],
+        cwd=tmp_path,
+        env=console_environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
-    copied_setup = tmp_path / "external_setup.py"
-    setup_evidence = tmp_path / "external_setup_evidence.txt"
+    console_workflow = tmp_path / "installed-console-workflow"
+    console_workflow.mkdir()
+    version_probe = subprocess.run(
+        [str(installed_console), "--version"],
+        cwd=console_workflow,
+        env=console_environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert version_probe.stdout.strip() == f"vercor, version {EXPECTED_VERSION}"
+    listing_probe = subprocess.run(
+        [str(installed_console), "show-setups"],
+        cwd=console_workflow,
+        env=console_environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "custom_component_wrapping" in listing_probe.stdout.splitlines()
+    copy_target = console_workflow / "copied"
+    copy_probe = subprocess.run(
+        [
+            str(installed_console),
+            "copy-setup",
+            "custom_component_wrapping",
+            "--to",
+            str(copy_target),
+        ],
+        cwd=console_workflow,
+        env=console_environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert (copy_target / "custom_component_wrapping.py").is_file()
+    assert "custom_component_wrapping.py" in copy_probe.stdout
+
+    local_package = console_workflow / "vercor"
+    local_package.mkdir()
+    (local_package / "__init__.py").write_text("", encoding="utf-8")
+    shadow_evidence = console_workflow / "shadow-runner.txt"
+    (local_package / "_setup_runner.py").write_text(
+        "from pathlib import Path\n"
+        f"Path({str(shadow_evidence)!r}).write_text('shadowed', encoding='utf-8')\n"
+        "raise SystemExit(23)\n",
+        encoding="utf-8",
+    )
+    copied_setup = console_workflow / "external_setup.py"
+    (console_workflow / "external_setup_helper.py").write_text(
+        "VALUE = 'lazy-import'\n",
+        encoding="utf-8",
+    )
+    setup_evidence = console_workflow / "external_setup_evidence.txt"
     copied_setup.write_text(
         "from pathlib import Path\n"
         "def run_setup(*, loglevel, float_type):\n"
+        "    from external_setup_helper import VALUE\n"
         f"    Path({str(setup_evidence)!r}).write_text(\n"
-        "        f'{loglevel},{float_type}', encoding='utf-8')\n",
+        "        f'{VALUE},{loglevel},{float_type}', encoding='utf-8')\n",
         encoding="utf-8",
     )
-    subprocess.run(
+    run_probe = subprocess.run(
         [
-            str(installed_python),
-            "-m",
-            "vercor._setup_runner",
+            str(installed_console),
+            "run",
             str(copied_setup),
             "--loglevel",
-            "info",
+            "debug",
             "--float-type",
-            "float64",
+            "float32",
         ],
-        cwd=tmp_path,
-        env=environment,
-        check=True,
+        cwd=console_workflow,
+        env=console_environment,
+        check=False,
         capture_output=True,
         text=True,
     )
-    assert setup_evidence.read_text(encoding="utf-8") == "info,float64"
+    assert run_probe.returncode == 0, run_probe.stderr
+    assert setup_evidence.read_text(encoding="utf-8") == "lazy-import,debug,float32"
+    assert not shadow_evidence.exists()
     probe_source = f"""
 import importlib
 import importlib.metadata
