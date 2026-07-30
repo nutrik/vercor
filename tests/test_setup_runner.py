@@ -8,6 +8,44 @@ import pytest
 from vercor import _setup_runner
 
 
+def test_main_returns_setup_status_with_selected_runtime_options(
+    tmp_path: Path,
+) -> None:
+    setup = tmp_path / "setup.py"
+    setup.write_text(
+        "def run_setup(*, loglevel, float_type):\n"
+        "    assert loglevel == 'debug'\n"
+        "    assert float_type == 'float32'\n"
+        "    return 7\n",
+        encoding="utf-8",
+    )
+
+    status = _setup_runner.main(
+        [str(setup), "--loglevel", "debug", "--float-type", "float32"]
+    )
+
+    assert status == 7
+
+
+def test_main_reports_setup_contract_error_as_usage_exit(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    setup = tmp_path / "setup.py"
+    setup.write_text("VALUE = 1\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as error:
+        _setup_runner.main(
+            [str(setup), "--loglevel", "info", "--float-type", "float64"]
+        )
+
+    expected_error = (
+        f"Error: {setup} must define callable run_setup(*, loglevel, float_type)\n"
+    )
+    assert error.value.code == 2
+    assert capsys.readouterr().err == expected_error
+
+
 def test_invoke_setup_passes_keyword_options_and_none_means_success(
     tmp_path: Path,
 ) -> None:
