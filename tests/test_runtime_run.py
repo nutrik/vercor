@@ -867,6 +867,32 @@ def test_runtime_profile_builder_accepts_explicit_dtype_policy() -> None:
     assert coupler.runtime.dtype == DTypePolicy(enable_x64=False)
 
 
+@pytest.mark.fast_always
+def test_runtime_profile_run_setup_maps_cli_options_and_returns_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_runtime = importlib.import_module("vercor.setups.gallery.profile_runtime")
+    captured: dict[str, object] = {}
+
+    def fake_profile_runtime(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(profile_runtime, "profile_runtime", fake_profile_runtime)
+    monkeypatch.setattr(profile_runtime, "_format_result", lambda result: ("ok",))
+
+    result = profile_runtime.run_setup(loglevel="trace", float_type="float64")
+
+    assert result == 0
+    assert captured == {
+        "steps": 24,
+        "grid_nx": 32,
+        "grid_ny": 16,
+        "log_level": "trace",
+        "dtype": DTypePolicy(enable_x64=True),
+    }
+
+
 def test_runtime_profile_harness_runs_small_slab_profile() -> None:
     profile_runtime = importlib.import_module("vercor.setups.gallery.profile_runtime")
 
