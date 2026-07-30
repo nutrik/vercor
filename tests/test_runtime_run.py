@@ -26,6 +26,7 @@ from vercor.setups._slab.land import make_slab_land
 from vercor.setups._slab.ocean import make_slab_ocean
 from vercor.setups._slab.seaice import make_slab_seaice
 from vercor.coupler import Coupler
+from vercor.dtypes import DTypePolicy
 from vercor.exchanges import Exchange
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.runtime import RuntimeOptions
@@ -843,11 +844,27 @@ def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
     profile_runtime = importlib.import_module("vercor.setups.gallery.profile_runtime")
 
     assert callable(profile_runtime.main)
+    assert callable(profile_runtime.run_setup)
     parser = profile_runtime.build_parser()
     args = parser.parse_args(["--steps", "3", "--log-level", "WARNING"])
     assert args.steps == 3
     assert args.log_level == "WARNING"
     assert not hasattr(args, "donate_state")
+
+
+def test_runtime_profile_builder_accepts_explicit_dtype_policy() -> None:
+    profile_runtime = importlib.import_module("vercor.setups.gallery.profile_runtime")
+
+    coupler = profile_runtime.build_slab_coupler(
+        steps=1,
+        grid_nx=2,
+        grid_ny=2,
+        log_level="warning",
+        dtype=DTypePolicy(enable_x64=False),
+    )
+
+    assert coupler.log_level == "warning"
+    assert coupler.runtime.dtype == DTypePolicy(enable_x64=False)
 
 
 def test_runtime_profile_harness_runs_small_slab_profile() -> None:

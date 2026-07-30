@@ -9,6 +9,7 @@ import pytest
 from vercor.setups.gallery import custom_component_wrapping
 import vercor._host_arrays as host_arrays_module
 from vercor.diagnostics import component_vector_speed
+from vercor.dtypes import DTypePolicy
 from vercor.grids import RectilinearGrid
 from vercor._host_arrays import transposed_host_array
 from tests.assertions import assert_allclose_compact
@@ -18,7 +19,11 @@ from vercor.state import ComponentState
 
 def test_custom_component_example_runs_behaviorally() -> None:
     grid = custom_component_wrapping.make_example_grid()
-    coupler = custom_component_wrapping.make_custom_coupler(grid)
+    coupler = custom_component_wrapping.make_custom_coupler(
+        grid,
+        log_level="warning",
+        dtype=DTypePolicy(enable_x64=False),
+    )
 
     final_state = coupler.run()
 
@@ -26,6 +31,9 @@ def test_custom_component_example_runs_behaviorally() -> None:
         final_state.component("MODEL").field("custom_flux"),
         jnp.full(grid.shape, 3.0),
     )
+    assert coupler.log_level == "warning"
+    assert coupler.runtime.dtype == DTypePolicy(enable_x64=False)
+    assert callable(custom_component_wrapping.run_setup)
 
 
 def test_runtime_array_to_host_is_canonical_host_transfer() -> None:
