@@ -109,20 +109,20 @@ def show_setups() -> None:
 
 
 def _normalize_setup_name(name: str) -> str:
-    """Validate a direct packaged setup name and return its Python filename."""
+    """Validate a direct setup name and return its Python filename."""
 
     if not name or name != name.strip() or "/" in name or "\\" in name:
-        raise click.BadParameter("must be a direct setup name", param_hint="NAME")
+        raise click.BadParameter("must be a direct setup name", param_hint="SETUP")
     if name == ".py":
-        raise click.BadParameter("must name a Python setup", param_hint="NAME")
+        raise click.BadParameter("must name a Python setup", param_hint="SETUP")
     if name.startswith("_"):
-        raise click.BadParameter("must name a public setup", param_hint="NAME")
+        raise click.BadParameter("must name a public setup", param_hint="SETUP")
     suffix = Path(name).suffix
     if suffix not in ("", ".py"):
-        raise click.BadParameter("must name a Python setup", param_hint="NAME")
+        raise click.BadParameter("must name a Python setup", param_hint="SETUP")
     filename = name if suffix else f"{name}.py"
     if filename in (".py", "__init__.py"):
-        raise click.BadParameter("must name a Python setup", param_hint="NAME")
+        raise click.BadParameter("must name a Python setup", param_hint="SETUP")
     return filename
 
 
@@ -148,28 +148,49 @@ class _CopySetupCommand(click.Command):
 
 
 @cli.command("copy-setup", cls=_CopySetupCommand)
-@click.argument("name")
-def copy_setup(name: str) -> None:
-    """Copy bundled setup NAME into the current directory."""
+@click.argument("setup")
+@click.option(
+    "--to",
+    "destination",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path("."),
+    help="Target directory (default: current working directory).",
+)
+def copy_setup(setup: str, destination: Path) -> None:
+    """Copy a standard setup to another directory."""
 
-    filename = _normalize_setup_name(name)
-    source = resources.files("vercor.setups.gallery").joinpath(filename)
-    if not source.is_file():
-        raise click.ClickException(f"unknown setup: {name}")
-    destination = Path.cwd() / filename
+    filename = _normalize_setup_name(setup)
+    catalog = {item.filename: item for item in _discover_setups()}
+    try:
+        template = catalog[filename]
+    except KeyError as error:
+        raise click.ClickException(f"unknown setup: {setup}") from error
+
+    try:
+        destination.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise click.ClickException(
+            f"could not create target directory {destination}: {error}"
+        ) from error
+    if not destination.is_dir():
+        raise click.ClickException(f"target path is not a directory: {destination}")
+
+    target = destination / template.filename
     created = False
     try:
-        with source.open("rb") as source_stream:
-            with destination.open("xb") as target_stream:
+        with template.source.open("rb") as source_stream:
+            with target.open("xb") as target_stream:
                 created = True
                 shutil.copyfileobj(source_stream, target_stream)
     except FileExistsError as error:
-        raise click.ClickException(f"{filename} already exists") from error
+        raise click.ClickException(f"{target} already exists") from error
     except OSError as error:
         if created:
-            destination.unlink(missing_ok=True)
-        raise click.ClickException(f"could not copy {filename}: {error}") from error
-    click.echo(f"Copied {filename}")
+            target.unlink(missing_ok=True)
+        raise click.ClickException(
+            f"could not copy {template.filename}: {error}"
+        ) from error
+    click.echo(f"Copied {template.filename} to {target}")
 
 
 @cli.command("run")
