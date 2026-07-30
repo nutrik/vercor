@@ -13,13 +13,26 @@ import pytest
 from vercor.cli import cli
 
 
+@pytest.fixture(autouse=True)
+def _use_worktree_package_for_child_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make each real child process import this worktree's private runner."""
+
+    project_root = Path(__file__).parent.parent
+    inherited_path = os.environ.get("PYTHONPATH")
+    paths = (
+        (str(project_root), inherited_path) if inherited_path else (str(project_root),)
+    )
+    monkeypatch.setenv("PYTHONPATH", os.pathsep.join(paths))
+
+
 def test_run_executes_python_file_with_current_interpreter() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("setup.py").write_text(
             "from pathlib import Path\n"
             "import sys\n"
-            "Path('interpreter.txt').write_text(sys.executable, encoding='utf-8')\n",
+            "def run_setup(*, loglevel, float_type):\n"
+            "    Path('interpreter.txt').write_text(sys.executable, encoding='utf-8')\n",
             encoding="utf-8",
         )
 
@@ -34,7 +47,8 @@ def test_run_executes_option_like_local_python_filename() -> None:
     with runner.isolated_filesystem():
         Path("-c.py").write_text(
             "from pathlib import Path\n"
-            "Path('ran.txt').write_text('ran', encoding='utf-8')\n",
+            "def run_setup(*, loglevel, float_type):\n"
+            "    Path('ran.txt').write_text('ran', encoding='utf-8')\n",
             encoding="utf-8",
         )
 
@@ -47,11 +61,116 @@ def test_run_executes_option_like_local_python_filename() -> None:
 def test_run_propagates_script_exit_status() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
-        Path("setup.py").write_text("raise SystemExit(7)\n", encoding="utf-8")
+        Path("setup.py").write_text(
+            "def run_setup(*, loglevel, float_type):\n" "    return 7\n",
+            encoding="utf-8",
+        )
 
         result = runner.invoke(cli, ["run", "setup.py"])
 
         assert result.exit_code == 7
+
+
+def test_run_passes_selected_loglevel_and_float_type() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("setup.py").write_text(
+            "from pathlib import Path\n"
+            "def run_setup(*, loglevel, float_type):\n"
+            "    Path('options.txt').write_text(\n"
+            "        f'{loglevel},{float_type}', encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "run",
+                "--loglevel",
+                "warning",
+                "--float-type",
+                "float32",
+                "setup.py",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert Path("options.txt").read_text(encoding="utf-8") == "warning,float32"
+
+
+def test_run_passes_default_loglevel_and_float_type() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("setup.py").write_text(
+            "from pathlib import Path\n"
+            "def run_setup(*, loglevel, float_type):\n"
+            "    Path('options.txt').write_text(\n"
+            "        f'{loglevel},{float_type}', encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(cli, ["run", "setup.py"])
+
+        assert result.exit_code == 0, result.output
+        assert Path("options.txt").read_text(encoding="utf-8") == "info,float64"
+
+
+@pytest.mark.parametrize("loglevel", ("trace", "debug", "info", "warning", "error"))
+@pytest.mark.parametrize("float_type", ("float64", "float32"))
+def test_run_accepts_every_runtime_option_choice(
+    loglevel: str,
+    float_type: str,
+) -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("setup.py").write_text(
+            "from pathlib import Path\n"
+            "def run_setup(*, loglevel, float_type):\n"
+            "    Path('options.txt').write_text(\n"
+            "        f'{loglevel},{float_type}', encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "run",
+                "--loglevel",
+                loglevel,
+                "--float-type",
+                float_type,
+                "setup.py",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert Path("options.txt").read_text(encoding="utf-8") == (
+            f"{loglevel},{float_type}"
+        )
+
+
+def test_run_propagates_setup_exception_status() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("setup.py").write_text(
+            "def run_setup(*, loglevel, float_type):\n"
+            "    raise RuntimeError('setup failed')\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(cli, ["run", "setup.py"])
+
+        assert result.exit_code == 1
+
+
+def test_run_help_lists_runtime_options_and_defaults() -> None:
+    result = CliRunner().invoke(cli, ["run", "--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "-v, --loglevel [trace|debug|info|warning|error]" in result.output
+    assert "[default: info]" in result.output
+    assert "--float-type [float64|float32]" in result.output
+    assert "[default: float64]" in result.output
 
 
 @pytest.mark.parametrize("target", ("missing.py", "notes.txt"))

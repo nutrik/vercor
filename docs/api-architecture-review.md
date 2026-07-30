@@ -210,6 +210,7 @@ vercor._runtime.topology
 vercor._runtime.topology_policy
 vercor._runtime.topology_state
 vercor._runtime.validation
+vercor._setup_runner
 vercor.components._adapter
 vercor.components._callable_wrappers
 vercor.components._contracts
