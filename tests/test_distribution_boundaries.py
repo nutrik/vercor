@@ -1346,7 +1346,7 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     )
     console_environment = os.environ.copy()
     console_environment.pop("PYTHONPATH", None)
-    subprocess.run(
+    console_install = subprocess.run(
         [
             str(venv_python),
             "-m",
@@ -1354,6 +1354,7 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
             "install",
             "--disable-pip-version-check",
             "--no-deps",
+            "--force-reinstall",
             "--only-binary=:all:",
             str(distributions.wheel),
         ],
@@ -1362,6 +1363,12 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
         check=True,
         capture_output=True,
         text=True,
+    )
+    assert installed_console.is_file(), (
+        "pip reported a successful wheel installation without creating the "
+        f"venv-local console entry point {installed_console}\n"
+        f"stdout:\n{console_install.stdout}\n"
+        f"stderr:\n{console_install.stderr}"
     )
 
     console_workflow = tmp_path / "installed-console-workflow"
