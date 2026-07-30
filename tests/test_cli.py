@@ -173,6 +173,24 @@ def test_run_help_lists_runtime_options_and_defaults() -> None:
     assert "[default: float64]" in result.output
 
 
+@pytest.mark.parametrize(
+    ("option", "value"),
+    (("--loglevel", "INFO"), ("--float-type", "FLOAT32")),
+)
+def test_run_rejects_uppercase_runtime_option_values(
+    option: str,
+    value: str,
+) -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("setup.py").write_text("", encoding="utf-8")
+
+        result = runner.invoke(cli, ["run", option, value, "setup.py"])
+
+        assert result.exit_code == 2
+        assert "Invalid value" in result.output
+
+
 @pytest.mark.parametrize("target", ("missing.py", "notes.txt"))
 def test_run_rejects_missing_or_non_python_file(target: str) -> None:
     runner = CliRunner()

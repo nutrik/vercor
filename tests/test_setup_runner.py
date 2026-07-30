@@ -67,6 +67,29 @@ def test_invoke_setup_requires_callable_contract(
         )
 
 
+@pytest.mark.parametrize(
+    "source",
+    (
+        "def run_setup(loglevel, float_type):\n" "    return None\n",
+        "def run_setup(*, loglevel, float_type, extra=None):\n" "    return None\n",
+        "def run_setup(**kwargs):\n" "    return None\n",
+    ),
+)
+def test_invoke_setup_requires_exact_keyword_only_signature(
+    source: str,
+    tmp_path: Path,
+) -> None:
+    setup = tmp_path / "setup.py"
+    setup.write_text(source, encoding="utf-8")
+
+    with pytest.raises(_setup_runner.SetupContractError, match="keyword-only"):
+        _setup_runner._invoke_setup(
+            setup,
+            loglevel="info",
+            float_type="float64",
+        )
+
+
 @pytest.mark.parametrize("value", ("True", "'bad'", "object()"))
 def test_invoke_setup_rejects_non_status_return(
     value: str,
