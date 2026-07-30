@@ -2,6 +2,7 @@
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
 
+- JCM/Veros gallery float64 spinup dtype mismatch fixed locally (2026-07-30): JCM setup now normalizes its state and loaded forcing to `RuntimeOptions.dtype` before optional spinup, matching the existing runtime-payload boundary while preserving integer leaves. TDD RED observed float32 forcing at the first spinup call; focused GREEN passed 46/46. The real gallery completed both JCM spinup steps, initialized all components, built topology, and entered coupled step 0 before an intentional SIGINT stopped its 100-year run. Mypy, flake8, whitespace, and the required fast and full suites passed; the known Flax/JAX warnings remain.
 - Packaged setup gallery CLI final-review, installed-wheel CI, and coverage-test fix wave completed locally (2026-07-30): all accepted runtime, copy, catalog, installed-console, help, documentation, plan, and test-fixture findings are implemented.
   - TDD RED isolated the accepted review findings; the wheel-CI regression reproduced inherited same-version pip behavior, and focused runner coverage established the direct-entry gap at 75%.
   - `--force-reinstall` with `--no-deps` now guarantees the wheel is installed into the test venv, and a post-install assertion reports pip stdout/stderr if the console entry point is absent; normal and simulated same-version probes plus all 26 distribution-boundary tests pass.
@@ -171,8 +172,7 @@ This is the bounded orientation log for active development. Detailed history is 
 - Keep output opt-in and optional-model imports lazy.
 - No registry, entry-point discovery, Pydantic, fan-in reducer, public prepared graph, fractional subcycling, or CAMulator dependency pin.
 - Do not tag, push, publish, or create a release without separate authority.
-- The Conda launcher can panic through `conda-rattler`; use the direct `scipy`
-  environment executable when that occurs.
+- The Conda launcher can panic through `conda-rattler`; use the direct `scipy` environment executable when that occurs.
 
 ## Validation Policy
 

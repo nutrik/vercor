@@ -37,7 +37,11 @@ from vercor.setups._time_helpers import (
     run_logged_spinup,
     grid_field_defaults,
 )
-from vercor.setups._external._jax_gcm_pytree import tree_as_real_dtype, tree_mean
+from vercor.setups._external._jax_gcm_pytree import (
+    tree_as_real_dtype,
+    tree_as_runtime_dtype,
+    tree_mean,
+)
 import vercor.setups._external.jax_gcm_fields as _jax_gcm_fields
 import vercor.setups._external.jax_gcm_runtime as _jax_gcm_runtime
 from vercor.setups._external.jax_gcm_tools import change_jcm_parameter_values
@@ -199,6 +203,8 @@ class JAXGCMSetupState:
                 lfluxland=True
             )
 
+        self._state = tree_as_runtime_dtype(self._state, self._dtype_policy)
+        self.forcing = tree_as_runtime_dtype(self.forcing, self._dtype_policy)
         self._step_function = self._generate_step_function(jitted=self.jitted)
 
         initial_fields = grid_field_defaults(
