@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from importlib import resources
+from importlib.resources.abc import Traversable
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -13,9 +16,96 @@ import click
 __all__ = ("cli",)
 
 
-@click.group()
+@dataclass(frozen=True)
+class _SetupTemplate:
+    """Describe one uniquely named copyable setup template."""
+
+    stem: str
+    filename: str
+    source: Traversable
+    origin: str
+
+
+def _public_python_file(name: str) -> bool:
+    return name.endswith(".py") and name != "__init__.py" and not name.startswith("_")
+
+
+def _external_setup_directories() -> tuple[Path, ...]:
+    raw_value = os.environ.get("VERCOR_SETUP_DIR", "")
+    return tuple(
+        Path(value).expanduser() for value in raw_value.split(os.pathsep) if value
+    )
+
+
+def _discover_setups() -> tuple[_SetupTemplate, ...]:
+    candidates: list[_SetupTemplate] = []
+    packaged = resources.files("vercor.setups.gallery")
+    try:
+        packaged_children = tuple(packaged.iterdir())
+    except OSError as error:
+        raise click.ClickException(
+            f"could not read packaged setup gallery: {error}"
+        ) from error
+    for source in packaged_children:
+        if source.is_file() and _public_python_file(source.name):
+            candidates.append(
+                _SetupTemplate(
+                    stem=Path(source.name).stem,
+                    filename=source.name,
+                    source=source,
+                    origin=f"vercor.setups.gallery/{source.name}",
+                )
+            )
+
+    for directory in _external_setup_directories():
+        if not directory.exists():
+            raise click.ClickException(f"setup directory does not exist: {directory}")
+        if not directory.is_dir():
+            raise click.ClickException(f"setup path is not a directory: {directory}")
+        try:
+            children = tuple(directory.iterdir())
+        except OSError as error:
+            raise click.ClickException(
+                f"could not read setup directory {directory}: {error}"
+            ) from error
+        for source in children:
+            if source.is_file() and _public_python_file(source.name):
+                candidates.append(
+                    _SetupTemplate(
+                        stem=source.stem,
+                        filename=source.name,
+                        source=source,
+                        origin=str(source),
+                    )
+                )
+
+    by_stem: dict[str, list[_SetupTemplate]] = {}
+    for candidate in candidates:
+        by_stem.setdefault(candidate.stem, []).append(candidate)
+    duplicates = {
+        stem: templates for stem, templates in by_stem.items() if len(templates) > 1
+    }
+    if duplicates:
+        details = "; ".join(
+            f"{stem}: {', '.join(item.origin for item in templates)}"
+            for stem, templates in sorted(duplicates.items())
+        )
+        raise click.ClickException(f"duplicate setup: {details}")
+    return tuple(sorted(candidates, key=lambda item: item.stem))
+
+
+@click.group(name="vercor")
+@click.version_option(package_name="vercor")
 def cli() -> None:
-    """Copy and run VerCOR setup scripts."""
+    """Vercor command-line tools."""
+
+
+@cli.command("show-setups")
+def show_setups() -> None:
+    """Print a list of available pre-configured setups."""
+
+    for setup in _discover_setups():
+        click.echo(setup.stem)
 
 
 def _normalize_setup_name(name: str) -> str:
@@ -36,7 +126,28 @@ def _normalize_setup_name(name: str) -> str:
     return filename
 
 
-@cli.command("copy-setup")
+class _CopySetupCommand(click.Command):
+    """Render the live setup catalog in copy command help."""
+
+    def format_epilog(
+        self,
+        ctx: click.Context,
+        formatter: click.HelpFormatter,
+    ) -> None:
+        formatter.write_paragraph()
+        formatter.write_heading("Available setups")
+        formatter.write_text("\n".join(item.stem for item in _discover_setups()))
+        formatter.write_paragraph()
+        formatter.write_text(
+            "Example:\n"
+            "    $ vercor copy-setup run_jcm_with_veros --to "
+            "~/vercor-setups/run_jcm_with_veros\n\n"
+            "Further directories containing setup templates can be added "
+            "via the VERCOR_SETUP_DIR environment variable."
+        )
+
+
+@cli.command("copy-setup", cls=_CopySetupCommand)
 @click.argument("name")
 def copy_setup(name: str) -> None:
     """Copy bundled setup NAME into the current directory."""

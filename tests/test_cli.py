@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from importlib import metadata
 from importlib import resources
+import os
 from pathlib import Path
 import sys
 
@@ -73,12 +76,167 @@ def test_run_rejects_directory() -> None:
         assert result.exit_code != 0
 
 
-def test_cli_help_lists_copy_and_run_commands() -> None:
+def test_cli_help_exposes_required_description_options_and_commands() -> None:
     result = CliRunner().invoke(cli, ["--help"])
 
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
+    assert "Vercor command-line tools" in result.output
+    assert "--version" in result.output
     assert "copy-setup" in result.output
+    assert "show-setups" in result.output
     assert "run" in result.output
+
+
+def test_cli_version_reports_installed_distribution_version() -> None:
+    result = CliRunner().invoke(cli, ["--version"])
+
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == f"vercor, version {metadata.version('vercor')}"
+
+
+def test_show_setups_lists_sorted_public_bundled_stems() -> None:
+    result = CliRunner().invoke(cli, ["show-setups"])
+
+    assert result.exit_code == 0, result.output
+    names = result.output.splitlines()
+    assert names == sorted(names)
+    assert "run_jcm_with_veros" in names
+    assert "__init__" not in names
+
+
+def test_show_setups_adds_direct_public_files_from_each_external_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (first / "zeta.py").write_text("", encoding="utf-8")
+    (first / "_private.py").write_text("", encoding="utf-8")
+    (first / "notes.txt").write_text("", encoding="utf-8")
+    (first / "nested").mkdir()
+    (first / "nested" / "ignored.py").write_text("", encoding="utf-8")
+    (second / "alpha.py").write_text("", encoding="utf-8")
+    monkeypatch.setenv("VERCOR_SETUP_DIR", os.pathsep.join((str(first), str(second))))
+
+    result = CliRunner().invoke(cli, ["show-setups"])
+
+    assert result.exit_code == 0, result.output
+    names = result.output.splitlines()
+    assert names == sorted(names)
+    assert "alpha" in names
+    assert "zeta" in names
+    assert "_private" not in names
+    assert "ignored" not in names
+
+
+def test_show_setups_rejects_missing_external_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing"
+    monkeypatch.setenv("VERCOR_SETUP_DIR", str(missing))
+
+    result = CliRunner().invoke(cli, ["show-setups"])
+
+    assert result.exit_code == 1
+    assert "setup directory does not exist" in result.output
+    assert str(missing) in result.output
+
+
+def test_show_setups_rejects_non_directory_external_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source_file = tmp_path / "setups.txt"
+    source_file.write_text("", encoding="utf-8")
+    monkeypatch.setenv("VERCOR_SETUP_DIR", str(source_file))
+
+    result = CliRunner().invoke(cli, ["show-setups"])
+
+    assert result.exit_code == 1
+    assert "setup path is not a directory" in result.output
+
+
+def test_show_setups_reports_unreadable_external_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    unreadable = tmp_path / "unreadable"
+    unreadable.mkdir()
+    original_iterdir = Path.iterdir
+
+    def failing_iterdir(path: Path) -> Iterator[Path]:
+        if path == unreadable:
+            raise OSError("permission denied")
+        return original_iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", failing_iterdir)
+    monkeypatch.setenv("VERCOR_SETUP_DIR", str(unreadable))
+
+    result = CliRunner().invoke(cli, ["show-setups"])
+
+    assert result.exit_code == 1
+    assert f"could not read setup directory {unreadable}" in result.output
+    assert "permission denied" in result.output
+
+
+def test_show_setups_rejects_duplicate_names_and_reports_sources(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (first / "custom.py").write_text("", encoding="utf-8")
+    (second / "custom.py").write_text("", encoding="utf-8")
+    monkeypatch.setenv("VERCOR_SETUP_DIR", os.pathsep.join((str(first), str(second))))
+
+    result = CliRunner().invoke(cli, ["show-setups"])
+
+    assert result.exit_code == 1
+    assert "duplicate setup: custom" in result.output
+    assert str(first / "custom.py") in result.output
+    assert str(second / "custom.py") in result.output
+
+
+def test_show_setups_rejects_packaged_and_external_duplicate_names(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    duplicate = external / "run_jcm_with_veros.py"
+    duplicate.write_text("", encoding="utf-8")
+    monkeypatch.setenv("VERCOR_SETUP_DIR", str(external))
+
+    result = CliRunner().invoke(cli, ["show-setups"])
+
+    assert result.exit_code == 1
+    assert "duplicate setup: run_jcm_with_veros" in result.output
+    assert "vercor.setups.gallery/run_jcm_with_veros.py" in result.output
+    assert str(duplicate) in result.output
+
+
+def test_copy_help_lists_discovered_setups_and_environment_guidance(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "local_template.py").write_text("", encoding="utf-8")
+    monkeypatch.setenv("VERCOR_SETUP_DIR", str(external))
+
+    result = CliRunner().invoke(cli, ["copy-setup", "--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "Available setups:" in result.output
+    assert "run_jcm_with_veros" in result.output
+    assert "local_template" in result.output
+    assert "VERCOR_SETUP_DIR" in result.output
+    assert "vercor copy-setup run_jcm_with_veros --to" in result.output
 
 
 def test_copy_setup_by_stem_copies_packaged_bytes() -> None:
