@@ -260,6 +260,108 @@ def test_copy_setup_accepts_python_filename() -> None:
         assert Path("run_slab_driver.py").is_file()
 
 
+def test_copy_setup_creates_destination_directory_and_parents() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        destination = Path("new/target")
+
+        result = runner.invoke(
+            cli,
+            ["copy-setup", "run_jcm_with_veros", "--to", str(destination)],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert (destination / "run_jcm_with_veros.py").is_file()
+
+
+def test_copy_setup_reuses_existing_destination_directory() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        destination = Path("existing")
+        destination.mkdir()
+
+        result = runner.invoke(
+            cli,
+            ["copy-setup", "run_jcm_with_veros.py", "--to", str(destination)],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert (destination / "run_jcm_with_veros.py").is_file()
+
+
+def test_copy_setup_copies_external_template_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    source = external / "local_template.py"
+    source.write_bytes(b"VALUE = 42\n")
+    destination = tmp_path / "copied"
+    monkeypatch.setenv("VERCOR_SETUP_DIR", str(external))
+
+    result = CliRunner().invoke(
+        cli,
+        ["copy-setup", "local_template", "--to", str(destination)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert (destination / "local_template.py").read_bytes() == source.read_bytes()
+
+
+def test_copy_setup_rejects_file_as_destination_directory() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        target = Path("target")
+        target.write_text("keep", encoding="utf-8")
+
+        result = runner.invoke(
+            cli,
+            ["copy-setup", "run_jcm_with_veros", "--to", str(target)],
+        )
+
+        assert result.exit_code != 0
+        assert target.read_text(encoding="utf-8") == "keep"
+
+
+def test_copy_setup_preserves_existing_file_inside_to_directory() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        directory = Path("target")
+        directory.mkdir()
+        destination = directory / "run_jcm_with_veros.py"
+        destination.write_text("keep me", encoding="utf-8")
+
+        result = runner.invoke(
+            cli,
+            ["copy-setup", "run_jcm_with_veros", "--to", str(directory)],
+        )
+
+        assert result.exit_code == 1
+        assert "already exists" in result.output
+        assert destination.read_text(encoding="utf-8") == "keep me"
+
+
+def test_copy_setup_rejects_duplicate_catalog_names(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    duplicate = external / "run_jcm_with_veros.py"
+    duplicate.write_text("", encoding="utf-8")
+    monkeypatch.setenv("VERCOR_SETUP_DIR", str(external))
+
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(cli, ["copy-setup", "run_jcm_with_veros"])
+
+    assert result.exit_code == 1
+    assert "duplicate setup: run_jcm_with_veros" in result.output
+    assert "vercor.setups.gallery/run_jcm_with_veros.py" in result.output
+    assert str(duplicate) in result.output
+
+
 def test_copy_setup_preserves_existing_destination() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -292,7 +394,7 @@ def test_copy_setup_rejects_malformed_name(
     result = CliRunner().invoke(cli, ["copy-setup", name])
 
     assert result.exit_code == 2
-    assert "Invalid value for NAME" in result.output
+    assert "Invalid value for SETUP" in result.output
     assert diagnostic in result.output
 
 
