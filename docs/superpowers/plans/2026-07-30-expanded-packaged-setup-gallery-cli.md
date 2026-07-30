@@ -1165,36 +1165,49 @@ git commit -m "feat: configure gallery setup runtime options"
 - Consumes: the approved `run_setup(*, loglevel: str, float_type: str) -> int | None` contract.
 - Produces: every public bundled setup has the exact contract and explicitly supplies runtime precision and logging.
 
-- [ ] **Step 1: Write a failing AST contract test for every bundled setup**
+- [ ] **Step 1: Write a failing live contract test for every bundled setup**
 
 Add:
 
 ```python
-def test_every_bundled_setup_defines_exact_run_setup_contract() -> None:
-    gallery = Path(__file__).resolve().parents[1] / "vercor" / "setups" / "gallery"
-    setup_files = sorted(
-        candidate
-        for candidate in gallery.glob("*.py")
-        if candidate.name != "__init__.py" and not candidate.name.startswith("_")
-    )
+@pytest.mark.parametrize(
+    "module_name",
+    (
+        "custom_component_wrapping",
+        "profile_runtime",
+        "run_camulator_with_veros",
+        "run_data_driver",
+        "run_jcm_with_era5data",
+        "run_jcm_with_slab",
+        "run_jcm_with_veros",
+        "run_jcm_with_verosdata",
+        "run_slab_driver",
+        "run_veros_with_era5data",
+    ),
+)
+def test_every_bundled_setup_exposes_keyword_only_run_contract(
+    module_name: str,
+) -> None:
+    module = importlib.import_module(f"vercor.setups.gallery.{module_name}")
 
-    assert setup_files
-    for setup_file in setup_files:
-        module = ast.parse(setup_file.read_text(encoding="utf-8"))
-        functions = {
-            node.name: node
-            for node in module.body
-            if isinstance(node, ast.FunctionDef)
-        }
-        run_setup = functions.get("run_setup")
-        assert run_setup is not None, setup_file
-        assert [arg.arg for arg in run_setup.args.kwonlyargs] == [
-            "loglevel",
-            "float_type",
-        ], setup_file
+    run_setup = module.run_setup
+    parameters = tuple(inspect.signature(run_setup).parameters.values())
+
+    assert callable(run_setup)
+    assert tuple(parameter.name for parameter in parameters) == (
+        "loglevel",
+        "float_type",
+    )
+    assert all(
+        parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        for parameter in parameters
+    )
 ```
 
-Add `import ast`. Run the test and expect seven missing-contract failures.
+Add `import importlib` and `import inspect`. Run the test and expect seven
+missing-contract failures. This imports real modules without executing their
+guarded setup bodies; the three representative modules from Task 4 already
+have focused option-flow behavior tests.
 
 - [ ] **Step 2: Convert each remaining guarded script body into `run_setup`**
 
@@ -1240,37 +1253,25 @@ cpl = Coupler(
 Do not change model choices, clocks, exchanges, output paths, plotting, or
 optional dependency imports.
 
-- [ ] **Step 3: Add AST assertions for explicit option consumption**
-
-Extend the AST test:
-
-```python
-source = setup_file.read_text(encoding="utf-8")
-assert "DTypePolicy(enable_x64=float_type == \"float64\")" in source, setup_file
-assert "log_level=loglevel" in source, setup_file
-```
-
-For the three modules completed in Task 4, permit the dtype construction inside
-their called helper by separately asserting their targeted behavioral tests;
-keep the exact source assertions for the seven files in this task.
-
-- [ ] **Step 4: Run gallery syntax/boundary tests and confirm GREEN**
+- [ ] **Step 3: Run live gallery contract and option-flow tests**
 
 Run:
 
 ```bash
 conda run -n scipy pytest \
-  tests/test_cli.py::test_every_bundled_setup_defines_exact_run_setup_contract \
+  tests/test_cli.py::test_every_bundled_setup_exposes_keyword_only_run_contract \
+  tests/test_jcm_example.py::test_run_setup_maps_cli_values_to_coupler_runtime \
   tests/test_api_boundaries.py \
   tests/test_setup_agnostic_api.py \
-  tests/test_jcm_example.py \
   -q --fast --tb=short
 conda run -n scipy python -m compileall -q vercor/setups/gallery
 ```
 
-Expected: PASS without importing unavailable optional model packages.
+Expected: PASS. The live contract test imports all bundled setup modules
+without executing model construction, while the representative JCM test
+asserts real log-level and dtype propagation.
 
-- [ ] **Step 5: Run the required fast suite and commit**
+- [ ] **Step 4: Run the required fast suite and commit**
 
 Run:
 
