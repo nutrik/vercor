@@ -717,6 +717,85 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     )
 
 
+def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
+        jax_gcm_state_module.JAXGCMSetupState
+    )
+    component.spinup_time = timedelta(hours=1)
+    component.model_timestep = timedelta(hours=1)
+    component.jitted = False
+    component.do_spinup = True
+    component.name = "ATM"
+    component.grid = make_test_grid()
+    component.data = {}
+    component.save_interval = timedelta(days=1)
+    forcing_values = {
+        field_name: jnp.ones((2, 3), dtype=jnp.float32)
+        for field_name in (
+            "alb0",
+            "sice_am",
+            "snowc_am",
+            "soilw_am",
+            "stl_am",
+            "sea_surface_temperature",
+        )
+    }
+    component.forcing_data = jax_gcm_state_module.ForcingData(**forcing_values)
+    component.model = SimpleNamespace(
+        coords=SimpleNamespace(
+            horizontal=SimpleNamespace(nodal_shape=(2, 3)),
+            vertical=SimpleNamespace(layers=2),
+        ),
+        primitive="primitive",
+        _prepare_initial_modal_state=lambda: {
+            "temperature": jnp.ones((2, 3), dtype=jnp.float32),
+            "mode": jnp.asarray(1, dtype=jnp.int32),
+        },
+    )
+
+    class _FakePhysicsData:
+        @staticmethod
+        def zeros(shape: tuple[int, int], layers: int) -> dict[str, Any]:
+            _ = layers
+            return {"heating": jnp.zeros(shape, dtype=jnp.float32)}
+
+    spinup_forcing_dtypes: list[set[jnp.dtype[Any]]] = []
+
+    def record_spinup_inputs(state: Any, forcing: Any) -> tuple[Any, str]:
+        spinup_forcing_dtypes.append(
+            {jnp.asarray(leaf).dtype for leaf in jax.tree_util.tree_leaves(forcing)}
+        )
+        return state, "unused"
+
+    monkeypatch.setattr(jax_gcm_state_module, "PhysicsData", _FakePhysicsData)
+    monkeypatch.setattr(
+        jax_gcm_state_module,
+        "dynamics_state_to_physics_state",
+        lambda modal_state, primitive: modal_state,
+    )
+    monkeypatch.setattr(
+        component,
+        "_generate_step_function",
+        lambda jitted: record_spinup_inputs,
+    )
+
+    hook_component = DataComponent(name="ATM", grid=component.grid)
+    component.setup(
+        cast(Any, hook_component),
+        SetupContext(
+            start=datetime(2000, 1, 1),
+            dt_seconds=3600.0,
+            logger=cast(Any, _RecordingLogger()),
+            run_order=("ATM",),
+            dtype=DTypePolicy(enable_x64=True),
+        ),
+    )
+
+    assert spinup_forcing_dtypes == [{jnp.dtype(jnp.float64)}]
+
+
 def test_jax_gcm_initialize_builds_default_forcing_when_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
