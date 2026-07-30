@@ -1262,6 +1262,7 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
         "vercor/setups/gallery/run_slab_driver.py",
         "vercor/setups/gallery/run_veros_with_era5data.py",
     }
+    runner_name = "vercor/_setup_runner.py"
 
     assert distributions.wheel.name == EXPECTED_WHEEL_NAME
     assert distributions.sdist.name == EXPECTED_SDIST_NAME
@@ -1280,6 +1281,7 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
         )
         entry_points = wheel.read(entry_points_name).decode("utf-8")
     assert "vercor/py.typed" in wheel_names
+    assert runner_name in wheel_names
     assert gallery_names.issubset(wheel_names)
     entry_points_config = configparser.ConfigParser()
     entry_points_config.read_string(entry_points)
@@ -1309,6 +1311,7 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     with tarfile.open(distributions.sdist, "r:gz") as sdist:
         sdist_names = set(sdist.getnames())
     assert f"vercor-{EXPECTED_VERSION}/vercor/py.typed" in sdist_names
+    assert f"vercor-{EXPECTED_VERSION}/{runner_name}" in sdist_names
     assert {
         f"vercor-{EXPECTED_VERSION}/{gallery_name}" for gallery_name in gallery_names
     }.issubset(sdist_names)
@@ -1322,6 +1325,7 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     )
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(target)
+    installed_python = Path(sys.executable)
     probe = subprocess.run(
         [
             sys.executable,
@@ -1338,6 +1342,34 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     )
     assert (tmp_path / "custom_component_wrapping.py").is_file()
     assert "custom_component_wrapping.py" in probe.stdout
+
+    copied_setup = tmp_path / "external_setup.py"
+    setup_evidence = tmp_path / "external_setup_evidence.txt"
+    copied_setup.write_text(
+        "from pathlib import Path\n"
+        "def run_setup(*, loglevel, float_type):\n"
+        f"    Path({str(setup_evidence)!r}).write_text(\n"
+        "        f'{loglevel},{float_type}', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [
+            str(installed_python),
+            "-m",
+            "vercor._setup_runner",
+            str(copied_setup),
+            "--loglevel",
+            "info",
+            "--float-type",
+            "float64",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert setup_evidence.read_text(encoding="utf-8") == "info,float64"
     probe_source = f"""
 import importlib
 import importlib.metadata
