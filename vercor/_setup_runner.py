@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+import inspect
 from pathlib import Path
 import runpy
 import sys
@@ -12,6 +13,26 @@ from typing import Any
 
 class SetupContractError(ValueError):
     """Report a setup file that does not implement the runner contract."""
+
+
+def _validate_setup_signature(path: Path, run_setup: Any) -> None:
+    """Require exactly the two keyword-only setup runtime options."""
+
+    try:
+        parameters = tuple(inspect.signature(run_setup).parameters.values())
+    except (TypeError, ValueError) as error:
+        raise SetupContractError(
+            f"{path} must define callable run_setup(*, loglevel, float_type) "
+            "with exactly two keyword-only parameters"
+        ) from error
+    expected_names = ("loglevel", "float_type")
+    if tuple(parameter.name for parameter in parameters) != expected_names or any(
+        parameter.kind is not inspect.Parameter.KEYWORD_ONLY for parameter in parameters
+    ):
+        raise SetupContractError(
+            f"{path} must define callable run_setup(*, loglevel, float_type) "
+            "with exactly two keyword-only parameters"
+        )
 
 
 def _load_setup(path: Path) -> dict[str, Any]:
@@ -36,6 +57,7 @@ def _invoke_setup(
         raise SetupContractError(
             f"{path} must define callable run_setup(*, loglevel, float_type)"
         )
+    _validate_setup_signature(path, run_setup)
     result = run_setup(loglevel=loglevel, float_type=float_type)
     if result is None:
         return 0

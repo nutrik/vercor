@@ -210,13 +210,13 @@ def copy_setup(setup: str, destination: Path) -> None:
 @click.option(
     "-v",
     "--loglevel",
-    type=click.Choice(_LOG_LEVELS, case_sensitive=False),
+    type=click.Choice(_LOG_LEVELS, case_sensitive=True),
     default="info",
     show_default=True,
 )
 @click.option(
     "--float-type",
-    type=click.Choice(_FLOAT_TYPES, case_sensitive=False),
+    type=click.Choice(_FLOAT_TYPES, case_sensitive=True),
     default="float64",
     show_default=True,
 )
