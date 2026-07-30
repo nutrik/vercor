@@ -76,7 +76,12 @@ Options:
 
 `SETUP` accepts either a public setup stem or its `.py` filename. Existing
 normalization and traversal protections remain: paths, private names, empty
-names, and non-Python suffixes are rejected.
+names, bare `.` and `..` markers, and non-Python suffixes are rejected. Catalog
+lookup precedes suffix diagnostics so a public dotted stem such as
+`model.profile`, as printed by `show-setups`, remains copyable by either
+`model.profile` or `model.profile.py`. If one template's canonical filename is
+another template's public stem, that shared reference is rejected as ambiguous
+instead of selecting either source implicitly.
 
 `--to` names a destination directory and defaults to the current working
 directory. If the directory does not exist, the command creates it, including
@@ -134,17 +139,21 @@ Options:
 The defaults are `info` and `float64`. Click validates the choices and the
 existing local `.py` file.
 
-The CLI starts a private VerCOR setup runner with `sys.executable` in a child
-process and passes the resolved setup path and selected values as separate
-arguments without a shell. The child loads the file without triggering its
+The CLI resolves the private runner file beside the already imported
+`vercor.cli` module and executes that file with `sys.executable -P` in a child
+process. It passes the resolved setup path and selected values as separate
+arguments without a shell, so a local `vercor.py` or `vercor/` cannot replace
+the trusted runner. The child loads the file without triggering its
 `if __name__ == "__main__"` block, validates that `run_setup` is callable, and
 invokes it with keyword arguments.
 
-The setup file's directory is available for local imports, matching ordinary
-script execution. Missing contracts and invalid return values produce concise
-runner diagnostics. `None` means success; an integer return value becomes the
-process exit status. Unhandled setup exceptions remain visible and cause a
-nonzero exit. The outer Click command returns the child's status unchanged.
+The setup file's directory remains on `sys.path` throughout loading and
+invocation, matching ordinary script execution even when `run_setup` performs
+a lazy adjacent import. The original path is restored in `finally`. Missing
+contracts and invalid return values produce concise runner diagnostics. `None`
+means success; an integer return value becomes the process exit status.
+Unhandled setup exceptions remain visible and cause a nonzero exit. The outer
+Click command returns the child's status unchanged.
 
 Loading and invocation stay in the child so setup globals, optional
 dependencies, JAX initialization, and failures do not contaminate the CLI
@@ -207,8 +216,10 @@ Behavioral tests are written before implementation and cover:
 - explicit log-level and float-type propagation;
 - default option values and every accepted choice;
 - missing/non-callable contracts, exceptions, and return statuses;
-- contract presence in every bundled setup; and
-- wheel and source-distribution inclusion of the gallery and private runner.
+- contract presence in every bundled setup;
+- wheel and source-distribution inclusion of the gallery and private runner; and
+- a real installed `vercor` console workflow covering version, listing,
+  destination copying, and lightweight external setup execution.
 
 Documentation tests and architecture checks are updated with the new commands
 and private boundary. `README.md`, user documentation, `DESIGN.md`,

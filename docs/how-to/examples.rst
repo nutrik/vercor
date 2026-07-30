@@ -1,10 +1,17 @@
 Run packaged setup gallery
 ==========================
 
-VerCOR packages longer runnable setup scripts in ``vercor.setups.gallery`` in
-addition to the small, dependency-light programs in the learning paths. List
-the available templates, copy one into a working directory, then run the copied
-script:
+.. note::
+
+   The setup-gallery CLI is unreleased development functionality. PyPI
+   ``vercor==0.4.3`` does not contain these commands; use a current
+   development-source installation until a later published release includes
+   them.
+
+The development version packages longer runnable setup scripts in
+``vercor.setups.gallery`` in addition to the small, dependency-light programs
+in the learning paths. List the available templates, copy one into a working
+directory, then run the copied script:
 
 .. code-block:: console
 

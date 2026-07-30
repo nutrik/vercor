@@ -1,6 +1,12 @@
 Troubleshooting
 ===============
 
+.. note::
+
+   The ``vercor show-setups``, ``copy-setup``, and ``run`` guidance below
+   describes unreleased development functionality. PyPI ``vercor==0.4.3`` does
+   not include these commands.
+
 An optional setup cannot be imported
 ------------------------------------
 

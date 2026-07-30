@@ -8,6 +8,7 @@ import inspect
 import os
 from pathlib import Path
 import sys
+from typing import IO
 
 from click.testing import CliRunner
 import pytest
@@ -48,9 +49,9 @@ def test_every_bundled_setup_exposes_keyword_only_run_contract(
     )
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def _use_worktree_package_for_child_runner(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make each real child process import this worktree's private runner."""
+    """Expose this worktree only to tests that start a real child process."""
 
     project_root = Path(__file__).parent.parent
     inherited_path = os.environ.get("PYTHONPATH")
@@ -60,7 +61,9 @@ def _use_worktree_package_for_child_runner(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("PYTHONPATH", os.pathsep.join(paths))
 
 
-def test_run_executes_python_file_with_current_interpreter() -> None:
+def test_run_executes_python_file_with_current_interpreter(
+    _use_worktree_package_for_child_runner: None,
+) -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("setup.py").write_text(
@@ -77,7 +80,9 @@ def test_run_executes_python_file_with_current_interpreter() -> None:
         assert Path("interpreter.txt").read_text(encoding="utf-8") == sys.executable
 
 
-def test_run_executes_option_like_local_python_filename() -> None:
+def test_run_executes_option_like_local_python_filename(
+    _use_worktree_package_for_child_runner: None,
+) -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("-c.py").write_text(
@@ -93,7 +98,9 @@ def test_run_executes_option_like_local_python_filename() -> None:
         assert Path("ran.txt").read_text(encoding="utf-8") == "ran"
 
 
-def test_run_propagates_script_exit_status() -> None:
+def test_run_propagates_script_exit_status(
+    _use_worktree_package_for_child_runner: None,
+) -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("setup.py").write_text(
@@ -106,7 +113,9 @@ def test_run_propagates_script_exit_status() -> None:
         assert result.exit_code == 7
 
 
-def test_run_passes_selected_loglevel_and_float_type() -> None:
+def test_run_passes_selected_loglevel_and_float_type(
+    _use_worktree_package_for_child_runner: None,
+) -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("setup.py").write_text(
@@ -133,7 +142,9 @@ def test_run_passes_selected_loglevel_and_float_type() -> None:
         assert Path("options.txt").read_text(encoding="utf-8") == "warning,float32"
 
 
-def test_run_passes_default_loglevel_and_float_type() -> None:
+def test_run_passes_default_loglevel_and_float_type(
+    _use_worktree_package_for_child_runner: None,
+) -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("setup.py").write_text(
@@ -155,6 +166,7 @@ def test_run_passes_default_loglevel_and_float_type() -> None:
 def test_run_accepts_every_runtime_option_choice(
     loglevel: str,
     float_type: str,
+    _use_worktree_package_for_child_runner: None,
 ) -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -184,7 +196,9 @@ def test_run_accepts_every_runtime_option_choice(
         )
 
 
-def test_run_propagates_setup_exception_status() -> None:
+def test_run_propagates_setup_exception_status(
+    _use_worktree_package_for_child_runner: None,
+) -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("setup.py").write_text(
@@ -196,6 +210,34 @@ def test_run_propagates_setup_exception_status() -> None:
         result = runner.invoke(cli, ["run", "setup.py"])
 
         assert result.exit_code == 1
+
+
+def test_run_uses_trusted_runner_when_working_directory_contains_vercor(
+    _use_worktree_package_for_child_runner: None,
+) -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        local_package = Path("vercor")
+        local_package.mkdir()
+        (local_package / "__init__.py").write_text("", encoding="utf-8")
+        (local_package / "_setup_runner.py").write_text(
+            "from pathlib import Path\n"
+            "Path('shadow-runner.txt').write_text('shadowed', encoding='utf-8')\n"
+            "raise SystemExit(23)\n",
+            encoding="utf-8",
+        )
+        Path("setup.py").write_text(
+            "from pathlib import Path\n"
+            "def run_setup(*, loglevel, float_type):\n"
+            "    Path('trusted-runner.txt').write_text('ran', encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(cli, ["run", "setup.py"])
+
+        assert result.exit_code == 0, result.output
+        assert Path("trusted-runner.txt").read_text(encoding="utf-8") == "ran"
+        assert not Path("shadow-runner.txt").exists()
 
 
 def test_run_help_lists_runtime_options_and_defaults() -> None:
@@ -252,11 +294,20 @@ def test_cli_help_exposes_required_description_options_and_commands() -> None:
     result = CliRunner().invoke(cli, ["--help"])
 
     assert result.exit_code == 0, result.output
-    assert "Vercor command-line tools" in result.output
-    assert "--version" in result.output
-    assert "copy-setup" in result.output
-    assert "show-setups" in result.output
-    assert "run" in result.output
+    assert result.output == (
+        "Usage: vercor [OPTIONS] COMMAND [ARGS]...\n"
+        "\n"
+        "  Vercor command-line tools\n"
+        "\n"
+        "Options:\n"
+        "  --version  Show the version and exit.\n"
+        "  --help     Show this message and exit.\n"
+        "\n"
+        "Commands:\n"
+        "  copy-setup   Copy a standard setup to another directory.\n"
+        "  run          Runs a Vercor setup from given file.\n"
+        "  show-setups  Print a list of available pre-configured setups.\n"
+    )
 
 
 def test_cli_version_reports_installed_distribution_version() -> None:
@@ -481,6 +532,82 @@ def test_copy_setup_copies_external_template_bytes(
     assert (destination / "local_template.py").read_bytes() == source.read_bytes()
 
 
+@pytest.mark.parametrize("use_canonical_filename", (False, True))
+def test_copy_setup_resolves_dotted_stem_and_canonical_filename(
+    use_canonical_filename: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    dotted_stem = "model.v" + "1"
+    setup_reference = f"{dotted_stem}.py" if use_canonical_filename else dotted_stem
+    external = tmp_path / "external"
+    external.mkdir()
+    source = external / f"{dotted_stem}.py"
+    source.write_bytes(b"VALUE = 17\n")
+    destination = tmp_path / setup_reference.replace(".", "-")
+    monkeypatch.setenv("VERCOR_SETUP_DIR", str(external))
+
+    listed = CliRunner().invoke(cli, ["show-setups"])
+    result = CliRunner().invoke(
+        cli,
+        ["copy-setup", setup_reference, "--to", str(destination)],
+    )
+
+    assert listed.exit_code == 0, listed.output
+    assert dotted_stem in listed.output.splitlines()
+    assert result.exit_code == 0, result.output
+    assert (destination / f"{dotted_stem}.py").read_bytes() == b"VALUE = 17\n"
+
+
+def test_copy_setup_rejects_ambiguous_stem_filename_reference(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    canonical_match = external / "foo.py"
+    stem_match = external / "foo.py.py"
+    canonical_match.write_bytes(b"CANONICAL = True\n")
+    stem_match.write_bytes(b"STEM = True\n")
+    destination = tmp_path / "copied"
+    monkeypatch.setenv("VERCOR_SETUP_DIR", str(external))
+
+    result = CliRunner().invoke(
+        cli,
+        ["copy-setup", "foo.py", "--to", str(destination)],
+    )
+
+    assert result.exit_code == 1
+    assert "ambiguous setup reference: foo.py" in result.output
+    assert str(canonical_match) in result.output
+    assert str(stem_match) in result.output
+    assert not destination.exists()
+
+
+@pytest.mark.parametrize("failure_type", (RuntimeError, KeyboardInterrupt))
+def test_copy_setup_removes_partial_destination_after_stream_failure(
+    failure_type: type[BaseException],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failing_copyfileobj(
+        _source_stream: IO[bytes],
+        target_stream: IO[bytes],
+        _length: int = 0,
+    ) -> None:
+        target_stream.write(b"partial")
+        raise failure_type("stream failed")
+
+    monkeypatch.setattr("vercor.cli.shutil.copyfileobj", failing_copyfileobj)
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        target = Path("run_jcm_with_veros.py")
+
+        result = runner.invoke(cli, ["copy-setup", "run_jcm_with_veros"])
+
+        assert result.exit_code != 0
+        assert not target.exists()
+
+
 def test_copy_setup_rejects_file_as_destination_directory() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -551,6 +678,8 @@ def test_copy_setup_preserves_existing_destination() -> None:
     ("name", "diagnostic"),
     (
         ("", "must be a direct setup name"),
+        (".", "must be a direct setup name"),
+        ("..", "must be a direct setup name"),
         (".py", "must name a Python setup"),
         ("../run_slab_driver", "must be a direct setup name"),
         ("nested/run_slab_driver", "must be a direct setup name"),

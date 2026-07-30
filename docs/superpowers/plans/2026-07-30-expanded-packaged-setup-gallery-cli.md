@@ -8,6 +8,11 @@
 
 **Tech Stack:** Python 3.12+, Click 8.1+, `importlib.resources`, `runpy`, `pathlib`, `subprocess`, pytest, Click `CliRunner`, Black, flake8, mypy, Flit/build.
 
+> **Final-review corrections (2026-07-30):** The final whole-branch reviewer
+> governs the corrected runtime, catalog, artifact, and lowercase-choice
+> instructions recorded below. They supersede the earlier task snippets where
+> those snippets conflict.
+
 ## Global Constraints
 
 - Work only in the isolated `feat/packaged-setup-gallery-cli` worktree and preserve the existing draft pull request.
@@ -19,7 +24,14 @@
 - `--loglevel` choices are exactly `trace`, `debug`, `info`, `warning`, and `error`, defaulting to `info`.
 - `--float-type` choices are exactly `float64` and `float32`, defaulting to `float64`.
 - `trace` maps to logging level 5; float choices map to `DTypePolicy(enable_x64=True/False)`.
-- Run setup code with `sys.executable` in a shell-free child process; preserve its integer exit status.
+- Run setup code with `sys.executable` in a shell-free child process; preserve
+  its integer exit status. Resolve the private runner from the already imported
+  package and execute that file with Python `-P` safe-path isolation.
+- Keep the setup file's parent at the front of `sys.path` for both loading and
+  `run_setup` invocation, then restore the original list in `finally`.
+- Resolve copy references against both each catalog stem and its canonical
+  `.py` filename; validate unmatched references without rejecting cataloged
+  dotted stems.
 - Keep `vercor.__all__` unchanged and do not import optional model dependencies from `vercor.cli`.
 - Follow strict TDD and run `conda run -n scipy pytest tests/ -q --fast --tb=short` before each implementation commit.
 
@@ -52,11 +64,20 @@ def test_cli_help_exposes_required_description_options_and_commands() -> None:
     result = CliRunner().invoke(cli, ["--help"])
 
     assert result.exit_code == 0, result.output
-    assert "Vercor command-line tools" in result.output
-    assert "--version" in result.output
-    assert "copy-setup" in result.output
-    assert "show-setups" in result.output
-    assert "run" in result.output
+    assert result.output == (
+        "Usage: vercor [OPTIONS] COMMAND [ARGS]...\n"
+        "\n"
+        "  Vercor command-line tools\n"
+        "\n"
+        "Options:\n"
+        "  --version  Show the version and exit.\n"
+        "  --help     Show this message and exit.\n"
+        "\n"
+        "Commands:\n"
+        "  copy-setup   Copy a standard setup to another directory.\n"
+        "  run          Runs a Vercor setup from given file.\n"
+        "  show-setups  Print a list of available pre-configured setups.\n"
+    )
 
 
 def test_cli_version_reports_installed_distribution_version() -> None:
@@ -310,10 +331,10 @@ def _discover_setups() -> tuple[_SetupTemplate, ...]:
 Decorate the group and add listing:
 
 ```python
-@click.group()
+@click.group(name="vercor", help="Vercor command-line tools")
 @click.version_option(package_name="vercor")
 def cli() -> None:
-    """Vercor command-line tools."""
+    """Provide Vercor command-line tools."""
 
 
 @cli.command("show-setups")
@@ -518,15 +539,24 @@ Change the command to:
     default=Path("."),
     help="Target directory (default: current working directory).",
 )
-def copy_setup(setup: str, destination: Path) -> None:
+def _copy_setup(setup: str, destination: Path) -> None:
     """Copy a standard setup to another directory."""
 
-    filename = _normalize_setup_name(setup)
-    catalog = {item.filename: item for item in _discover_setups()}
-    try:
-        template = catalog[filename]
-    except KeyError as error:
-        raise click.ClickException(f"unknown setup: {setup}") from error
+    _validate_setup_reference(setup)
+    catalog: dict[str, list[_SetupTemplate]] = {}
+    for item in _discover_setups():
+        for reference in (item.stem, item.filename):
+            catalog.setdefault(reference, []).append(item)
+    matches = catalog.get(setup, [])
+    if not matches:
+        _normalize_setup_name(setup)
+        raise click.ClickException(f"unknown setup: {setup}")
+    if len(matches) > 1:
+        details = ", ".join(item.origin for item in matches)
+        raise click.ClickException(
+            f"ambiguous setup reference: {setup}: {details}"
+        )
+    template = matches[0]
 
     try:
         destination.mkdir(parents=True, exist_ok=True)
@@ -542,15 +572,18 @@ def copy_setup(setup: str, destination: Path) -> None:
     target = destination / template.filename
     created = False
     try:
-        with template.source.open("rb") as source_stream:
-            with target.open("xb") as target_stream:
-                created = True
-                shutil.copyfileobj(source_stream, target_stream)
+        try:
+            with template.source.open("rb") as source_stream:
+                with target.open("xb") as target_stream:
+                    created = True
+                    shutil.copyfileobj(source_stream, target_stream)
+        except BaseException:
+            if created:
+                target.unlink(missing_ok=True)
+            raise
     except FileExistsError as error:
         raise click.ClickException(f"{target} already exists") from error
     except OSError as error:
-        if created:
-            target.unlink(missing_ok=True)
         raise click.ClickException(
             f"could not copy {template.filename}: {error}"
         ) from error
@@ -738,13 +771,7 @@ class SetupContractError(ValueError):
 
 
 def _load_setup(path: Path) -> dict[str, Any]:
-    setup_directory = str(path.parent)
-    original_sys_path = list(sys.path)
-    sys.path.insert(0, setup_directory)
-    try:
-        return runpy.run_path(str(path), run_name="_vercor_setup")
-    finally:
-        sys.path[:] = original_sys_path
+    return runpy.run_path(str(path), run_name="_vercor_setup")
 
 
 def _invoke_setup(
@@ -753,18 +780,24 @@ def _invoke_setup(
     loglevel: str,
     float_type: str,
 ) -> int:
-    namespace = _load_setup(path)
-    run_setup = namespace.get("run_setup")
-    if not callable(run_setup):
-        raise SetupContractError(
-            f"{path} must define callable run_setup(*, loglevel, float_type)"
-        )
-    result = run_setup(loglevel=loglevel, float_type=float_type)
-    if result is None:
-        return 0
-    if isinstance(result, bool) or not isinstance(result, int):
-        raise SetupContractError("run_setup must return int or None")
-    return result
+    original_sys_path = list(sys.path)
+    sys.path.insert(0, str(path.parent))
+    try:
+        namespace = _load_setup(path)
+        run_setup = namespace.get("run_setup")
+        if not callable(run_setup):
+            raise SetupContractError(
+                f"{path} must define callable run_setup(*, loglevel, float_type)"
+            )
+        _validate_setup_signature(path, run_setup)
+        result = run_setup(loglevel=loglevel, float_type=float_type)
+        if result is None:
+            return 0
+        if isinstance(result, bool) or not isinstance(result, int):
+            raise SetupContractError("run_setup must return int or None")
+        return result
+    finally:
+        sys.path[:] = original_sys_path
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -877,13 +910,13 @@ _FLOAT_TYPES = ("float64", "float32")
 @click.option(
     "-v",
     "--loglevel",
-    type=click.Choice(_LOG_LEVELS, case_sensitive=False),
+    type=click.Choice(_LOG_LEVELS, case_sensitive=True),
     default="info",
     show_default=True,
 )
 @click.option(
     "--float-type",
-    type=click.Choice(_FLOAT_TYPES, case_sensitive=False),
+    type=click.Choice(_FLOAT_TYPES, case_sensitive=True),
     default="float64",
     show_default=True,
 )
@@ -892,16 +925,17 @@ def run(setup_file: Path, loglevel: str, float_type: str) -> None:
 
     if setup_file.suffix != ".py":
         raise click.BadParameter("must be a .py file", param_hint="SETUP_FILE")
+    runner_path = Path(__file__).with_name("_setup_runner.py").resolve()
     completed = subprocess.run(
         [
             sys.executable,
-            "-m",
-            "vercor._setup_runner",
+            "-P",
+            str(runner_path),
             str(setup_file.resolve()),
             "--loglevel",
-            loglevel.lower(),
+            loglevel,
             "--float-type",
-            float_type.lower(),
+            float_type,
         ],
         check=False,
     )
@@ -1310,23 +1344,13 @@ assert runner_name in wheel_names
 assert f"vercor-{EXPECTED_VERSION}/{runner_name}" in sdist_names
 ```
 
-Extend the installed-artifact probe so it runs:
-
-```python
-[
-    str(installed_python),
-    "-m",
-    "vercor._setup_runner",
-    str(copied_setup),
-    "--loglevel",
-    "info",
-    "--float-type",
-    "float64",
-]
-```
-
-against a small external test setup with a `run_setup` function rather than
-executing the heavyweight copied gallery model.
+Extend the installed-artifact probe with an isolated virtual environment that
+inherits system site packages. Install the built wheel into it with
+`pip --no-deps`, then execute the environment's real `vercor` console entry
+point for `--version`, `show-setups`, `copy-setup --to`, and `run`. Run a small
+external setup whose `run_setup` lazily imports an adjacent helper; do not
+substitute `python -m vercor.cli` or direct private-runner invocation for the
+console workflow.
 
 - [ ] **Step 2: Run the artifact test and record RED if packaging is incomplete**
 
