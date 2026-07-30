@@ -213,11 +213,27 @@ lightweight factory; JCM/Dinosaur, Veros, CREDIT, Torch, TensorFlow, and runtime
 configuration are deferred until invocation. Missing optional dependencies
 produce factory-oriented errors without affecting core import.
 
-`vercor.setups.gallery` owns the packaged runnable setup scripts. The public
-`vercor.cli` owner module exposes the installed ``vercor`` command, which
-copies one gallery script into the current directory without overwriting an
-existing file and runs only local ``.py`` scripts with the active Python
-interpreter.
+The setup-gallery command boundary has explicit owners:
+
+- `vercor.cli`: Click presentation, shared discovery, duplicate rejection,
+  and exclusive copying.
+- `vercor._setup_runner`: private child loading and contract invocation.
+- `vercor.setups.gallery`: model-specific setup construction and explicit
+  translation of log level and dtype.
+- `vercor._logging.config`: standard levels plus `trace == 5`.
+
+`vercor.cli` exposes the installed ``vercor`` command. It discovers the
+packaged gallery and direct external directories named by an ``os.pathsep``-
+separated ``VERCOR_SETUP_DIR`` list, rejects duplicate template names, and
+creates or reuses a requested ``--to`` directory while exclusively copying a
+single file without overwrite. ``run`` accepts only local ``.py`` files and
+uses the active interpreter to invoke the private child runner. That child
+loads the setup without its main guard and requires exactly
+``run_setup(*, loglevel, float_type)``; ``None`` means success and an integer
+is the process status. CLI choices are lowercase ``trace``, ``debug``,
+``info``, ``warning``, and ``error`` (default ``info``), plus ``float64`` and
+``float32`` (default ``float64``). Gallery templates translate those choices to
+the Coupler log level and ``DTypePolicy``/``RuntimeOptions`` dtype policy.
 
 Bundled slab, data, JCM, Veros, and CAMulator factories return the same
 structural components used by external plugins. JAXGCM/Veros spinup is

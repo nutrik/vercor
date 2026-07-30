@@ -101,13 +101,32 @@ assert bool(jnp.all(jnp.isfinite(sea_surface_temperature)))
 
 ## Setup gallery
 
-VerCOR packages runnable setup scripts with the installed distribution. Copy a
-setup into your working directory, then run the user-editable copy:
+VerCOR packages runnable setup scripts with the installed distribution. List
+the available templates, copy one into a user-editable directory, then run that
+local copy:
 
 ```console
-vercor copy-setup run_jcm_with_veros
-vercor run run_jcm_with_veros.py
+vercor show-setups
+vercor copy-setup run_jcm_with_veros \
+  --to ~/vercor-setups/run_jcm_with_veros
+vercor run \
+  --loglevel info \
+  --float-type float64 \
+  ~/vercor-setups/run_jcm_with_veros/run_jcm_with_veros.py
 ```
+
+`vercor --version` reports the installed distribution version. `VERCOR_SETUP_DIR`
+may add external templates as an `os.pathsep`-separated list of direct
+directories. Every template name must be unique across the packaged gallery and
+those directories; duplicates are errors. `copy-setup --to` creates missing
+parent directories or reuses an existing directory, but never overwrites an
+existing setup file.
+
+An external template must define exactly
+`run_setup(*, loglevel, float_type)`. `vercor run` passes lowercase-only
+`loglevel` choices (`trace`, `debug`, `info`, `warning`, or `error`) and
+`float_type` choices (`float64` or `float32`); their defaults are `info` and
+`float64`. The function returns `None` for success or an integer process status.
 
 ## Documentation
 

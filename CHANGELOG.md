@@ -8,7 +8,10 @@ versioning; pre-releases may still refine new contracts.
 ### Added
 
 - Packaged the runnable setup gallery and added the installed ``vercor`` CLI
-  for safely copying and running local setup scripts.
+  for listing, safely copying, and running local setup scripts through the
+  explicit ``run_setup(*, loglevel, float_type)`` child-process contract.
+- Added installed wheel and source-distribution coverage for the private setup
+  runner and an external lightweight setup contract.
 
 ## [0.4.3] - 2026-07-25
 

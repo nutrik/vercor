@@ -13,6 +13,56 @@ external data. CAMulator has no documented compatible dependency pin.
 driver; see :doc:`how-to/examples` for the packaged setup gallery and its data
 requirements.
 
+A setup file does not satisfy ``vercor run``
+--------------------------------------------
+
+**Symptom.** ``vercor run`` reports that a setup must define ``run_setup`` or
+that its return value is invalid.
+
+**Cause.** The local Python file does not define exactly
+``run_setup(*, loglevel, float_type)``, or the callable returned a value other
+than ``None`` or an integer status.
+
+**Action.** Define the keyword-only callable with exactly those two parameters.
+Use the lowercase CLI values for ``loglevel`` (``trace``, ``debug``, ``info``,
+``warning``, or ``error``) and ``float_type`` (``float64`` or ``float32``).
+
+Duplicate setup templates are rejected
+--------------------------------------
+
+**Symptom.** ``show-setups`` or ``copy-setup`` reports ``duplicate setup``.
+
+**Cause.** A public direct ``.py`` file in a ``VERCOR_SETUP_DIR`` directory has
+the same stem as another external template or a packaged gallery template.
+
+**Action.** Rename or remove one template so every catalog name is unique. Set
+``VERCOR_SETUP_DIR`` to an ``os.pathsep``-separated list of existing directories;
+it does not search nested directories.
+
+An external setup directory is missing
+--------------------------------------
+
+**Symptom.** The CLI reports that a setup directory does not exist or is not a
+directory.
+
+**Cause.** ``VERCOR_SETUP_DIR`` contains a missing path or a file.
+
+**Action.** Correct each direct directory in the ``os.pathsep``-separated list,
+or unset the variable when only packaged templates are needed.
+
+Copying a setup collides with a local file
+------------------------------------------
+
+**Symptom.** ``copy-setup`` reports that the destination setup file already
+exists.
+
+**Cause.** The target directory already contains a file with the selected
+template filename.
+
+**Action.** Choose a different ``--to`` directory or rename the existing local
+file. ``copy-setup --to`` creates missing parent directories and reuses an
+existing directory, but never overwrites a destination file.
+
 An exchange field is rejected
 -----------------------------
 
