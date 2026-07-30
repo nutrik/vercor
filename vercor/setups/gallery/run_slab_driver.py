@@ -10,7 +10,7 @@ from vercor import (
     Exchange,
     RuntimeOptions,
 )
-from vercor.dtypes import jax_ones
+from vercor.dtypes import DTypePolicy, jax_ones
 from vercor import RectilinearGrid
 from vercor.output import OutputTarget
 from vercor.regridding import bilinear, conservative
@@ -34,7 +34,11 @@ from vercor.diagnostics import (
 )
 from vercor.topology import SurfaceMaskPolicy
 
-if __name__ == "__main__":
+
+def run_setup(*, loglevel: str, float_type: str) -> None:
+    """Run this setup through the shared VerCOR CLI contract."""
+
+    dtype = DTypePolicy(enable_x64=float_type == "float64")
     # Build grids
     atm_grid = RectilinearGrid.uniform(
         "atm-grid",
@@ -127,7 +131,8 @@ if __name__ == "__main__":
         components=components,
         exchanges=exchanges,
         run_order=run_order,
-        runtime=RuntimeOptions(topology=SurfaceMaskPolicy()),
+        runtime=RuntimeOptions(dtype=dtype, topology=SurfaceMaskPolicy()),
+        log_level=loglevel,
     )
 
     final_state = cpl.run(output=OutputTarget("."))
@@ -176,3 +181,7 @@ if __name__ == "__main__":
     fig.colorbar(cast(Any, scalar_mappable), ax=axs, shrink=0.6)
 
     plt.show()
+
+
+if __name__ == "__main__":
+    run_setup(loglevel="info", float_type="float64")
