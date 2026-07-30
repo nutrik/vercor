@@ -15,6 +15,9 @@ import click
 
 __all__ = ("cli",)
 
+_LOG_LEVELS = ("trace", "debug", "info", "warning", "error")
+_FLOAT_TYPES = ("float64", "float32")
+
 
 @dataclass(frozen=True)
 class _SetupTemplate:
@@ -204,16 +207,35 @@ def copy_setup(setup: str, destination: Path) -> None:
         path_type=Path,
     ),
 )
-def run(setup_file: Path) -> None:
-    """Run local Python SETUP_FILE with the active interpreter."""
+@click.option(
+    "-v",
+    "--loglevel",
+    type=click.Choice(_LOG_LEVELS, case_sensitive=False),
+    default="info",
+    show_default=True,
+)
+@click.option(
+    "--float-type",
+    type=click.Choice(_FLOAT_TYPES, case_sensitive=False),
+    default="float64",
+    show_default=True,
+)
+def run(setup_file: Path, loglevel: str, float_type: str) -> None:
+    """Runs a Vercor setup from given file."""
 
     if setup_file.suffix != ".py":
-        raise click.BadParameter(
-            "must be a .py file",
-            param_hint="SETUP_FILE",
-        )
+        raise click.BadParameter("must be a .py file", param_hint="SETUP_FILE")
     completed = subprocess.run(
-        [sys.executable, str(setup_file.resolve())],
+        [
+            sys.executable,
+            "-m",
+            "vercor._setup_runner",
+            str(setup_file.resolve()),
+            "--loglevel",
+            loglevel.lower(),
+            "--float-type",
+            float_type.lower(),
+        ],
         check=False,
     )
     if completed.returncode:
