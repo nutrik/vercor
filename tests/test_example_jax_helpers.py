@@ -79,12 +79,11 @@ def test_custom_component_run_setup_maps_cli_options_without_running_models(
         fake_make_custom_coupler,
     )
 
-    result = custom_component_wrapping.run_setup(
+    custom_component_wrapping.run_setup(
         loglevel="error",
         float_type="float32",
     )
 
-    assert result is None
     assert captured == {
         "grid": grid,
         "log_level": "error",

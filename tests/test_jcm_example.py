@@ -15,7 +15,7 @@ from typing import Any, cast
 
 import pytest
 
-from vercor import Clock
+from vercor import Clock, RuntimeOptions
 from vercor.dtypes import DTypePolicy
 from vercor.setups import JCMInputs
 
@@ -117,7 +117,8 @@ def test_build_coupler_uses_injected_ocean_inputs_and_clock(
     assert setup_calls == [(ocean.grid, jcm_inputs)]
     assert len(coupler.exchanges) == 4
     assert coupler.kwargs["log_level"] == "warning"
-    assert coupler.kwargs["runtime"].dtype == DTypePolicy(enable_x64=True)
+    runtime = cast(RuntimeOptions, coupler.kwargs["runtime"])
+    assert runtime.dtype == DTypePolicy(enable_x64=True)
 
 
 @pytest.mark.fast_always

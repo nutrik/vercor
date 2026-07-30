@@ -159,7 +159,7 @@ class _CopySetupCommand(click.Command):
     default=Path("."),
     help="Target directory (default: current working directory).",
 )
-def copy_setup(setup: str, destination: Path) -> None:
+def _copy_setup(setup: str, destination: Path) -> None:
     """Copy a standard setup to another directory."""
 
     filename = _normalize_setup_name(setup)
