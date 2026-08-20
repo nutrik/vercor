@@ -202,6 +202,17 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
 
 
 @pytest.mark.fast_always
+def test_conda_environment_reuses_project_optional_dependency_policy() -> None:
+    """Keep JCM and Veros constraints owned by project metadata."""
+    environment = yaml.safe_load(
+        (PROJECT_ROOT / "conda-environment.yml").read_text(encoding="utf-8")
+    )
+    pip_dependencies = environment["dependencies"][-1]
+
+    assert pip_dependencies == {"pip": ["-e .[jcm,veros]"]}
+
+
+@pytest.mark.fast_always
 def test_pytest_defaults_use_measured_parallel_policy() -> None:
     metadata = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")

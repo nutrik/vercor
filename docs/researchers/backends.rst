@@ -1,7 +1,7 @@
-Choose an execution backend
-===========================
+Execution backend
+=================
 
-Set the backend through :class:`~vercor.runtime.RuntimeOptions` when 
+Set the backend through :class:`~vercor.runtime.RuntimeOptions` when
 constructing a :class:`~vercor.Coupler`.
 For a graph that contains both JAX and host components, use the default
 recommendation:

@@ -1,7 +1,7 @@
-For Python and JAX developers
+For developers
 =============================
 
-Use this path to build data, host, and differentiable JAX components, then
+Use this path to wrap / build data, host, and differentiable JAX components, then
 connect them through explicit exchanges.
 
 .. toctree::

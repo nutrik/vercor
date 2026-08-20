@@ -4,9 +4,9 @@ Coupling components
 Prerequisites
 -------------
 
-Install the core VerCOR package and read :doc:`data-components` and
-:doc:`jax-components` for the two component styles used here. The example uses
-the built-in bilinear regridder and needs no optional model package.
+Read :doc:`data-components` and :doc:`jax-components` for the two component
+styles used here. The example uses the built-in bilinear regridder and needs
+no optional model package.
 
 An :class:`~vercor.exchanges.Exchange` transfers named fields from a source
 component to a target component. Both endpoints must declare every exchanged
@@ -49,5 +49,5 @@ plain exchanges for those graphs.
 Next steps
 ----------
 
-Choose an execution policy in :doc:`../how-to/backends`, then configure
-optional files and diagnostics in :doc:`../how-to/output`.
+Choose an execution policy in :doc:`../researchers/backends`, then configure
+optional files and diagnostics in :doc:`../researchers/output`.

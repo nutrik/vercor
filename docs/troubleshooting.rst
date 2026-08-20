@@ -1,12 +1,6 @@
 Troubleshooting
 ===============
 
-.. note::
-
-   The ``vercor show-setups``, ``copy-setup``, and ``run`` guidance below
-   describes unreleased development functionality. PyPI ``vercor==0.4.3`` does
-   not include these commands.
-
 An optional setup cannot be imported
 ------------------------------------
 
@@ -16,7 +10,7 @@ An optional setup cannot be imported
 external data. CAMulator has no documented compatible dependency pin.
 
 **Action.** Install and configure the dependency required by the selected
-driver; see :doc:`how-to/examples` for the packaged setup gallery and its data
+driver; see :doc:`researchers/running` for the packaged setup gallery and its data
 requirements.
 
 A setup file does not satisfy ``vercor run``
@@ -92,7 +86,7 @@ A host component fails with the JAX backend
 **Cause.** ``RuntimeOptions(backend="jax")`` permits only JAX components.
 
 **Action.** Use ``RuntimeOptions(backend="auto")`` for a mixed graph, or use
-``backend="host"``; see :doc:`how-to/backends`.
+``backend="host"``; see :doc:`researchers/backends`.
 
 A compiled payload changes structure
 ------------------------------------
@@ -114,4 +108,4 @@ Output fails under JIT or differentiation
 state.
 
 **Action.** Run with ``output=None`` under JIT or differentiation, then write
-results in ordinary Python; see :doc:`how-to/output`.
+results in ordinary Python; see :doc:`researchers/output`.

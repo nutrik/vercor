@@ -4,9 +4,8 @@ Host components
 Prerequisites
 -------------
 
-Install the core VerCOR package and read :doc:`concepts` for the distinction
-between fixed author configuration and per-run payload state. This tutorial
-uses no optional model package.
+Read :doc:`concepts` for the distinction between fixed author configuration and per-run payload state.
+This tutorial uses no optional model package.
 
 A component that needs ordinary Python or host-library execution declares
 ``execution="host"``.  :class:`~vercor.runtime.RuntimeOptions` ``(backend="auto")``
