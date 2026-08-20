@@ -455,6 +455,7 @@ def test_migration_v0_4_snippet_runs_without_private_or_compat_imports(
 def test_release_files_and_metadata_describe_the_stable_release() -> None:
     """Bind release documentation to installed project metadata and artifact names."""
 
+    assert EXPECTED_VERSION == "0.4.4"
     expected_release_notes = f"docs/release-notes-{EXPECTED_VERSION}.md"
     project = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -465,7 +466,7 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
 
     changelog = CHANGELOG_PATH.read_text(encoding="utf-8")
     assert re.search(
-        rf"^## \[{re.escape(EXPECTED_VERSION)}\] - 2026-07-25$",
+        rf"^## \[{re.escape(EXPECTED_VERSION)}\] - 2026-08-20$",
         changelog,
         re.MULTILINE,
     )
@@ -475,16 +476,17 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
     assert release_notes_path.is_file()
     release_notes = release_notes_path.read_text(encoding="utf-8")
     for required in (
-        "`v0.4.2`",
-        "invalid license classifier",
-        "PyPI",
-        "GitHub Release",
-        "remains immutable",
-        "Apache Software License",
-        "`pyproject.toml`",
+        "setup gallery",
+        "command-line",
+        "documentation",
+        "JCM",
+        "dtype",
+        "release visibility",
     ):
         assert required in release_notes
     releasing = RELEASING_PATH.read_text(encoding="utf-8")
+    assert "release/vercor-0.4.4" in releasing
+    assert "release/vercor-0.4.3" not in releasing
     commands = "\n".join(re.findall(r"```bash\n(.*?)```", releasing, re.DOTALL))
     for command in (
         "python -m build",
@@ -732,9 +734,9 @@ def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
     branch_assignment = f'RELEASE_BRANCH="{expected_branch}"'
     exact_title = f'--title "Release {expected_title}"'
     exact_body = (
-        f'--body "Prepare the immutable {expected_title} recovery release. The '
-        "v0.4.2 workflow failed because PyPI rejected its invalid license "
-        'classifier; v0.4.2 remains unchanged."'
+        f'--body "Prepare {expected_title} with the packaged setup-gallery CLI, '
+        "expanded documentation, JCM dtype normalization, and hardened release "
+        'automation."'
     )
 
     assert "refactor" not in guide
@@ -797,6 +799,7 @@ def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
     )
     absence = "tools/validate_release_state.py github-tag-absent"
     pypi_absence = 'test "$PYPI_STATUS" = "404"'
+    range_whitespace = 'git diff --check "$MAIN_COMMIT" "$RELEASE_COMMIT"'
     draft_pr = (
         'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" '
         "--draft"
@@ -807,6 +810,7 @@ def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
         'test "$(git branch --show-current)" = "$RELEASE_BRANCH"',
         'test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"',
         'git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"',
+        range_whitespace,
         push,
         remote_query,
         remote_check,
@@ -817,6 +821,7 @@ def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
         draft_pr,
     ):
         assert required in prepare
+    assert prepare.index(range_whitespace) < prepare.index(push)
     assert prepare.index(push) < prepare.index(remote_query)
     assert prepare.index(remote_query) < prepare.index(remote_check)
     assert prepare.index(remote_check) < prepare.index(capability)

@@ -17,7 +17,6 @@ EXPECTED_ROOT_PAGES = (
     "introduction",
     "researchers/index",
     "developers/index",
-    "how-to/index",
     "api/index",
     "troubleshooting",
     "project-resources",
@@ -44,6 +43,7 @@ PROJECT_RESOURCE_PAGES = (
     "migration-0.3-to-0.4",
     "plugin-authoring",
     "release-notes-0.4.3",
+    "release-notes-0.4.4",
     "releasing",
 )
 
@@ -56,8 +56,8 @@ def test_documentation_has_two_learning_paths_and_reference_sections() -> None:
     for page in EXPECTED_ROOT_PAGES:
         assert page in index_source
 
-    assert "For Earth-system researchers" in index_source
-    assert "For Python and JAX developers" in index_source
+    assert "For researchers" in index_source
+    assert "For developers" in index_source
 
 
 @pytest.mark.fast_always
@@ -102,6 +102,17 @@ def test_running_guide_does_not_claim_run_state_advances_the_clock_window() -> N
     assert "replays the configured :class:`~vercor.Clock` window" in source
     assert "does not store a clock cursor" in source
     assert "To continue a simulation" not in source
+
+
+@pytest.mark.fast_always
+def test_getting_started_runs_the_standalone_quickstart_with_python() -> None:
+    """Keep the standalone quickstart separate from the setup-runner contract."""
+    source = (DOCS_ROOT / "researchers" / "getting-started.rst").read_text(
+        encoding="utf-8"
+    )
+
+    assert "   python quickstart.py" in source
+    assert "     quickstart.py" not in source
 
 
 @pytest.mark.fast_always
@@ -170,6 +181,9 @@ def test_readme_is_a_concise_gateway_to_canonical_documentation() -> None:
     """Keep detailed guidance on Read the Docs instead of in the README."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
+    assert 'python -m pip install "vercor==0.4.4"' in readme
+    assert "Development-only" not in readme
+    assert "unreleased" not in readme.lower()
     assert "https://vercor.readthedocs.io/" in readme
     for canonical_link in (
         "[Researcher guide](https://vercor.readthedocs.io/en/latest/researchers/)",

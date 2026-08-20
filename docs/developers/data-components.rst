@@ -4,8 +4,7 @@ Data components
 Prerequisites
 -------------
 
-Install the core VerCOR package on Python 3.12 or 3.13. This tutorial uses no
-optional model package or external data.
+This tutorial uses no optional model package or external data.
 
 Use :class:`~vercor.components.DataComponent` for forcing or observations 
 that have no active model step.  A scalar field expands to the component grid,

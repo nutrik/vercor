@@ -1,0 +1,19 @@
+name: vercor
+
+channels:
+    - conda-forge
+    - nodefaults
+
+dependencies:
+    - python=3.13
+    - pip>=24.0
+    - click
+    - numpy
+    - scipy
+    - h5netcdf
+    - h5py
+    - xarray
+    - matplotlib>=3.8.1
+    - jax
+    - pip:
+        - -e .[jcm,veros]

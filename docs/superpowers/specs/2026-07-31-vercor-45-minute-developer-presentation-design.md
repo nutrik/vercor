@@ -197,4 +197,3 @@ The finished artifact must:
 - Unsupported performance benchmarks.
 - A claim that every mixed VerCOR workflow is differentiable.
 - Detailed private runtime, CI, packaging, or release-engineering architecture.
-

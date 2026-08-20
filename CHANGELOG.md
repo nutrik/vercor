@@ -5,6 +5,8 @@ versioning; pre-releases may still refine new contracts.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-08-20
+
 ### Added
 
 - Packaged the runnable setup gallery and added the installed ``vercor`` CLI
@@ -12,6 +14,23 @@ versioning; pre-releases may still refine new contracts.
   explicit ``run_setup(*, loglevel, float_type)`` child-process contract.
 - Added installed wheel and source-distribution coverage for the private setup
   runner and an external lightweight setup contract.
+- Added a canonical Read the Docs manual with researcher and developer learning
+  paths, executable examples, and a curated API reference.
+- Added a recreatable Conda environment for source installations.
+
+### Changed
+
+- Hardened the tagged-release workflow with bounded GitHub release-visibility
+  checks and exact artifact-state validation.
+- Made Sphinx derive its displayed version from package metadata and made
+  documentation dependencies explicit in CI.
+
+### Fixed
+
+- Normalized JCM state and forcing arrays to the configured runtime dtype before
+  optional spinup.
+- Hardened setup discovery, copying, child execution, and installed-wheel
+  validation across supported CLI paths.
 
 ## [0.4.3] - 2026-07-25
 
@@ -125,6 +144,8 @@ versioning; pre-releases may still refine new contracts.
 This alpha does not ship legacy adapters. Follow
 `docs/migration-0.3-to-0.4.md` to migrate 0.3-only workflows directly.
 
+[Unreleased]: https://github.com/nutrik/vercor/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/nutrik/vercor/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/nutrik/vercor/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/nutrik/vercor/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/nutrik/vercor/compare/v0.4.0...v0.4.1
