@@ -6,6 +6,11 @@ import re
 
 EXTERNAL_TYPING_ALIAS_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     (
+        "jax.Array | numpy.ndarray | numpy.bool | numpy.number | bool | int | "
+        "float | complex",
+        "jax.typing.ArrayLike",
+    ),
+    (
         "Union[jax.Array, numpy.ndarray, numpy.bool, numpy.number, bool, int, "
         "float, complex, jax._src.literals.TypedNdArray]",
         "jax.typing.ArrayLike",
