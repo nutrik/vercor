@@ -1806,6 +1806,8 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
     setup_hook = component.spec.lifecycle.setup
     assert setup_hook is not None
     setup_state = cast(Any, setup_hook).__self__
+    terrain_mask = np.asarray(setup_state.model.terrain.fmask)
+    assert np.any((terrain_mask > 0.0) & (terrain_mask < 1.0))
     initial_payload = initial_state._component_state("ATM").payload
     assert initial_payload is not None
     initial_carry = initial_payload.jcm_state.physics_carry
@@ -1881,6 +1883,42 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
         atol=1e-10,
         equal_nan=False,
         label="real JCM forward/reverse derivative",
+    )
+
+    def full_coupler_loss(surface_temperature: jax.Array) -> jax.Array:
+        state = initial_state.replace_fields(
+            "ATM",
+            {
+                "sea_surface_temperature": jnp.full(
+                    component.grid.shape,
+                    surface_temperature,
+                )
+            },
+        )
+        result = coupler.run(state)
+        return jnp.mean(result.component("ATM").field("temperature"))
+
+    coupled_surface_temperature = jnp.asarray(288.0, dtype=jnp.float64)
+    coupled_loss, coupled_reverse = jax.value_and_grad(full_coupler_loss)(
+        coupled_surface_temperature
+    )
+    _, coupled_forward = jax.jvp(
+        full_coupler_loss,
+        (coupled_surface_temperature,),
+        (jnp.ones_like(coupled_surface_temperature),),
+    )
+
+    assert np.isfinite(np.asarray(coupled_loss))
+    assert np.isfinite(np.asarray(coupled_reverse))
+    assert np.isfinite(np.asarray(coupled_forward))
+    assert float(jnp.abs(coupled_reverse)) > 0.0
+    assert_allclose_compact(
+        coupled_forward,
+        coupled_reverse,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+        label="full Coupler real JCM forward/reverse derivative",
     )
 
 
