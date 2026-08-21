@@ -66,25 +66,28 @@ def prepare_surface_temperature_forcing(
     total_surface_temperature: object,
     land_fraction_mask: object,
 ) -> tuple[jax.Array, jax.Array]:
+    """Build finite JCM land and sea temperatures from one surface field.
+
+    JCM applies ``land_fraction_mask`` when combining its land and sea fluxes,
+    so fractional coastal cells require the complete temperature in both
+    forcing arrays. Scaling a temperature by its surface fraction is
+    physically invalid and can make JCM's reverse-mode surface-flux derivative
+    non-finite. A reference value fills only cells where the corresponding
+    surface is absent.
+    """
+
     total_surface_temperature_array = as_jax_real_array(total_surface_temperature)
     land_fraction_mask_array = as_jax_real_array(land_fraction_mask)
 
-    land_surface_temperature = (
-        total_surface_temperature_array * land_fraction_mask_array
-    )
-    sea_surface_temperature = total_surface_temperature_array * (
-        1.0 - land_fraction_mask_array
-    )
-
     land_surface_temperature = jnp.where(
-        land_surface_temperature == 0.0,
+        land_fraction_mask_array > 0.0,
+        total_surface_temperature_array,
         REFERENCE_SURFACE_TEMPERATURE,
-        land_surface_temperature,
     )
     sea_surface_temperature = jnp.where(
-        sea_surface_temperature == 0.0,
+        land_fraction_mask_array < 1.0,
+        total_surface_temperature_array,
         REFERENCE_SURFACE_TEMPERATURE,
-        sea_surface_temperature,
     )
 
     return land_surface_temperature, sea_surface_temperature

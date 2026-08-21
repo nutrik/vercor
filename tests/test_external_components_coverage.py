@@ -420,6 +420,33 @@ def test_prepare_surface_temperature_forcing_supports_jit_and_fill_value() -> No
     )
 
 
+def test_prepare_surface_temperature_forcing_preserves_fractional_cells() -> None:
+    total_surface_temperature = jnp.asarray([[270.0, 281.0], [282.0, 567.0]])
+    land_fraction_mask = jnp.asarray([[1.0, 0.0], [0.25, 0.75]])
+
+    def forcing_sum(temperature: jax.Array) -> jax.Array:
+        land, sea = jax_gcm_fields_module.prepare_surface_temperature_forcing(
+            temperature,
+            land_fraction_mask,
+        )
+        return jnp.sum(land + sea)
+
+    land_surface_temperature, sea_surface_temperature = jax.jit(
+        jax_gcm_fields_module.prepare_surface_temperature_forcing
+    )(total_surface_temperature, land_fraction_mask)
+    gradient = jax.grad(forcing_sum)(total_surface_temperature)
+
+    assert_allclose_compact(
+        land_surface_temperature,
+        np.asarray([[270.0, 288.15], [282.0, 567.0]]),
+    )
+    assert_allclose_compact(
+        sea_surface_temperature,
+        np.asarray([[288.15, 281.0], [282.0, 567.0]]),
+    )
+    assert_allclose_compact(gradient, np.asarray([[1.0, 1.0], [2.0, 2.0]]))
+
+
 def test_map_jcm_output_fields_supports_jit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
