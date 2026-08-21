@@ -109,11 +109,6 @@ class _FakeShortwaveRad(NamedTuple):
     rsns: jax.Array
 
 
-class _FakePhysicsPrediction(NamedTuple):
-    surface_flux: _FakeSurfaceFlux
-    shortwave_rad: _FakeShortwaveRad
-
-
 class _FakeDynamicsPrediction(NamedTuple):
     normalized_surface_pressure: jax.Array
     u_wind: jax.Array
@@ -123,7 +118,7 @@ class _FakeDynamicsPrediction(NamedTuple):
 
 
 class _FakePrediction(NamedTuple):
-    physics: _FakePhysicsPrediction
+    physics: dict[str, Any]
     dynamics: _FakeDynamicsPrediction
 
 
@@ -187,16 +182,16 @@ def _fake_jcm_step(
         axis=-1,
     )
     prediction = _FakePrediction(
-        physics=_FakePhysicsPrediction(
-            surface_flux=_FakeSurfaceFlux(
+        physics={
+            "_surface_flux": _FakeSurfaceFlux(
                 shf=surface_flux[jnp.newaxis, ...],
                 evap=(surface_flux * 0.1)[jnp.newaxis, ...],
                 rlds=(surface_temperature + 3.0)[jnp.newaxis, ...],
             ),
-            shortwave_rad=_FakeShortwaveRad(
+            "_shortwave_rad": _FakeShortwaveRad(
                 rsns=(surface_temperature + 4.0)[jnp.newaxis, ...],
             ),
-        ),
+        },
         dynamics=_FakeDynamicsPrediction(
             normalized_surface_pressure=jnp.ones_like(surface_temperature)[
                 jnp.newaxis, ...
@@ -208,9 +203,14 @@ def _fake_jcm_step(
         ),
     )
     updated_state = JCMState(
-        prog=state.prog,
-        phydata=state.phydata,
-        metadata=state.metadata + jnp.sum(surface_temperature),
+        dynamics=jax.tree_util.tree_map(lambda value: value[0], prediction.dynamics),
+        physics=jax.tree_util.tree_map(lambda value: value[0], prediction.physics),
+        dycore_state={
+            "marker": state.dycore_state["marker"] + jnp.sum(surface_temperature)
+        },
+        physics_carry={
+            "marker": state.physics_carry["marker"] + 2.0 * jnp.sum(surface_temperature)
+        },
     )
     return updated_state, prediction
 
@@ -239,9 +239,25 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
     )()
     state.sigma_levels = jnp.asarray([0.2, 1.0], dtype=jnp.float64)
     state._state = JCMState(
-        prog={"marker": jnp.asarray(0.0)},
-        phydata={},
-        metadata=jnp.asarray(0.0),
+        dynamics=_FakeDynamicsPrediction(
+            normalized_surface_pressure=jnp.ones(grid.shape, dtype=jnp.float64),
+            u_wind=jnp.zeros((2, *grid.shape), dtype=jnp.float64),
+            v_wind=jnp.zeros((2, *grid.shape), dtype=jnp.float64),
+            temperature=jnp.zeros((2, *grid.shape), dtype=jnp.float64),
+            specific_humidity=jnp.zeros((2, *grid.shape), dtype=jnp.float64),
+        ),
+        physics={
+            "_surface_flux": _FakeSurfaceFlux(
+                shf=jnp.zeros((*grid.shape, 2), dtype=jnp.float64),
+                evap=jnp.zeros((*grid.shape, 2), dtype=jnp.float64),
+                rlds=jnp.zeros(grid.shape, dtype=jnp.float64),
+            ),
+            "_shortwave_rad": _FakeShortwaveRad(
+                rsns=jnp.zeros(grid.shape, dtype=jnp.float64),
+            ),
+        },
+        dycore_state={"marker": jnp.asarray(0.0)},
+        physics_carry={"marker": jnp.asarray(10.0)},
     )
     state.forcing = _FakeJCMForcing(
         stl_am=jnp.zeros((grid.shape[1], grid.shape[0]), dtype=jnp.float64),
@@ -1705,6 +1721,12 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
     )
     assert set(initial_float_dtypes) == {jnp.dtype(jnp.float32)}
     assert final_float_dtypes == initial_float_dtypes
+    assert float(atmosphere_state.payload.jcm_state.dycore_state["marker"]) != float(
+        initial_payload.jcm_state.dycore_state["marker"]
+    )
+    assert float(atmosphere_state.payload.jcm_state.physics_carry["marker"]) != float(
+        initial_payload.jcm_state.physics_carry["marker"]
+    )
 
     def loss(sea_surface_temperature: jax.Array) -> jax.Array:
         atmosphere = initial_state._component_state("ATM")
@@ -1757,11 +1779,11 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
     )
 
 
-def test_real_jax_gcm_initial_payload_seeds_speedy_coords(
+def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
     fast_mode: bool,
 ) -> None:
     if fast_mode:
-        pytest.skip("Real JCM payload structure regression runs outside --fast")
+        pytest.skip("Real JCM carry regression runs outside --fast")
 
     from vercor.setups import JAXGCMConfig, load_jcm_inputs, make_jax_gcm
 
@@ -1769,28 +1791,55 @@ def test_real_jax_gcm_initial_payload_seeds_speedy_coords(
     component = make_jax_gcm(
         inputs.coords,
         inputs.terrain,
-        config=JAXGCMConfig(
-            forcing_data=inputs.forcing,
-            jitted=True,
-        ),
+        config=JAXGCMConfig(forcing_data=inputs.forcing, jitted=True),
     )
     coupler = Coupler(
-        Clock(datetime(2000, 1, 1), 86400.0, 1),
+        Clock(datetime(2000, 1, 1), 86400.0, 2),
         components=(component,),
         run_order=("ATM",),
-        runtime=RuntimeOptions(topology=None),
+        runtime=RuntimeOptions(
+            dtype=DTypePolicy.from_jax_config(),
+            topology=None,
+        ),
     )
-    state = coupler.initial_state()
+    initial_state = coupler.initial_state()
     setup_hook = component.spec.lifecycle.setup
     assert setup_hook is not None
     setup_state = cast(Any, setup_hook).__self__
+    initial_payload = initial_state._component_state("ATM").payload
+    assert initial_payload is not None
+    initial_carry = initial_payload.jcm_state.physics_carry
+    assert initial_payload.jcm_state.dycore_state is not None
+    assert initial_carry is not None
+    assert cast(Any, jax.tree_util.tree_structure(initial_carry)) == (
+        jax.tree_util.tree_structure(setup_state.model._final_physics_state)
+    )
+    initial_float_leaves = [
+        np.asarray(leaf)
+        for leaf in jax.tree_util.tree_leaves(initial_carry)
+        if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
+    ]
+    assert all(np.all(np.isfinite(leaf)) for leaf in initial_float_leaves)
 
-    payload = state._component_state("ATM").payload
-    assert payload is not None
-    assert payload.jcm_state.phydata.speedy_coords is not None
-    assert str(
-        jax.tree_util.tree_structure(payload.jcm_state.phydata.speedy_coords)
-    ) == str(jax.tree_util.tree_structure(setup_state.model.physics.cached_coords))
+    final_state = run_scanned_coupler(coupler, initial_state)
+    final_payload = final_state._component_state("ATM").payload
+    assert final_payload is not None
+    final_carry = final_payload.jcm_state.physics_carry
+    final_float_leaves = [
+        np.asarray(leaf)
+        for leaf in jax.tree_util.tree_leaves(final_carry)
+        if hasattr(leaf, "dtype") and jnp.issubdtype(leaf.dtype, jnp.inexact)
+    ]
+    assert cast(Any, jax.tree_util.tree_structure(final_carry)) == (
+        jax.tree_util.tree_structure(initial_carry)
+    )
+    assert len(final_float_leaves) == len(initial_float_leaves)
+    assert any(
+        not np.allclose(initial, final)
+        for initial, final in zip(initial_float_leaves, final_float_leaves)
+    )
+    temperature = final_state._component_state("ATM").fields.get("temperature")
+    assert np.all(np.isfinite(np.asarray(temperature)))
 
 
 def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> None:

@@ -238,9 +238,9 @@ def _iter_data_items(data: dict[str, Any]) -> list[tuple[str, Any]]:
 
 
 def _default_physics_module() -> _PhysicsModuleLike:
-    from jcm.physics.speedy.speedy_physics import SpeedyPhysics
+    from jcm.physics.speedy.speedy_terms import speedy_physics
 
-    return cast(_PhysicsModuleLike, SpeedyPhysics())
+    return cast(_PhysicsModuleLike, speedy_physics())
 
 
 def jax_gcm_prediction_output_variables(
@@ -328,8 +328,14 @@ def _jax_gcm_state_output_variables(
     """Purely extract one state sample after coordinate caching."""
 
     prediction = SimpleNamespace(
-        dynamics=jax.tree_util.tree_map(_with_leading_time_dim, jcm_state.prog),
-        physics=jax.tree_util.tree_map(_with_leading_time_dim, jcm_state.phydata),
+        dynamics=jax.tree_util.tree_map(
+            _with_leading_time_dim,
+            jcm_state.dynamics,
+        ),
+        physics=jax.tree_util.tree_map(
+            _with_leading_time_dim,
+            jcm_state.physics,
+        ),
         times=as_jax_real_array([0.0]),
     )
     return _jax_gcm_prediction_output_variables(
@@ -370,6 +376,12 @@ def jax_gcm_unit_metadata(
     physics_units_path = selected_physics_module.UNITS_TABLE_CSV_PATH
     if physics_units_path is not None:
         metadata.update(_read_units_table(Path(physics_units_path)))
+    else:
+        physics_resource = resources.files("jcm.physics.speedy").joinpath(
+            "units_table.csv"
+        )
+        with resources.as_file(physics_resource) as physics_path:
+            metadata.update(_read_units_table(physics_path))
     return metadata
 
 

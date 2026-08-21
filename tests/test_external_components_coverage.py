@@ -529,7 +529,7 @@ def test_map_jcm_output_fields_supports_jit(
     assert_allclose_compact(mapped_fields["model_level_height"], np.full((2, 2), 150.0))
 
 
-def test_generate_step_function_non_jitted_averages_predictions() -> None:
+def test_generate_step_function_threads_jcm_2_physics_carry() -> None:
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
@@ -540,37 +540,100 @@ def test_generate_step_function_non_jitted_averages_predictions() -> None:
     calls: dict[str, Any] = {}
 
     class _FakeModel:
-        def run_from_state(
+        def run_from_state_with_carry(
             self,
-            *,
             initial_state: Any,
+            forcing: Any,
             save_interval: float,
             total_time: float,
-            forcing: Any,
-        ) -> tuple[str, Any]:
-            calls["run_from_state"] = (
+            output_averages: bool,
+            initial_physics_state: Any,
+        ) -> tuple[str, str, Any]:
+            calls["run"] = (
                 initial_state,
+                initial_physics_state,
                 save_interval,
                 total_time,
+                output_averages,
                 forcing,
             )
             predictions = SimpleNamespace(
                 dynamics={"wind": jnp.asarray([[1.0, 3.0], [5.0, 7.0]])},
-                physics={"temp": jnp.asarray([[2.0, 4.0], [6.0, 8.0]])},
+                physics={"heat": jnp.asarray([[2.0, 4.0], [6.0, 8.0]])},
             )
-            return "next-modal-state", predictions
+            return "next-dycore", "next-carry", predictions
 
     component.model = _FakeModel()
-    state = jax_gcm_state_module.JCMState(prog={}, phydata={}, metadata="initial-state")
+    state = jax_gcm_state_module.JCMState(
+        dynamics={},
+        physics={},
+        dycore_state="initial-dycore",
+        physics_carry="initial-carry",
+    )
 
-    step_function = component._generate_step_function(jitted=False)
-    next_state, predictions = step_function(state, "forcing")
+    next_state, predictions = component._generate_step_function(jitted=False)(
+        state, "forcing"
+    )
 
-    assert calls["run_from_state"] == ("initial-state", 2.0, 0.5, "forcing")
-    assert next_state.metadata == "next-modal-state"
-    assert_allclose_compact(next_state.prog["wind"], np.asarray([3.0, 5.0]))
-    assert_allclose_compact(next_state.phydata["temp"], np.asarray([4.0, 6.0]))
-    assert predictions.physics["temp"].shape == (2, 2)
+    assert calls["run"] == (
+        "initial-dycore",
+        "initial-carry",
+        2.0,
+        0.5,
+        False,
+        "forcing",
+    )
+    assert next_state.dycore_state == "next-dycore"
+    assert next_state.physics_carry == "next-carry"
+    assert_allclose_compact(next_state.dynamics["wind"], np.asarray([3.0, 5.0]))
+    assert_allclose_compact(next_state.physics["heat"], np.asarray([4.0, 6.0]))
+    assert predictions.physics["heat"].shape == (2, 2)
+
+
+def test_bootstrap_jcm_state_captures_native_state_and_physics_carry() -> None:
+    calls = {"bootstrap": 0}
+
+    class _FakeDycore:
+        def to_physics_state(self, state: Any) -> dict[str, Any]:
+            return {"converted": state}
+
+    class _FakeModel:
+        def __init__(self) -> None:
+            self.dycore = _FakeDycore()
+            self._final_dycore_state: Any = None
+            self._final_physics_state: Any = None
+
+        def bootstrap_state(self) -> None:
+            calls["bootstrap"] += 1
+            self._final_dycore_state = {"vorticity": jnp.asarray(1.0)}
+            self._final_physics_state = {"heating": jnp.asarray(2.0)}
+
+    model = _FakeModel()
+    state = jax_gcm_state_module._bootstrap_jcm_state(cast(Any, model))
+
+    assert calls == {"bootstrap": 1}
+    assert state.dynamics == {"converted": state.dycore_state}
+    assert state.dycore_state is model._final_dycore_state
+    assert state.physics is model._final_physics_state
+    assert state.physics_carry is model._final_physics_state
+
+
+@pytest.mark.parametrize(
+    ("dycore_state", "physics_carry"),
+    [(None, object()), (object(), None)],
+)
+def test_bootstrap_jcm_state_rejects_missing_final_state(
+    dycore_state: Any,
+    physics_carry: Any,
+) -> None:
+    model = SimpleNamespace(
+        bootstrap_state=lambda: None,
+        _final_dycore_state=dycore_state,
+        _final_physics_state=physics_carry,
+    )
+
+    with pytest.raises(RuntimeError, match="did not initialize"):
+        jax_gcm_state_module._bootstrap_jcm_state(cast(Any, model))
 
 
 def test_jax_gcm_constructor_builds_jax_backed_grid(
@@ -594,9 +657,10 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
             terrain: Any,
             physics: Any,
         ) -> None:
-            _ = time_step, physics
+            _ = time_step
             self.coords = coords
             self.terrain = terrain
+            self.physics = physics
 
     monkeypatch.setattr(
         jax_gcm_state_module.Parameters,
@@ -605,8 +669,8 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
     )
     monkeypatch.setattr(
         jax_gcm_state_module,
-        "SpeedyPhysics",
-        lambda parameters: SimpleNamespace(parameters=parameters),
+        "speedy_physics",
+        lambda parameters: _FakePhysicsModule(),
     )
     monkeypatch.setattr(jax_gcm_state_module, "Model", _FakeModel)
 
@@ -666,36 +730,34 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     component._dtype_policy = DTypePolicy()
     component.save_interval = timedelta(days=1)
     component.forcing_data = "provided-forcing"
+    initial_dycore_state = {"marker": jnp.asarray(0.0)}
+    initial_physics_carry = {"marker": jnp.asarray(10.0)}
     component.model = SimpleNamespace(
         coords=SimpleNamespace(
             horizontal=SimpleNamespace(nodal_shape=(2, 3)),
-            vertical=SimpleNamespace(layers=2),
         ),
-        primitive="primitive",
-        _prepare_initial_modal_state=lambda: "modal-state",
+        dycore=SimpleNamespace(to_physics_state=lambda state: {"converted": state}),
+        _final_dycore_state=initial_dycore_state,
+        _final_physics_state=initial_physics_carry,
+        bootstrap_state=lambda: None,
     )
 
-    physics_calls: dict[str, Any] = {}
+    def advance_state(state: Any, forcing: Any) -> tuple[Any, str]:
+        _ = forcing
+        return (
+            jax_gcm_state_module.JCMState(
+                dynamics=state.dynamics,
+                physics=state.physics,
+                dycore_state={"marker": state.dycore_state["marker"] + 1.0},
+                physics_carry={"marker": state.physics_carry["marker"] + 1.0},
+            ),
+            "unused",
+        )
 
-    class _FakePhysicsData:
-        @staticmethod
-        def zeros(shape: tuple[int, int], layers: int) -> dict[str, Any]:
-            physics_calls["zeros"] = (shape, layers)
-            return {"shape": shape, "layers": layers}
-
-    monkeypatch.setattr(jax_gcm_state_module, "PhysicsData", _FakePhysicsData)
-    monkeypatch.setattr(
-        jax_gcm_state_module,
-        "dynamics_state_to_physics_state",
-        lambda modal_state, primitive: {
-            "modal_state": modal_state,
-            "primitive": primitive,
-        },
-    )
     monkeypatch.setattr(
         component,
         "_generate_step_function",
-        lambda jitted: (lambda state, forcing: (state, "unused")),
+        lambda jitted: advance_state,
     )
     hook_component = DataComponent(
         name="CUSTOM_ATMOSPHERE",
@@ -709,8 +771,9 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
 
     assert component.coupling_timestep == timedelta(hours=1)
     assert component.spinup_steps == 2
-    assert physics_calls["zeros"] == ((2, 3), 2)
     assert component.forcing == "provided-forcing"
+    assert float(component._state.dycore_state["marker"]) == 2.0
+    assert float(component._state.physics_carry["marker"]) == 12.0
     assert (
         setup_result.fields["sea_surface_temperature"]
         == jax_gcm_fields_module.REFERENCE_SURFACE_TEMPERATURE
@@ -742,39 +805,59 @@ def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
             "sea_surface_temperature",
         )
     }
-    component.forcing_data = jax_gcm_state_module.ForcingData(**forcing_values)
+    component.forcing_data = jax_gcm_state_module.ForcingData.zeros((2, 3)).copy(
+        stl_am=forcing_values["stl_am"],
+        sea_surface_temperature=forcing_values["sea_surface_temperature"],
+    )
+    initial_dycore_state = {
+        "temperature": jnp.ones((2, 3), dtype=jnp.float32),
+        "mode": jnp.asarray(1, dtype=jnp.int32),
+        "marker": jnp.asarray(0.0, dtype=jnp.float32),
+    }
+    initial_physics_carry = {
+        "heating": jnp.zeros((2, 3), dtype=jnp.float32),
+        "marker": jnp.asarray(10.0, dtype=jnp.float32),
+    }
     component.model = SimpleNamespace(
         coords=SimpleNamespace(
             horizontal=SimpleNamespace(nodal_shape=(2, 3)),
-            vertical=SimpleNamespace(layers=2),
         ),
-        primitive="primitive",
-        _prepare_initial_modal_state=lambda: {
-            "temperature": jnp.ones((2, 3), dtype=jnp.float32),
-            "mode": jnp.asarray(1, dtype=jnp.int32),
-        },
+        dycore=SimpleNamespace(to_physics_state=lambda state: state),
+        _final_dycore_state=initial_dycore_state,
+        _final_physics_state=initial_physics_carry,
+        bootstrap_state=lambda: None,
     )
 
-    class _FakePhysicsData:
-        @staticmethod
-        def zeros(shape: tuple[int, int], layers: int) -> dict[str, Any]:
-            _ = layers
-            return {"heating": jnp.zeros(shape, dtype=jnp.float32)}
-
     spinup_forcing_dtypes: list[set[jnp.dtype[Any]]] = []
+    spinup_state_dtypes: list[set[jnp.dtype[Any]]] = []
 
     def record_spinup_inputs(state: Any, forcing: Any) -> tuple[Any, str]:
         spinup_forcing_dtypes.append(
             {jnp.asarray(leaf).dtype for leaf in jax.tree_util.tree_leaves(forcing)}
         )
-        return state, "unused"
+        spinup_state_dtypes.append(
+            {
+                jnp.asarray(leaf).dtype
+                for leaf in jax.tree_util.tree_leaves(state)
+                if jnp.issubdtype(jnp.asarray(leaf).dtype, jnp.inexact)
+            }
+        )
+        return (
+            jax_gcm_state_module.JCMState(
+                dynamics=state.dynamics,
+                physics=state.physics,
+                dycore_state={
+                    **state.dycore_state,
+                    "marker": state.dycore_state["marker"] + 1.0,
+                },
+                physics_carry={
+                    **state.physics_carry,
+                    "marker": state.physics_carry["marker"] + 1.0,
+                },
+            ),
+            "unused",
+        )
 
-    monkeypatch.setattr(jax_gcm_state_module, "PhysicsData", _FakePhysicsData)
-    monkeypatch.setattr(
-        jax_gcm_state_module,
-        "dynamics_state_to_physics_state",
-        lambda modal_state, primitive: modal_state,
-    )
     monkeypatch.setattr(
         component,
         "_generate_step_function",
@@ -794,6 +877,10 @@ def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
     )
 
     assert spinup_forcing_dtypes == [{jnp.dtype(jnp.float64)}]
+    assert spinup_state_dtypes == [{jnp.dtype(jnp.float64)}]
+    assert component._state.dycore_state["mode"].dtype == jnp.dtype(jnp.int32)
+    assert float(component._state.dycore_state["marker"]) == 1.0
+    assert float(component._state.physics_carry["marker"]) == 11.0
 
 
 def test_jax_gcm_initialize_builds_default_forcing_when_missing(
@@ -812,19 +899,17 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
     component._dtype_policy = DTypePolicy()
     component.save_interval = timedelta(days=1)
     component.forcing_data = None
+    initial_dycore_state = {"marker": jnp.asarray(0.0)}
+    initial_physics_carry = {"marker": jnp.asarray(10.0)}
     component.model = SimpleNamespace(
         coords=SimpleNamespace(
             horizontal=SimpleNamespace(nodal_shape=(2, 3)),
-            vertical=SimpleNamespace(layers=2),
         ),
-        primitive="primitive",
-        _prepare_initial_modal_state=lambda: "modal-state",
+        dycore=SimpleNamespace(to_physics_state=lambda state: {"converted": state}),
+        _final_dycore_state=initial_dycore_state,
+        _final_physics_state=initial_physics_carry,
+        bootstrap_state=lambda: None,
     )
-
-    class _FakePhysicsData:
-        @staticmethod
-        def zeros(shape: tuple[int, int], layers: int) -> dict[str, Any]:
-            return {"shape": shape, "layers": layers}
 
     forcing = _FakeForcing()
     step_calls = {"count": 0}
@@ -834,15 +919,6 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
         step_calls["count"] += 1
         return state, "unused"
 
-    monkeypatch.setattr(jax_gcm_state_module, "PhysicsData", _FakePhysicsData)
-    monkeypatch.setattr(
-        jax_gcm_state_module,
-        "dynamics_state_to_physics_state",
-        lambda modal_state, primitive: {
-            "modal_state": modal_state,
-            "primitive": primitive,
-        },
-    )
     monkeypatch.setattr(
         jax_gcm_state_module,
         "default_forcing",
@@ -864,7 +940,7 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
     )
 
     assert component.forcing is forcing
-    assert forcing.copy_calls == [{"lfluxland": True}]
+    assert forcing.copy_calls == []
     assert step_calls["count"] == 0
 
 
@@ -890,16 +966,21 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     )
     component.forcing = _FakeForcing()
     cast(Any, component).sigma_levels = np.asarray([0.2, 1.0], dtype=float)
-    component._state = cast(Any, SimpleNamespace(metadata=jnp.asarray(0.0)))
+    component._state = jax_gcm_state_module.JCMState(
+        dynamics={},
+        physics={},
+        dycore_state={"marker": jnp.asarray(0.0)},
+        physics_carry={"marker": jnp.asarray(10.0)},
+    )
 
-    p = SimpleNamespace(
-        surface_flux=SimpleNamespace(
+    p = {
+        "_surface_flux": SimpleNamespace(
             shf=np.full((2, 2, 2), 5.0, dtype=float),
             evap=np.full((2, 2, 2), 2.0, dtype=float),
             rlds=np.full((2, 2), 40.0, dtype=float),
         ),
-        shortwave_rad=SimpleNamespace(rsns=np.full((2, 2), 30.0, dtype=float)),
-    )
+        "_shortwave_rad": SimpleNamespace(rsns=np.full((2, 2), 30.0, dtype=float)),
+    }
     d = SimpleNamespace(
         u_wind=np.asarray(
             [
@@ -932,17 +1013,15 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     component._step_function = cast(
         Any,
         lambda state, forcing: (
-            SimpleNamespace(metadata=jnp.asarray(1.0)),
+            jax_gcm_state_module.JCMState(
+                dynamics=d,
+                physics=p,
+                dycore_state={"marker": state.dycore_state["marker"] + 1.0},
+                physics_carry={"marker": state.physics_carry["marker"] + 2.0},
+            ),
             prediction,
         ),
     )
-    monkeypatch.setattr(jax_gcm_runtime_module, "tree_stack", lambda objs: objs[0])
-    monkeypatch.setattr(
-        jax_gcm_runtime_module,
-        "tree_unwrap_leading_dims",
-        lambda obj: obj,
-    )
-    monkeypatch.setattr(jax_gcm_runtime_module, "tree_mean", lambda obj, axis: obj)
     monkeypatch.setattr(
         jax_gcm_fields_module,
         "compute_sigma_pressure_levels",
@@ -1065,7 +1144,16 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         ** coupler.constants.dry_air_kappa,
     )
     assert_allclose_compact(data.get("model_level_height"), np.full((2, 2), 150.0))
-    assert step_result.payload.jcm_state.metadata == 1.0
+    assert float(step_result.payload.jcm_state.dycore_state["marker"]) == 1.0
+    assert float(step_result.payload.jcm_state.physics_carry["marker"]) == 12.0
+
+
+def test_jax_gcm_runtime_rejects_missing_speedy_diagnostics() -> None:
+    with pytest.raises(ComponentError, match="_shortwave_rad"):
+        jax_gcm_runtime_module._required_speedy_diagnostics(
+            {"_surface_flux": object()},
+            component_name="ATM",
+        )
 
 
 def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
@@ -1242,11 +1330,11 @@ def test_jax_gcm_snapshot_output_uses_final_runtime_payload_not_runtime_data(
         model=SimpleNamespace(coords=coords, physics=physics_module)
     )
     jcm_state = SimpleNamespace(
-        prog={
+        dynamics={
             "temperature": np.arange(18.0).reshape(3, 2, 3),
             "u_wind": np.full((3, 2, 3), 4.0),
         },
-        phydata={},
+        physics={},
     )
     component_state = ComponentRuntimeState(
         fields=FieldStore.from_mapping({"temperature": np.full((3, 2, 3), -999.0)}),
@@ -1276,7 +1364,7 @@ def test_jax_gcm_snapshot_output_uses_final_runtime_payload_not_runtime_data(
         assert np.asarray(temperature)[0, 0, 0, 0] != -999.0
         assert_allclose_compact(
             np.asarray(temperature)[0],
-            np.transpose(jcm_state.prog["temperature"], axes=(0, 2, 1)),
+            np.transpose(jcm_state.dynamics["temperature"], axes=(0, 2, 1)),
         )
 
 
@@ -1287,8 +1375,8 @@ def test_jax_gcm_output_provider_samples_post_step_payload() -> None:
         model=SimpleNamespace(coords=coords, physics=physics_module),
     )
     jcm_state = SimpleNamespace(
-        prog={"temperature": np.arange(18.0).reshape(3, 2, 3)},
-        phydata={},
+        dynamics={"temperature": np.arange(18.0).reshape(3, 2, 3)},
+        physics={},
     )
     provider = jax_gcm_output_module.jax_gcm_output_provider(setup_state)
 
@@ -1307,8 +1395,48 @@ def test_jax_gcm_output_provider_samples_post_step_payload() -> None:
     assert frame.sample_dimension == "time"
     assert_allclose_compact(
         frame.variables["temperature"].values[0],
-        jcm_state.prog["temperature"],
+        jcm_state.dynamics["temperature"],
     )
+
+
+def test_jax_gcm_unit_metadata_uses_packaged_speedy_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    dynamics_root = tmp_path / "jcm"
+    physics_root = tmp_path / "speedy"
+    dynamics_root.mkdir()
+    physics_root.mkdir()
+    (dynamics_root / "dynamics_units_table.csv").write_text(
+        "Variable,Units,Description\nunique_dynamics,K,dynamics field\n",
+        encoding="utf-8",
+    )
+    (physics_root / "units_table.csv").write_text(
+        "Variable,Units,Description\nunique_physics,W m-2,physics field\n",
+        encoding="utf-8",
+    )
+    roots = {
+        "jcm": dynamics_root,
+        "jcm.physics.speedy": physics_root,
+    }
+    monkeypatch.setattr(
+        jax_gcm_output_module.resources,
+        "files",
+        lambda package: roots[package],
+    )
+
+    metadata = jax_gcm_output_module.jax_gcm_unit_metadata(
+        cast(Any, SimpleNamespace(UNITS_TABLE_CSV_PATH=None))
+    )
+
+    assert metadata["unique_dynamics"] == {
+        "units": "K",
+        "description": "dynamics field",
+    }
+    assert metadata["unique_physics"] == {
+        "units": "W m-2",
+        "description": "physics field",
+    }
 
 
 def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(

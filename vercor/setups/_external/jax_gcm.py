@@ -18,7 +18,7 @@ from vercor.setups.config import JAXGCMConfig
 
 if TYPE_CHECKING:
     from dinosaur.coordinate_systems import CoordinateSystem as _CoordinateSystem
-    from jcm.physics_interface import TerrainData as _TerrainData
+    from jcm.terrain import TerrainData as _TerrainData
 else:
     _CoordinateSystem = Any
     _TerrainData = Any
