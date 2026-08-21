@@ -170,6 +170,7 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
     runtime_dependencies = tuple(project["dependencies"])
     extras = project["optional-dependencies"]
 
+    assert extras["jcm"] == ["dinosaur==1.3.6", "jcm==2.0.1"]
     assert not any(
         dependency.lower().startswith("pytest") for dependency in runtime_dependencies
     )
