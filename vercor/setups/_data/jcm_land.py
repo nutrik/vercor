@@ -29,19 +29,24 @@ def _canonicalize_jcm_forcing_field(
     field: Any,
     *,
     field_name: str,
+    expected_spatial_shape: tuple[int, int],
 ) -> jax.Array:
     """Return one static or time-first JCM surface field in VerCOR layout."""
 
     values = getattr(field, "values", field)
     array = as_jax_real_array(values)
-    if array.ndim == 2:
-        return array.T
-    if array.ndim == 3:
-        return array.transpose((0, 2, 1))
-    raise ValueError(
-        f"JCM forcing field '{field_name}' has shape {array.shape}; expected "
-        "(longitude, latitude) or (time, longitude, latitude)"
-    )
+    if array.ndim not in (2, 3):
+        raise ValueError(
+            f"JCM forcing field '{field_name}' has shape {array.shape}; expected "
+            "(longitude, latitude) or (time, longitude, latitude)"
+        )
+    if array.shape[-2:] != expected_spatial_shape:
+        raise ValueError(
+            f"JCM forcing field '{field_name}' has shape {array.shape}; expected "
+            "spatial dimensions (longitude, latitude) "
+            f"{expected_spatial_shape}"
+        )
+    return array.T if array.ndim == 2 else array.transpose((0, 2, 1))
 
 
 def make_jcm_land(
@@ -56,13 +61,16 @@ def make_jcm_land(
 
     longitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.longitudes))
     latitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.latitudes))
+    forcing_spatial_shape = (longitude.shape[0], latitude.shape[0])
     land_surface_temperature = _canonicalize_jcm_forcing_field(
         jcm_forcing.stl_am,
         field_name="stl_am",
+        expected_spatial_shape=forcing_spatial_shape,
     )
     soil_moisture = _canonicalize_jcm_forcing_field(
         jcm_forcing.soilw_am,
         field_name="soilw_am",
+        expected_spatial_shape=forcing_spatial_shape,
     )
     lnd_bmask, _ = create_lnd_mask_from_ocn(
         atm_lat=latitude,

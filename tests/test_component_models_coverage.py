@@ -1145,4 +1145,46 @@ def test_jcm_land_rejects_invalid_jcm_forcing_rank() -> None:
         jcm_land_module._canonicalize_jcm_forcing_field(
             np.ones(3),
             field_name="stl_am",
+            expected_spatial_shape=(2, 2),
+        )
+
+
+@pytest.mark.parametrize(
+    "values",
+    (
+        pytest.param(np.ones((3, 2)), id="static"),
+        pytest.param(
+            SimpleNamespace(values=np.ones((4, 2, 3))),
+            id="time-first",
+        ),
+    ),
+)
+def test_jcm_land_rejects_wrong_spatial_extents(
+    values: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        jcm_land_module,
+        "create_lnd_mask_from_ocn",
+        lambda **kwargs: (np.ones((2, 2)), np.zeros((2, 2))),
+    )
+    coords = SimpleNamespace(
+        horizontal=SimpleNamespace(
+            longitudes=np.deg2rad(np.asarray([0.0, 180.0])),
+            latitudes=np.deg2rad(np.asarray([-45.0, 45.0])),
+        )
+    )
+    forcing = SimpleNamespace(
+        stl_am=values,
+        soilw_am=np.ones((2, 2)),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="JCM forcing field 'stl_am'.*expected spatial.*\\(2, 2\\)",
+    ):
+        make_jcm_land(
+            cast(Any, coords),
+            cast(Any, forcing),
+            make_test_grid(name="ocn"),
         )
