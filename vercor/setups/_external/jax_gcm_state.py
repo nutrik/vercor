@@ -11,19 +11,14 @@ import jax
 import jax.numpy as jnp
 import tree_math
 
-from dinosaur import primitive_equations
 from dinosaur.coordinate_systems import CoordinateSystem
 
-from jcm.forcing import default_forcing
-from jcm.model import ForcingData, Model, Predictions
+from jcm.forcing import ForcingData, default_forcing
+from jcm.model import Model, ModelPredictions
 from jcm.physics.speedy.params import Parameters
-from jcm.physics.speedy.physics_data import PhysicsData
-from jcm.physics.speedy.speedy_physics import SpeedyPhysics
-from jcm.physics_interface import (
-    PhysicsState,
-    TerrainData,
-    dynamics_state_to_physics_state,
-)
+from jcm.physics.speedy.speedy_terms import speedy_physics
+from jcm.physics_interface import PhysicsState
+from jcm.terrain import TerrainData
 
 from vercor.components import (
     Component,
@@ -38,7 +33,6 @@ from vercor.setups._time_helpers import (
     grid_field_defaults,
 )
 from vercor.setups._external._jax_gcm_pytree import (
-    tree_as_real_dtype,
     tree_as_runtime_dtype,
     tree_mean,
 )
@@ -51,17 +45,34 @@ from vercor.types import RuntimeArray
 @tree_math.struct
 @dataclass
 class JCMState:
-    """JCM prognostic, physics, and primitive-equation state bundle."""
+    """JCM gridpoint output, native dycore state, and physics carry."""
 
-    prog: PhysicsState
-    phydata: Any
-    metadata: primitive_equations.State
+    dynamics: PhysicsState
+    physics: Any
+    dycore_state: Any
+    physics_carry: Any
+
+
+def _bootstrap_jcm_state(model: Model) -> JCMState:
+    """Return the initialized JCM 2 dycore and physics state bundle."""
+
+    model.bootstrap_state()
+    dycore_state = model._final_dycore_state
+    physics_carry = model._final_physics_state
+    if dycore_state is None or physics_carry is None:
+        raise RuntimeError("JCM bootstrap did not initialize dycore and physics state")
+    return JCMState(
+        dynamics=model.dycore.to_physics_state(dycore_state),
+        physics=physics_carry,
+        dycore_state=dycore_state,
+        physics_carry=physics_carry,
+    )
 
 
 class JAXGCMSetupState:
     """Mutable setup-time owner for a JAXGCM/JCM atmosphere adapter."""
 
-    _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, Predictions]]
+    _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, ModelPredictions]]
     _state: JCMState
     forcing: ForcingData
     data: dict[str, RuntimeArray]
@@ -98,10 +109,10 @@ class JAXGCMSetupState:
                 default_parameters=jcm_parameters,
             )
 
-        physics = SpeedyPhysics(parameters=jcm_parameters)
+        physics = speedy_physics(parameters=jcm_parameters)
 
         self.model = Model(
-            coords,
+            coords=coords,
             time_step=model_timestep.total_seconds() / 60.0,
             terrain=terrain,
             physics=physics,
@@ -125,32 +136,37 @@ class JAXGCMSetupState:
 
     def _generate_step_function(
         self, jitted: bool = True
-    ) -> Callable[[JCMState, ForcingData], tuple[JCMState, Predictions]]:
+    ) -> Callable[[JCMState, ForcingData], tuple[JCMState, ModelPredictions]]:
         """Return the model step function, optionally JIT compiled."""
 
         def step_function(
             state: JCMState, forcing: ForcingData
-        ) -> tuple[JCMState, Predictions]:
+        ) -> tuple[JCMState, ModelPredictions]:
             precision_policy = self._dtype_policy
-            new_atm_modal_state, predictions = self.model.run_from_state(
-                initial_state=state.metadata,
-                save_interval=self.save_interval / timedelta(days=1),
-                total_time=self.coupling_timestep / timedelta(days=1),
-                forcing=forcing,
+            final_dycore_state, final_physics_carry, predictions = (
+                self.model.run_from_state_with_carry(
+                    initial_state=state.dycore_state,
+                    initial_physics_state=state.physics_carry,
+                    save_interval=self.save_interval / timedelta(days=1),
+                    total_time=self.coupling_timestep / timedelta(days=1),
+                    output_averages=False,
+                    forcing=forcing,
+                )
             )
 
             # JCM currently returns a stacked object; reduce to one runtime state.
             return (
                 JCMState(
-                    prog=tree_as_real_dtype(
+                    dynamics=tree_as_runtime_dtype(
                         tree_mean(predictions.dynamics, axis=0),
                         precision_policy,
                     ),
-                    phydata=tree_as_real_dtype(
+                    physics=tree_as_runtime_dtype(
                         tree_mean(predictions.physics, axis=0),
                         precision_policy,
                     ),
-                    metadata=new_atm_modal_state,
+                    dycore_state=final_dycore_state,
+                    physics_carry=final_physics_carry,
                 ),
                 predictions,
             )
@@ -174,34 +190,12 @@ class JAXGCMSetupState:
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
 
-        _modal_state = self.model._prepare_initial_modal_state()
-        speedy_coords = getattr(
-            getattr(self.model, "physics", None),
-            "cached_coords",
-            None,
-        )
-        physics_data_kwargs = (
-            {"speedy_coords": speedy_coords} if speedy_coords is not None else {}
-        )
-        self._state = JCMState(
-            metadata=_modal_state,
-            phydata=tree_as_real_dtype(
-                PhysicsData.zeros(
-                    self.model.coords.horizontal.nodal_shape,
-                    self.model.coords.vertical.layers,
-                    **physics_data_kwargs,
-                ),
-                self._dtype_policy,
-            ),
-            prog=dynamics_state_to_physics_state(_modal_state, self.model.primitive),
-        )
+        self._state = _bootstrap_jcm_state(self.model)
 
         if self.forcing_data is not None:
             self.forcing = self.forcing_data
         else:
-            self.forcing = default_forcing(self.model.coords.horizontal).copy(
-                lfluxland=True
-            )
+            self.forcing = default_forcing(self.model.coords.horizontal)
 
         self._state = tree_as_runtime_dtype(self._state, self._dtype_policy)
         self.forcing = tree_as_runtime_dtype(self.forcing, self._dtype_policy)

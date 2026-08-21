@@ -1342,6 +1342,24 @@ def test_jax_gcm_factory_binds_runtime_hooks_directly() -> None:
 
 
 @pytest.mark.fast_always
+def test_jax_gcm_adapter_uses_jcm_2_api_owners() -> None:
+    state_source = Path("vercor/setups/_external/jax_gcm_state.py").read_text(
+        encoding="utf-8"
+    )
+    factory_source = Path("vercor/setups/_external/jax_gcm.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "from jcm.physics.speedy.speedy_terms import speedy_physics" in state_source
+    assert "from jcm.terrain import TerrainData" in state_source
+    assert "from jcm.forcing import ForcingData" in state_source
+    assert "SpeedyPhysics" not in state_source
+    assert "dynamics_state_to_physics_state" not in state_source
+    assert "_prepare_initial_modal_state" not in state_source
+    assert "from jcm.terrain import TerrainData as _TerrainData" in factory_source
+
+
+@pytest.mark.fast_always
 def test_jax_gcm_average_writer_bypasses_xarray_adapter() -> None:
     source = Path("vercor/setups/_external/jax_gcm_output.py").read_text(
         encoding="utf-8"

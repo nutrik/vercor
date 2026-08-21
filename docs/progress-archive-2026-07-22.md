@@ -18,3 +18,10 @@ orientation log in `PROGRESS.md`.
   ownership. RED/GREEN was 2/2; affected tests passed 81/81, runnable fast
   passed 656/656, real preparation and static gates passed. Apple Git later
   became available and the remaining repository policy test passed.
+- Post-review version-policy hardening completed locally (2026-07-15): the
+  ownership matrix preserves qualified external/independent identifiers while
+  rejecting exact and shorthand VerCOR labels. Policy passed 141/141,
+  policy/architecture passed 161/161, and the full suite passed 1261/1261 with
+  the same five third-party warning instances. Independent final review found
+  no Critical, Important, or Minor issues. Release artifacts and hashes above
+  remain unchanged; no tag, push, publication, or upload was performed.

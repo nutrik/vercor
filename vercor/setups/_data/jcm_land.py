@@ -1,5 +1,7 @@
-import jax.numpy as jnp
 from typing import TYPE_CHECKING, Any
+
+import jax
+import jax.numpy as jnp
 
 from vercor.components import (
     ComponentSpec,
@@ -10,7 +12,6 @@ from vercor.dtypes import as_jax_real_array
 from vercor.grids import RectilinearGrid
 from vercor.grid_masks import create_lnd_mask_from_ocn
 from vercor.output import OutputSpec
-from vercor.setups._data._field_helpers import canonicalize_surface_field
 from vercor.setups._output import resolve_output
 
 if TYPE_CHECKING:
@@ -22,6 +23,25 @@ else:
 
 _JCM_LAND_INPUT_NAMES = ("latent_heat_flux", "sensible_heat_flux")
 _JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture")
+
+
+def _canonicalize_jcm_forcing_field(
+    field: Any,
+    *,
+    field_name: str,
+) -> jax.Array:
+    """Return one static or time-first JCM surface field in VerCOR layout."""
+
+    values = getattr(field, "values", field)
+    array = as_jax_real_array(values)
+    if array.ndim == 2:
+        return array.T
+    if array.ndim == 3:
+        return array.transpose((0, 2, 1))
+    raise ValueError(
+        f"JCM forcing field '{field_name}' has shape {array.shape}; expected "
+        "(longitude, latitude) or (time, longitude, latitude)"
+    )
 
 
 def make_jcm_land(
@@ -36,8 +56,14 @@ def make_jcm_land(
 
     longitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.longitudes))
     latitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.latitudes))
-    land_surface_temperature = canonicalize_surface_field(jcm_forcing.stl_am)
-    soil_moisture = canonicalize_surface_field(jcm_forcing.soilw_am)
+    land_surface_temperature = _canonicalize_jcm_forcing_field(
+        jcm_forcing.stl_am,
+        field_name="stl_am",
+    )
+    soil_moisture = _canonicalize_jcm_forcing_field(
+        jcm_forcing.soilw_am,
+        field_name="soilw_am",
+    )
     lnd_bmask, _ = create_lnd_mask_from_ocn(
         atm_lat=latitude,
         atm_lon=longitude,

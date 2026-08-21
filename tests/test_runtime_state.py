@@ -22,6 +22,7 @@ from vercor.dtypes import DTypePolicy
 from vercor.exchanges import Exchange
 from vercor.runtime import RuntimeOptions
 from vercor.setups._external.jax_gcm_runtime import JAXGCMRuntimePayload
+from vercor.setups._external.jax_gcm_state import JCMState
 from vercor._runtime.contracts import ExchangeContract
 from vercor._runtime.component_state import create_runtime_component_state
 import vercor._runtime.field_transfer as field_transfer_module
@@ -887,7 +888,12 @@ def test_runtime_coupler_state_restores_component_index_cache_after_pytree_round
 
 def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
     payload = JAXGCMRuntimePayload(
-        jcm_state={"metadata": jnp.asarray(1.0)},
+        jcm_state=JCMState(
+            dynamics={},
+            physics={},
+            dycore_state={"marker": jnp.asarray(1.0)},
+            physics_carry={"marker": jnp.asarray(10.0)},
+        ),
         forcing={"surface_temperature": jnp.asarray([[2.0, 3.0]])},
     )
     component = ComponentRuntimeState(
@@ -902,7 +908,17 @@ def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
         assert isinstance(runtime_payload, JAXGCMRuntimePayload)
         return value.with_payload(
             JAXGCMRuntimePayload(
-                jcm_state={"metadata": runtime_payload.jcm_state["metadata"] + 1.0},
+                jcm_state=JCMState(
+                    dynamics=runtime_payload.jcm_state.dynamics,
+                    physics=runtime_payload.jcm_state.physics,
+                    dycore_state={
+                        "marker": runtime_payload.jcm_state.dycore_state["marker"] + 1.0
+                    },
+                    physics_carry={
+                        "marker": runtime_payload.jcm_state.physics_carry["marker"]
+                        + 2.0
+                    },
+                ),
                 forcing=runtime_payload.forcing,
             )
         )
@@ -911,8 +927,12 @@ def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
 
     assert isinstance(updated.payload, JAXGCMRuntimePayload)
     assert_allclose_compact(
-        updated.payload.jcm_state["metadata"],
+        updated.payload.jcm_state.dycore_state["marker"],
         np.asarray(2.0),
+    )
+    assert_allclose_compact(
+        updated.payload.jcm_state.physics_carry["marker"],
+        np.asarray(12.0),
     )
 
 

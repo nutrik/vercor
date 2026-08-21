@@ -1102,3 +1102,47 @@ def test_jcm_land_constructor_converts_coords_and_preserves_data(
         forcing.stl_am.T,
     )
     assert_allclose_compact(component._data["soil_moisture"], forcing.soilw_am.T)
+
+
+def test_jcm_land_canonicalizes_jcm_2_time_series_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        jcm_land_module,
+        "create_lnd_mask_from_ocn",
+        lambda **kwargs: (np.ones((2, 2)), np.zeros((2, 2))),
+    )
+    coords = SimpleNamespace(
+        horizontal=SimpleNamespace(
+            longitudes=np.deg2rad(np.asarray([0.0, 180.0])),
+            latitudes=np.deg2rad(np.asarray([-45.0, 45.0])),
+        )
+    )
+    values = np.arange(12.0).reshape(3, 2, 2)
+    forcing = SimpleNamespace(
+        stl_am=SimpleNamespace(values=values),
+        soilw_am=SimpleNamespace(values=values + 20.0),
+    )
+
+    component = make_jcm_land(
+        cast(Any, coords),
+        cast(Any, forcing),
+        make_test_grid(name="ocn"),
+    )
+    _prepare_component_for_test(component, cast(Any, CoverageCouplerStub()))
+
+    assert_allclose_compact(
+        cast(Any, component)._data["land_surface_temperature"],
+        values.transpose(0, 2, 1),
+    )
+
+
+def test_jcm_land_rejects_invalid_jcm_forcing_rank() -> None:
+    with pytest.raises(
+        ValueError,
+        match="JCM forcing field 'stl_am'.*shape \\(3,\\)",
+    ):
+        jcm_land_module._canonicalize_jcm_forcing_field(
+            np.ones(3),
+            field_name="stl_am",
+        )

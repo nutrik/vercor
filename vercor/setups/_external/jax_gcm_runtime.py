@@ -20,12 +20,7 @@ from vercor.exceptions import ComponentError, CouplerError
 from vercor.field_layout import validate_canonical_grid_field_shape
 from vercor._pytree import PyTreeNodeMixin
 from vercor.physics import PhysicalConstants
-from vercor.setups._external._jax_gcm_pytree import (
-    tree_mean,
-    tree_as_runtime_dtype,
-    tree_stack,
-    tree_unwrap_leading_dims,
-)
+from vercor.setups._external._jax_gcm_pytree import tree_as_runtime_dtype
 import vercor.setups._external.jax_gcm_fields as _jax_gcm_fields
 
 if TYPE_CHECKING:
@@ -173,6 +168,23 @@ def validate_jax_gcm_runtime_state(
         )
 
 
+def _required_speedy_diagnostics(
+    physics: Mapping[str, Any],
+    *,
+    component_name: str,
+) -> tuple[Any, Any]:
+    """Return required SPEEDY diagnostics from a JCM 2 mapping."""
+
+    required = ("_surface_flux", "_shortwave_rad")
+    missing = tuple(name for name in required if name not in physics)
+    if missing:
+        names = ", ".join(missing)
+        raise ComponentError(
+            f"JAXGCM component '{component_name}' is missing JCM diagnostics: {names}"
+        )
+    return physics["_surface_flux"], physics["_shortwave_rad"]
+
+
 def step_jax_gcm_runtime(
     state: "JAXGCMSetupState",
     fields: Mapping[str, Any],
@@ -212,9 +224,9 @@ def step_jax_gcm_runtime(
         payload.jcm_state,
         applied_forcing,
     )
-    averaged_prediction = tree_mean(
-        tree_unwrap_leading_dims(tree_stack([prediction])),
-        axis=0,
+    surface_flux, shortwave_rad = _required_speedy_diagnostics(
+        jcm_state.physics,
+        component_name=state.name,
     )
 
     mapped_fields = _jax_gcm_fields.map_jcm_output_fields(
@@ -225,15 +237,15 @@ def step_jax_gcm_runtime(
         constants.universal_gas_constant,
         constants.reference_pressure,
         constants.dry_air_kappa,
-        averaged_prediction.physics.surface_flux.shf,
-        averaged_prediction.physics.surface_flux.evap,
-        averaged_prediction.physics.surface_flux.rlds,
-        averaged_prediction.physics.shortwave_rad.rsns,
-        averaged_prediction.dynamics.normalized_surface_pressure,
-        averaged_prediction.dynamics.u_wind,
-        averaged_prediction.dynamics.v_wind,
-        averaged_prediction.dynamics.temperature,
-        averaged_prediction.dynamics.specific_humidity,
+        surface_flux.shf,
+        surface_flux.evap,
+        surface_flux.rlds,
+        shortwave_rad.rsns,
+        jcm_state.dynamics.normalized_surface_pressure,
+        jcm_state.dynamics.u_wind,
+        jcm_state.dynamics.v_wind,
+        jcm_state.dynamics.temperature,
+        jcm_state.dynamics.specific_humidity,
         dtype=dtype,
     )
 
