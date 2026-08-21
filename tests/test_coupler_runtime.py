@@ -1834,12 +1834,54 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
         jax.tree_util.tree_structure(initial_carry)
     )
     assert len(final_float_leaves) == len(initial_float_leaves)
+    assert all(np.all(np.isfinite(leaf)) for leaf in final_float_leaves)
     assert any(
         not np.allclose(initial, final)
         for initial, final in zip(initial_float_leaves, final_float_leaves)
     )
     temperature = final_state._component_state("ATM").fields.get("temperature")
     assert np.all(np.isfinite(np.asarray(temperature)))
+
+    native_surface_temperature = jnp.full(
+        (component.grid.shape[1], component.grid.shape[0]),
+        288.0,
+        dtype=jnp.float64,
+    )
+    forcing = initial_payload.forcing.copy(
+        stl_am=native_surface_temperature,
+        sea_surface_temperature=native_surface_temperature,
+    )
+
+    def real_jcm_loss(sea_surface_temperature: jax.Array) -> jax.Array:
+        next_state, _ = setup_state._step_function(
+            initial_payload.jcm_state,
+            forcing.copy(sea_surface_temperature=sea_surface_temperature),
+        )
+        return jnp.sum(next_state.dynamics.temperature)
+
+    loss_value, reverse_gradient = jax.value_and_grad(real_jcm_loss)(
+        native_surface_temperature
+    )
+    _, forward_tangent = jax.jvp(
+        real_jcm_loss,
+        (native_surface_temperature,),
+        (jnp.ones_like(native_surface_temperature),),
+    )
+
+    assert np.isfinite(np.asarray(loss_value))
+    assert reverse_gradient.shape == native_surface_temperature.shape
+    assert np.all(np.isfinite(np.asarray(reverse_gradient)))
+    assert np.isfinite(np.asarray(forward_tangent))
+    assert np.any(np.asarray(reverse_gradient) != 0.0)
+    assert float(jnp.abs(forward_tangent)) > 0.0
+    assert_allclose_compact(
+        forward_tangent,
+        jnp.sum(reverse_gradient),
+        rtol=1e-6,
+        atol=1e-10,
+        equal_nan=False,
+        label="real JCM forward/reverse derivative",
+    )
 
 
 def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> None:
