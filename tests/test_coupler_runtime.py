@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, NamedTuple, cast
+from typing import Any, Literal, NamedTuple, cast
 
 import jax
 import jax.numpy as jnp
@@ -767,11 +767,22 @@ def test_run_supports_jit_grad_and_jvp() -> None:
             result._component_state("OCN").fields.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(initial_sst)
     gradient = jax.grad(loss)(initial_sst)
-    _, tangent = jax.jvp(loss, (initial_sst,), (jnp.ones_like(initial_sst),))
+    _, forward_tangent = jax.jvp(loss, (initial_sst,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, initial_sst)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
 
     assert np.all(np.isfinite(np.asarray(gradient)))
-    assert np.isfinite(np.asarray(tangent))
+    assert np.isfinite(np.asarray(forward_tangent))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_run_matches_one_step_closed_form_for_slab_ocean() -> None:
@@ -1000,12 +1011,23 @@ def test_mixed_grid_slab_coupler_runs_with_real_regridders_under_jit_grad_and_jv
             result._component_state("OCN").fields.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(initial_sst)
     gradient = jax.grad(loss)(initial_sst)
-    _, tangent = jax.jvp(loss, (initial_sst,), (jnp.ones_like(initial_sst),))
+    _, forward_tangent = jax.jvp(loss, (initial_sst,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, initial_sst)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
 
     assert gradient.shape == initial_sst.shape
     assert np.all(np.isfinite(np.asarray(gradient)))
-    assert np.isfinite(np.asarray(tangent))
+    assert np.isfinite(np.asarray(forward_tangent))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_data_forcing_components_run_inside_runtime() -> None:
@@ -1114,10 +1136,23 @@ def test_data_forcing_components_run_inside_runtime() -> None:
             result._component_state("ATM").received.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(monthly_ocean)
     gradient = jax.grad(loss)(monthly_ocean)
+    _, forward_tangent = jax.jvp(loss, (monthly_ocean,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, monthly_ocean)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert gradient.shape == monthly_ocean.shape
     assert_allclose_compact(gradient[0], np.ones((2, 2)))
     assert_allclose_compact(gradient[1:], np.zeros((11, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_public_data_component_monthly_output_validates_and_sends_runtime_slice() -> (
@@ -1323,10 +1358,23 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
             result._component_state("ATM").received.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(monthly_ocean)
     gradient = jax.grad(loss)(monthly_ocean)
+    _, forward_tangent = jax.jvp(loss, (monthly_ocean,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, monthly_ocean)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert gradient.shape == monthly_ocean.shape
     assert np.all(np.isfinite(np.asarray(gradient[0])))
     assert_allclose_compact(gradient[1:], np.zeros((11, 2, 3)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() -> None:
@@ -1399,11 +1447,24 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
             result._component_state("ATM").received.get("land_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(forcing)
     gradient = jax.grad(loss)(forcing)
+    _, forward_tangent = jax.jvp(loss, (forcing,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, forcing)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert gradient.shape == forcing.shape
     assert_allclose_compact(gradient[2], np.ones(grid.shape))
     assert_allclose_compact(gradient[:2], np.zeros((2, 2, 2)))
     assert_allclose_compact(gradient[3:], np.zeros((362, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> None:
@@ -1478,10 +1539,23 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
             result._component_state("ATM").received.get("land_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(forcing)
     gradient = jax.grad(loss)(forcing)
+    _, forward_tangent = jax.jvp(loss, (forcing,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, forcing)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert_allclose_compact(gradient[59], np.ones(grid.shape))
     assert_allclose_compact(gradient[:59], np.zeros((59, 2, 2)))
     assert_allclose_compact(gradient[60:], np.zeros((305, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad() -> (
@@ -1570,10 +1644,23 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
             result._component_state("ATM").received.get("land_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(forcing)
     gradient = jax.grad(loss)(forcing)
+    _, forward_tangent = jax.jvp(loss, (forcing,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, forcing)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert_allclose_compact(gradient[56], np.ones(grid.shape))
     assert_allclose_compact(gradient[:56], np.zeros((56, 2, 2)))
     assert_allclose_compact(gradient[57:], np.zeros((308, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
@@ -1664,10 +1751,23 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
             result._component_state("ATM").received.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(monthly_ocean)
     gradient = jax.grad(loss)(monthly_ocean)
+    _, forward_tangent = jax.jvp(loss, (monthly_ocean,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, monthly_ocean)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert_allclose_compact(gradient[0], np.full(grid.shape, right_weight))
     assert_allclose_compact(gradient[11], np.full(grid.shape, left_weight))
     assert_allclose_compact(gradient[1:11], np.zeros((10, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 @pytest.mark.filterwarnings(
@@ -1743,10 +1843,28 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
         result = run_scanned_coupler(coupler, state)
         return jnp.sum(result._component_state("ATM").fields.get("temperature"))
 
-    gradient = jax.grad(loss)(jnp.full(grid.shape, 281.0, dtype=jnp.float32))
+    sea_surface_temperature = jnp.full(grid.shape, 281.0, dtype=jnp.float32)
+    tangent_seed = jnp.ones_like(sea_surface_temperature)
+    gradient = jax.grad(loss)(sea_surface_temperature)
+    _, forward_tangent = jax.jvp(
+        loss,
+        (sea_surface_temperature,),
+        (tangent_seed,),
+    )
+    value, pullback = jax.vjp(loss, sea_surface_temperature)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert gradient.shape == grid.shape
     assert np.all(np.isfinite(np.asarray(gradient)))
     assert np.any(np.asarray(gradient) != 0.0)
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> None:
@@ -1903,24 +2021,25 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
     coupled_loss, coupled_reverse = jax.value_and_grad(full_coupler_loss)(
         coupled_surface_temperature
     )
-    coupled_vjp_value, coupled_pullback = jax.vjp(
+    tangent_seed = jnp.ones_like(coupled_surface_temperature)
+    value, pullback = jax.vjp(
         full_coupler_loss,
         coupled_surface_temperature,
     )
-    (coupled_vjp_cotangent,) = coupled_pullback(jnp.ones_like(coupled_vjp_value))
-    _, coupled_forward = jax.jvp(
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+    _, forward_tangent = jax.jvp(
         full_coupler_loss,
         (coupled_surface_temperature,),
-        (jnp.ones_like(coupled_surface_temperature),),
+        (tangent_seed,),
     )
 
     assert np.isfinite(np.asarray(coupled_loss))
     assert np.isfinite(np.asarray(coupled_reverse))
-    assert np.isfinite(np.asarray(coupled_vjp_cotangent))
-    assert np.isfinite(np.asarray(coupled_forward))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert np.isfinite(np.asarray(forward_tangent))
     assert float(jnp.abs(coupled_reverse)) > 0.0
     assert_allclose_compact(
-        coupled_forward,
+        forward_tangent,
         coupled_reverse,
         rtol=1e-5,
         atol=1e-8,
@@ -1928,8 +2047,8 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
         label="full Coupler real JCM forward/reverse derivative",
     )
     assert_allclose_compact(
-        coupled_forward,
-        coupled_vjp_cotangent,
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
         rtol=1e-5,
         atol=1e-8,
         equal_nan=False,
@@ -1999,17 +2118,28 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
         result = run_scanned_coupler(coupler, state)
         return jnp.sum(result._component_state("ATM").fields.get("temperature"))
 
+    tangent_seed = jnp.ones_like(sea_surface_temperature)
     gradient = jax.grad(loss)(sea_surface_temperature)
-    _, tangent = jax.jvp(
+    _, forward_tangent = jax.jvp(
         loss,
         (sea_surface_temperature,),
-        (jnp.ones_like(sea_surface_temperature),),
+        (tangent_seed,),
     )
+    value, pullback = jax.vjp(loss, sea_surface_temperature)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
 
     assert gradient.shape == grid.shape
     assert np.all(np.isfinite(np.asarray(gradient)))
     assert np.any(np.asarray(gradient) != 0.0)
-    assert np.isfinite(np.asarray(tangent))
+    assert np.isfinite(np.asarray(forward_tangent))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_jax_gcm_runtime_requires_initialized_payload() -> None:
@@ -2402,7 +2532,7 @@ def _masked_scalar_component(
     value: jax.Array,
     *,
     step: Any | None = None,
-    execution: str = "jax",
+    execution: Literal["jax", "host"] = "jax",
 ) -> CallableComponent:
     """Build a two-cell component with one inactive grid location."""
 
@@ -2478,7 +2608,7 @@ def test_compiled_component_step_reports_active_nonfinite_output() -> None:
         match="Component 'SAFE' step output field 'value'.*active domain",
     ):
         state = _single_component_coupler(component).run()
-        state._component_state("SAFE").fields.get("value").block_until_ready()
+        jax.block_until_ready(state._component_state("SAFE").fields.get("value"))
 
 
 def _state_validation_coupler(

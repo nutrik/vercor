@@ -61,14 +61,12 @@ def test_active_finite_contract_rejects_non_trailing_mask() -> None:
 
 
 def test_active_finite_contract_reports_compiled_failure() -> None:
-    checked_sum = jax.jit(
-        lambda values: (
-            require_active_finite(values, active_mask=None, owner="compiled field"),
-            jnp.sum(values),
-        )[1]
-    )
+    def checked_sum(values: jax.Array) -> jax.Array:
+        require_active_finite(values, active_mask=None, owner="compiled field")
+        return jnp.sum(values)
+
     with pytest.raises(JaxRuntimeError, match="compiled field.*active domain"):
-        checked_sum(jnp.asarray([1.0, jnp.nan])).block_until_ready()
+        jax.jit(checked_sum)(jnp.asarray([1.0, jnp.nan])).block_until_ready()
 
 
 @pytest.mark.parametrize("bad_value", [0.0, -1.0, jnp.nan, jnp.inf, -jnp.inf])
@@ -80,14 +78,12 @@ def test_strictly_positive_rejects_non_positive_or_non_finite_values(
 
 
 def test_strictly_positive_reports_compiled_failure() -> None:
-    checked_sum = jax.jit(
-        lambda values: (
-            require_strictly_positive(values, owner="compiled scale"),
-            jnp.sum(values),
-        )[1]
-    )
+    def checked_sum(values: jax.Array) -> jax.Array:
+        require_strictly_positive(values, owner="compiled scale")
+        return jnp.sum(values)
+
     with pytest.raises(JaxRuntimeError, match="compiled scale.*strictly positive"):
-        checked_sum(jnp.asarray([1.0, 0.0])).block_until_ready()
+        jax.jit(checked_sum)(jnp.asarray([1.0, 0.0])).block_until_ready()
 
 
 def test_replace_missing_nan_fills_nan_and_preserves_finite_values() -> None:
