@@ -86,8 +86,10 @@ def replace_missing_nan(
     array = jnp.asarray(values)
     finite_locations = ~jnp.isnan(array)
     require_active_finite(array, active_mask=finite_locations, owner=owner)
+    fill_array = jnp.asarray(fill_value)
+    require_active_finite(fill_array, active_mask=None, owner=f"{owner} fill value")
     return jnp.where(
-        finite_locations, array, jnp.asarray(fill_value, dtype=array.dtype)
+        finite_locations, array, jnp.asarray(fill_array, dtype=array.dtype)
     )
 
 
@@ -103,7 +105,18 @@ def safe_masked_divide(
     condition = jnp.asarray(where, dtype=bool)
     numerator_array = jnp.asarray(numerator)
     denominator_array = jnp.asarray(denominator)
+    require_active_finite(
+        numerator_array,
+        active_mask=condition,
+        owner="safe numerator",
+    )
+    require_active_finite(
+        denominator_array,
+        active_mask=condition,
+        owner="safe denominator",
+    )
     safe_numerator = jnp.where(condition, numerator_array, 0.0)
     safe_denominator = jnp.where(condition, denominator_array, 1.0)
     quotient = safe_numerator / safe_denominator
+    require_active_finite(quotient, active_mask=condition, owner="safe quotient")
     return jnp.where(condition, quotient, inactive_value)

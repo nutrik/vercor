@@ -103,6 +103,45 @@ def test_replace_missing_nan_rejects_infinity(bad_value: float) -> None:
         replace_missing_nan(jnp.asarray([1.0, bad_value]), owner="test field")
 
 
+@pytest.mark.parametrize("bad_fill_value", [jnp.nan, jnp.inf, -jnp.inf])
+def test_replace_missing_nan_rejects_non_finite_fill_value(
+    bad_fill_value: float,
+) -> None:
+    with pytest.raises(CouplerError, match="test field fill value"):
+        replace_missing_nan(
+            jnp.asarray([1.0, jnp.nan]),
+            owner="test field",
+            fill_value=bad_fill_value,
+        )
+
+
+@pytest.mark.parametrize("operand", ["numerator", "denominator"])
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_safe_masked_divide_rejects_infinite_inactive_operands(
+    operand: str,
+    bad_value: float,
+) -> None:
+    numerator = jnp.asarray([4.0, bad_value if operand == "numerator" else jnp.nan])
+    denominator = jnp.asarray([2.0, bad_value if operand == "denominator" else 0.0])
+    with pytest.raises(CouplerError, match=f"safe {operand}.*infinity"):
+        safe_masked_divide(
+            numerator,
+            denominator,
+            where=jnp.asarray([True, False]),
+            inactive_value=jnp.nan,
+        )
+
+
+def test_safe_masked_divide_rejects_non_finite_active_quotient() -> None:
+    with pytest.raises(CouplerError, match="safe quotient.*active domain"):
+        safe_masked_divide(
+            jnp.asarray([1.0, jnp.nan]),
+            jnp.asarray([0.0, 0.0]),
+            where=jnp.asarray([True, False]),
+            inactive_value=jnp.nan,
+        )
+
+
 def test_safe_masked_divide_has_finite_jvp_and_vjp() -> None:
     mask = jnp.asarray([True, False])
 
