@@ -142,6 +142,26 @@ def test_safe_masked_divide_rejects_non_finite_active_quotient() -> None:
         )
 
 
+def test_safe_masked_divide_broadcasts_scalar_numerator() -> None:
+    divided = safe_masked_divide(
+        4.0,
+        jnp.asarray([2.0, 0.0]),
+        where=jnp.asarray([True, False]),
+        inactive_value=jnp.nan,
+    )
+    assert_array_equal_compact(divided, jnp.asarray([2.0, jnp.nan]))
+
+
+def test_safe_masked_divide_broadcasts_scalar_denominator() -> None:
+    divided = safe_masked_divide(
+        jnp.asarray([4.0, jnp.nan]),
+        2.0,
+        where=jnp.asarray([True, False]),
+        inactive_value=jnp.nan,
+    )
+    assert_array_equal_compact(divided, jnp.asarray([2.0, jnp.nan]))
+
+
 def test_safe_masked_divide_has_finite_jvp_and_vjp() -> None:
     mask = jnp.asarray([True, False])
 

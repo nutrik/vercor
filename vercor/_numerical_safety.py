@@ -105,6 +105,17 @@ def safe_masked_divide(
     condition = jnp.asarray(where, dtype=bool)
     numerator_array = jnp.asarray(numerator)
     denominator_array = jnp.asarray(denominator)
+    try:
+        numerator_array, denominator_array, condition = jnp.broadcast_arrays(
+            numerator_array,
+            denominator_array,
+            condition,
+        )
+    except ValueError as error:
+        raise CouplerError(
+            "safe masked divide numerator, denominator, and mask shapes "
+            "cannot be broadcast together."
+        ) from error
     require_active_finite(
         numerator_array,
         active_mask=condition,
