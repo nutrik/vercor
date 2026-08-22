@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from jax import Array, lax
 
 from vercor.dtypes import as_jax_real_array, jax_full, jax_index_dtype
+from vercor._numerical_safety import safe_masked_divide
 import vercor._interpolators._bilinear_extrapolation as _extrapolation
 import vercor._interpolators._bilinear_geometry as _geometry
 import vercor._interpolators._bilinear_weights as _weights
@@ -220,12 +221,17 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             wsum = w00 + w10 + w01 + w11
 
             num = (
-                jnp.where(m00, w00 * v00, 0.0)
-                + jnp.where(m10, w10 * v10, 0.0)
-                + jnp.where(m01, w01 * v01, 0.0)
-                + jnp.where(m11, w11 * v11, 0.0)
+                w00 * jnp.where(m00, v00, 0.0)
+                + w10 * jnp.where(m10, v10, 0.0)
+                + w01 * jnp.where(m01, v01, 0.0)
+                + w11 * jnp.where(m11, v11, 0.0)
             )
-            out = jnp.where(wsum > 0.0, num / wsum, jnp.nan)
+            out = safe_masked_divide(
+                num,
+                wsum,
+                where=wsum > 0.0,
+                inactive_value=jnp.nan,
+            )
             return out, wsum
 
         num = self.w00 * v00 + self.w10 * v10 + self.w01 * v01 + self.w11 * v11
@@ -305,12 +311,17 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             w11 = self.w11 * m11
             wsum = (w00 + w10 + w01 + w11)[..., None]
             num = (
-                jnp.where(m00[..., None], w00[..., None] * v00, 0.0)
-                + jnp.where(m10[..., None], w10[..., None] * v10, 0.0)
-                + jnp.where(m01[..., None], w01[..., None] * v01, 0.0)
-                + jnp.where(m11[..., None], w11[..., None] * v11, 0.0)
+                w00[..., None] * jnp.where(m00[..., None], v00, 0.0)
+                + w10[..., None] * jnp.where(m10[..., None], v10, 0.0)
+                + w01[..., None] * jnp.where(m01[..., None], v01, 0.0)
+                + w11[..., None] * jnp.where(m11[..., None], v11, 0.0)
             )
-            vt3 = jnp.where(wsum > 0.0, num / wsum, jnp.nan)
+            vt3 = safe_masked_divide(
+                num,
+                wsum,
+                where=wsum > 0.0,
+                inactive_value=jnp.nan,
+            )
             need = ~jnp.isfinite(vt3[..., 0])
         else:
             num = (
@@ -323,8 +334,9 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             vt3 = jnp.where(all_ok[..., None], num, jnp.nan)
             need = ~all_ok
 
-        u_t = jnp.sum(vt3 * self._e_east_t, axis=-1)
-        v_t = jnp.sum(vt3 * self._e_north_t, axis=-1)
+        vt3_for_projection = jnp.where(need[..., None], 0.0, vt3)
+        u_t = jnp.sum(vt3_for_projection * self._e_east_t, axis=-1)
+        v_t = jnp.sum(vt3_for_projection * self._e_north_t, axis=-1)
 
         def apply_vector_extrapolation(_: None) -> tuple[Array, Array]:
             u_fill = self._extrapolate_scalar(u_src_array, valid)

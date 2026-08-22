@@ -11,6 +11,7 @@ from vercor.dtypes import (
     jax_real_dtype,
     jax_zeros,
 )
+from vercor._numerical_safety import safe_masked_divide
 from vercor._pytree import PyTreeNodeMixin
 from vercor.types import RuntimeArray
 
@@ -228,7 +229,12 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
         else:
             norm = self.dst_areas
 
-        result = jnp.where(norm > 1e-15, weighted_sum / norm, jnp.nan)
+        result = safe_masked_divide(
+            weighted_sum,
+            norm,
+            where=norm > 1e-15,
+            inactive_value=jnp.nan,
+        )
         result_grid = result.reshape((self.n_dst_lat, self.n_dst_lon))
 
         if self._d_lat_flip:
