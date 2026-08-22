@@ -6,10 +6,12 @@ from typing import TYPE_CHECKING, Any, cast
 import jax
 import jax.numpy as jnp
 
+from vercor._numerical_safety import require_active_finite
 from vercor.exceptions import CouplerError
 from vercor.exchanges import Exchange
-from vercor.field_layout import validate_component_data_layout
 from vercor._runtime.contracts import ExchangeContract
+from vercor.field_layout import validate_component_data_layout
+from vercor.fields import _flatten_field_items
 from vercor.state import RunState
 from vercor._runtime.validation import validate_component_runtime_contract_fields
 
@@ -151,6 +153,19 @@ def validate_runtime_state(
             binary=False,
         )
 
+    received_masks = {
+        (exchange.target, field_name): runtime_state._fractional_mask(exchange.route_id)
+        for exchange in exchanges
+        for field_name in _flatten_field_items(exchange.fields)
+    }
+    for component in components.values():
+        component_state = runtime_state._component_state(component.name)
+        _validate_component_store_finiteness(
+            component_state,
+            component=component,
+            received_masks=received_masks,
+        )
+
 
 def _validate_component_store_schemas(
     component_state: Any,
@@ -194,6 +209,33 @@ def _validate_component_store_schemas(
                     f"{owner} field '{field_name}' has dtype {value.dtype}, "
                     f"expected {expected_dtype}."
                 )
+
+
+def _validate_component_store_finiteness(
+    component_state: Any,
+    *,
+    component: Any,
+    received_masks: Mapping[tuple[str, str], Any],
+) -> None:
+    """Reject non-finite values before a runtime store crosses its next owner."""
+
+    for store_name in ("fields", "received", "sent"):
+        store = getattr(component_state, store_name)
+        for field_name in store.field_names:
+            inbound_mask = received_masks.get((component.name, field_name))
+            active_mask = (
+                inbound_mask
+                if store_name in {"fields", "received"} and inbound_mask is not None
+                else component.grid.binary_mask
+            )
+            require_active_finite(
+                store.get(field_name),
+                active_mask=active_mask,
+                owner=(
+                    f"Component '{component.name}' runtime {store_name} "
+                    f"field '{field_name}'"
+                ),
+            )
 
 
 def _validate_exact_names(

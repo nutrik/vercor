@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from jax.errors import JaxRuntimeError
 
 from tests._coverage_support import make_test_grid
 from tests.assertions import assert_allclose_compact
@@ -2381,6 +2382,89 @@ def test_component_step_rejects_step_result_with_non_mapping_fields() -> None:
         match=r"StepResult.fields.*mapping.*list",
     ):
         coupler.run()
+
+
+def _masked_scalar_component(
+    value: jax.Array,
+    *,
+    step: Any | None = None,
+    execution: str = "jax",
+) -> CallableComponent:
+    """Build a two-cell component with one inactive grid location."""
+
+    grid = make_test_grid(
+        name="masked-scalar",
+        longitude=np.asarray([0.0, 1.0]),
+        latitude=np.asarray([0.0]),
+        binary_mask=np.asarray([[1.0, 0.0]]),
+    )
+    return CallableComponent(
+        "SAFE",
+        grid,
+        (lambda fields: {"value": fields["value"]}) if step is None else step,
+        spec=ComponentSpec(
+            outputs=("value",),
+            initial_fields={"value": value},
+            execution=execution,
+        ),
+    )
+
+
+def _single_component_coupler(component: CallableComponent) -> Coupler:
+    """Build a one-step coupler for numerical runtime-boundary tests."""
+
+    return Coupler(
+        clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
+        components=(component,),
+        run_order=("SAFE",),
+        runtime=RuntimeOptions(
+            backend="host" if component.spec.execution == "host" else "jax"
+        ),
+    )
+
+
+@pytest.mark.fast_always
+def test_initial_state_rejects_active_nan_but_allows_inactive_missing_nan() -> None:
+    invalid = _masked_scalar_component(jnp.asarray([[jnp.nan, jnp.nan]]))
+    with pytest.raises(
+        CouplerError, match="Component 'SAFE'.*field 'value'.*active domain"
+    ):
+        _single_component_coupler(invalid).initial_state()
+
+    valid = _masked_scalar_component(jnp.asarray([[2.0, jnp.nan]]))
+    state = _single_component_coupler(valid).initial_state()
+    fields = np.asarray(state.component("SAFE").field("value"))
+    assert np.isfinite(fields[0, 0])
+    assert np.isnan(fields[0, 1])
+
+
+@pytest.mark.fast_always
+def test_component_step_fails_at_first_active_nonfinite_output() -> None:
+    component = _masked_scalar_component(
+        jnp.asarray([[2.0, jnp.nan]]),
+        step=lambda fields: {"value": fields["value"].at[0, 0].set(jnp.nan)},
+        execution="host",
+    )
+    with pytest.raises(
+        CouplerError,
+        match="Component 'SAFE' step output field 'value'.*active domain",
+    ):
+        _single_component_coupler(component).run()
+
+
+@pytest.mark.fast_always
+def test_compiled_component_step_reports_active_nonfinite_output() -> None:
+    component = _masked_scalar_component(
+        jnp.asarray([[2.0, jnp.nan]]),
+        step=lambda fields: {"value": fields["value"].at[0, 0].set(jnp.nan)},
+        execution="jax",
+    )
+    with pytest.raises(
+        JaxRuntimeError,
+        match="Component 'SAFE' step output field 'value'.*active domain",
+    ):
+        state = _single_component_coupler(component).run()
+        state._component_state("SAFE").fields.get("value").block_until_ready()
 
 
 def _state_validation_coupler(

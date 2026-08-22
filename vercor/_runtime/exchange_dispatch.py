@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+import jax.numpy as jnp
+
+from vercor._numerical_safety import require_active_finite
 from vercor.exceptions import ExchangeError
 from vercor.exchanges import Exchange
 from vercor.fields import VectorField
@@ -14,6 +17,8 @@ def _dispatch_vector_exchange_field(
     received_updates: dict[str, Any],
     field_name: VectorField,
     regrid: Any,
+    route_id: str,
+    fractional_mask: Any,
 ) -> None:
     """Dispatch one vector exchange field into the received update mapping."""
 
@@ -25,6 +30,15 @@ def _dispatch_vector_exchange_field(
         source_fields.get(field_name.u),
         source_fields.get(field_name.v),
     )
+    for vector_name, vector_value in (
+        (field_name.u, u_vector),
+        (field_name.v, v_vector),
+    ):
+        require_active_finite(
+            vector_value,
+            active_mask=fractional_mask,
+            owner=(f"exchange '{route_id}' regridded vector field '{vector_name}'"),
+        )
     received_updates[field_name.u] = u_vector
     received_updates[field_name.v] = v_vector
 
@@ -34,14 +48,22 @@ def _dispatch_scalar_exchange_field(
     received_updates: dict[str, Any],
     field_name: str,
     regrid: Any,
+    route_id: str,
     fractional_mask: Any,
 ) -> None:
     """Dispatch one scalar exchange field into the received update mapping."""
 
     if field_name not in source_fields:
         raise ExchangeError(f"Field {field_name} not present in source fields")
-    received_updates[field_name] = (
-        regrid.regrid(source_fields.get(field_name)) * fractional_mask
+    regridded = regrid.regrid(source_fields.get(field_name))
+    require_active_finite(
+        regridded,
+        active_mask=fractional_mask,
+        owner=f"exchange '{route_id}' regridded field '{field_name}'",
+    )
+    active = jnp.asarray(fractional_mask) > 0
+    received_updates[field_name] = jnp.where(active, regridded, 0.0) * jnp.asarray(
+        fractional_mask
     )
 
 
@@ -70,6 +92,8 @@ def dispatch_component_exchanges(
                     received_updates,
                     field_name,
                     regrid,
+                    exchange.route_id,
+                    fractional_mask,
                 )
             else:
                 _dispatch_scalar_exchange_field(
@@ -77,6 +101,7 @@ def dispatch_component_exchanges(
                     received_updates,
                     field_name,
                     regrid,
+                    exchange.route_id,
                     fractional_mask,
                 )
 
