@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from tests.assertions import assert_allclose_compact
+from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
 import vercor.fluxes.utilities as flux_utilities_module
 from vercor.fluxes.bulk_formula_cesm import (
     compute_ocean_surface_fluxes,
@@ -25,6 +25,7 @@ from vercor.fluxes.utilities import (
 from vercor.fluxes.vertical_coordinates import (
     compute_hybrid_pressure_levels,
     get_altitudes_hybrid_sigma_levels,
+    get_altitudes_sigma_levels,
 )
 from vercor.physics import PhysicalConstants
 
@@ -248,6 +249,62 @@ def test_flux_utility_kernels_support_jit() -> None:
     )
 
 
+def test_flux_and_vertical_coordinate_kernels_have_finite_jvp_vjp() -> None:
+    constants = PhysicalConstants()
+    temperature = jnp.asarray([260.0, 280.0, 300.0])
+    pressure = jnp.asarray([90_000.0, 101_325.0, 120_000.0])
+
+    assert_finite_jvp_vjp(
+        lambda values: jnp.sum(qsat(values)),
+        temperature,
+        jnp.ones_like(temperature),
+    )
+    assert_finite_jvp_vjp(
+        lambda values: jnp.sum(qsat_august_eqn(values[0], values[1])),
+        (pressure, temperature),
+        (jnp.ones_like(pressure), jnp.ones_like(temperature)),
+    )
+    assert_finite_jvp_vjp(
+        lambda values: jnp.sum(compute_air_density(constants, values[0], values[1])),
+        (pressure, temperature),
+        (jnp.ones_like(pressure), jnp.ones_like(temperature)),
+    )
+    assert_finite_jvp_vjp(
+        lambda values: jnp.sum(
+            compute_potential_temperature(constants, values[0], values[1])
+        ),
+        (temperature, pressure),
+        (jnp.ones_like(temperature), jnp.ones_like(pressure)),
+    )
+
+    hybrid_half_pressure = jnp.asarray([0.0, 1_000.0, 5_000.0, 100_000.0])[
+        None, None, :
+    ]
+    hybrid_humidity = jnp.full((1, 1, 3), 0.002)
+    assert_finite_jvp_vjp(
+        lambda values: jnp.sum(
+            get_altitudes_hybrid_sigma_levels(
+                constants,
+                values,
+                hybrid_humidity,
+                hybrid_half_pressure,
+            )
+        ),
+        jnp.full((1, 1, 3), 260.0),
+        jnp.ones((1, 1, 3)),
+    )
+
+    sigma_pressure = jnp.asarray([100_000.0, 70_000.0, 40_000.0])[:, None, None]
+    sigma_humidity = jnp.full((3, 1, 1), 0.002)
+    assert_finite_jvp_vjp(
+        lambda values: jnp.sum(
+            get_altitudes_sigma_levels(values, sigma_pressure, sigma_humidity)
+        ),
+        jnp.full((3, 1, 1), 270.0),
+        jnp.ones((3, 1, 1)),
+    )
+
+
 def test_compute_ocean_surface_fluxes_produces_finite_and_physically_consistent_signs() -> (
     None
 ):
@@ -432,6 +489,57 @@ def test_flux_kernels_support_jit_and_gradients() -> None:
     finite_diff = _finite_difference_scalar_grad(scalar_sensible_heat, 300.0)
     assert np.isfinite(grad_value)
     assert np.isclose(grad_value, finite_diff, rtol=2e-2, atol=1e-3)
+
+    assert_finite_jvp_vjp(
+        lambda surface_temperature: sum(
+            (
+                jnp.sum(value)
+                for value in compute_ocean_surface_fluxes(
+                    constants,
+                    mask,
+                    zbot,
+                    ubot,
+                    vbot,
+                    thbot,
+                    qbot,
+                    rbot,
+                    tbot,
+                    us,
+                    vs,
+                    surface_temperature,
+                )
+            ),
+            start=jnp.asarray(0.0),
+        ),
+        jnp.asarray([[300.0]]),
+        jnp.ones((1, 1)),
+        rtol=1e-5,
+        atol=1e-7,
+    )
+    assert_finite_jvp_vjp(
+        lambda surface_temperature: sum(
+            (
+                jnp.sum(value)
+                for value in shr_flux_atmIce(
+                    constants,
+                    mask,
+                    zbot,
+                    ubot,
+                    vbot,
+                    thbot,
+                    qbot,
+                    rbot,
+                    tbot,
+                    surface_temperature,
+                )
+            ),
+            start=jnp.asarray(0.0),
+        ),
+        jnp.asarray([[270.0]]),
+        jnp.ones((1, 1)),
+        rtol=1e-5,
+        atol=1e-7,
+    )
 
 
 def test_ocean_flux_uses_traced_reference_heights() -> None:

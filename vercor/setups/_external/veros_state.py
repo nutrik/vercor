@@ -7,6 +7,7 @@ from typing import Any, Callable, NamedTuple, cast
 import jax
 import jax.numpy as jnp
 
+from vercor._numerical_safety import replace_missing_nan
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor._host_arrays import runtime_array_to_host
 
@@ -42,14 +43,14 @@ def prepare_surface_forcing_fields(
 ) -> VerosForcingFields:
     restore_to_climatology_jax = jnp.asarray(restore_to_climatology, dtype=bool)
 
-    def _prepare(field: object) -> jax.Array:
+    def _prepare(field: object, owner: str) -> jax.Array:
         field_jax = as_jax_real_array(field)
-        return jnp.nan_to_num(field_jax.T[..., jnp.newaxis])
+        return replace_missing_nan(field_jax, owner=owner).T[..., jnp.newaxis]
 
-    taux_prepared = _prepare(taux)
-    tauy_prepared = _prepare(tauy)
-    qnet_prepared = _prepare(qnet)
-    qnec_prepared = _prepare(qnec)
+    taux_prepared = _prepare(taux, "Veros taux surface forcing")
+    tauy_prepared = _prepare(tauy, "Veros tauy surface forcing")
+    qnet_prepared = _prepare(qnet, "Veros qnet surface forcing")
+    qnec_prepared = _prepare(qnec, "Veros qnec surface forcing")
     qnec_prepared = jnp.where(
         restore_to_climatology_jax, qnec_prepared, jnp.zeros_like(qnec_prepared)
     )

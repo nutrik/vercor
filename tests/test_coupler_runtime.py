@@ -1903,6 +1903,11 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
     coupled_loss, coupled_reverse = jax.value_and_grad(full_coupler_loss)(
         coupled_surface_temperature
     )
+    coupled_vjp_value, coupled_pullback = jax.vjp(
+        full_coupler_loss,
+        coupled_surface_temperature,
+    )
+    (coupled_vjp_cotangent,) = coupled_pullback(jnp.ones_like(coupled_vjp_value))
     _, coupled_forward = jax.jvp(
         full_coupler_loss,
         (coupled_surface_temperature,),
@@ -1911,6 +1916,7 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
 
     assert np.isfinite(np.asarray(coupled_loss))
     assert np.isfinite(np.asarray(coupled_reverse))
+    assert np.isfinite(np.asarray(coupled_vjp_cotangent))
     assert np.isfinite(np.asarray(coupled_forward))
     assert float(jnp.abs(coupled_reverse)) > 0.0
     assert_allclose_compact(
@@ -1920,6 +1926,14 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
         atol=1e-8,
         equal_nan=False,
         label="full Coupler real JCM forward/reverse derivative",
+    )
+    assert_allclose_compact(
+        coupled_forward,
+        coupled_vjp_cotangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+        label="full Coupler real JCM JVP/VJP inner product",
     )
 
 
