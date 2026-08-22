@@ -4,8 +4,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from jax.experimental import checkify
 
-from tests.assertions import assert_allclose_compact, assert_array_equal_compact
+from tests.assertions import (
+    assert_allclose_compact,
+    assert_array_equal_compact,
+    assert_finite_jvp_vjp,
+)
 from vercor.dtypes import jax_index_dtype
 from vercor._interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 
@@ -246,6 +251,90 @@ def test_scalar_extrapolation_idw_k2_symmetric_mean() -> None:
     out = interp.apply_scalar(src)
 
     assert_allclose_compact(out, np.array([[4.0]]), rtol=0.0, atol=1e-12)
+
+
+def test_zero_support_bilinear_scalar_has_finite_jvp_and_vjp() -> None:
+    """Inactive missing scalar targets must not leak a zero-denominator derivative."""
+
+    interpolator = _scalar_interp(
+        lon_src=jnp.asarray([0.0, 1.0]),
+        lat_src=jnp.asarray([0.0, 1.0]),
+        lon_tgt=jnp.asarray([0.5]),
+        lat_tgt=jnp.asarray([0.5]),
+        src_mask=jnp.zeros((2, 2), dtype=bool),
+        tgt_mask=jnp.zeros((1, 1), dtype=bool),
+    )
+    source = jnp.ones((2, 2))
+
+    errors, output = checkify.checkify(
+        interpolator.apply_scalar, errors=checkify.float_checks
+    )(source)
+    assert errors.get() is None
+    assert bool(jnp.isnan(output[0, 0]))
+    assert_finite_jvp_vjp(
+        lambda values: jnp.nansum(interpolator.apply_scalar(values)),
+        source,
+        jnp.ones((2, 2)),
+    )
+
+
+def test_zero_support_bilinear_vector_has_finite_jvp_and_vjp() -> None:
+    """Inactive missing vector targets must not leak a zero-denominator derivative."""
+
+    interpolator = _scalar_interp(
+        lon_src=jnp.asarray([0.0, 1.0]),
+        lat_src=jnp.asarray([0.0, 1.0]),
+        lon_tgt=jnp.asarray([0.5]),
+        lat_tgt=jnp.asarray([0.5]),
+        src_mask=jnp.zeros((2, 2), dtype=bool),
+        tgt_mask=jnp.zeros((1, 1), dtype=bool),
+    )
+    source = jnp.ones((2, 2))
+
+    errors, (u_tgt, v_tgt) = checkify.checkify(
+        lambda values: interpolator.apply_vector(values, values),
+        errors=checkify.float_checks,
+    )(source)
+    assert errors.get() is None
+    assert bool(jnp.isnan(u_tgt[0, 0]))
+    assert bool(jnp.isnan(v_tgt[0, 0]))
+    assert_finite_jvp_vjp(
+        lambda values: jnp.nansum(interpolator.apply_vector(values, values)[0])
+        + jnp.nansum(interpolator.apply_vector(values, values)[1]),
+        source,
+        jnp.ones((2, 2)),
+    )
+
+
+def test_idw_with_inactive_nan_neighbours_has_finite_jvp_and_vjp() -> None:
+    """IDW must ignore NaN values selected only to pad its neighbour count."""
+
+    interpolator = _scalar_interp(
+        lon_src=jnp.asarray([0.0, 1.0, 2.0]),
+        lat_src=jnp.asarray([0.0, 1.0, 2.0]),
+        lon_tgt=jnp.asarray([1.5]),
+        lat_tgt=jnp.asarray([1.5]),
+        src_mask=jnp.asarray(
+            [[True, False, False], [False, False, False], [False, False, False]]
+        ),
+        periodic_longitude=False,
+        extrapolation_mode="idw",
+        idw_k=8,
+    )
+    source = jnp.asarray(
+        [
+            [2.0, jnp.nan, jnp.nan],
+            [jnp.nan, jnp.nan, jnp.nan],
+            [jnp.nan, jnp.nan, jnp.nan],
+        ]
+    )
+
+    assert_allclose_compact(interpolator.apply_scalar(source), jnp.asarray([[2.0]]))
+    assert_finite_jvp_vjp(
+        lambda values: jnp.nansum(interpolator.apply_scalar(values)),
+        source,
+        jnp.ones((3, 3)),
+    )
 
 
 def test_scalar_invalid_extrapolation_mode_raises_when_used() -> None:

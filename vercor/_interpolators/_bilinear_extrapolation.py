@@ -6,6 +6,7 @@ from jax import Array, lax
 import jax.numpy as jnp
 
 from vercor.dtypes import jax_full
+from vercor._numerical_safety import safe_masked_divide
 import vercor._interpolators._bilinear_geometry as _geometry
 
 
@@ -62,19 +63,21 @@ def extrapolate_scalar_field(
             neg_distances = -masked_distances
             top_neg, idx = lax.top_k(neg_distances, k)
             dist_k = -top_neg
-            val_k = values[idx]
+            valid_k = jnp.isfinite(dist_k)
+            val_k = jnp.where(valid_k, values[idx], 0.0)
             weights = jnp.where(
-                jnp.isfinite(dist_k),
+                valid_k,
                 1.0 / (dist_k + idw_eps),
                 0.0,
             )
             wsum = jnp.sum(weights, axis=1)
             return cast(
                 Array,
-                jnp.where(
-                    wsum > 0.0,
-                    jnp.sum(weights * val_k, axis=1) / wsum,
-                    fill_value,
+                safe_masked_divide(
+                    jnp.sum(weights * val_k, axis=1),
+                    wsum,
+                    where=wsum > 0.0,
+                    inactive_value=fill_value,
                 ),
             )
 
