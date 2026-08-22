@@ -2,9 +2,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from jax.experimental import checkify
 from numpy.typing import NDArray
 
-from tests.assertions import assert_allclose_compact
+from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
 from vercor.dtypes import jax_index_dtype, jax_real_dtype
 from vercor._interpolators.conservative_remap_rectilinear import (
     ConservativeRectilinearRemapper,
@@ -292,6 +293,31 @@ def test_source_mask_with_fracarea_gives_nan_for_fully_masked_target_cell() -> N
     assert_allclose_compact(out[0, 1], 2.0, rtol=0.0, atol=1e-14)
     assert_allclose_compact(out[1, 0], 3.0, rtol=0.0, atol=1e-14)
     assert_allclose_compact(out[1, 1], 4.0, rtol=0.0, atol=1e-14)
+
+
+def test_zero_support_fracarea_has_finite_jvp_and_vjp() -> None:
+    """Fully masked fracarea cells retain NaN values with finite derivatives."""
+
+    remapper = _make_remapper(
+        src_lon_edges=jnp.asarray([0.0, 1.0, 2.0]),
+        src_lat_edges=jnp.asarray([0.0, 1.0, 2.0]),
+        dst_lon_edges=jnp.asarray([0.0, 1.0, 2.0]),
+        dst_lat_edges=jnp.asarray([0.0, 1.0, 2.0]),
+        src_mask=jnp.ones((2, 2), dtype=bool),
+        normalize="fracarea",
+    )
+    source = jnp.ones((2, 2))
+
+    errors, output = checkify.checkify(
+        remapper.apply_scalar, errors=checkify.float_checks
+    )(source)
+    assert errors.get() is None
+    assert bool(jnp.all(jnp.isnan(output)))
+    assert_finite_jvp_vjp(
+        lambda values: jnp.nansum(remapper.apply_scalar(values)),
+        source,
+        jnp.ones((2, 2)),
+    )
 
 
 def test_nan_handling_differs_between_fracarea_and_conservation() -> None:

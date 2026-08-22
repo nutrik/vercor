@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 import torch
 import xarray as xr
+from jax.errors import JaxRuntimeError
 
 import vercor.setups._external.camulator_contracts as camulator_contracts_module
 import vercor.setups._external.camulator_fields as camulator_fields_module
@@ -24,7 +25,8 @@ import vercor.setups._external.camulator_runtime as camulator_runtime_module
 import vercor.setups._external.camulator_tensors as camulator_tensors_module
 import vercor.setups._external.camulator_wind_filter as camulator_wind_filter_module
 from tests._coverage_support import capture_logger_output
-from tests.assertions import assert_allclose_compact
+from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
+from vercor.exceptions import ComponentError, CouplerError
 from vercor.recipes import ATMOSPHERE_TO_LAND_RADIATION_FIELDS
 from vercor._runtime.contracts import build_exchange_contracts
 from vercor.components.contexts import SetupContext, StepContext
@@ -260,6 +262,102 @@ def test_prepare_camulator_surface_forcing_supports_jit_and_gradients() -> None:
     )(jnp.asarray([[1.0, 2.0], [3.0, 4.0]]))
     assert gradient.shape == sea_surface_temperature.shape
     assert np.all(np.isfinite(np.asarray(gradient)))
+    assert_finite_jvp_vjp(
+        lambda sst: jnp.sum(
+            camulator_fields_module.prepare_camulator_surface_forcing(
+                sst,
+                jnp.asarray([[10.0, 11.0], [12.0, 13.0]]),
+                jnp.asarray([[0.0, 0.0], [1.0, 0.0]]),
+            )[1]
+            * weights
+        ),
+        jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
+        jnp.ones((2, 2)),
+    )
+
+
+def test_camulator_surface_forcing_rejects_infinity() -> None:
+    with pytest.raises(
+        CouplerError,
+        match="CAMulator.*surface temperature.*infinity",
+    ):
+        cast(
+            Any,
+            camulator_fields_module.prepare_camulator_surface_forcing,
+        ).__wrapped__(
+            jnp.asarray([[jnp.inf, 280.0]]),
+            jnp.asarray([[jnp.nan, jnp.nan]]),
+            jnp.zeros((1, 2)),
+        )
+
+
+def test_camulator_surface_forcing_rejects_zero_variance() -> None:
+    with pytest.raises(
+        CouplerError,
+        match="standard deviation.*strictly positive",
+    ):
+        cast(
+            Any,
+            camulator_fields_module.prepare_camulator_surface_forcing,
+        ).__wrapped__(
+            jnp.full((2, 2), 280.0),
+            jnp.zeros((2, 2)),
+            jnp.zeros((2, 2)),
+        )
+
+
+def test_compiled_camulator_surface_forcing_rejects_infinity() -> None:
+    with pytest.raises(
+        JaxRuntimeError,
+        match="CAMulator.*surface temperature.*infinity",
+    ):
+        result = jax.jit(camulator_fields_module.prepare_camulator_surface_forcing)(
+            jnp.asarray([[jnp.inf, 280.0]]),
+            jnp.asarray([[jnp.nan, jnp.nan]]),
+            jnp.zeros((1, 2)),
+        )
+        result[0].block_until_ready()
+
+
+def test_compiled_camulator_surface_forcing_rejects_zero_variance() -> None:
+    with pytest.raises(
+        JaxRuntimeError,
+        match="standard deviation.*strictly positive",
+    ):
+        result = jax.jit(camulator_fields_module.prepare_camulator_surface_forcing)(
+            jnp.full((2, 2), 280.0),
+            jnp.zeros((2, 2)),
+            jnp.zeros((2, 2)),
+        )
+        result[0].block_until_ready()
+
+
+@pytest.mark.parametrize("bad_value", [jnp.nan, jnp.inf, -jnp.inf])
+def test_camulator_surface_forcing_rejects_nonfinite_land_mask(
+    bad_value: float,
+) -> None:
+    with pytest.raises(CouplerError, match="CAMulator land mask.*active domain"):
+        cast(
+            Any,
+            camulator_fields_module.prepare_camulator_surface_forcing,
+        ).__wrapped__(
+            jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
+            jnp.asarray([[10.0, 20.0], [30.0, 40.0]]),
+            jnp.asarray([[bad_value, 0.0], [0.0, 0.0]]),
+        )
+
+
+@pytest.mark.parametrize("bad_value", [jnp.nan, jnp.inf, -jnp.inf])
+def test_compiled_camulator_surface_forcing_rejects_nonfinite_land_mask(
+    bad_value: float,
+) -> None:
+    with pytest.raises(JaxRuntimeError, match="CAMulator land mask.*active domain"):
+        result = jax.jit(camulator_fields_module.prepare_camulator_surface_forcing)(
+            jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
+            jnp.asarray([[10.0, 20.0], [30.0, 40.0]]),
+            jnp.asarray([[bad_value, 0.0], [0.0, 0.0]]),
+        )
+        result[0].block_until_ready()
 
 
 def test_prepare_camulator_dynamic_forcing_chunk_supports_jit_and_ordering() -> None:
@@ -271,6 +369,39 @@ def test_prepare_camulator_dynamic_forcing_chunk_supports_jit_and_ordering() -> 
 
     assert prepared.shape == (3, 2, 2, 2)
     assert_allclose_compact(prepared, np.asarray(values).transpose((1, 0, 2, 3)))
+    assert_finite_jvp_vjp(
+        lambda forcing: jnp.sum(
+            camulator_fields_module.prepare_camulator_dynamic_forcing_chunk(forcing)
+        ),
+        values,
+        jnp.ones_like(values),
+    )
+
+
+@pytest.mark.parametrize("bad_value", [jnp.nan, jnp.inf, -jnp.inf])
+def test_camulator_dynamic_forcing_rejects_nonfinite_source(
+    bad_value: float,
+) -> None:
+    values = jnp.zeros((2, 3, 2, 2)).at[0, 0, 0, 0].set(bad_value)
+    with pytest.raises(CouplerError, match="CAMulator dynamic forcing.*active domain"):
+        cast(
+            Any,
+            camulator_fields_module.prepare_camulator_dynamic_forcing_chunk,
+        ).__wrapped__(values)
+
+
+@pytest.mark.parametrize("bad_value", [jnp.nan, jnp.inf, -jnp.inf])
+def test_compiled_camulator_dynamic_forcing_rejects_nonfinite_source(
+    bad_value: float,
+) -> None:
+    values = jnp.zeros((2, 3, 2, 2)).at[0, 0, 0, 0].set(bad_value)
+    with pytest.raises(
+        JaxRuntimeError, match="CAMulator dynamic forcing.*active domain"
+    ):
+        result = jax.jit(
+            camulator_fields_module.prepare_camulator_dynamic_forcing_chunk
+        )(values)
+        result.block_until_ready()
 
 
 def test_prepare_camulator_sst_input_supports_jit_and_shape() -> None:
@@ -282,6 +413,13 @@ def test_prepare_camulator_sst_input_supports_jit_and_shape() -> None:
 
     assert prepared.shape == (1, 1, 1, 2, 2)
     assert_allclose_compact(prepared[0, 0, 0], np.asarray(surface_temperature))
+    assert_finite_jvp_vjp(
+        lambda forcing: jnp.sum(
+            camulator_fields_module.prepare_camulator_sst_input(forcing)
+        ),
+        surface_temperature,
+        jnp.ones_like(surface_temperature),
+    )
 
 
 def test_torch_tensor_from_jax_array_uses_copied_host_boundary() -> None:
@@ -852,6 +990,44 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
     assert np.all(np.isfinite(np.asarray(mapped_fields["density"])))
     assert np.all(np.isfinite(np.asarray(mapped_fields["potential_temperature"])))
 
+    def mapped_objective(temperature_values: jax.Array) -> jax.Array:
+        fields = camulator_fields_module.map_camulator_prediction_arrays(
+            constants.earth_radius,
+            constants.gravity,
+            constants.dry_air_gas_constant,
+            constants.water_vapor_mass_ratio_correction,
+            constants.dry_air_molecular_weight,
+            constants.universal_gas_constant,
+            constants.reference_pressure,
+            constants.dry_air_kappa,
+            constants.stefan_boltzmann_constant,
+            100000.0,
+            hyai,
+            hybi,
+            hyam,
+            hybm,
+            u_wind,
+            v_wind,
+            surface_temperature,
+            temperature_values,
+            specific_humidity_3d,
+            net_shortwave_accumulated,
+            net_longwave_accumulated,
+            surface_pressure,
+        )
+        return sum(
+            (jnp.sum(value) for value in fields.values()),
+            start=jnp.asarray(0.0),
+        )
+
+    assert_finite_jvp_vjp(
+        mapped_objective,
+        temperature_3d,
+        jnp.ones_like(temperature_3d),
+        rtol=1e-5,
+        atol=1e-7,
+    )
+
 
 def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
     state_kwargs: dict[str, Any] = {}
@@ -1404,6 +1580,227 @@ def test_camulator_land_declares_radiation_exchange_inputs(
         validate_exchange_fields_declared(component, contracts[name])
 
 
+class _FiniteCamulatorBoundaryStepper:
+    """Minimal native stepper with counters for boundary-order assertions."""
+
+    def __init__(self) -> None:
+        self.build_input_calls = 0
+        self.model_calls = 0
+        self.postprocessing_calls = 0
+        self.shift_calls = 0
+
+    def build_input_with_forcing(
+        self,
+        state: torch.Tensor,
+        dynamic_forcing: torch.Tensor,
+        static_forcing: torch.Tensor,
+    ) -> torch.Tensor:
+        _ = dynamic_forcing, static_forcing
+        self.build_input_calls += 1
+        return state.clone()
+
+    def model(self, model_input: torch.Tensor) -> torch.Tensor:
+        self.model_calls += 1
+        return torch.ones_like(model_input)
+
+    def _apply_postprocessing(
+        self,
+        prediction: torch.Tensor,
+        model_input: torch.Tensor,
+    ) -> torch.Tensor:
+        _ = model_input
+        self.postprocessing_calls += 1
+        return prediction
+
+    def shift_state_forward(
+        self,
+        state: torch.Tensor,
+        prediction: torch.Tensor,
+    ) -> torch.Tensor:
+        _ = state
+        self.shift_calls += 1
+        return prediction
+
+
+class _InvalidSecondInputStepper(_FiniteCamulatorBoundaryStepper):
+    def build_input_with_forcing(
+        self,
+        state: torch.Tensor,
+        dynamic_forcing: torch.Tensor,
+        static_forcing: torch.Tensor,
+    ) -> torch.Tensor:
+        model_input = super().build_input_with_forcing(
+            state,
+            dynamic_forcing,
+            static_forcing,
+        )
+        model_input.flatten()[0] = torch.nan
+        return model_input
+
+
+class _InvalidRawPredictionStepper(_FiniteCamulatorBoundaryStepper):
+    def model(self, model_input: torch.Tensor) -> torch.Tensor:
+        prediction = super().model(model_input)
+        if self.model_calls == 1:
+            prediction.flatten()[0] = torch.nan
+        return prediction
+
+    def _apply_postprocessing(
+        self,
+        prediction: torch.Tensor,
+        model_input: torch.Tensor,
+    ) -> torch.Tensor:
+        processed = super()._apply_postprocessing(prediction, model_input)
+        return torch.nan_to_num(processed)
+
+
+class _InvalidPostprocessedPredictionStepper(_FiniteCamulatorBoundaryStepper):
+    def _apply_postprocessing(
+        self,
+        prediction: torch.Tensor,
+        model_input: torch.Tensor,
+    ) -> torch.Tensor:
+        processed = super()._apply_postprocessing(prediction, model_input)
+        if self.postprocessing_calls == 1:
+            processed.flatten()[0] = torch.nan
+        return processed
+
+
+class _InvalidShiftedStateStepper(_FiniteCamulatorBoundaryStepper):
+    def shift_state_forward(
+        self,
+        state: torch.Tensor,
+        prediction: torch.Tensor,
+    ) -> torch.Tensor:
+        shifted = super().shift_state_forward(state, prediction).clone()
+        if self.shift_calls == 1:
+            shifted.flatten()[0] = torch.nan
+        return shifted
+
+
+class _NoOpCamulatorInputAccessor:
+    def set_state_var(
+        self,
+        state: torch.Tensor,
+        variable_name: str,
+        value: torch.Tensor,
+    ) -> None:
+        _ = state, variable_name, value
+
+
+def _camulator_boundary_case(
+    stepper: _FiniteCamulatorBoundaryStepper,
+) -> tuple[Any, dict[str, jax.Array], Any]:
+    """Return a deterministic two-substep CAMulator native-boundary fake."""
+
+    start = datetime(2000, 1, 1, 0, 0, 0)
+    dynamic_ds = xr.Dataset(
+        data_vars={
+            "F1": (
+                ("time", "lat", "lon"),
+                np.ones((2, 2, 2), dtype=np.float32),
+            )
+        },
+        coords={"time": [start, datetime(2000, 1, 1, 6, 0, 0)]},
+    )
+    resources = SimpleNamespace(
+        dynamic_ds=dynamic_ds,
+        device="cpu",
+        stepper=stepper,
+        static_forcing=torch.zeros((1, 1, 1, 2, 2)),
+        LANDM_COSLAT=jnp.zeros((2, 2)),
+        accessor_input=_NoOpCamulatorInputAccessor(),
+    )
+    fields = {
+        "sea_surface_temperature": jnp.asarray([[280.0, 281.0], [282.0, 283.0]]),
+        "land_surface_temperature": jnp.zeros((2, 2)),
+    }
+    payload = camulator_gcm_state_module.CAMulatorRuntimePayload(
+        model_state=torch.zeros((1, 1, 1, 2, 2)),
+        cursor=camulator_forcing_module.CamulatorRuntimeCursor(),
+    )
+    return resources, fields, payload
+
+
+def test_camulator_rejects_invalid_model_input_before_second_substep() -> None:
+    stepper = _InvalidSecondInputStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+
+    with pytest.raises(ComponentError, match="CAMulator model input.*non-finite"):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=0,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 1
+
+
+def test_camulator_rejects_raw_prediction_before_postprocessing_or_reuse() -> None:
+    stepper = _InvalidRawPredictionStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+
+    with pytest.raises(ComponentError, match="CAMulator raw prediction.*non-finite"):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=0,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 1
+    assert stepper.postprocessing_calls == 0
+    assert stepper.shift_calls == 0
+
+
+def test_camulator_rejects_postprocessed_prediction_before_state_reuse() -> None:
+    stepper = _InvalidPostprocessedPredictionStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+
+    with pytest.raises(
+        ComponentError,
+        match="CAMulator postprocessed prediction.*non-finite",
+    ):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=0,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 1
+    assert stepper.postprocessing_calls == 1
+    assert stepper.shift_calls == 0
+
+
+def test_camulator_rejects_shifted_state_before_next_substep() -> None:
+    stepper = _InvalidShiftedStateStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+
+    with pytest.raises(
+        ComponentError, match="CAMulator shifted model state.*non-finite"
+    ):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=0,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 1
+    assert stepper.postprocessing_calls == 1
+    assert stepper.shift_calls == 1
+
+
 def test_camulator_runtime_step_is_reproducible_from_one_payload(
     monkeypatch: Any,
 ) -> None:
@@ -1441,6 +1838,7 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
             static_forcing: torch.Tensor,
         ) -> torch.Tensor:
             _ = static_forcing
+            assert bool(torch.all(torch.isfinite(dynamic_forcing)))
             captured["dynamic_forcing"] = dynamic_forcing.detach().cpu()
             return state
 
@@ -1464,6 +1862,7 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
     class _StepAccessor:
         def set_state_var(self, state: Any, variable_name: str, value: Any) -> None:
             assert variable_name == "SST"
+            assert bool(torch.all(torch.isfinite(value)))
             captured["sst"] = value.detach().cpu()
             first_sst_channel = state.shape[1] - value.shape[1]
             state[:, first_sst_channel:, ...].copy_(value)
@@ -1574,6 +1973,9 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
     assert second.payload.cursor.timestep_counter == 1
     assert initial_payload.cursor.timestep_counter == 0
     assert torch.count_nonzero(initial_payload.model_state).item() == 0
+    assert all(
+        np.all(np.isfinite(np.asarray(value))) for value in first.fields.values()
+    )
     assert torch.equal(
         first.payload.output_prediction,
         second.payload.output_prediction,

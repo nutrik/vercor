@@ -6,6 +6,11 @@ import jax
 import jax.numpy as jnp
 import torch
 
+from vercor._numerical_safety import (
+    replace_missing_nan,
+    require_active_finite,
+    require_strictly_positive,
+)
 from vercor.dtypes import PrecisionPolicy, as_jax_real_array, jax_full
 from vercor.fluxes.vertical_coordinates import compute_hybrid_sigma_full_level_altitudes
 from vercor._host_arrays import runtime_array_to_host
@@ -32,14 +37,41 @@ def prepare_camulator_surface_forcing(
 ) -> tuple[jax.Array, jax.Array]:
     """Prepare CAMulator's rescaled surface-temperature forcing field."""
 
-    sst = jnp.nan_to_num(as_jax_real_array(sea_surface_temperature))
-    skt = jnp.nan_to_num(as_jax_real_array(land_surface_temperature))
+    sst = replace_missing_nan(
+        as_jax_real_array(sea_surface_temperature),
+        owner="CAMulator sea surface temperature",
+    )
+    skt = replace_missing_nan(
+        as_jax_real_array(land_surface_temperature),
+        owner="CAMulator land surface temperature",
+    )
     land_mask = as_jax_real_array(land_mask_coslat)
+    require_active_finite(
+        land_mask,
+        active_mask=None,
+        owner="CAMulator land mask",
+    )
 
     total_surface_temperature = jnp.where(land_mask < 1.0, sst + skt, 283.0)
+    mean = jnp.mean(total_surface_temperature)
+    standard_deviation = jnp.std(total_surface_temperature)
+    require_strictly_positive(
+        standard_deviation,
+        owner="CAMulator surface-temperature standard deviation",
+    )
     rescaled_total_surface_temperature = (
-        total_surface_temperature - jnp.nanmean(total_surface_temperature)
-    ) / jnp.nanstd(total_surface_temperature)
+        total_surface_temperature - mean
+    ) / standard_deviation
+    require_active_finite(
+        total_surface_temperature,
+        active_mask=None,
+        owner="CAMulator total surface temperature",
+    )
+    require_active_finite(
+        rescaled_total_surface_temperature,
+        active_mask=None,
+        owner="CAMulator rescaled surface temperature",
+    )
 
     return total_surface_temperature, rescaled_total_surface_temperature
 
@@ -50,7 +82,13 @@ def prepare_camulator_dynamic_forcing_chunk(
 ) -> jax.Array:
     """Convert xarray forcing values to CAMulator's time-major layout."""
 
-    return as_jax_real_array(dynamic_forcing_values).transpose((1, 0, 2, 3))
+    dynamic_forcing = as_jax_real_array(dynamic_forcing_values)
+    require_active_finite(
+        dynamic_forcing,
+        active_mask=None,
+        owner="CAMulator dynamic forcing",
+    )
+    return dynamic_forcing.transpose((1, 0, 2, 3))
 
 
 @jax.jit

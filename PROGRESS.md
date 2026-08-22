@@ -1,25 +1,54 @@
 # VerCOR Progress
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
+- No-NaN differentiation audit and final-review fixes completed locally
+  (2026-08-22): active runtime fields fail fast at preparation, exchange, step,
+  and send boundaries; inactive NaN remains a masked missing-data sentinel,
+  infinity is invalid everywhere, and inactive operands are finite-neutralized
+  before nonlinear arithmetic. TDD recorded 67 expected defect failures: safe
+  division 4, bilinear 9, bulk flux 46, lifecycle 1, JCM 3, and CAMulator 4;
+  one baseline-GREEN route-mask characterization also passes.
 
-- JCM 2 migration and fractional-surface reverse-gradient correction completed locally (2026-08-21) against Dinosaur 1.3.6 and JCM 2.0.1: the adapter uses explicit bootstrap state and immutable dynamics/physics/dycore/physics-carry transitions.
-  SPEEDY diagnostics map from `_surface_flux`/`_shortwave_rad`; output reads native state with the packaged units fallback, and JCM land canonicalizes time-first forcing while rejecting coordinate mismatches.
-  Root cause: multiplying temperature by JCM's fractional terrain mask produced approximately 28.8 K coastal forcing and NaN surface-flux adjoints. Present land/sea fractions now receive the complete finite temperature; only absent surfaces receive the reference fill.
-  TDD RED captured the 282 K to 70.5 K scaling error and the real full-Coupler NaN reverse objective; focused GREEN enforces binary/fractional values, JIT gradients, finite nonzero JVP/reverse agreement, real two-step carry, and an explicit fractional-terrain precondition.
-  Black left 245 files unchanged with its known Python-version advisory; strict flake8 reported 0; mypy passed 245 files; compileall and whitespace checks passed.
-  Fast passed its 777/1,504 selection; full and branch coverage passed 1,504/1,504 at 91.25% (7,625 statements and 1,634 branches), with only the six known Flax/JAX and JCM/xarray warnings.
-  Independent gradient and code-quality reviews found no remaining blocker. The global-x64/JCM mixed-branch boundary remains; fake float32 JIT/AD coverage stays enforced, and no tag, push, publication, or upload was performed.
+  | Audit path | Primal/JIT | JVP | VJP | Inactive NaN | Fail-fast |
+  | --- | --- | --- | --- | --- | --- |
+  | Slab | pass | pass | pass | not applicable | not applicable |
+  | Data | pass | pass | pass | pass | pass |
+  | Flux/vertical | pass | pass | pass | pass | pass |
+  | Bilinear | pass | pass | pass | pass | pass |
+  | Conservative | pass | pass | pass | pass | not applicable |
+  | Exchange/runtime | pass | pass | pass | pass | pass |
+  | JCM | pass | pass | pass | pass | pass |
+  | Veros | pass | pass | pass | pass | pass |
+  | CAMulator | pass | pass | pass | pass | pass |
+  | Composed Coupler | pass | pass | pass | pass | pass |
+
+  Veros and CAMulator transform cells describe their standalone JAX kernels;
+  installed Veros fake-native-state application and unavailable/unpinned
+  CAMulator/CREDIT fake host application are primal-only. Real JCM 2.0.1 ran
+  packaged inputs, two native steps, and the full-Coupler JVP/VJP path.
+  First-source repairs validate masked-division final outputs and every bulk-
+  flux operand; neutralize masked flux inputs and bilinear corners before
+  nonlinear arithmetic; distinguish missing NaN from invalid infinity; order
+  central finiteness before author lifecycle validation; validate JCM payload
+  leaf paths before reuse/storage; and validate CAMulator model, postprocessing,
+  and state-reuse tensors.
+  Route-aware evidence proves inbound fields/received use fractional route
+  masks while sent uses component masks; no active value is filled or scaled.
+
+  Final gates: Black left 247 files unchanged with its known Python
+  3.13/configured-3.15 advisory; flake8 0; mypy 247 files; compileall and
+  whitespace clean. Affected owners passed 243/243, direct dependents 152/152,
+  composed audit 105/105, required focus 304/304, fast 795/795, and
+  full/coverage 1,639/1,639 with the six known warning instances. Coverage is
+  91.42% across 7,796 statements and 1,666 branches. The fresh exactly-two-file
+  build is `/private/tmp/vercor-no-nan-build.k49Qjn`; Twine
+  accepted the 0.4.4 wheel/sdist and artifact/NumPy boundaries passed 28/28.
+  Tasks 1-5 are complete; nothing was pushed, published, uploaded, tagged, or proposed as a PR.
+- JCM 2 migration/fractional-surface gradient correction completed locally (2026-08-21) against Dinosaur 1.3.6/JCM 2.0.1: explicit immutable carry transitions and current diagnostics replaced legacy ownership; canonical time-first land forcing rejects coordinate drift; the 282 K to 70.5 K RED traced erroneous fractional-temperature scaling, and GREEN preserves complete temperature on present land/sea fractions with finite JIT/JVP/reverse behavior and real two-step carry. Static gates, fast 777/1,504, and full/coverage 1,504/1,504 at 91.25% (7,625 statements; 1,634 branches) passed with six known warnings; the global-x64 mixed branch remains covered by fake float32 JIT/AD.
 - VerCOR 0.4.4 release-candidate evidence was refreshed after the README and release-runbook corrections (2026-08-20): release metadata, the changelog, the maintained release notes, installation guidance, and the fail-closed release transcript now use the 0.4.4 package, branch, tag, and artifact identities. TDD recorded the intended three metadata/resource/README RED failures before focused GREEN. The pending documentation reorganization and Conda environment are included; warning-as-error Sphinx, YAML validation, Black, strict flake8, mypy, compileall, whitespace, and the 772-test fast selection passed before artifact recording. The full and branch-coverage suites each passed their 1,489-test pre-record selection with one evidence-only test deferred; coverage was 91.25% across 7,594 statements and 1,622 branches. The exact two-file artifact boundary passed 25/25, Twine passed both files, and an isolated dependency-free wheel smoke reported version 0.4.4, the six-symbol root API, and the installed CLI: `vercor-0.4.4-py3-none-any.whl`, 231397 B, SHA-256 `b3c739b72c9f74a093e2df48553e5077b7c1b3331326dff566e731b2a72390f0`; `vercor-0.4.4.tar.gz`, 162296 B, SHA-256 `34d3c1c16c20d2af523f02dca7c7ea235aace248a3c660f8327196aea814275e`. Independent review corrections bind the standalone quickstart to Python, reuse project-owned optional dependency constraints in Conda, remove committed EOF whitespace, and check the complete release range before push. Draft PR #22's first exact run exposed JAX's newer PEP 604 rendering of `ArrayLike` in the quality and dependency-free wheel lanes; a focused RED/GREEN contract now canonicalizes that evidenced spelling, and the exact installed-wheel regression plus the mandated fast/full suites pass locally. No tag, merge, upload, publication, GitHub Release, or package-index mutation was performed.
 - JCM/Veros gallery float64 spinup dtype mismatch fixed locally (2026-07-30): JCM setup now normalizes its state and loaded forcing to `RuntimeOptions.dtype` before optional spinup, matching the existing runtime-payload boundary while preserving integer leaves. TDD RED observed float32 forcing at the first spinup call; focused GREEN passed 46/46. The real gallery completed both JCM spinup steps, initialized all components, built topology, and entered coupled step 0 before an intentional SIGINT stopped its 100-year run. Mypy, flake8, whitespace, and the required fast and full suites passed; the known Flax/JAX warnings remain.
-- Packaged setup gallery CLI final-review, installed-wheel CI, and coverage-test fix wave completed locally (2026-07-30): all accepted runtime, copy, catalog, installed-console, help, documentation, plan, and test-fixture findings are implemented.
-  - TDD RED isolated the accepted review findings; the wheel-CI regression reproduced inherited same-version pip behavior, and focused runner coverage established the direct-entry gap at 75%.
-  - `--force-reinstall` with `--no-deps` now guarantees the wheel is installed into the test venv, and a post-install assertion reports pip stdout/stderr if the console entry point is absent; normal and simulated same-version probes plus all 26 distribution-boundary tests pass.
-  - The runner retains the setup parent through invocation and restores `sys.path`; the CLI resolves the trusted runner and uses Python `-P`; copy lookup accepts stem/filename keys, rejects cross-key ambiguity, and removes every partial new target while preserving existing ones.
-  - Final static gates passed: Black left 245 Python files unchanged with the known Python 3.13/target-3.15 advisory; strict flake8 reported 0; mypy passed 245 files; compileall and `git diff --check` exited 0.
-  - After adding two direct `main()` success and contract-error tests, the setup-runner suite passes 15/15 and `_setup_runner.py` branch coverage rises from 75% to 93% without production changes; active memory remains exactly 180 lines.
-  - The required fast suite passed its 775/1,489 selection with 714 deselected; full and coverage passed 1,489/1,489 at 91.21% with known warnings. CLI docs mark this unreleased and absent from PyPI `0.4.3`; no publication or release mutation occurred.
+- Packaged setup gallery CLI/installed-wheel review completed locally (2026-07-30): TDD covered same-version wheel reinstall, retained/restored setup-parent imports, trusted `-P` runner invocation, collision-safe copy cleanup, and direct `main()` success/error behavior; distribution boundaries passed 26/26, runner coverage rose 75% to 93%, static gates passed, fast was 775/1,489, and full/coverage was 1,489/1,489 at 91.21%. CLI documentation remained unreleased; no publication occurred.
 - Packaged setup gallery CLI final-review fixes completed locally (2026-07-29): `vercor run -- -c.py` now resolves the Click-validated local script to an absolute path before invoking `sys.executable`, preventing Python from parsing an option-like filename while preserving shell-free execution and exact child status propagation. A real child-process regression recorded the intended `-c`/`.py` syntax-error RED before GREEN. Malformed setup names now assert Click exit 2 with a name-specific diagnostic, `.py` is correctly rejected during normalization, and an ordinary missing resource independently asserts exit 1 with `unknown setup`; troubleshooting now names the packaged setup gallery. Focused boundary verification passed 9/9, the complete CLI suite passed 20/20, and the warning-as-error Sphinx build passed 1/1. Black left 243 files unchanged with its known Python-version advisory; flake8 reported 0; mypy passed 243 source files; compileall and whitespace checks succeeded. Configured four-worker xdist verification passed the 763-test fast selection with four known Flax/JAX warnings and the full 1,420/1,420 suite with those warnings plus one known JCM/xarray future warning.
-- Documentation CI dependency correction completed locally (2026-07-27): PR #17's `quality` job failed because optional JCM installed Sphinx transitively while the job omitted the canonical `docs/requirements.txt` environment containing MyST Parser. A focused workflow contract recorded the intended missing-install RED failure; the job now installs the pinned documentation requirements before running the suite, and the dependency contract, existing quality-gate contract, workflow Bash syntax validation, and strict Sphinx build pass 4/4.
 - Canonical Read the Docs project manual completed locally (2026-07-27): the published researcher and developer learning paths cover running, data, host, JAX, coupling, output, and troubleshooting guidance; five executable tutorial programs use only public interfaces; and six explicit-autodoc pages split the curated stable API from warned advanced runtime/topology contracts. Final reader review corrected tutorial prerequisites/results/next steps, distinguished route-ID collisions from unsupported target-field fan-in, linked repeated migration guidance to its canonical page, and kept archives, audits, and internal plans out of the maintained resource inventory. The warning-free strict HTML build covered all 31 published sources; focused documentation/API/plugin/distribution verification passed 127/127. Static gates passed: Black left 246 files unchanged with its Python 3.13/configured-target-Python-3.15 safety-parse advisory, flake8 reported 0, mypy reported no issues in 241 source files, compileall and whitespace checks succeeded, and published-source hygiene found no unfinished marker or private import statement. Final fast verification passed 758/758 with four known Flax/JAX `jax.core.Effect` deprecation warnings.
 - Sphinx project-version lookup and warning-free HTML build completed locally (2026-07-27): `docs/conf.py` resolves the repository-root `pyproject.toml` from `__file__`, parses `[project].version` with `tomllib`, and uses it for both Sphinx version fields without importing `vercor` or falling back to `main`; configuration tests cover an unrelated working directory, synthetic metadata, and missing-version failure (2/2 passed), the real `-W --keep-going` HTML build contract passed 1/1 offline, the documentation/version regression suite passed 184/184, and final fast verification passed 728/728 with four known Flax/JAX deprecation warnings.
 - Release-ready package-version evidence completed locally (2026-07-25): the sole license classifier is now `License :: OSI Approved :: Apache Software License`; `pyproject.toml` is the only executable VerCOR version owner. The CI build job reads that version and emits `version`, `wheel_name`, and `sdist_name`, which the build, upload, installed-artifact, external-extension, macOS, tag-guard, and publish-inventory paths consume. TDD recorded the intended old-`Apache-2.0` and duplicate-classifier failures, then four intended version-source RED failures (the missing build-output mapping and tag-guard `VERSION`); focused GREEN passed 195/195. Static gates on the final implementation passed: Black left 237 files unchanged with its Python 3.13/target-Python-3.15 safety-parse advisory, flake8 reported 0, mypy reported no issues in 237 files, and compileall succeeded. Fresh final verification passed 195/195 focused contracts, 711/711 fast tests (four known Flax/JAX `jax.core.Effect` deprecation warnings), and 1,349/1,349 full tests (those four plus one JCM/xarray `compat` future warning); `git diff --check` was clean. No tag, push, publication, release, or remote mutation occurred.
@@ -39,48 +68,20 @@ This is the bounded orientation log for active development. Detailed history is 
   Preflight found branch `refactor` and no local or remotely advertised `v0.4.0` tag; Twine passed both VerCOR artifacts while the evidence-only plugin wheel had nonblocking missing-long-description warnings; other warnings were pip user-cache disabled, four Flax/JAX-effect instances, and one JCM/xarray instance.
   No commit, tag, push, publication, upload, merge, or hosted release was performed.
 - Time-selected runtime output verification completed locally (2026-07-23): period accumulation had sampled raw climatology/forcing-record axes rather than the scalar time-selected field; shared transfer-policy selection now supplies the default provider's precomputed `RuntimeStepInfo`. Focused selector/output checks passed 3/3 and 95/95; fast 664/664; full and branch coverage 1,302/1,302 at 91.13% (7,404 statements; 1,562 branches); maintained output-free JVP/reverse gradients 3/3. The stale `tests/test_gradients.py` path does not exist. Black left 236 files unchanged; flake8 0; mypy 236 files; compileall, installed wheel/sdist/plugin artifact boundary (16 tests), optional-model nodes (9 parameterized tests), and whitespace passed. Warnings unchanged: four Flax/JAX `jax.core.Effect` deprecations and one JCM/xarray merge-default future warning.
-- Bundled output defaults aligned locally (2026-07-23): omitted slab, ERA5,
-  ERA-Interim, and direct/paired JCM-land declarations now resolve to
-  `OutputSpec()`, matching external configs with no period policy; explicit
-  step/month policies and final-field output remain independent. TDD RED was
-  14 expected failures; focused passed 57/57 and the applicable
-  output/setup/API/artifact fast set passed 51/51. Fast passed 664/664 with four
-  known Flax/JAX warnings; full and branch coverage passed 1,298/1,298 with one
-  additional JCM/xarray warning. Coverage is 91.10% across 7,398 statements and
-  1,560 branches. Black left 236 files unchanged; flake8 was 0, mypy passed 236
-  files, compileall, installed artifacts, and whitespace checks passed.
+- Bundled output defaults aligned locally (2026-07-23): omitted slab, ERA5, ERA-Interim, and direct/paired JCM-land output resolves to `OutputSpec()` while explicit cadence/final fields remain independent; TDD RED 14/14, focused 57/57, artifact focus 51/51, fast 664/664, full/coverage 1,298/1,298 at 91.10% (7,398 statements; 1,560 branches), and all static/artifact gates passed with known warnings.
 - Installed plugin evidence and author guidance completed locally (2026-07-21): the fixture accepts `0.4.0a1` through `<0.5`, its non-default configuration produces independently observable JAX, host, exchange, and backend results, and CI now resolves the plugin against the installed VerCOR wheel. The new public-only author guide executes configuration, payload, regridding, topology, workflow/backend, output, and fake-testing examples in order. The reviewed guide composes through a plugin-owned factory, samples payload state, and release instructions preserve normal plugin dependency resolution.
-- Stable extension and factory typing completed locally (2026-07-21):
-  `RegridderFactory` is one runtime-checkable public protocol, the plugin
-  fixture may import only the six-symbol root/stable extension tier, and the
-  review/design distinguish that tier from retained alpha inventory and JAX
-  integration hooks. RED was the expected `TYPE_CHECKING` source-boundary and
-  extension-import failures; focused GREEN and strict plugin mypy passed, as
-  did the full suite. The user-approved follow-up narrowed the factory protocol
-  to its two required grids, restoring built-in/default factory compatibility.
-  No public export was removed.
+- Stable extension/factory typing completed locally (2026-07-21): one two-grid runtime-checkable `RegridderFactory`, six-symbol-root/stable-tier plugin imports, and explicit alpha/JAX-hook boundaries passed RED/GREEN, strict plugin mypy, and full tests without removing a public export.
 - CAMulator atmosphere payload ownership completed locally (2026-07-21): setup seeds a frozen native payload; functional stepping clones and advances payload-owned model state, cursor, forecast hour, and predictions; providers and snapshots sample only context payloads. TDD RED was 5 expected failures; exact focus passed 18/18, complete focus passed 90/90, static gates passed, and full passed 1,242/1,242 with five known third-party warnings.
 - Explicit CAMulator forcing alignment and functional land cursor completed locally (2026-07-21): `strict` now rejects coupler/forcing start mismatches, `forcing_start` opts in without warnings, typed configuration carries the policy, the immutable cursor advances functionally, and land owns its cursor in runtime payload; TDD RED was 4 expected failures and focused GREEN passed all selected tests.
 - Veros payload ownership completed locally (2026-07-21): setup seeds the native payload; runtime returns `StepResult` without mutating setup resources; provider and snapshot output read context payloads. RED was 4 transition/provider plus 2 setup failures; focused GREEN passed 79/79 (8/8 non-fast ownership), and full passed 1,242/1,242 with five known third-party warnings.
 - Static component identity through setup completed locally (2026-07-21): setup cannot replace declared name, grid, or spec; the adapter revalidates after the hook before examining its result. TDD RED was 3/3 expected failures; focused GREEN passed 42/42.
 - CI artifact and NetCDF backend stability completed locally (2026-07-21): the quality job now reuses the build-once artifact bundle, forcing fixtures explicitly use h5netcdf, and JCM packaged input loading temporarily prefers h5netcdf without leaking xarray configuration. After the formatting follow-up, the static gates passed: Black left 234 files unchanged (with its known Python 3.13/target-Python-3.15 safety-parse advisory), flake8 was 0, mypy passed 234 source files, and compileall/whitespace checks were clean. The exact direct-`scipy`-interpreter workflow contract command with `-n0` passed 1/1. Fast passed 638/638 with four Flax/JAX-effect deprecation warnings; full and branch coverage passed 1,235/1,235 without NetCDF/HDF failures, with those four warnings plus one JCM/xarray merge-default future warning. Branch coverage was 90.75% across 7,287 statements and 1,524 branches.
 - JAXGCM runtime dtype warning fixed locally (2026-07-21): the adapter applies the runtime-owned `DTypePolicy` before pressure and altitude calculations, preventing `float64` promotion and the incompatible JAX scatter into `float32`; the warning-as-error and mapped-field dtype regression had 1/1 RED, focused GREEN passed 11/11, fast/full passed 638/638 and 1,235/1,235 without the scatter warning, Black left 234 files unchanged, flake8 was 0, mypy passed 234 source files, and whitespace checks were clean.
-- Codebase simplification completed locally (2026-07-20): Tasks 1-8 reduced
-  private grid/regridding/runtime/component state and focused setup paths while
-  preserving public behavior; all task focuses, fast/full/coverage, and static
-  gates passed. Detailed evidence is retained in the task reports and archive.
+- Codebase simplification completed locally (2026-07-20): Tasks 1-8 reduced private grid/regridding/runtime/component state and setup paths while preserving public behavior; all focused, fast/full/coverage, and static gates passed, with details retained in task reports/archive.
 - Period-average window-start identity completed locally (2026-07-17): filenames and NetCDF times use each schema's actual start across partial/subsequent periods, mixed cadences, and Gregorian/no-leap/360-day clocks while preserving calendar ISO formats, post-step provider times, means, and incomplete-period behavior. TDD RED/GREEN was 4/4; output focus 25/25.
   Black/flake8/mypy/compileall passed; fast passed 636/636 and full/coverage 1224/1224 (90.50% across 7,361 statements and 1,538 branches), with known third-party warnings.
-- VerCOR 0.4 deprecation cleanup completed locally (2026-07-17) in commits `f82588f` through `04e6f45`. Obsolete evidence,
-  mutable helpers, absence-only guards, and old adapter tests are gone; positive contracts cover public ownership, lifecycle,
-  immutable state, artifacts, output, numerics, JIT, and gradients. Supported foreign-state, calendar, transform, lazy-import,
-  payload-copy, and offline-artifact behavior remains. Focused gates passed 34/34, 94/94, 136/136, and 301/301; docs 175/175;
-  fast 632/632; full/coverage 1220/1220 at 90.49%. Black, flake8, mypy, compileall, and whitespace passed.
-- Controlled pytest parallelization completed locally (2026-07-16): fixed n4
-  loadscope reduced the measured 124.38s serial mean to 61.66s (50.43%) while
-  preserving selection, warnings, and 90.52% combined coverage. Fast/full,
-  Black, flake8, mypy, compileall, and whitespace gates passed; production and
-  release behavior did not change.
+- VerCOR 0.4 deprecation cleanup completed locally (2026-07-17, `f82588f..04e6f45`): obsolete mutable/absence-only evidence was replaced by positive public, lifecycle, immutable-state, artifact, output, numeric, JIT, and gradient contracts while foreign-state/calendar/transform/lazy-import/payload/artifact behavior remained; focused 34/34, 94/94, 136/136, 301/301, docs 175/175, fast 632/632, full/coverage 1,220/1,220 at 90.49%, and static gates passed.
+- Controlled pytest parallelization completed locally (2026-07-16): fixed n4 loadscope reduced the 124.38s serial mean to 61.66s (50.43%) while preserving selection, warnings, 90.52% combined coverage, static gates, and production/release behavior.
 - Calendar-owned runtime year metadata completed locally (2026-07-15):
   commits `9ade80c` and `a9b079c`. Runtime forcing metadata now derives year
   type and duration per timestamp; the duplicate runtime owner and private
@@ -174,7 +175,6 @@ This is the bounded orientation log for active development. Detailed history is 
 - No registry, entry-point discovery, Pydantic, fan-in reducer, public prepared graph, fractional subcycling, or CAMulator dependency pin.
 - Do not tag, push, publish, or create a release without separate authority.
 - The Conda launcher can panic through `conda-rattler`; use the direct `scipy` environment executable when that occurs.
-
 ## Validation Policy
 
 Use concise pytest output. Run focused tests while iterating, then Black, strict flake8, mypy, compileall, fast and full pytest, branch coverage, build, installed wheel/sdist/plugin smokes, and `git diff --check` before a release candidate commit. Put detailed command evidence in the active task report and archive only durable outcomes here.

@@ -17,6 +17,11 @@ The exact API inventory and migration decisions are in
 - Validate author and backend boundaries before corrupt state reaches a physics
   step.
 - Keep public contracts small while allowing third-party structural plugins.
+- Active runtime fields are finite at preparation, exchange, component-step,
+  and send boundaries. NaN remains a missing-data sentinel only outside the
+  applicable component or route mask; infinity is always invalid.
+- Masked numerical kernels neutralize inactive operands before nonlinear
+  arithmetic so output-free JVP and VJP cannot inherit inactive-branch NaNs.
 
 The stable release does not provide registries, entry-point discovery, Pydantic
 models, fan-in reducers, a public prepared graph, fractional subcycling,
@@ -137,6 +142,16 @@ backend inputs and results receive the same check. Validation covers:
 
 Runtime assertions remain transform-safe. A structurally exact foreign state
 is accepted; a changed coordinate, dtype, field, payload schema, or mask is not.
+Active runtime fields are finite at preparation, exchange, component-step, and
+send boundaries. NaN remains a missing-data sentinel only outside the
+applicable component or route mask; infinity is always invalid. Masked
+numerical kernels neutralize inactive operands before nonlinear arithmetic so
+output-free JVP and VJP cannot inherit inactive-branch NaNs.
+State validation completes schema, topology, and central route/component field
+finiteness checks before invoking component-author lifecycle validation.
+Bundled adapters validate owned numeric payload/native leaves immediately
+before reuse and after production while preserving each adapter's established
+JAX-transform or host-only differentiation boundary.
 
 ## 7. Workflow and execution
 
@@ -273,6 +288,11 @@ Tests are layered across pure numerical kernels, component contracts, routes,
 state, workflow/backend behavior, output behavior, optional setup boundaries,
 gradients, and installed distributions. `--fast` selects a deterministic
 development subset; the full suite runs before commit.
+
+The numerical-safety matrix requires finite active primal/JIT, JVP, and VJP
+evidence for differentiable paths and fail-fast primal evidence at host-only
+boundaries. It retains inactive NaN only for masked or output-only semantics;
+masked kernels neutralize inactive operands before nonlinear arithmetic.
 
 Release gates are Black, strict flake8, mypy, compileall, fast/full pytest,
 90% branch coverage, build, installed wheel and source-distribution probes,

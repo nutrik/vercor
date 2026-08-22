@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 import jax
 import jax.numpy as jnp
 
+from vercor._numerical_safety import require_active_finite
 from vercor.components import (
     Component,
     PrefillContext,
@@ -38,6 +39,61 @@ class JAXGCMRuntimePayload(PyTreeNodeMixin):
 
     jcm_state: Any
     forcing: Any
+
+
+def _require_finite_numeric_tree(tree: Any, *, owner: str) -> None:
+    """Reject non-finite inexact leaves with their native PyTree paths."""
+
+    path_leaves, _ = jax.tree_util.tree_flatten_with_path(tree)
+    for path, value in path_leaves:
+        try:
+            array = jnp.asarray(value)
+        except (TypeError, ValueError):
+            continue
+        if not jnp.issubdtype(array.dtype, jnp.inexact):
+            continue
+        leaf_path = jax.tree_util.keystr(path)
+        require_active_finite(
+            array,
+            active_mask=None,
+            owner=f"{owner}{leaf_path or ' root'}",
+        )
+
+
+def _require_finite_jax_gcm_state(
+    jcm_state: Any,
+    *,
+    component_name: str,
+    stage: str,
+) -> None:
+    """Validate every named numerical section of one native JCM carry."""
+
+    for section in ("dynamics", "physics", "dycore_state", "physics_carry"):
+        _require_finite_numeric_tree(
+            getattr(jcm_state, section),
+            owner=(
+                f"JAXGCM component '{component_name}' {stage} " f"jcm_state.{section}"
+            ),
+        )
+
+
+def _require_finite_jax_gcm_payload(
+    payload: JAXGCMRuntimePayload,
+    *,
+    component_name: str,
+    stage: str,
+) -> None:
+    """Validate native state and forcing before payload storage or reuse."""
+
+    _require_finite_jax_gcm_state(
+        payload.jcm_state,
+        component_name=component_name,
+        stage=stage,
+    )
+    _require_finite_numeric_tree(
+        payload.forcing,
+        owner=f"JAXGCM component '{component_name}' {stage} forcing",
+    )
 
 
 def jax_gcm_default_field_names(
@@ -89,10 +145,16 @@ def create_jax_gcm_runtime_payload(
 
     jcm_state = tree_as_runtime_dtype(state._state, state._dtype_policy)
     forcing = tree_as_runtime_dtype(state.forcing, state._dtype_policy)
-    return JAXGCMRuntimePayload(
+    payload = JAXGCMRuntimePayload(
         jcm_state=jcm_state,
         forcing=forcing,
     )
+    _require_finite_jax_gcm_payload(
+        payload,
+        component_name=state.name,
+        stage="setup output",
+    )
+    return payload
 
 
 def prefill_jax_gcm_runtime_fields(
@@ -199,6 +261,11 @@ def step_jax_gcm_runtime(
             "JAXGCM runtime requires an initialized immutable runtime payload "
             f"for component '{state.name}'"
         )
+    _require_finite_jax_gcm_payload(
+        payload,
+        component_name=state.name,
+        stage="step input",
+    )
 
     (
         land_surface_temperature,
@@ -223,6 +290,11 @@ def step_jax_gcm_runtime(
     jcm_state, prediction = state._step_function(
         payload.jcm_state,
         applied_forcing,
+    )
+    _require_finite_jax_gcm_state(
+        jcm_state,
+        component_name=state.name,
+        stage="step output",
     )
     surface_flux, shortwave_rad = _required_speedy_diagnostics(
         jcm_state.physics,

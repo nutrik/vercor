@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, NamedTuple, cast
+from typing import Any, Literal, NamedTuple, cast
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from jax.errors import JaxRuntimeError
 
 from tests._coverage_support import make_test_grid
 from tests.assertions import assert_allclose_compact
@@ -47,9 +48,13 @@ from vercor.exchanges import Exchange
 from vercor.fields import _flatten_field_items
 from vercor.forcing_index import daily_forcing_index
 from vercor.grids import RectilinearGrid
+from vercor.physics import PhysicalConstants
 from vercor.regridding import bilinear, conservative
 from vercor.runtime import RuntimeOptions
 from vercor._runtime.state import ComponentRuntimeState
+from vercor._runtime.preparation import (
+    validate_runtime_state as validate_prepared_runtime_state,
+)
 from vercor.state import RunState
 from vercor._runtime.stores import FieldStore
 from vercor.time_selection import (
@@ -766,11 +771,22 @@ def test_run_supports_jit_grad_and_jvp() -> None:
             result._component_state("OCN").fields.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(initial_sst)
     gradient = jax.grad(loss)(initial_sst)
-    _, tangent = jax.jvp(loss, (initial_sst,), (jnp.ones_like(initial_sst),))
+    _, forward_tangent = jax.jvp(loss, (initial_sst,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, initial_sst)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
 
     assert np.all(np.isfinite(np.asarray(gradient)))
-    assert np.isfinite(np.asarray(tangent))
+    assert np.isfinite(np.asarray(forward_tangent))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_run_matches_one_step_closed_form_for_slab_ocean() -> None:
@@ -999,12 +1015,23 @@ def test_mixed_grid_slab_coupler_runs_with_real_regridders_under_jit_grad_and_jv
             result._component_state("OCN").fields.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(initial_sst)
     gradient = jax.grad(loss)(initial_sst)
-    _, tangent = jax.jvp(loss, (initial_sst,), (jnp.ones_like(initial_sst),))
+    _, forward_tangent = jax.jvp(loss, (initial_sst,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, initial_sst)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
 
     assert gradient.shape == initial_sst.shape
     assert np.all(np.isfinite(np.asarray(gradient)))
-    assert np.isfinite(np.asarray(tangent))
+    assert np.isfinite(np.asarray(forward_tangent))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_data_forcing_components_run_inside_runtime() -> None:
@@ -1113,10 +1140,23 @@ def test_data_forcing_components_run_inside_runtime() -> None:
             result._component_state("ATM").received.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(monthly_ocean)
     gradient = jax.grad(loss)(monthly_ocean)
+    _, forward_tangent = jax.jvp(loss, (monthly_ocean,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, monthly_ocean)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert gradient.shape == monthly_ocean.shape
     assert_allclose_compact(gradient[0], np.ones((2, 2)))
     assert_allclose_compact(gradient[1:], np.zeros((11, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_public_data_component_monthly_output_validates_and_sends_runtime_slice() -> (
@@ -1322,10 +1362,23 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
             result._component_state("ATM").received.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(monthly_ocean)
     gradient = jax.grad(loss)(monthly_ocean)
+    _, forward_tangent = jax.jvp(loss, (monthly_ocean,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, monthly_ocean)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert gradient.shape == monthly_ocean.shape
     assert np.all(np.isfinite(np.asarray(gradient[0])))
     assert_allclose_compact(gradient[1:], np.zeros((11, 2, 3)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() -> None:
@@ -1398,11 +1451,24 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
             result._component_state("ATM").received.get("land_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(forcing)
     gradient = jax.grad(loss)(forcing)
+    _, forward_tangent = jax.jvp(loss, (forcing,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, forcing)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert gradient.shape == forcing.shape
     assert_allclose_compact(gradient[2], np.ones(grid.shape))
     assert_allclose_compact(gradient[:2], np.zeros((2, 2, 2)))
     assert_allclose_compact(gradient[3:], np.zeros((362, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> None:
@@ -1477,10 +1543,23 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
             result._component_state("ATM").received.get("land_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(forcing)
     gradient = jax.grad(loss)(forcing)
+    _, forward_tangent = jax.jvp(loss, (forcing,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, forcing)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert_allclose_compact(gradient[59], np.ones(grid.shape))
     assert_allclose_compact(gradient[:59], np.zeros((59, 2, 2)))
     assert_allclose_compact(gradient[60:], np.zeros((305, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad() -> (
@@ -1569,10 +1648,23 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
             result._component_state("ATM").received.get("land_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(forcing)
     gradient = jax.grad(loss)(forcing)
+    _, forward_tangent = jax.jvp(loss, (forcing,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, forcing)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert_allclose_compact(gradient[56], np.ones(grid.shape))
     assert_allclose_compact(gradient[:56], np.zeros((56, 2, 2)))
     assert_allclose_compact(gradient[57:], np.zeros((308, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
@@ -1663,10 +1755,23 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
             result._component_state("ATM").received.get("sea_surface_temperature")
         )
 
+    tangent_seed = jnp.ones_like(monthly_ocean)
     gradient = jax.grad(loss)(monthly_ocean)
+    _, forward_tangent = jax.jvp(loss, (monthly_ocean,), (tangent_seed,))
+    value, pullback = jax.vjp(loss, monthly_ocean)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert_allclose_compact(gradient[0], np.full(grid.shape, right_weight))
     assert_allclose_compact(gradient[11], np.full(grid.shape, left_weight))
     assert_allclose_compact(gradient[1:11], np.zeros((10, 2, 2)))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 @pytest.mark.filterwarnings(
@@ -1742,10 +1847,28 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
         result = run_scanned_coupler(coupler, state)
         return jnp.sum(result._component_state("ATM").fields.get("temperature"))
 
-    gradient = jax.grad(loss)(jnp.full(grid.shape, 281.0, dtype=jnp.float32))
+    sea_surface_temperature = jnp.full(grid.shape, 281.0, dtype=jnp.float32)
+    tangent_seed = jnp.ones_like(sea_surface_temperature)
+    gradient = jax.grad(loss)(sea_surface_temperature)
+    _, forward_tangent = jax.jvp(
+        loss,
+        (sea_surface_temperature,),
+        (tangent_seed,),
+    )
+    value, pullback = jax.vjp(loss, sea_surface_temperature)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+
     assert gradient.shape == grid.shape
     assert np.all(np.isfinite(np.asarray(gradient)))
     assert np.any(np.asarray(gradient) != 0.0)
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> None:
@@ -1777,6 +1900,135 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
         payload.forcing.sea_surface_temperature.shape
         == forcing_template.sea_surface_temperature.shape
     )
+
+
+def _jax_gcm_payload_with_carry_marker(payload: Any, marker: jax.Array) -> Any:
+    """Return one fake JCM payload with a replaced physics-carry marker."""
+
+    jcm_state = payload.jcm_state
+    return jax_gcm_runtime_module.JAXGCMRuntimePayload(
+        jcm_state=JCMState(
+            dynamics=jcm_state.dynamics,
+            physics=jcm_state.physics,
+            dycore_state=jcm_state.dycore_state,
+            physics_carry={"marker": marker},
+        ),
+        forcing=payload.forcing,
+    )
+
+
+def test_jax_gcm_rejects_nonfinite_input_carry_before_model_reuse() -> None:
+    fixture = _make_jax_gcm_fixture(make_test_grid(name="jcm-invalid-input-carry"))
+    payload = jax_gcm_runtime_module.create_jax_gcm_runtime_payload(fixture.state)
+    invalid_payload = _jax_gcm_payload_with_carry_marker(
+        payload,
+        jnp.asarray(jnp.nan),
+    )
+    native_calls = 0
+    valid_step = fixture.state._step_function
+
+    def recording_step(state: JCMState, forcing: Any) -> Any:
+        nonlocal native_calls
+        native_calls += 1
+        return valid_step(state, forcing)
+
+    fixture.state._step_function = recording_step
+
+    with pytest.raises(
+        CouplerError,
+        match=(
+            "JAXGCM component 'ATM'.*step input.*physics_carry.*marker"
+            ".*active domain"
+        ),
+    ):
+        jax_gcm_runtime_module.step_jax_gcm_runtime(
+            fixture.state,
+            fixture.state.data,
+            invalid_payload,
+            PhysicalConstants(),
+            DTypePolicy(),
+        )
+
+    assert native_calls == 0
+
+
+def test_jax_gcm_rejects_nonfinite_output_carry_before_next_substep() -> None:
+    fixture = _make_jax_gcm_fixture(make_test_grid(name="jcm-invalid-output-carry"))
+    payload = jax_gcm_runtime_module.create_jax_gcm_runtime_payload(fixture.state)
+    native_calls = 0
+    valid_step = fixture.state._step_function
+
+    def invalid_output_step(state: JCMState, forcing: Any) -> Any:
+        nonlocal native_calls
+        native_calls += 1
+        updated_state, prediction = valid_step(state, forcing)
+        return (
+            JCMState(
+                dynamics=updated_state.dynamics,
+                physics=updated_state.physics,
+                dycore_state=updated_state.dycore_state,
+                physics_carry={"marker": jnp.asarray(jnp.nan)},
+            ),
+            prediction,
+        )
+
+    fixture.state._step_function = invalid_output_step
+
+    with pytest.raises(
+        CouplerError,
+        match=(
+            "JAXGCM component 'ATM'.*step output.*physics_carry.*marker"
+            ".*active domain"
+        ),
+    ):
+        for _ in range(2):
+            result, _, _ = jax_gcm_runtime_module.step_jax_gcm_runtime(
+                fixture.state,
+                fixture.state.data,
+                payload,
+                PhysicalConstants(),
+                DTypePolicy(),
+            )
+            payload = result.payload
+
+    assert native_calls == 1
+
+
+def test_jax_gcm_reports_compiled_nonfinite_input_carry_path() -> None:
+    fixture = _make_jax_gcm_fixture(make_test_grid(name="jcm-compiled-invalid-carry"))
+    payload = jax_gcm_runtime_module.create_jax_gcm_runtime_payload(fixture.state)
+    valid_step = fixture.state._step_function
+
+    def finite_output_step(state: JCMState, forcing: Any) -> Any:
+        finite_state = JCMState(
+            dynamics=state.dynamics,
+            physics=state.physics,
+            dycore_state=state.dycore_state,
+            physics_carry={"marker": jnp.asarray(0.0)},
+        )
+        return valid_step(finite_state, forcing)
+
+    fixture.state._step_function = finite_output_step
+
+    def carry_after_step(marker: jax.Array) -> jax.Array:
+        invalid_payload = _jax_gcm_payload_with_carry_marker(payload, marker)
+        result, _, _ = jax_gcm_runtime_module.step_jax_gcm_runtime(
+            fixture.state,
+            fixture.state.data,
+            invalid_payload,
+            PhysicalConstants(),
+            DTypePolicy(),
+        )
+        return cast(jax.Array, result.payload.jcm_state.physics_carry["marker"])
+
+    with pytest.raises(
+        JaxRuntimeError,
+        match=(
+            "JAXGCM component 'ATM'.*step input.*physics_carry.*marker"
+            ".*active domain"
+        ),
+    ):
+        jax.jit(carry_after_step)(jnp.asarray(jnp.nan)).block_until_ready()
 
 
 def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
@@ -1902,23 +2154,38 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
     coupled_loss, coupled_reverse = jax.value_and_grad(full_coupler_loss)(
         coupled_surface_temperature
     )
-    _, coupled_forward = jax.jvp(
+    tangent_seed = jnp.ones_like(coupled_surface_temperature)
+    value, pullback = jax.vjp(
+        full_coupler_loss,
+        coupled_surface_temperature,
+    )
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+    _, forward_tangent = jax.jvp(
         full_coupler_loss,
         (coupled_surface_temperature,),
-        (jnp.ones_like(coupled_surface_temperature),),
+        (tangent_seed,),
     )
 
     assert np.isfinite(np.asarray(coupled_loss))
     assert np.isfinite(np.asarray(coupled_reverse))
-    assert np.isfinite(np.asarray(coupled_forward))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert np.isfinite(np.asarray(forward_tangent))
     assert float(jnp.abs(coupled_reverse)) > 0.0
     assert_allclose_compact(
-        coupled_forward,
+        forward_tangent,
         coupled_reverse,
         rtol=1e-5,
         atol=1e-8,
         equal_nan=False,
         label="full Coupler real JCM forward/reverse derivative",
+    )
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+        label="full Coupler real JCM JVP/VJP inner product",
     )
 
 
@@ -1984,17 +2251,28 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
         result = run_scanned_coupler(coupler, state)
         return jnp.sum(result._component_state("ATM").fields.get("temperature"))
 
+    tangent_seed = jnp.ones_like(sea_surface_temperature)
     gradient = jax.grad(loss)(sea_surface_temperature)
-    _, tangent = jax.jvp(
+    _, forward_tangent = jax.jvp(
         loss,
         (sea_surface_temperature,),
-        (jnp.ones_like(sea_surface_temperature),),
+        (tangent_seed,),
     )
+    value, pullback = jax.vjp(loss, sea_surface_temperature)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
 
     assert gradient.shape == grid.shape
     assert np.all(np.isfinite(np.asarray(gradient)))
     assert np.any(np.asarray(gradient) != 0.0)
-    assert np.isfinite(np.asarray(tangent))
+    assert np.isfinite(np.asarray(forward_tangent))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert_allclose_compact(
+        jnp.vdot(tangent_seed, reverse_vjp),
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
 
 
 def test_jax_gcm_runtime_requires_initialized_payload() -> None:
@@ -2383,6 +2661,89 @@ def test_component_step_rejects_step_result_with_non_mapping_fields() -> None:
         coupler.run()
 
 
+def _masked_scalar_component(
+    value: jax.Array,
+    *,
+    step: Any | None = None,
+    execution: Literal["jax", "host"] = "jax",
+) -> CallableComponent:
+    """Build a two-cell component with one inactive grid location."""
+
+    grid = make_test_grid(
+        name="masked-scalar",
+        longitude=np.asarray([0.0, 1.0]),
+        latitude=np.asarray([0.0]),
+        binary_mask=np.asarray([[1.0, 0.0]]),
+    )
+    return CallableComponent(
+        "SAFE",
+        grid,
+        (lambda fields: {"value": fields["value"]}) if step is None else step,
+        spec=ComponentSpec(
+            outputs=("value",),
+            initial_fields={"value": value},
+            execution=execution,
+        ),
+    )
+
+
+def _single_component_coupler(component: CallableComponent) -> Coupler:
+    """Build a one-step coupler for numerical runtime-boundary tests."""
+
+    return Coupler(
+        clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
+        components=(component,),
+        run_order=("SAFE",),
+        runtime=RuntimeOptions(
+            backend="host" if component.spec.execution == "host" else "jax"
+        ),
+    )
+
+
+@pytest.mark.fast_always
+def test_initial_state_rejects_active_nan_but_allows_inactive_missing_nan() -> None:
+    invalid = _masked_scalar_component(jnp.asarray([[jnp.nan, jnp.nan]]))
+    with pytest.raises(
+        CouplerError, match="Component 'SAFE'.*field 'value'.*active domain"
+    ):
+        _single_component_coupler(invalid).initial_state()
+
+    valid = _masked_scalar_component(jnp.asarray([[2.0, jnp.nan]]))
+    state = _single_component_coupler(valid).initial_state()
+    fields = np.asarray(state.component("SAFE").field("value"))
+    assert np.isfinite(fields[0, 0])
+    assert np.isnan(fields[0, 1])
+
+
+@pytest.mark.fast_always
+def test_component_step_fails_at_first_active_nonfinite_output() -> None:
+    component = _masked_scalar_component(
+        jnp.asarray([[2.0, jnp.nan]]),
+        step=lambda fields: {"value": fields["value"].at[0, 0].set(jnp.nan)},
+        execution="host",
+    )
+    with pytest.raises(
+        CouplerError,
+        match="Component 'SAFE' step output field 'value'.*active domain",
+    ):
+        _single_component_coupler(component).run()
+
+
+@pytest.mark.fast_always
+def test_compiled_component_step_reports_active_nonfinite_output() -> None:
+    component = _masked_scalar_component(
+        jnp.asarray([[2.0, jnp.nan]]),
+        step=lambda fields: {"value": fields["value"].at[0, 0].set(jnp.nan)},
+        execution="jax",
+    )
+    with pytest.raises(
+        JaxRuntimeError,
+        match="Component 'SAFE' step output field 'value'.*active domain",
+    ):
+        state = _single_component_coupler(component).run()
+        jax.block_until_ready(state._component_state("SAFE").fields.get("value"))
+
+
 def _state_validation_coupler(
     *,
     dormant_lifecycle: LifecycleHooks | None = None,
@@ -2461,6 +2822,82 @@ def test_runtime_state_runs_validation_hooks_outside_run_order() -> None:
     coupler.initial_state()
 
     assert validated == ["DORMANT"]
+
+
+@pytest.mark.fast_always
+def test_central_finiteness_precedes_author_lifecycle_validation() -> None:
+    def validate(component: Component, context: Any) -> None:
+        values = np.asarray(context.state.field("value", scope="state"))
+        if not np.all(np.isfinite(values)):
+            raise ComponentError(
+                f"Author lifecycle for '{component.name}' observed invalid data."
+            )
+
+    coupler = _state_validation_coupler(
+        dormant_lifecycle=LifecycleHooks(validate=validate)
+    )
+    state = coupler.initial_state()
+    dormant = state._component_state("DORMANT")
+    malformed = state._with_component_state(
+        "DORMANT",
+        dormant.with_fields(dormant.fields.set("value", jnp.full((2, 2), jnp.nan))),
+    )
+
+    with pytest.raises(
+        CouplerError,
+        match="Component 'DORMANT' runtime fields field 'value'.*active domain",
+    ):
+        coupler.run(malformed)
+
+
+@pytest.mark.fast_always
+def test_runtime_store_finiteness_uses_route_mask_only_for_inbound_stores() -> None:
+    coupler = _make_coupler(steps=1)
+    prepared = coupler._ensure_prepared()
+    fractional_masks = {
+        route_id: jnp.ones((2, 2), dtype=jnp.float64)
+        for route_id in prepared.topology_maps.regridders
+    }
+    fractional_masks["OCN->ATM"] = jnp.asarray(
+        [[1.0, 0.0], [1.0, 1.0]],
+        dtype=jnp.float64,
+    )
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=prepared.topology_maps.regridders,
+        fractional_masks=fractional_masks,
+    )
+    prepared = coupler._ensure_prepared()
+    state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
+    atmosphere = state._component_state("ATM")
+    inbound = (
+        jnp.asarray(atmosphere.fields.get("sea_surface_temperature"))
+        .at[0, 1]
+        .set(jnp.nan)
+    )
+    atmosphere = atmosphere.with_fields(
+        atmosphere.fields.set("sea_surface_temperature", inbound)
+    ).with_received(atmosphere.received.set("sea_surface_temperature", inbound))
+    route_inactive_state = state._with_component_state("ATM", atmosphere)
+
+    validate_prepared_runtime_state(route_inactive_state, prepared=prepared)
+
+    invalid_sent = atmosphere.with_sent(
+        atmosphere.sent.set(
+            "sensible_heat_flux",
+            jnp.asarray(atmosphere.sent.get("sensible_heat_flux"))
+            .at[0, 1]
+            .set(jnp.nan),
+        )
+    )
+    with pytest.raises(
+        CouplerError,
+        match="Component 'ATM' runtime sent field 'sensible_heat_flux'.*active domain",
+    ):
+        validate_prepared_runtime_state(
+            state._with_component_state("ATM", invalid_sent),
+            prepared=prepared,
+        )
 
 
 @pytest.mark.fast_always
