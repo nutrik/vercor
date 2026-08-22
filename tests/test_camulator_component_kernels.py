@@ -332,6 +332,34 @@ def test_compiled_camulator_surface_forcing_rejects_zero_variance() -> None:
         result[0].block_until_ready()
 
 
+@pytest.mark.parametrize("bad_value", [jnp.nan, jnp.inf, -jnp.inf])
+def test_camulator_surface_forcing_rejects_nonfinite_land_mask(
+    bad_value: float,
+) -> None:
+    with pytest.raises(CouplerError, match="CAMulator land mask.*active domain"):
+        cast(
+            Any,
+            camulator_fields_module.prepare_camulator_surface_forcing,
+        ).__wrapped__(
+            jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
+            jnp.asarray([[10.0, 20.0], [30.0, 40.0]]),
+            jnp.asarray([[bad_value, 0.0], [0.0, 0.0]]),
+        )
+
+
+@pytest.mark.parametrize("bad_value", [jnp.nan, jnp.inf, -jnp.inf])
+def test_compiled_camulator_surface_forcing_rejects_nonfinite_land_mask(
+    bad_value: float,
+) -> None:
+    with pytest.raises(JaxRuntimeError, match="CAMulator land mask.*active domain"):
+        result = jax.jit(camulator_fields_module.prepare_camulator_surface_forcing)(
+            jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
+            jnp.asarray([[10.0, 20.0], [30.0, 40.0]]),
+            jnp.asarray([[bad_value, 0.0], [0.0, 0.0]]),
+        )
+        result[0].block_until_ready()
+
+
 def test_prepare_camulator_dynamic_forcing_chunk_supports_jit_and_ordering() -> None:
     values = jnp.arange(2 * 3 * 2 * 2, dtype=jnp.float32).reshape(2, 3, 2, 2)
 
@@ -348,6 +376,32 @@ def test_prepare_camulator_dynamic_forcing_chunk_supports_jit_and_ordering() -> 
         values,
         jnp.ones_like(values),
     )
+
+
+@pytest.mark.parametrize("bad_value", [jnp.nan, jnp.inf, -jnp.inf])
+def test_camulator_dynamic_forcing_rejects_nonfinite_source(
+    bad_value: float,
+) -> None:
+    values = jnp.zeros((2, 3, 2, 2)).at[0, 0, 0, 0].set(bad_value)
+    with pytest.raises(CouplerError, match="CAMulator dynamic forcing.*active domain"):
+        cast(
+            Any,
+            camulator_fields_module.prepare_camulator_dynamic_forcing_chunk,
+        ).__wrapped__(values)
+
+
+@pytest.mark.parametrize("bad_value", [jnp.nan, jnp.inf, -jnp.inf])
+def test_compiled_camulator_dynamic_forcing_rejects_nonfinite_source(
+    bad_value: float,
+) -> None:
+    values = jnp.zeros((2, 3, 2, 2)).at[0, 0, 0, 0].set(bad_value)
+    with pytest.raises(
+        JaxRuntimeError, match="CAMulator dynamic forcing.*active domain"
+    ):
+        result = jax.jit(
+            camulator_fields_module.prepare_camulator_dynamic_forcing_chunk
+        )(values)
+        result.block_until_ready()
 
 
 def test_prepare_camulator_sst_input_supports_jit_and_shape() -> None:

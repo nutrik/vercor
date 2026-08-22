@@ -46,6 +46,11 @@ def prepare_camulator_surface_forcing(
         owner="CAMulator land surface temperature",
     )
     land_mask = as_jax_real_array(land_mask_coslat)
+    require_active_finite(
+        land_mask,
+        active_mask=None,
+        owner="CAMulator land mask",
+    )
 
     total_surface_temperature = jnp.where(land_mask < 1.0, sst + skt, 283.0)
     mean = jnp.mean(total_surface_temperature)
@@ -77,7 +82,13 @@ def prepare_camulator_dynamic_forcing_chunk(
 ) -> jax.Array:
     """Convert xarray forcing values to CAMulator's time-major layout."""
 
-    return as_jax_real_array(dynamic_forcing_values).transpose((1, 0, 2, 3))
+    dynamic_forcing = as_jax_real_array(dynamic_forcing_values)
+    require_active_finite(
+        dynamic_forcing,
+        active_mask=None,
+        owner="CAMulator dynamic forcing",
+    )
+    return dynamic_forcing.transpose((1, 0, 2, 3))
 
 
 @jax.jit
