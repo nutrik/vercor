@@ -122,7 +122,10 @@ def _dispatch_with_passthrough_regridder(
         (exchange,),
         {exchange.route_id: _ScalingRegridder()},
     )
-    return dispatched._component_state("ATM").received.get("temperature")
+    return cast(
+        jax.Array,
+        dispatched._component_state("ATM").received.get("temperature"),
+    )
 
 
 def test_dispatch_component_exchanges_handles_scalar_masks_and_gradients() -> None:

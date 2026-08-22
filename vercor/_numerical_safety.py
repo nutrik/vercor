@@ -19,7 +19,7 @@ def _broadcast_active_mask(
         return jnp.ones(values.shape, dtype=bool)
     mask = jnp.asarray(active_mask) > 0
     if mask.ndim > values.ndim or (
-        mask.ndim > 0 and values.shape[-mask.ndim :] != mask.shape
+        mask.ndim > 0 and values.shape[slice(-mask.ndim, None)] != mask.shape
     ):
         raise CouplerError(
             f"{owner} active mask shape {mask.shape} is not a trailing suffix "

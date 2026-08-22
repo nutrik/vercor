@@ -1068,9 +1068,12 @@ def _runtime_send_state(forcing: jax.Array) -> ComponentRuntimeState:
 def _daily_step_info(index: int) -> RuntimeStepInfo:
     """Return scalar step metadata selecting one daily forcing record."""
 
-    return jax.tree_util.tree_map(
-        lambda value: value[0],
-        RuntimeStepInfo.from_sequences([0], [1], [1.0], [0.0], [index]),
+    return cast(
+        RuntimeStepInfo,
+        jax.tree_util.tree_map(
+            lambda value: value[0],
+            RuntimeStepInfo.from_sequences([0], [1], [1.0], [0.0], [index]),
+        ),
     )
 
 

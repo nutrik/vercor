@@ -645,16 +645,24 @@ def test_output_free_workflow_preserves_jvp_and_reverse_mode_gradients() -> None
         )
         return jnp.mean(coupler.run(state).component("A").field("value"))
 
+    value = jnp.asarray(2.0)
+    tangent_seed = jnp.asarray(1.0)
     primal, tangent = jax.jvp(
         objective,
-        (jnp.asarray(2.0),),
-        (jnp.asarray(1.0),),
+        (value,),
+        (tangent_seed,),
     )
-    reverse = jax.grad(objective)(jnp.asarray(2.0))
+    reverse = jax.grad(objective)(value)
+    vjp_primal, pullback = jax.vjp(objective, value)
+    (reverse_vjp,) = pullback(jnp.ones_like(vjp_primal))
 
+    assert np.isfinite(np.asarray(primal))
+    assert np.isfinite(np.asarray(tangent))
+    assert np.isfinite(np.asarray(reverse_vjp))
     assert_allclose_compact(primal, jnp.asarray(5.0))
     assert_allclose_compact(tangent, jnp.asarray(1.0))
     assert_allclose_compact(reverse, jnp.asarray(1.0))
+    assert_allclose_compact(tangent, reverse_vjp, equal_nan=False)
 
 
 def test_payload_dependent_multi_step_scan_preserves_treedef_jvp_and_grad() -> None:
@@ -706,13 +714,101 @@ def test_payload_dependent_multi_step_scan_preserves_treedef_jvp_and_grad() -> N
         )
         return jnp.mean(result.component("A").field("value"))
 
+    value = jnp.asarray(3.0)
+    tangent_seed = jnp.asarray(1.0)
     primal, tangent = jax.jvp(
         objective,
-        (jnp.asarray(3.0),),
-        (jnp.asarray(1.0),),
+        (value,),
+        (tangent_seed,),
     )
-    reverse = jax.grad(objective)(jnp.asarray(3.0))
+    reverse = jax.grad(objective)(value)
+    vjp_primal, pullback = jax.vjp(objective, value)
+    (reverse_vjp,) = pullback(jnp.ones_like(vjp_primal))
 
+    assert np.isfinite(np.asarray(primal))
+    assert np.isfinite(np.asarray(tangent))
+    assert np.isfinite(np.asarray(reverse_vjp))
     assert_allclose_compact(primal, jnp.asarray(24.0))
     assert_allclose_compact(tangent, jnp.asarray(8.0))
     assert_allclose_compact(reverse, jnp.asarray(8.0))
+    assert_allclose_compact(tangent, reverse_vjp, equal_nan=False)
+
+
+def test_output_free_workflow_keeps_inactive_nan_out_of_jvp_and_vjp() -> None:
+    binary_mask = np.asarray([[1.0, 0.0], [1.0, 0.0]])
+    grid = make_test_grid(
+        name="workflow-inactive-missing-data",
+        binary_mask=binary_mask,
+    )
+
+    def step(
+        fields: Mapping[str, Any],
+        context: StepContext,
+    ) -> Mapping[str, Any]:
+        _ = context
+        return {"value": fields["value"] + 1.0}
+
+    component = CallableComponent(
+        "MASKED",
+        grid,
+        step,
+        spec=ComponentSpec(
+            inputs=("value",),
+            outputs=("value",),
+            initial_fields={"value": jnp.asarray([[2.0, jnp.nan], [3.0, jnp.nan]])},
+        ),
+    )
+    coupler = Coupler(
+        _clock(steps=2),
+        components=(component,),
+        run_order=("MASKED",),
+    )
+    initial_state = coupler.initial_state()
+    initial_values = cast(
+        jax.Array,
+        initial_state.component("MASKED").field("value"),
+    )
+    active = jnp.asarray(binary_mask > 0.0)
+    tangent_seed = jnp.where(
+        active,
+        jnp.ones_like(initial_values),
+        jnp.zeros_like(initial_values),
+    )
+
+    assert np.all(np.isfinite(np.asarray(initial_values)[binary_mask > 0.0]))
+    assert np.all(np.isnan(np.asarray(initial_values)[binary_mask == 0.0]))
+
+    def objective(values: jax.Array) -> jax.Array:
+        state = initial_state.replace_fields("MASKED", {"value": values})
+        result = coupler.run(state)
+        final_values = result.component("MASKED").field("value")
+        return jnp.sum(jnp.where(active, final_values, 0.0))
+
+    eager = objective(initial_values)
+    compiled_objective = jax.jit(objective)
+    compiled = compiled_objective(initial_values)
+    primal, forward_tangent = jax.jvp(
+        compiled_objective,
+        (initial_values,),
+        (tangent_seed,),
+    )
+    value, pullback = jax.vjp(compiled_objective, initial_values)
+    (reverse_vjp,) = pullback(jnp.ones_like(value))
+    reverse_projection = jnp.vdot(tangent_seed, reverse_vjp)
+
+    assert np.isfinite(np.asarray(eager))
+    assert np.isfinite(np.asarray(compiled))
+    assert np.isfinite(np.asarray(primal))
+    assert np.isfinite(np.asarray(forward_tangent))
+    assert np.all(np.isfinite(np.asarray(reverse_vjp)))
+    assert np.isfinite(np.asarray(reverse_projection))
+    assert_allclose_compact(eager, jnp.asarray(9.0), equal_nan=False)
+    assert_allclose_compact(compiled, eager, equal_nan=False)
+    assert_allclose_compact(primal, eager, equal_nan=False)
+    assert_allclose_compact(
+        reverse_projection,
+        forward_tangent,
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=False,
+    )
