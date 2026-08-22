@@ -26,7 +26,7 @@ import vercor.setups._external.camulator_tensors as camulator_tensors_module
 import vercor.setups._external.camulator_wind_filter as camulator_wind_filter_module
 from tests._coverage_support import capture_logger_output
 from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
-from vercor.exceptions import CouplerError
+from vercor.exceptions import ComponentError, CouplerError
 from vercor.recipes import ATMOSPHERE_TO_LAND_RADIATION_FIELDS
 from vercor._runtime.contracts import build_exchange_contracts
 from vercor.components.contexts import SetupContext, StepContext
@@ -1578,6 +1578,227 @@ def test_camulator_land_declares_radiation_exchange_inputs(
     assert contracts["LND"].receives == radiation_fields
     for name, component in components.items():
         validate_exchange_fields_declared(component, contracts[name])
+
+
+class _FiniteCamulatorBoundaryStepper:
+    """Minimal native stepper with counters for boundary-order assertions."""
+
+    def __init__(self) -> None:
+        self.build_input_calls = 0
+        self.model_calls = 0
+        self.postprocessing_calls = 0
+        self.shift_calls = 0
+
+    def build_input_with_forcing(
+        self,
+        state: torch.Tensor,
+        dynamic_forcing: torch.Tensor,
+        static_forcing: torch.Tensor,
+    ) -> torch.Tensor:
+        _ = dynamic_forcing, static_forcing
+        self.build_input_calls += 1
+        return state.clone()
+
+    def model(self, model_input: torch.Tensor) -> torch.Tensor:
+        self.model_calls += 1
+        return torch.ones_like(model_input)
+
+    def _apply_postprocessing(
+        self,
+        prediction: torch.Tensor,
+        model_input: torch.Tensor,
+    ) -> torch.Tensor:
+        _ = model_input
+        self.postprocessing_calls += 1
+        return prediction
+
+    def shift_state_forward(
+        self,
+        state: torch.Tensor,
+        prediction: torch.Tensor,
+    ) -> torch.Tensor:
+        _ = state
+        self.shift_calls += 1
+        return prediction
+
+
+class _InvalidSecondInputStepper(_FiniteCamulatorBoundaryStepper):
+    def build_input_with_forcing(
+        self,
+        state: torch.Tensor,
+        dynamic_forcing: torch.Tensor,
+        static_forcing: torch.Tensor,
+    ) -> torch.Tensor:
+        model_input = super().build_input_with_forcing(
+            state,
+            dynamic_forcing,
+            static_forcing,
+        )
+        model_input.flatten()[0] = torch.nan
+        return model_input
+
+
+class _InvalidRawPredictionStepper(_FiniteCamulatorBoundaryStepper):
+    def model(self, model_input: torch.Tensor) -> torch.Tensor:
+        prediction = super().model(model_input)
+        if self.model_calls == 1:
+            prediction.flatten()[0] = torch.nan
+        return prediction
+
+    def _apply_postprocessing(
+        self,
+        prediction: torch.Tensor,
+        model_input: torch.Tensor,
+    ) -> torch.Tensor:
+        processed = super()._apply_postprocessing(prediction, model_input)
+        return torch.nan_to_num(processed)
+
+
+class _InvalidPostprocessedPredictionStepper(_FiniteCamulatorBoundaryStepper):
+    def _apply_postprocessing(
+        self,
+        prediction: torch.Tensor,
+        model_input: torch.Tensor,
+    ) -> torch.Tensor:
+        processed = super()._apply_postprocessing(prediction, model_input)
+        if self.postprocessing_calls == 1:
+            processed.flatten()[0] = torch.nan
+        return processed
+
+
+class _InvalidShiftedStateStepper(_FiniteCamulatorBoundaryStepper):
+    def shift_state_forward(
+        self,
+        state: torch.Tensor,
+        prediction: torch.Tensor,
+    ) -> torch.Tensor:
+        shifted = super().shift_state_forward(state, prediction).clone()
+        if self.shift_calls == 1:
+            shifted.flatten()[0] = torch.nan
+        return shifted
+
+
+class _NoOpCamulatorInputAccessor:
+    def set_state_var(
+        self,
+        state: torch.Tensor,
+        variable_name: str,
+        value: torch.Tensor,
+    ) -> None:
+        _ = state, variable_name, value
+
+
+def _camulator_boundary_case(
+    stepper: _FiniteCamulatorBoundaryStepper,
+) -> tuple[Any, dict[str, jax.Array], Any]:
+    """Return a deterministic two-substep CAMulator native-boundary fake."""
+
+    start = datetime(2000, 1, 1, 0, 0, 0)
+    dynamic_ds = xr.Dataset(
+        data_vars={
+            "F1": (
+                ("time", "lat", "lon"),
+                np.ones((2, 2, 2), dtype=np.float32),
+            )
+        },
+        coords={"time": [start, datetime(2000, 1, 1, 6, 0, 0)]},
+    )
+    resources = SimpleNamespace(
+        dynamic_ds=dynamic_ds,
+        device="cpu",
+        stepper=stepper,
+        static_forcing=torch.zeros((1, 1, 1, 2, 2)),
+        LANDM_COSLAT=jnp.zeros((2, 2)),
+        accessor_input=_NoOpCamulatorInputAccessor(),
+    )
+    fields = {
+        "sea_surface_temperature": jnp.asarray([[280.0, 281.0], [282.0, 283.0]]),
+        "land_surface_temperature": jnp.zeros((2, 2)),
+    }
+    payload = camulator_gcm_state_module.CAMulatorRuntimePayload(
+        model_state=torch.zeros((1, 1, 1, 2, 2)),
+        cursor=camulator_forcing_module.CamulatorRuntimeCursor(),
+    )
+    return resources, fields, payload
+
+
+def test_camulator_rejects_invalid_model_input_before_second_substep() -> None:
+    stepper = _InvalidSecondInputStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+
+    with pytest.raises(ComponentError, match="CAMulator model input.*non-finite"):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=0,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 1
+
+
+def test_camulator_rejects_raw_prediction_before_postprocessing_or_reuse() -> None:
+    stepper = _InvalidRawPredictionStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+
+    with pytest.raises(ComponentError, match="CAMulator raw prediction.*non-finite"):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=0,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 1
+    assert stepper.postprocessing_calls == 0
+    assert stepper.shift_calls == 0
+
+
+def test_camulator_rejects_postprocessed_prediction_before_state_reuse() -> None:
+    stepper = _InvalidPostprocessedPredictionStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+
+    with pytest.raises(
+        ComponentError,
+        match="CAMulator postprocessed prediction.*non-finite",
+    ):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=0,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 1
+    assert stepper.postprocessing_calls == 1
+    assert stepper.shift_calls == 0
+
+
+def test_camulator_rejects_shifted_state_before_next_substep() -> None:
+    stepper = _InvalidShiftedStateStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+
+    with pytest.raises(
+        ComponentError, match="CAMulator shifted model state.*non-finite"
+    ):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=0,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 1
+    assert stepper.postprocessing_calls == 1
+    assert stepper.shift_calls == 1
 
 
 def test_camulator_runtime_step_is_reproducible_from_one_payload(

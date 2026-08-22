@@ -4,9 +4,27 @@ from jax import lax
 from jax.typing import ArrayLike
 from typing import cast
 
+from vercor._numerical_safety import require_active_finite
 from vercor.dtypes import as_jax_real_array
 from vercor.fluxes.utilities import cdn, psimhu, psixhu, qsat
 from vercor.physics import PhysicalConstants
+
+
+def _prepare_bulk_flux_operand(
+    values: jax.Array,
+    active_mask: jax.Array,
+    *,
+    owner: str,
+    missing_value: float,
+) -> jax.Array:
+    """Validate one flux input and neutralize only masked missing-data NaNs."""
+
+    require_active_finite(values, active_mask=active_mask, owner=owner)
+    return jnp.where(
+        jnp.isnan(values),
+        jnp.asarray(missing_value, dtype=values.dtype),
+        values,
+    )
 
 
 def _compute_stability_terms(
@@ -124,6 +142,73 @@ def compute_ocean_surface_fluxes(
     us_array = as_jax_real_array(us)
     vs_array = as_jax_real_array(vs)
     ts_array = as_jax_real_array(ts)
+
+    require_active_finite(
+        mask_array,
+        active_mask=None,
+        owner="Ocean bulk-flux input 'mask'",
+    )
+    active_mask = mask_array > 0.0
+    zbot_array = _prepare_bulk_flux_operand(
+        zbot_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'zbot'",
+        missing_value=1.0,
+    )
+    ubot_array = _prepare_bulk_flux_operand(
+        ubot_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'ubot'",
+        missing_value=0.0,
+    )
+    vbot_array = _prepare_bulk_flux_operand(
+        vbot_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'vbot'",
+        missing_value=0.0,
+    )
+    thbot_array = _prepare_bulk_flux_operand(
+        thbot_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'thbot'",
+        missing_value=273.15,
+    )
+    qbot_array = _prepare_bulk_flux_operand(
+        qbot_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'qbot'",
+        missing_value=0.0,
+    )
+    rbot_array = _prepare_bulk_flux_operand(
+        rbot_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'rbot'",
+        missing_value=1.0,
+    )
+    tbot_array = _prepare_bulk_flux_operand(
+        tbot_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'tbot'",
+        missing_value=273.15,
+    )
+    us_array = _prepare_bulk_flux_operand(
+        us_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'us'",
+        missing_value=0.0,
+    )
+    vs_array = _prepare_bulk_flux_operand(
+        vs_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'vs'",
+        missing_value=0.0,
+    )
+    ts_array = _prepare_bulk_flux_operand(
+        ts_array,
+        active_mask,
+        owner="Ocean bulk-flux input 'ts'",
+        missing_value=273.15,
+    )
 
     zref = constants.reference_height
     ztref = constants.air_temperature_reference_height
@@ -322,7 +407,6 @@ def shr_flux_atmIce(
     """Compute atmosphere-sea-ice surface fluxes using JAX-native array math."""
 
     _ = missval
-    _ = tbot
 
     mask_array = as_jax_real_array(mask)
     zbot_array = as_jax_real_array(zbot)
@@ -331,7 +415,64 @@ def shr_flux_atmIce(
     thbot_array = as_jax_real_array(thbot)
     qbot_array = as_jax_real_array(qbot)
     rbot_array = as_jax_real_array(rbot)
+    tbot_array = as_jax_real_array(tbot)
     ts_array = as_jax_real_array(ts)
+
+    require_active_finite(
+        mask_array,
+        active_mask=None,
+        owner="Ice bulk-flux input 'mask'",
+    )
+    active_mask = mask_array > 0.0
+    zbot_array = _prepare_bulk_flux_operand(
+        zbot_array,
+        active_mask,
+        owner="Ice bulk-flux input 'zbot'",
+        missing_value=1.0,
+    )
+    ubot_array = _prepare_bulk_flux_operand(
+        ubot_array,
+        active_mask,
+        owner="Ice bulk-flux input 'ubot'",
+        missing_value=0.0,
+    )
+    vbot_array = _prepare_bulk_flux_operand(
+        vbot_array,
+        active_mask,
+        owner="Ice bulk-flux input 'vbot'",
+        missing_value=0.0,
+    )
+    thbot_array = _prepare_bulk_flux_operand(
+        thbot_array,
+        active_mask,
+        owner="Ice bulk-flux input 'thbot'",
+        missing_value=273.15,
+    )
+    qbot_array = _prepare_bulk_flux_operand(
+        qbot_array,
+        active_mask,
+        owner="Ice bulk-flux input 'qbot'",
+        missing_value=0.0,
+    )
+    rbot_array = _prepare_bulk_flux_operand(
+        rbot_array,
+        active_mask,
+        owner="Ice bulk-flux input 'rbot'",
+        missing_value=1.0,
+    )
+    tbot_array = _prepare_bulk_flux_operand(
+        tbot_array,
+        active_mask,
+        owner="Ice bulk-flux input 'tbot'",
+        missing_value=273.15,
+    )
+    ts_array = _prepare_bulk_flux_operand(
+        ts_array,
+        active_mask,
+        owner="Ice bulk-flux input 'ts'",
+        missing_value=273.15,
+    )
+    _ = tbot_array
 
     zref = constants.reference_height
     ztref = constants.air_temperature_reference_height

@@ -22,6 +22,18 @@ if TYPE_CHECKING:
     from vercor.setups._external.camulator_gcm_state import CAMulatorGCMSetupState
 
 
+def _require_finite_torch_tensor(value: Any, *, owner: str) -> None:
+    """Reject a non-Tensor or non-finite value at one native host boundary."""
+
+    if not isinstance(value, torch.Tensor):
+        raise ComponentError(
+            f"{owner} must be a torch.Tensor; got {type(value).__name__}."
+        )
+    invalid_count = int(torch.count_nonzero(~torch.isfinite(value)).item())
+    if invalid_count:
+        raise ComponentError(f"{owner} contains {invalid_count} non-finite value(s).")
+
+
 def coerce_camulator_datetime(time_obj: Any) -> datetime:
     """Return a Python datetime from CAMulator/xarray time coordinates."""
 
@@ -114,16 +126,37 @@ def run_camulator_prediction_block(
             ),
         )
 
+        model_input = model_input.float()
+        _require_finite_torch_tensor(
+            model_input,
+            owner=f"CAMulator model input at forecast hour {forecast_hour}",
+        )
         with torch.no_grad():
-            prediction = resources.stepper.model(model_input.float())
+            prediction = resources.stepper.model(model_input)
+        _require_finite_torch_tensor(
+            prediction,
+            owner=f"CAMulator raw prediction at forecast hour {forecast_hour}",
+        )
 
         prediction = resources.stepper._apply_postprocessing(prediction, model_input)
+        _require_finite_torch_tensor(
+            prediction,
+            owner=(
+                "CAMulator postprocessed prediction at forecast hour "
+                f"{forecast_hour}"
+            ),
+        )
         prediction_samples.append(prediction)
 
-        model_state = resources.stepper.shift_state_forward(
+        next_model_state = resources.stepper.shift_state_forward(
             model_state,
             prediction,
         )
+        _require_finite_torch_tensor(
+            next_model_state,
+            owner=f"CAMulator shifted model state at forecast hour {forecast_hour}",
+        )
+        model_state = next_model_state
         forecast_hour += 1
 
     if prediction is None or last_total_surface_temperature is None:

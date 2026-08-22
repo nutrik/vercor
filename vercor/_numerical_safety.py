@@ -130,4 +130,10 @@ def safe_masked_divide(
     safe_denominator = jnp.where(condition, denominator_array, 1.0)
     quotient = safe_numerator / safe_denominator
     require_active_finite(quotient, active_mask=condition, owner="safe quotient")
-    return jnp.where(condition, quotient, inactive_value)
+    output = jnp.where(condition, quotient, inactive_value)
+    require_active_finite(
+        output,
+        active_mask=condition,
+        owner="safe masked divide output",
+    )
+    return output

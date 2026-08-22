@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from jax.errors import JaxRuntimeError
 from jax.experimental import checkify
 
 from tests.assertions import (
@@ -12,6 +13,7 @@ from tests.assertions import (
     assert_finite_jvp_vjp,
 )
 from vercor.dtypes import jax_index_dtype
+from vercor.exceptions import CouplerError
 from vercor._interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 
 
@@ -28,6 +30,20 @@ def _scalar_interp(
         lon_tgt=lon_tgt,
         lat_tgt=lat_tgt,
         **kwargs,  # type: ignore
+    )
+
+
+def _nonrenormalizing_missing_scalar_interpolator() -> BilinearRectilinearInterpolator:
+    """Return one scalar cell whose missing corner invalidates the target."""
+
+    return _scalar_interp(
+        lon_src=jnp.asarray([0.0, 1.0]),
+        lat_src=jnp.asarray([0.0, 1.0]),
+        lon_tgt=jnp.asarray([0.5]),
+        lat_tgt=jnp.asarray([0.5]),
+        periodic_longitude=False,
+        nan_renorm=False,
+        extrapolation_mode=None,
     )
 
 
@@ -128,6 +144,80 @@ def test_scalar_nan_renorm_false_falls_back_to_fill_when_corner_invalid() -> Non
     out = interp.apply_scalar(src)
 
     assert_array_equal_compact(out, np.array([[-999.0]]))
+
+
+def test_scalar_nan_renorm_false_neutralizes_invalid_corner_before_weighting() -> None:
+    interpolator = _nonrenormalizing_missing_scalar_interpolator()
+    source = jnp.asarray([[1.0, jnp.nan], [3.0, 5.0]])
+
+    errors, checked = checkify.checkify(
+        interpolator.apply_scalar,
+        errors=checkify.float_checks,
+    )(source)
+    eager = interpolator.apply_scalar(source)
+    compiled = jax.jit(interpolator.apply_scalar)(source)
+
+    assert errors.get() is None
+    assert bool(jnp.isnan(checked[0, 0]))
+    assert bool(jnp.isnan(eager[0, 0]))
+    assert bool(jnp.isnan(compiled[0, 0]))
+    assert_finite_jvp_vjp(
+        lambda values: jnp.nansum(interpolator.apply_scalar(values)),
+        source,
+        jnp.asarray([[1.0, 0.0], [1.0, 1.0]]),
+    )
+
+
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_scalar_bilinear_rejects_infinite_source_eager(bad_value: float) -> None:
+    interpolator = _nonrenormalizing_missing_scalar_interpolator()
+    source = jnp.asarray([[1.0, bad_value], [3.0, 5.0]])
+
+    with pytest.raises(CouplerError, match="bilinear scalar source.*infinity"):
+        interpolator.apply_scalar(source)
+
+
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_scalar_bilinear_rejects_infinite_source_under_checkify(
+    bad_value: float,
+) -> None:
+    interpolator = _nonrenormalizing_missing_scalar_interpolator()
+    source = jnp.asarray([[1.0, bad_value], [3.0, 5.0]])
+
+    with pytest.raises(CouplerError, match="bilinear scalar source.*infinity"):
+        checkify.checkify(
+            interpolator.apply_scalar,
+            errors=checkify.float_checks,
+        )(source)
+
+
+@pytest.mark.parametrize("transform", ["jit", "jvp", "vjp"])
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_scalar_bilinear_rejects_infinite_source_under_transforms(
+    bad_value: float,
+    transform: str,
+) -> None:
+    interpolator = _nonrenormalizing_missing_scalar_interpolator()
+    source = jnp.asarray([[1.0, bad_value], [3.0, 5.0]])
+
+    def objective(values: jax.Array) -> jax.Array:
+        return jnp.nansum(interpolator.apply_scalar(values))
+
+    expected_error = JaxRuntimeError if transform == "jit" else CouplerError
+    with pytest.raises(expected_error, match="bilinear scalar source.*infinity"):
+        if transform == "jit":
+            jax.jit(objective)(source).block_until_ready()
+        elif transform == "jvp":
+            value, tangent = jax.jvp(
+                objective,
+                (source,),
+                (jnp.zeros_like(source),),
+            )
+            jax.block_until_ready((value, tangent))
+        else:
+            value, pullback = jax.vjp(objective, source)
+            (reverse,) = pullback(jnp.ones_like(value))
+            jax.block_until_ready((value, reverse))
 
 
 def test_scalar_periodic_longitude_wrap_uses_dateline_cell() -> None:

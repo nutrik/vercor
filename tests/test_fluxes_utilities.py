@@ -6,8 +6,12 @@ from dataclasses import replace
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
+from jax.errors import JaxRuntimeError
+from jax.experimental import checkify
 
 from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
+from vercor.exceptions import CouplerError
 import vercor.fluxes.utilities as flux_utilities_module
 from vercor.fluxes.bulk_formula_cesm import (
     compute_ocean_surface_fluxes,
@@ -46,6 +50,61 @@ def _ocean_state(shape: tuple[int, int] = (3, 4)) -> dict[str, np.ndarray]:
         "vs": np.zeros(shape),
         "ts": np.full(shape, 300.0),
     }
+
+
+def _call_surface_flux(
+    flux_kind: str,
+    state: dict[str, np.ndarray],
+    surface_temperature: jax.Array | np.ndarray,
+) -> tuple[jax.Array, ...]:
+    """Evaluate one bulk-flux owner with a shared named test state."""
+
+    constants = PhysicalConstants()
+    if flux_kind == "ocean":
+        return compute_ocean_surface_fluxes(
+            constants,
+            state["mask"],
+            state["zbot"],
+            state["ubot"],
+            state["vbot"],
+            state["thbot"],
+            state["qbot"],
+            state["rbot"],
+            state["tbot"],
+            state["us"],
+            state["vs"],
+            surface_temperature,
+        )
+    return shr_flux_atmIce(
+        constants,
+        state["mask"],
+        state["zbot"],
+        state["ubot"],
+        state["vbot"],
+        state["thbot"],
+        state["qbot"],
+        state["rbot"],
+        state["tbot"],
+        surface_temperature,
+    )
+
+
+def _masked_surface_flux_case(
+    flux_kind: str,
+) -> tuple[dict[str, np.ndarray], float]:
+    """Return a two-cell bulk-flux state with one inactive location."""
+
+    state = _ocean_state(shape=(1, 2))
+    state["mask"] = np.asarray([[1.0, 0.0]])
+    if flux_kind == "ice":
+        state["ubot"] = np.full((1, 2), 6.0)
+        state["vbot"] = np.full((1, 2), 1.0)
+        state["thbot"] = np.full((1, 2), 266.0)
+        state["qbot"] = np.full((1, 2), 0.004)
+        state["rbot"] = np.full((1, 2), 1.3)
+        state["tbot"] = np.full((1, 2), 266.0)
+        return state, 270.0
+    return state, 300.0
 
 
 def _finite_difference_scalar_grad(
@@ -406,6 +465,103 @@ def test_compute_ocean_surface_fluxes_respects_mask_for_surface_exchange_outputs
     # qref is not fully masked by the current implementation.
     for arr in (out[0], out[1], out[2], out[3], out[4], out[5], out[6], out[8]):
         assert np.all(arr[state["mask"] == 0.0] == 0.0)
+
+
+@pytest.mark.parametrize("flux_kind", ["ocean", "ice"])
+def test_bulk_flux_neutralizes_inactive_nan_before_nonlinear_arithmetic(
+    flux_kind: str,
+) -> None:
+    state, active_temperature = _masked_surface_flux_case(flux_kind)
+    surface_temperature = jnp.asarray([[active_temperature, jnp.nan]])
+
+    def flux(values: jax.Array) -> tuple[jax.Array, ...]:
+        return _call_surface_flux(flux_kind, state, values)
+
+    errors, checked = checkify.checkify(flux, errors=checkify.float_checks)(
+        surface_temperature
+    )
+    eager = flux(surface_temperature)
+    compiled = jax.jit(flux)(surface_temperature)
+    finite_baseline = flux(jnp.full((1, 2), active_temperature))
+
+    assert errors.get() is None
+    for checked_value, eager_value, compiled_value, baseline_value in zip(
+        checked,
+        eager,
+        compiled,
+        finite_baseline,
+        strict=True,
+    ):
+        assert bool(jnp.all(jnp.isfinite(checked_value)))
+        assert bool(jnp.all(jnp.isfinite(eager_value)))
+        assert bool(jnp.all(jnp.isfinite(compiled_value)))
+        assert_allclose_compact(eager_value[0, 0], baseline_value[0, 0])
+
+    assert_finite_jvp_vjp(
+        lambda values: sum(
+            (jnp.sum(value) for value in flux(values)),
+            start=jnp.asarray(0.0),
+        ),
+        surface_temperature,
+        jnp.asarray([[1.0, 0.0]]),
+        rtol=1e-5,
+        atol=1e-7,
+    )
+
+
+_BULK_FLUX_OPERANDS = (
+    *(("ocean", name) for name in _ocean_state(shape=(1, 2))),
+    *(
+        ("ice", name)
+        for name in (
+            "mask",
+            "zbot",
+            "ubot",
+            "vbot",
+            "thbot",
+            "qbot",
+            "rbot",
+            "tbot",
+            "ts",
+        )
+    ),
+)
+
+
+@pytest.mark.parametrize(("flux_kind", "operand"), _BULK_FLUX_OPERANDS)
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_bulk_flux_rejects_infinity_in_every_inactive_operand(
+    flux_kind: str,
+    operand: str,
+    bad_value: float,
+) -> None:
+    state, active_temperature = _masked_surface_flux_case(flux_kind)
+    state["ts"] = np.full((1, 2), active_temperature)
+    state[operand] = state[operand].copy()
+    state[operand][0, 1] = float(bad_value)
+
+    with pytest.raises(
+        CouplerError,
+        match=f"{flux_kind.title()} bulk-flux input '{operand}'.*infinity",
+    ):
+        _call_surface_flux(flux_kind, state, state["ts"])
+
+
+@pytest.mark.parametrize("flux_kind", ["ocean", "ice"])
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_bulk_flux_reports_compiled_inactive_infinity(
+    flux_kind: str,
+    bad_value: float,
+) -> None:
+    state, active_temperature = _masked_surface_flux_case(flux_kind)
+
+    with pytest.raises(
+        JaxRuntimeError,
+        match=f"{flux_kind.title()} bulk-flux input 'ts'.*infinity",
+    ):
+        jax.jit(lambda values: _call_surface_flux(flux_kind, state, values))(
+            jnp.asarray([[active_temperature, bad_value]])
+        )[0].block_until_ready()
 
 
 def test_flux_kernels_support_jit_and_gradients() -> None:

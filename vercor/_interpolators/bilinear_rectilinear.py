@@ -212,6 +212,10 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         m10 = valid[self.j0, self.i1]
         m01 = valid[self.j1, self.i0]
         m11 = valid[self.j1, self.i1]
+        valid_v00 = jnp.where(m00, v00, 0.0)
+        valid_v10 = jnp.where(m10, v10, 0.0)
+        valid_v01 = jnp.where(m01, v01, 0.0)
+        valid_v11 = jnp.where(m11, v11, 0.0)
 
         if self.nan_renorm:
             w00 = self.w00 * m00
@@ -220,12 +224,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             w11 = self.w11 * m11
             wsum = w00 + w10 + w01 + w11
 
-            num = (
-                w00 * jnp.where(m00, v00, 0.0)
-                + w10 * jnp.where(m10, v10, 0.0)
-                + w01 * jnp.where(m01, v01, 0.0)
-                + w11 * jnp.where(m11, v11, 0.0)
-            )
+            num = w00 * valid_v00 + w10 * valid_v10 + w01 * valid_v01 + w11 * valid_v11
             out = safe_masked_divide(
                 num,
                 wsum,
@@ -234,7 +233,12 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             )
             return out, wsum
 
-        num = self.w00 * v00 + self.w10 * v10 + self.w01 * v01 + self.w11 * v11
+        num = (
+            self.w00 * valid_v00
+            + self.w10 * valid_v10
+            + self.w01 * valid_v01
+            + self.w11 * valid_v11
+        )
         all_ok = m00 & m10 & m01 & m11
         out = jnp.where(all_ok, num, jnp.nan)
         wsum = jnp.where(all_ok, 1.0, 0.0)
