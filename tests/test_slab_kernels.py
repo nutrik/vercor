@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from tests.assertions import assert_allclose_compact
+from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
 from vercor.setups._slab.atmosphere import (
     _bulk_flux_step,
     _default_sea_surface_temperature,
@@ -46,6 +46,11 @@ def test_atmosphere_kernels_support_jit_and_gradients() -> None:
         sea_surface_temperature
     )
     assert_allclose_compact(gradient, np.full((2, 2), 10.0))
+    assert_finite_jvp_vjp(
+        lambda sst: jnp.sum(_bulk_flux_step(jnp.full_like(sst, 288.0), sst)[0]),
+        jnp.full((2, 2), 285.0),
+        jnp.ones((2, 2)),
+    )
 
 
 def test_ocean_kernel_supports_jit_and_matches_closed_form() -> None:
@@ -89,6 +94,23 @@ def test_ocean_kernel_supports_jit_and_matches_closed_form() -> None:
         )
     )(sensible_heat_flux)
     assert np.all(np.isfinite(np.asarray(gradient)))
+    assert_finite_jvp_vjp(
+        lambda surface_temperature: jnp.sum(
+            _advance_sea_surface_temperature(
+                surface_temperature,
+                jnp.full_like(surface_temperature, 10.0),
+                jnp.full_like(surface_temperature, 5.0),
+                3600.0,
+                1025.0,
+                3990.0,
+                30.0,
+                1.0 / (30.0 * 86400.0),
+                288.15,
+            )
+        ),
+        jnp.full((2, 2), 288.0),
+        jnp.ones((2, 2)),
+    )
 
 
 def test_land_kernel_supports_jit_and_clipping() -> None:
@@ -108,6 +130,17 @@ def test_land_kernel_supports_jit_and_clipping() -> None:
         lambda sm: jnp.sum(_update_soil_moisture(sm, jnp.full((2, 2), 100.0), 10.0))
     )(jnp.full((2, 2), 0.3))
     assert_allclose_compact(gradient, np.ones((2, 2)))
+    assert_finite_jvp_vjp(
+        lambda moisture: jnp.sum(
+            _update_soil_moisture(
+                moisture,
+                jnp.full_like(moisture, 100.0),
+                10.0,
+            )
+        ),
+        jnp.full((2, 2), 0.3),
+        jnp.ones((2, 2)),
+    )
 
 
 def test_seaice_kernel_supports_jit_and_gradient() -> None:
@@ -124,3 +157,10 @@ def test_seaice_kernel_supports_jit_and_gradient() -> None:
     )
     assert np.all(np.isfinite(np.asarray(gradient)))
     assert np.all(np.asarray(gradient) < 0.0)
+    assert_finite_jvp_vjp(
+        lambda surface_temperature: jnp.sum(
+            _diagnose_ice_fraction(surface_temperature)
+        ),
+        jnp.asarray([[270.0, 272.0], [274.0, 276.0]]),
+        jnp.ones((2, 2)),
+    )

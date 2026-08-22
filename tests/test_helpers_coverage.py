@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from tests.assertions import assert_allclose_compact
+from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
 from vercor.exceptions import GridError
 from vercor.exchanges import Exchange
 from vercor.fields import vector
@@ -113,6 +113,15 @@ def test_centers_to_edges_and_compute_land_mask_edge_cases() -> None:
 
     land_mask = compute_land_mask(np.asarray([[-0.5, 0.9995], [0.7, 1.0]]))
     assert_allclose_compact(land_mask, np.asarray([[1, 0], [1, 0]]))
+    assert_finite_jvp_vjp(
+        lambda centers: jnp.sum(centers_to_edges(centers[0], "lat"))
+        + jnp.sum(centers_to_edges(centers[1], "lon")),
+        (
+            jnp.asarray([-60.0, 0.0, 60.0]),
+            jnp.asarray([0.0, 90.0, 180.0]),
+        ),
+        (jnp.ones(3), jnp.ones(3)),
+    )
 
 
 def test_helper_kernels_support_jax_jit() -> None:

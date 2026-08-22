@@ -16,6 +16,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 import xarray as xr
+from jax.errors import JaxRuntimeError
 from veros.core.external.solvers import (
     get_linear_solver as veros_get_linear_solver,
 )
@@ -35,13 +36,13 @@ import vercor.setups._external.veros_runtime_settings as veros_runtime_settings_
 import vercor.setups._external.veros_setup as veros_setup_module
 import vercor.setups._external.veros_state as veros_state_module
 from tests._coverage_support import capture_logger_output, make_test_grid
-from tests.assertions import assert_allclose_compact
+from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
 from vercor.calendar import DateTime360, DateTime365
 from vercor.components.contracts import PrefillContext
 from vercor.components import StepResult
 from vercor.components.data import DataComponent
 from vercor.components.contexts import SetupContext, StepContext
-from vercor.exceptions import ComponentError
+from vercor.exceptions import ComponentError, CouplerError
 from vercor.output import (
     OutputContext,
     OutputFrame,
@@ -400,6 +401,35 @@ def test_cleanup_surface_temperature_fields_supports_jit_and_gradients() -> None
         )
     )(jnp.asarray([[270.0, 271.0], [272.0, 273.0]]))
     assert_allclose_compact(gradient, np.ones((2, 2)))
+    assert_finite_jvp_vjp(
+        lambda land: jnp.sum(
+            jax_gcm_fields_module.cleanup_surface_temperature_fields(
+                land,
+                jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
+            )[2]
+        ),
+        jnp.asarray([[270.0, 271.0], [272.0, 273.0]]),
+        jnp.ones((2, 2)),
+    )
+
+
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_jcm_surface_cleanup_rejects_infinity(bad_value: float) -> None:
+    with pytest.raises(CouplerError, match="JCM.*surface temperature.*infinity"):
+        cast(Any, jax_gcm_fields_module.cleanup_surface_temperature_fields).__wrapped__(
+            jnp.asarray([[bad_value, jnp.nan]]),
+            jnp.asarray([[jnp.nan, 280.0]]),
+        )
+
+
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_compiled_jcm_surface_cleanup_rejects_infinity(bad_value: float) -> None:
+    with pytest.raises(JaxRuntimeError, match="JCM.*surface temperature.*infinity"):
+        result = jax.jit(jax_gcm_fields_module.cleanup_surface_temperature_fields)(
+            jnp.asarray([[bad_value, jnp.nan]]),
+            jnp.asarray([[jnp.nan, 280.0]]),
+        )
+        result[0].block_until_ready()
 
 
 def test_prepare_surface_temperature_forcing_supports_jit_and_fill_value() -> None:
@@ -445,6 +475,11 @@ def test_prepare_surface_temperature_forcing_preserves_fractional_cells() -> Non
         np.asarray([[288.15, 281.0], [282.0, 567.0]]),
     )
     assert_allclose_compact(gradient, np.asarray([[1.0, 1.0], [2.0, 2.0]]))
+    assert_finite_jvp_vjp(
+        forcing_sum,
+        total_surface_temperature,
+        jnp.ones_like(total_surface_temperature),
+    )
 
 
 def test_map_jcm_output_fields_supports_jit(
@@ -554,6 +589,44 @@ def test_map_jcm_output_fields_supports_jit(
         np.asarray([[284.0, 286.0], [285.0, 287.0]]) * (100000.0 / 80000.0) ** 0.286,
     )
     assert_allclose_compact(mapped_fields["model_level_height"], np.full((2, 2), 150.0))
+
+    fixed_temperature = jnp.asarray(
+        [
+            [[280.0, 281.0], [282.0, 283.0]],
+            [[284.0, 285.0], [286.0, 287.0]],
+        ]
+    )
+
+    def mapped_objective(temperature_values: jax.Array) -> jax.Array:
+        fields = jax_gcm_fields_module.map_jcm_output_fields(
+            2.5e6,
+            1.0e5,
+            jnp.asarray([0.2, 1.0]),
+            28.966,
+            8314.47,
+            1.0e5,
+            0.286,
+            jnp.full((2, 2, 2), 5.0),
+            jnp.full((2, 2, 2), 2.0),
+            jnp.full((2, 2), 40.0),
+            jnp.full((2, 2), 30.0),
+            jnp.asarray([[0.9, 1.0], [1.1, 1.2]]),
+            jnp.ones((2, 2, 2)),
+            jnp.full((2, 2, 2), 2.0),
+            temperature_values,
+            jnp.full((2, 2, 2), 20.0),
+            dtype=DTypePolicy(),
+        )
+        return sum(
+            (jnp.sum(value) for value in fields.values()),
+            start=jnp.asarray(0.0),
+        )
+
+    assert_finite_jvp_vjp(
+        mapped_objective,
+        fixed_temperature,
+        jnp.ones_like(fixed_temperature),
+    )
 
 
 def test_generate_step_function_threads_jcm_2_physics_carry() -> None:
@@ -1847,6 +1920,13 @@ def test_veros_update_veros_interior_supports_jit_and_gradients() -> None:
         )
     )(interior)
     assert_allclose_compact(gradient, np.ones((4, 4, 1)))
+    assert_finite_jvp_vjp(
+        lambda payload: jnp.sum(
+            veros_state_module.update_veros_interior(array, payload)
+        ),
+        interior,
+        jnp.ones_like(interior),
+    )
 
 
 def test_veros_extract_surface_temperature_supports_jit_and_gradients() -> None:
@@ -1869,6 +1949,13 @@ def test_veros_extract_surface_temperature_supports_jit_and_gradients() -> None:
     expected_gradient = np.zeros((8, 8, 2, 2), dtype=float)
     expected_gradient[2:-2, 2:-2, -1, 0] = 1.0
     assert_allclose_compact(gradient, expected_gradient)
+    assert_finite_jvp_vjp(
+        lambda payload: jnp.sum(
+            veros_state_module.extract_surface_temperature(payload, 0)
+        ),
+        temperature,
+        jnp.ones_like(temperature),
+    )
 
 
 def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate() -> (
@@ -1904,6 +1991,56 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
         restored,
         np.asarray([[[12.0], [14.0]], [[13.0], [15.0]]]),
     )
+    assert_finite_jvp_vjp(
+        lambda forcing: sum(
+            (
+                jnp.sum(value)
+                for value in veros_state_module.prepare_surface_forcing_fields(
+                    forcing[0],
+                    forcing[1],
+                    forcing[2],
+                    forcing[3],
+                    True,
+                )
+            ),
+            start=jnp.asarray(0.0),
+        ),
+        (
+            jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
+            jnp.asarray([[5.0, 6.0], [7.0, 8.0]]),
+            jnp.asarray([[9.0, 10.0], [11.0, 12.0]]),
+            jnp.asarray([[13.0, 14.0], [15.0, 16.0]]),
+        ),
+        (
+            jnp.ones((2, 2)),
+            jnp.ones((2, 2)),
+            jnp.ones((2, 2)),
+            jnp.ones((2, 2)),
+        ),
+    )
+
+
+def test_veros_surface_forcing_rejects_infinity() -> None:
+    with pytest.raises(CouplerError, match="Veros.*surface forcing.*infinity"):
+        cast(Any, veros_state_module.prepare_surface_forcing_fields).__wrapped__(
+            jnp.asarray([[jnp.inf]]),
+            jnp.zeros((1, 1)),
+            jnp.zeros((1, 1)),
+            jnp.zeros((1, 1)),
+            True,
+        )
+
+
+def test_compiled_veros_surface_forcing_rejects_infinity() -> None:
+    with pytest.raises(JaxRuntimeError, match="Veros.*surface forcing.*infinity"):
+        result = jax.jit(veros_state_module.prepare_surface_forcing_fields)(
+            jnp.asarray([[jnp.inf]]),
+            jnp.zeros((1, 1)),
+            jnp.zeros((1, 1)),
+            jnp.zeros((1, 1)),
+            True,
+        )
+        result.taux.block_until_ready()
 
 
 def test_veros_output_snapshot_uses_variable_metadata_and_current_timestep() -> None:
@@ -2432,6 +2569,9 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
     )
 
     assert isinstance(result, StepResult)
+    assert all(
+        np.all(np.isfinite(np.asarray(value))) for value in result.fields.values()
+    )
     assert result.payload is not initial_native_state
     assert component._veros_state is initial_native_state
     assert_allclose_compact(
@@ -2495,6 +2635,7 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
     ) -> Any:
         assert jitted is True
         assert all(isinstance(value, jax.Array) for value in forcing_fields)
+        assert all(np.all(np.isfinite(np.asarray(value))) for value in forcing_fields)
         forcing_calls.append(forcing_fields)
         return state
 

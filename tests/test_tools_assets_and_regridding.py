@@ -10,13 +10,18 @@ import pytest
 import vercor.grid_masks as grid_masks_module
 
 from tests._coverage_support import capture_logger_output
-from tests.assertions import assert_allclose_compact, assert_array_equal_compact
+from tests.assertions import (
+    assert_allclose_compact,
+    assert_array_equal_compact,
+    assert_finite_jvp_vjp,
+)
 from vercor.exceptions import RegridderError
 from vercor.grid_masks import (
     check_remap_conservation,
     check_total_lnd_ocn_mask_sum,
     compute_ocn_lnd_masks_on_atm_grid,
     create_lnd_mask_from_ocn,
+    compute_land_mask,
 )
 from vercor.grids import RectilinearGrid
 from vercor.jax_logging import DEFAULT_LOGGER_NAME
@@ -36,6 +41,42 @@ def test_compute_ocn_lnd_masks_on_atm_grid_clips_and_builds_binary_land_mask() -
     assert_allclose_compact(ocn_fmask, np.array([[1.0, 0.0], [0.4, 0.0]]))
     assert_allclose_compact(lnd_fmask, np.array([[0.0, 1.0], [0.6, 1.0]]))
     assert_array_equal_compact(lnd_bmask, np.array([[0, 1], [1, 1]]))
+
+    class IdentityRegridder:
+        def regrid(self, field: jax.Array) -> jax.Array:
+            return field
+
+    identity = cast(Any, IdentityRegridder())
+    assert_finite_jvp_vjp(
+        lambda mask: sum(
+            (
+                jnp.sum(jnp.asarray(value, dtype=jnp.float64))
+                for value in compute_ocn_lnd_masks_on_atm_grid(mask, identity)
+            ),
+            start=jnp.asarray(0.0),
+        ),
+        jnp.asarray([[0.2, 0.8], [0.4, 0.6]]),
+        jnp.ones((2, 2)),
+    )
+
+
+def test_mask_and_area_weighted_mean_kernels_have_finite_transforms() -> None:
+    assert_finite_jvp_vjp(
+        lambda ocean_fraction: jnp.sum(
+            jnp.asarray(compute_land_mask(ocean_fraction), dtype=jnp.float64)
+        ),
+        jnp.asarray([[0.2, 0.8], [0.4, 0.6]]),
+        jnp.ones((2, 2)),
+    )
+
+    fractional_mask = jnp.asarray([[0.25, 0.75], [1.0, 0.5]])
+    latitude_weights = jnp.asarray([[0.5], [1.0]])
+    area_weights = fractional_mask * latitude_weights
+    assert_finite_jvp_vjp(
+        lambda field: jnp.sum(field * area_weights) / jnp.sum(area_weights),
+        jnp.asarray([[270.0, 280.0], [290.0, 300.0]]),
+        jnp.ones((2, 2)),
+    )
 
 
 def test_check_total_lnd_ocn_mask_sum_success_and_failure() -> None:

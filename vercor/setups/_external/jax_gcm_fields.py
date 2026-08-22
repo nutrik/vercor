@@ -5,6 +5,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
+from vercor._numerical_safety import replace_missing_nan
 from vercor.dtypes import DTypePolicy, as_jax_real_array
 from vercor.fluxes.vertical_coordinates import (
     compute_sigma_pressure_levels,
@@ -43,11 +44,13 @@ def cleanup_surface_temperature_fields(
     land_surface_temperature: object,
     sea_surface_temperature: object,
 ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
-    land_surface_temperature_array = jnp.nan_to_num(
-        as_jax_real_array(land_surface_temperature)
+    land_surface_temperature_array = replace_missing_nan(
+        as_jax_real_array(land_surface_temperature),
+        owner="JCM land surface temperature",
     )
-    sea_surface_temperature_array = jnp.nan_to_num(
-        as_jax_real_array(sea_surface_temperature)
+    sea_surface_temperature_array = replace_missing_nan(
+        as_jax_real_array(sea_surface_temperature),
+        owner="JCM sea surface temperature",
     )
     total_surface_temperature = (
         land_surface_temperature_array + sea_surface_temperature_array

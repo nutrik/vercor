@@ -4,8 +4,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from tests.assertions import assert_allclose_compact
+from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
 import vercor.diagnostics as diagnostics_module
+from vercor._runtime.field_transfer import select_runtime_field
+from vercor._runtime.time import RuntimeStepInfo
+from vercor.components import TransferPolicy
 from vercor.dtypes import DTypePolicy, as_jax_real_array
 from vercor.field_layout import canonicalize_time_last_surface_field
 from vercor.setups._data.era5_atmosphere import (
@@ -115,6 +118,35 @@ def test_era5_atmosphere_helpers_support_jit_and_gradients() -> None:
     )(surface_pressure)
     assert np.all(np.isfinite(np.asarray(density_gradient)))
 
+    def atmosphere_objective(
+        inputs: tuple[jax.Array, jax.Array, jax.Array, jax.Array],
+    ) -> jax.Array:
+        pressure_log, temperature_levels, humidity_levels, surface_temperature = inputs
+        mapped = _compute_monthly_diagnostics(
+            constants,
+            dtype,
+            _decode_surface_pressure(pressure_log),
+            hyai,
+            hybi,
+            hyam,
+            hybm,
+            temperature_levels,
+            humidity_levels,
+            surface_temperature,
+        )
+        return sum((jnp.sum(value) for value in mapped), start=jnp.asarray(0.0))
+
+    assert_finite_jvp_vjp(
+        atmosphere_objective,
+        (lnsp, temperature_3d, specific_humidity_3d, temperature),
+        (
+            jnp.ones_like(lnsp),
+            jnp.ones_like(temperature_3d),
+            jnp.ones_like(specific_humidity_3d),
+            jnp.ones_like(temperature),
+        ),
+    )
+
 
 def test_total_surface_temperature_diagnostic_uses_runtime_view_fields() -> None:
     view = ComponentState(
@@ -205,6 +237,16 @@ def test_ocean_mask_helpers_accept_jax_arrays() -> None:
     assert np.isnan(np.asarray(masked_sst)[0, 0, 0])
     assert np.isclose(np.asarray(masked_sst)[0, 1, 0], 282.0)
     assert masked_sst.shape == (2, 2, 2)
+    assert_finite_jvp_vjp(
+        lambda temperature: jnp.nansum(
+            mask_time_last_surface_field(
+                temperature,
+                _ocean_binary_mask_from_land_fraction(land_fraction),
+            )
+        ),
+        sea_surface_temperature,
+        jnp.ones_like(sea_surface_temperature),
+    )
 
 
 def test_shared_masked_surface_field_helper_supports_jit_and_gradients() -> None:
@@ -237,6 +279,26 @@ def test_shared_masked_surface_field_helper_supports_jit_and_gradients() -> None
     assert_allclose_compact(
         gradient,
         np.asarray([[[0.0, 0.0], [1.0, 1.0]], [[1.0, 1.0], [0.0, 0.0]]]),
+    )
+    inactive_in_source_layout = jnp.asarray(
+        [[[True, True], [False, False]], [[False, False], [True, True]]]
+    )
+    masked_primal = jnp.where(
+        inactive_in_source_layout,
+        jnp.nan,
+        sea_surface_temperature,
+    )
+    masked_tangent = jnp.where(
+        inactive_in_source_layout,
+        0.0,
+        1.0,
+    )
+    assert_finite_jvp_vjp(
+        lambda temperature: jnp.nansum(
+            mask_time_last_surface_field(temperature, binary_mask)
+        ),
+        masked_primal,
+        masked_tangent,
     )
 
 
@@ -293,6 +355,11 @@ def test_erainterim_helpers_prepare_jax_backed_grid_and_masked_fields() -> None:
     assert np.all(np.asarray(binary_mask[:3, :]) == 0.0)
     assert np.isnan(np.asarray(sea_surface_temperature)[0, 0, 0])
     assert np.isclose(np.asarray(sea_surface_temperature)[0, 3, 0], 274.15)
+    assert_finite_jvp_vjp(
+        lambda values: jnp.sum(_assemble_erainterim_field(values, 46, 3, 5)),
+        core_field,
+        jnp.ones_like(core_field),
+    )
 
 
 def test_jcm_land_layout_uses_shared_jax_helpers() -> None:
@@ -341,3 +408,25 @@ def test_jcm_land_layout_uses_shared_jax_helpers() -> None:
         temperature_gradient, np.ones_like(np.asarray(land_surface_temperature))
     )
     assert_allclose_compact(soil_gradient, np.ones_like(np.asarray(soil_moisture)))
+
+    step_info = RuntimeStepInfo(
+        monthly_index_left=jnp.asarray(0, dtype=jnp.int32),
+        monthly_index_right=jnp.asarray(1, dtype=jnp.int32),
+        monthly_weight_left=jnp.asarray(1.0),
+        monthly_weight_right=jnp.asarray(0.0),
+        daily_index=jnp.asarray(1, dtype=jnp.int32),
+    )
+    daily_forcing = jnp.stack(
+        (land_surface_temperature, land_surface_temperature + 10.0),
+    )
+    assert_finite_jvp_vjp(
+        lambda forcing: jnp.sum(
+            select_runtime_field(
+                forcing,
+                TransferPolicy("daily"),
+                step_info,
+            )
+        ),
+        daily_forcing,
+        jnp.ones_like(daily_forcing),
+    )
