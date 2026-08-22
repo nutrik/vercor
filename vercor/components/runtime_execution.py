@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import jax
 
+from vercor._numerical_safety import require_active_finite
 from vercor.components._adapter import _copy_owned_pytree
 from vercor.components._runtime_fields import apply_step_result, runtime_fields
 from vercor.components.contracts import StepResult, _KEEP_PAYLOAD
@@ -68,8 +69,15 @@ def step_component_runtime_state(
             "payload to preserve it, replace payload with the same PyTree structure, "
             "or set execution='host' to clear or restructure payload state."
         )
-    return apply_step_result(
+    updated_state = apply_step_result(
         component,
         component_state,
         result,
     )
+    for field_name in component.spec.outputs:
+        require_active_finite(
+            updated_state.fields.get(field_name),
+            active_mask=component.grid.binary_mask,
+            owner=f"Component '{component.name}' step output field '{field_name}'",
+        )
+    return updated_state

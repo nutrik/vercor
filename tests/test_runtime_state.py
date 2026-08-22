@@ -20,6 +20,7 @@ from vercor.clock import Clock
 from vercor.coupler import Coupler
 from vercor.dtypes import DTypePolicy
 from vercor.exchanges import Exchange
+from vercor.exceptions import CouplerError
 from vercor.runtime import RuntimeOptions
 from vercor.setups._external.jax_gcm_runtime import JAXGCMRuntimePayload
 from vercor.setups._external.jax_gcm_state import JCMState
@@ -36,10 +37,10 @@ from vercor.types import RuntimeArray
 
 
 class _RuntimeSendComponent(DataComponent):
-    def __init__(self, transfer: TransferPolicy) -> None:
+    def __init__(self, transfer: TransferPolicy, *, grid: Any | None = None) -> None:
         super().__init__(
             "DATA",
-            make_test_grid(name="runtime-send"),
+            make_test_grid(name="runtime-send") if grid is None else grid,
             spec=ComponentSpec(transfer=transfer),
         )
 
@@ -1052,3 +1053,46 @@ def test_runtime_send_applies_daily_time_slice_under_jit_and_grad() -> None:
     assert_allclose_compact(gradient[2], np.ones((2, 2)))
     assert_allclose_compact(gradient[:2], np.zeros((2, 2, 2)))
     assert_allclose_compact(gradient[3:], np.zeros((2, 2, 2)))
+
+
+def _runtime_send_state(forcing: jax.Array) -> ComponentRuntimeState:
+    """Create the immutable store layout needed for one outbound field."""
+
+    return ComponentRuntimeState(
+        fields=FieldStore.from_mapping({"temperature": forcing}),
+        received=FieldStore.empty(),
+        sent=FieldStore.empty(),
+    )
+
+
+def _daily_step_info(index: int) -> RuntimeStepInfo:
+    """Return scalar step metadata selecting one daily forcing record."""
+
+    return jax.tree_util.tree_map(
+        lambda value: value[0],
+        RuntimeStepInfo.from_sequences([0], [1], [1.0], [0.0], [index]),
+    )
+
+
+def test_runtime_send_rejects_nonfinite_selected_active_field() -> None:
+    component = _RuntimeSendComponent(
+        TransferPolicy("daily"),
+        grid=make_test_grid(
+            name="runtime-send-nonfinite",
+            binary_mask=np.asarray([[1.0, 0.0], [1.0, 0.0]]),
+        ),
+    )
+    forcing = jnp.asarray(
+        [
+            [[1.0, jnp.nan], [2.0, jnp.nan]],
+            [[jnp.nan, jnp.nan], [3.0, jnp.nan]],
+        ]
+    )
+    state = _runtime_send_state(forcing)
+    with pytest.raises(CouplerError, match="sent field 'temperature'.*active domain"):
+        send_runtime_fields(
+            component,
+            state,
+            _daily_step_info(index=1),
+            contract=ExchangeContract(sends=("temperature",)),
+        )

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import jax.numpy as jnp
 
+from vercor._numerical_safety import require_active_finite
 from vercor._runtime.contracts import ExchangeContract
 from vercor._runtime.state import ComponentRuntimeState
 from vercor._runtime.time import RuntimeStepInfo
@@ -62,15 +63,18 @@ def send_runtime_fields(
 ) -> ComponentRuntimeState:
     """Move component fields into sent runtime fields."""
 
-    return component_state.with_sent(
-        component_state.sent.set_many(
-            {
-                field_name: select_runtime_field(
-                    component_state.fields.get(field_name),
-                    component.spec.transfer,
-                    step_info,
-                )
-                for field_name in contract.sends
-            }
+    selected_fields = {
+        field_name: select_runtime_field(
+            component_state.fields.get(field_name),
+            component.spec.transfer,
+            step_info,
         )
-    )
+        for field_name in contract.sends
+    }
+    for field_name, value in selected_fields.items():
+        require_active_finite(
+            value,
+            active_mask=component.grid.binary_mask,
+            owner=f"Component '{component.name}' sent field '{field_name}'",
+        )
+    return component_state.with_sent(component_state.sent.set_many(selected_fields))
