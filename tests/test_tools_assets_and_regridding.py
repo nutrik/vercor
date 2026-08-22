@@ -47,17 +47,29 @@ def test_compute_ocn_lnd_masks_on_atm_grid_clips_and_builds_binary_land_mask() -
             return field
 
     identity = cast(Any, IdentityRegridder())
+    representative_mask = jnp.asarray([[0.2, 0.8], [0.4, 0.6]])
+
+    def mask_objective(mask: jax.Array) -> jax.Array:
+        ocean, land, binary_land = compute_ocn_lnd_masks_on_atm_grid(mask, identity)
+        return (
+            2.0 * jnp.sum(ocean)
+            + 0.5 * jnp.sum(land)
+            + 0.25 * jnp.sum(jnp.asarray(binary_land, dtype=jnp.float64))
+        )
+
     assert_finite_jvp_vjp(
-        lambda mask: sum(
-            (
-                jnp.sum(jnp.asarray(value, dtype=jnp.float64))
-                for value in compute_ocn_lnd_masks_on_atm_grid(mask, identity)
-            ),
-            start=jnp.asarray(0.0),
-        ),
-        jnp.asarray([[0.2, 0.8], [0.4, 0.6]]),
+        mask_objective,
+        representative_mask,
         jnp.ones((2, 2)),
     )
+    _, forward = jax.jvp(
+        mask_objective,
+        (representative_mask,),
+        (jnp.ones((2, 2)),),
+    )
+    reverse = jax.grad(mask_objective)(representative_mask)
+    assert_allclose_compact(forward, 6.0)
+    assert_allclose_compact(reverse, np.full((2, 2), 1.5))
 
 
 def test_mask_and_area_weighted_mean_kernels_have_finite_transforms() -> None:
