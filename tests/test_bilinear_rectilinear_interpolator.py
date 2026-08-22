@@ -306,6 +306,34 @@ def test_zero_support_bilinear_vector_has_finite_jvp_and_vjp() -> None:
     )
 
 
+def test_zero_support_bilinear_vector_neutralizes_inactive_nan_sources() -> None:
+    """Masked NaN vector sources must not reach Cartesian basis products."""
+
+    interpolator = _scalar_interp(
+        lon_src=jnp.asarray([0.0, 1.0]),
+        lat_src=jnp.asarray([0.0, 1.0]),
+        lon_tgt=jnp.asarray([0.5]),
+        lat_tgt=jnp.asarray([0.5]),
+        src_mask=jnp.zeros((2, 2), dtype=bool),
+        tgt_mask=jnp.zeros((1, 1), dtype=bool),
+    )
+    source = jnp.full((2, 2), jnp.nan)
+
+    errors, (u_tgt, v_tgt) = checkify.checkify(
+        lambda values: interpolator.apply_vector(values, values),
+        errors=checkify.float_checks,
+    )(source)
+    assert errors.get() is None
+    assert bool(jnp.isnan(u_tgt[0, 0]))
+    assert bool(jnp.isnan(v_tgt[0, 0]))
+    assert_finite_jvp_vjp(
+        lambda values: jnp.nansum(interpolator.apply_vector(values, values)[0])
+        + jnp.nansum(interpolator.apply_vector(values, values)[1]),
+        source,
+        jnp.ones((2, 2)),
+    )
+
+
 def test_idw_with_inactive_nan_neighbours_has_finite_jvp_and_vjp() -> None:
     """IDW must ignore NaN values selected only to pad its neighbour count."""
 
