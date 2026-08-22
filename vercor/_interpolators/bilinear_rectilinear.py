@@ -290,8 +290,10 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             & jnp.isfinite(u_src_array)
             & jnp.isfinite(v_src_array)
         )
-        v3 = (u_src_array[..., None] * self._e_east_src) + (
-            v_src_array[..., None] * self._e_north_src
+        valid_u_src = jnp.where(valid, u_src_array, 0.0)
+        valid_v_src = jnp.where(valid, v_src_array, 0.0)
+        v3 = (valid_u_src[..., None] * self._e_east_src) + (
+            valid_v_src[..., None] * self._e_north_src
         )
 
         v00 = v3[self.j0, self.i0, :]
