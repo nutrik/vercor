@@ -1,15 +1,7 @@
 # VerCOR Progress
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
-
-- Numerical-safety foundation added (2026-08-22): private owner
-  `vercor._numerical_safety` provides transform-safe active-domain finite
-  checks, strict positivity checks, NaN replacement, and masked division;
-  `tests.assertions.assert_finite_jvp_vjp` centralizes finite JVP/VJP checks.
-  TDD RED was the intended collection failure (`ModuleNotFoundError` because
-  `vercor._numerical_safety` did not yet exist); focused GREEN passed 17/17,
-  and the private-inventory architecture check passed 1/1. Runtime integration
-  and component numerical-safety audits remain pending for Tasks 2-5.
+- Numerical-safety foundation and review fix round 1 (2026-08-22): private owner `vercor._numerical_safety` and `assert_finite_jvp_vjp` enforce finite active values, no infinities, safe division, and finite fills; TDD REDs were the missing-module collection error and eight regressions, focused GREEN passed 25/25, and fast/full gates passed. Runtime/component audits remain pending for Tasks 2-5.
 - JCM 2 migration and fractional-surface reverse-gradient correction completed locally (2026-08-21) against Dinosaur 1.3.6 and JCM 2.0.1: the adapter uses explicit bootstrap state and immutable dynamics/physics/dycore/physics-carry transitions.
   SPEEDY diagnostics map from `_surface_flux`/`_shortwave_rad`; output reads native state with the packaged units fallback, and JCM land canonicalizes time-first forcing while rejecting coordinate mismatches.
   Root cause: multiplying temperature by JCM's fractional terrain mask produced approximately 28.8 K coastal forcing and NaN surface-flux adjoints. Present land/sea fractions now receive the complete finite temperature; only absent surfaces receive the reference fill.
