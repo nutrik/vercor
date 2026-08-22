@@ -183,6 +183,7 @@ vercor._regridders.base
 vercor._regridders.bilinear
 vercor._regridders.conservative
 vercor._run_order
+vercor._numerical_safety
 vercor._runtime
 vercor._runtime.backends
 vercor._runtime.component_state
@@ -300,6 +301,8 @@ vercor.setups.config
 
 - Field/runtime helpers: `vercor._field_names`, `vercor._host_arrays`,
   `vercor._pytree`, and `vercor._run_order`.
+- Numerical safety: `vercor._numerical_safety` owns transform-safe finite,
+  positivity, missing-NaN replacement, and masked-division primitives.
 - Interpolation: `vercor._interpolators`,
   `vercor._interpolators._bilinear_extrapolation`,
   `vercor._interpolators._bilinear_geometry`,
