@@ -6,17 +6,23 @@ from jax import Array, lax
 import jax.numpy as jnp
 
 from vercor.dtypes import jax_full
-from vercor._numerical_safety import safe_masked_divide
+from vercor._numerical_safety import require_active_finite, safe_masked_divide
 import vercor._interpolators._bilinear_geometry as _geometry
 
 
 def valid_scalar_source_mask(source_values: Array, src_mask: Array | None) -> Array:
     """Return source points available for scalar interpolation or extrapolation."""
 
-    finite_source = jnp.isfinite(source_values)
+    missing_source = jnp.isnan(source_values)
+    require_active_finite(
+        source_values,
+        active_mask=~missing_source,
+        owner="bilinear scalar source",
+    )
+    available_source = ~missing_source
     if src_mask is None:
-        return finite_source
-    return jnp.asarray(src_mask, dtype=bool) & finite_source
+        return available_source
+    return jnp.asarray(src_mask, dtype=bool) & available_source
 
 
 def extrapolate_scalar_field(

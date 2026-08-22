@@ -175,3 +175,35 @@ def test_safe_masked_divide_has_finite_jvp_and_vjp() -> None:
         jnp.asarray([4.0, jnp.nan]),
         jnp.asarray([1.0, 0.0]),
     )
+
+
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_safe_masked_divide_rejects_infinite_inactive_output(
+    bad_value: float,
+) -> None:
+    with pytest.raises(CouplerError, match="safe masked divide output.*infinity"):
+        safe_masked_divide(
+            jnp.asarray([4.0, jnp.nan]),
+            jnp.asarray([2.0, 0.0]),
+            where=jnp.asarray([True, False]),
+            inactive_value=bad_value,
+        )
+
+
+@pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
+def test_safe_masked_divide_reports_compiled_infinite_inactive_output(
+    bad_value: float,
+) -> None:
+    def divide(inactive_value: jax.Array) -> jax.Array:
+        return safe_masked_divide(
+            jnp.asarray([4.0, jnp.nan]),
+            jnp.asarray([2.0, 0.0]),
+            where=jnp.asarray([True, False]),
+            inactive_value=inactive_value,
+        )
+
+    with pytest.raises(
+        JaxRuntimeError,
+        match="safe masked divide output.*infinity",
+    ):
+        jax.jit(divide)(jnp.asarray(bad_value)).block_until_ready()

@@ -1,22 +1,20 @@
 # VerCOR Progress
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
-- No-NaN differentiation audit completed locally (2026-08-22): active runtime
-  fields fail fast at preparation, exchange, step, and send boundaries;
-  inactive NaN remains a masked missing-data sentinel, infinity is invalid
-  everywhere, and inactive operands are finite-neutralized before nonlinear
-  arithmetic. All composed scalar Coupler losses now retain their gradient/JVP
-  checks and exercise explicit VJP with the directional inner-product identity.
-  The new composed characterizations passed against unchanged production code
-  after correcting only a test tangent from NumPy float64 to runtime-owned
-  float32; no additional numerical defect was exposed.
+- No-NaN differentiation audit and final-review fixes completed locally
+  (2026-08-22): active runtime fields fail fast at preparation, exchange, step,
+  and send boundaries; inactive NaN remains a masked missing-data sentinel,
+  infinity is invalid everywhere, and inactive operands are finite-neutralized
+  before nonlinear arithmetic. TDD recorded 67 expected defect failures: safe
+  division 4, bilinear 9, bulk flux 46, lifecycle 1, JCM 3, and CAMulator 4;
+  one baseline-GREEN route-mask characterization also passes.
 
   | Audit path | Primal/JIT | JVP | VJP | Inactive NaN | Fail-fast |
   | --- | --- | --- | --- | --- | --- |
   | Slab | pass | pass | pass | not applicable | not applicable |
   | Data | pass | pass | pass | pass | pass |
-  | Flux/vertical | pass | pass | pass | not applicable | not applicable |
-  | Bilinear | pass | pass | pass | pass | not applicable |
+  | Flux/vertical | pass | pass | pass | pass | pass |
+  | Bilinear | pass | pass | pass | pass | pass |
   | Conservative | pass | pass | pass | pass | not applicable |
   | Exchange/runtime | pass | pass | pass | pass | pass |
   | JCM | pass | pass | pass | pass | pass |
@@ -28,22 +26,24 @@ This is the bounded orientation log for active development. Detailed history is 
   installed Veros fake-native-state application and unavailable/unpinned
   CAMulator/CREDIT fake host application are primal-only. Real JCM 2.0.1 ran
   packaged inputs, two native steps, and the full-Coupler JVP/VJP path.
-  First-source repairs are the shared active-finite/positive/NaN-only/masked-
-  division primitives; finite-neutralized scalar exchange; bilinear, vector,
-  IDW, and conservative masked arithmetic; JCM/Veros NaN-only source cleanup;
-  and CAMulator NaN-only cleanup, positive scale, land-mask, and dynamic-source
-  validation. No active value is silently filled, clipped, or scaled.
+  First-source repairs validate masked-division final outputs and every bulk-
+  flux operand; neutralize masked flux inputs and bilinear corners before
+  nonlinear arithmetic; distinguish missing NaN from invalid infinity; order
+  central finiteness before author lifecycle validation; validate JCM payload
+  leaf paths before reuse/storage; and validate CAMulator model, postprocessing,
+  and state-reuse tensors.
+  Route-aware evidence proves inbound fields/received use fractional route
+  masks while sent uses component masks; no active value is filled or scaled.
 
   Final gates: Black left 247 files unchanged with its known Python
   3.13/configured-3.15 advisory; flake8 0; mypy 247 files; compileall and
-  whitespace clean. Composed audit 96/96, required focus 245/245 (two known
-  JCM/xarray and Flax tracer warnings), fast 786/786 (four known Flax warnings),
-  and full/coverage 1,569/1,569 (those six known warning instances) passed.
-  Coverage is 91.34% across 7,726 statements and 1,654 branches. The fresh
-  exactly-two-file build is `/private/tmp/vercor-no-nan-build.tWXmYy`; Twine
+  whitespace clean. Affected owners passed 243/243, direct dependents 152/152,
+  composed audit 105/105, required focus 304/304, fast 795/795, and
+  full/coverage 1,639/1,639 with the six known warning instances. Coverage is
+  91.42% across 7,796 statements and 1,666 branches. The fresh exactly-two-file
+  build is `/private/tmp/vercor-no-nan-build.k49Qjn`; Twine
   accepted the 0.4.4 wheel/sdist and artifact/NumPy boundaries passed 28/28.
-  Tasks 1-5 are complete; nothing was pushed, published, uploaded, tagged, or
-  proposed as a PR.
+  Tasks 1-5 are complete; nothing was pushed, published, uploaded, tagged, or proposed as a PR.
 - JCM 2 migration/fractional-surface gradient correction completed locally (2026-08-21) against Dinosaur 1.3.6/JCM 2.0.1: explicit immutable carry transitions and current diagnostics replaced legacy ownership; canonical time-first land forcing rejects coordinate drift; the 282 K to 70.5 K RED traced erroneous fractional-temperature scaling, and GREEN preserves complete temperature on present land/sea fractions with finite JIT/JVP/reverse behavior and real two-step carry. Static gates, fast 777/1,504, and full/coverage 1,504/1,504 at 91.25% (7,625 statements; 1,634 branches) passed with six known warnings; the global-x64 mixed branch remains covered by fake float32 JIT/AD.
 - VerCOR 0.4.4 release-candidate evidence was refreshed after the README and release-runbook corrections (2026-08-20): release metadata, the changelog, the maintained release notes, installation guidance, and the fail-closed release transcript now use the 0.4.4 package, branch, tag, and artifact identities. TDD recorded the intended three metadata/resource/README RED failures before focused GREEN. The pending documentation reorganization and Conda environment are included; warning-as-error Sphinx, YAML validation, Black, strict flake8, mypy, compileall, whitespace, and the 772-test fast selection passed before artifact recording. The full and branch-coverage suites each passed their 1,489-test pre-record selection with one evidence-only test deferred; coverage was 91.25% across 7,594 statements and 1,622 branches. The exact two-file artifact boundary passed 25/25, Twine passed both files, and an isolated dependency-free wheel smoke reported version 0.4.4, the six-symbol root API, and the installed CLI: `vercor-0.4.4-py3-none-any.whl`, 231397 B, SHA-256 `b3c739b72c9f74a093e2df48553e5077b7c1b3331326dff566e731b2a72390f0`; `vercor-0.4.4.tar.gz`, 162296 B, SHA-256 `34d3c1c16c20d2af523f02dca7c7ea235aace248a3c660f8327196aea814275e`. Independent review corrections bind the standalone quickstart to Python, reuse project-owned optional dependency constraints in Conda, remove committed EOF whitespace, and check the complete release range before push. Draft PR #22's first exact run exposed JAX's newer PEP 604 rendering of `ArrayLike` in the quality and dependency-free wheel lanes; a focused RED/GREEN contract now canonicalizes that evidenced spelling, and the exact installed-wheel regression plus the mandated fast/full suites pass locally. No tag, merge, upload, publication, GitHub Release, or package-index mutation was performed.
 - JCM/Veros gallery float64 spinup dtype mismatch fixed locally (2026-07-30): JCM setup now normalizes its state and loaded forcing to `RuntimeOptions.dtype` before optional spinup, matching the existing runtime-payload boundary while preserving integer leaves. TDD RED observed float32 forcing at the first spinup call; focused GREEN passed 46/46. The real gallery completed both JCM spinup steps, initialized all components, built topology, and entered coupled step 0 before an intentional SIGINT stopped its 100-year run. Mypy, flake8, whitespace, and the required fast and full suites passed; the known Flax/JAX warnings remain.

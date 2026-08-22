@@ -147,6 +147,11 @@ send boundaries. NaN remains a missing-data sentinel only outside the
 applicable component or route mask; infinity is always invalid. Masked
 numerical kernels neutralize inactive operands before nonlinear arithmetic so
 output-free JVP and VJP cannot inherit inactive-branch NaNs.
+State validation completes schema, topology, and central route/component field
+finiteness checks before invoking component-author lifecycle validation.
+Bundled adapters validate owned numeric payload/native leaves immediately
+before reuse and after production while preserving each adapter's established
+JAX-transform or host-only differentiation boundary.
 
 ## 7. Workflow and execution
 

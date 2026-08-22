@@ -97,10 +97,6 @@ def validate_runtime_state(
             component_state,
             contract,
         )
-        component._validate_runtime_state(
-            component_state,
-            contract,
-        )
 
     expected_mask_names = tuple(exchange.route_id for exchange in exchanges)
     _validate_exact_names(
@@ -164,6 +160,11 @@ def validate_runtime_state(
             component_state,
             component=component,
             received_masks=received_masks,
+        )
+    for component in components.values():
+        component._validate_runtime_state(
+            runtime_state._component_state(component.name),
+            contracts[component.name],
         )
 
 

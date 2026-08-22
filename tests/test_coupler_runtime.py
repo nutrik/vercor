@@ -48,9 +48,13 @@ from vercor.exchanges import Exchange
 from vercor.fields import _flatten_field_items
 from vercor.forcing_index import daily_forcing_index
 from vercor.grids import RectilinearGrid
+from vercor.physics import PhysicalConstants
 from vercor.regridding import bilinear, conservative
 from vercor.runtime import RuntimeOptions
 from vercor._runtime.state import ComponentRuntimeState
+from vercor._runtime.preparation import (
+    validate_runtime_state as validate_prepared_runtime_state,
+)
 from vercor.state import RunState
 from vercor._runtime.stores import FieldStore
 from vercor.time_selection import (
@@ -1898,6 +1902,135 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
     )
 
 
+def _jax_gcm_payload_with_carry_marker(payload: Any, marker: jax.Array) -> Any:
+    """Return one fake JCM payload with a replaced physics-carry marker."""
+
+    jcm_state = payload.jcm_state
+    return jax_gcm_runtime_module.JAXGCMRuntimePayload(
+        jcm_state=JCMState(
+            dynamics=jcm_state.dynamics,
+            physics=jcm_state.physics,
+            dycore_state=jcm_state.dycore_state,
+            physics_carry={"marker": marker},
+        ),
+        forcing=payload.forcing,
+    )
+
+
+def test_jax_gcm_rejects_nonfinite_input_carry_before_model_reuse() -> None:
+    fixture = _make_jax_gcm_fixture(make_test_grid(name="jcm-invalid-input-carry"))
+    payload = jax_gcm_runtime_module.create_jax_gcm_runtime_payload(fixture.state)
+    invalid_payload = _jax_gcm_payload_with_carry_marker(
+        payload,
+        jnp.asarray(jnp.nan),
+    )
+    native_calls = 0
+    valid_step = fixture.state._step_function
+
+    def recording_step(state: JCMState, forcing: Any) -> Any:
+        nonlocal native_calls
+        native_calls += 1
+        return valid_step(state, forcing)
+
+    fixture.state._step_function = recording_step
+
+    with pytest.raises(
+        CouplerError,
+        match=(
+            "JAXGCM component 'ATM'.*step input.*physics_carry.*marker"
+            ".*active domain"
+        ),
+    ):
+        jax_gcm_runtime_module.step_jax_gcm_runtime(
+            fixture.state,
+            fixture.state.data,
+            invalid_payload,
+            PhysicalConstants(),
+            DTypePolicy(),
+        )
+
+    assert native_calls == 0
+
+
+def test_jax_gcm_rejects_nonfinite_output_carry_before_next_substep() -> None:
+    fixture = _make_jax_gcm_fixture(make_test_grid(name="jcm-invalid-output-carry"))
+    payload = jax_gcm_runtime_module.create_jax_gcm_runtime_payload(fixture.state)
+    native_calls = 0
+    valid_step = fixture.state._step_function
+
+    def invalid_output_step(state: JCMState, forcing: Any) -> Any:
+        nonlocal native_calls
+        native_calls += 1
+        updated_state, prediction = valid_step(state, forcing)
+        return (
+            JCMState(
+                dynamics=updated_state.dynamics,
+                physics=updated_state.physics,
+                dycore_state=updated_state.dycore_state,
+                physics_carry={"marker": jnp.asarray(jnp.nan)},
+            ),
+            prediction,
+        )
+
+    fixture.state._step_function = invalid_output_step
+
+    with pytest.raises(
+        CouplerError,
+        match=(
+            "JAXGCM component 'ATM'.*step output.*physics_carry.*marker"
+            ".*active domain"
+        ),
+    ):
+        for _ in range(2):
+            result, _, _ = jax_gcm_runtime_module.step_jax_gcm_runtime(
+                fixture.state,
+                fixture.state.data,
+                payload,
+                PhysicalConstants(),
+                DTypePolicy(),
+            )
+            payload = result.payload
+
+    assert native_calls == 1
+
+
+def test_jax_gcm_reports_compiled_nonfinite_input_carry_path() -> None:
+    fixture = _make_jax_gcm_fixture(make_test_grid(name="jcm-compiled-invalid-carry"))
+    payload = jax_gcm_runtime_module.create_jax_gcm_runtime_payload(fixture.state)
+    valid_step = fixture.state._step_function
+
+    def finite_output_step(state: JCMState, forcing: Any) -> Any:
+        finite_state = JCMState(
+            dynamics=state.dynamics,
+            physics=state.physics,
+            dycore_state=state.dycore_state,
+            physics_carry={"marker": jnp.asarray(0.0)},
+        )
+        return valid_step(finite_state, forcing)
+
+    fixture.state._step_function = finite_output_step
+
+    def carry_after_step(marker: jax.Array) -> jax.Array:
+        invalid_payload = _jax_gcm_payload_with_carry_marker(payload, marker)
+        result, _, _ = jax_gcm_runtime_module.step_jax_gcm_runtime(
+            fixture.state,
+            fixture.state.data,
+            invalid_payload,
+            PhysicalConstants(),
+            DTypePolicy(),
+        )
+        return cast(jax.Array, result.payload.jcm_state.physics_carry["marker"])
+
+    with pytest.raises(
+        JaxRuntimeError,
+        match=(
+            "JAXGCM component 'ATM'.*step input.*physics_carry.*marker"
+            ".*active domain"
+        ),
+    ):
+        jax.jit(carry_after_step)(jnp.asarray(jnp.nan)).block_until_ready()
+
+
 def test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry(
     fast_mode: bool,
 ) -> None:
@@ -2689,6 +2822,82 @@ def test_runtime_state_runs_validation_hooks_outside_run_order() -> None:
     coupler.initial_state()
 
     assert validated == ["DORMANT"]
+
+
+@pytest.mark.fast_always
+def test_central_finiteness_precedes_author_lifecycle_validation() -> None:
+    def validate(component: Component, context: Any) -> None:
+        values = np.asarray(context.state.field("value", scope="state"))
+        if not np.all(np.isfinite(values)):
+            raise ComponentError(
+                f"Author lifecycle for '{component.name}' observed invalid data."
+            )
+
+    coupler = _state_validation_coupler(
+        dormant_lifecycle=LifecycleHooks(validate=validate)
+    )
+    state = coupler.initial_state()
+    dormant = state._component_state("DORMANT")
+    malformed = state._with_component_state(
+        "DORMANT",
+        dormant.with_fields(dormant.fields.set("value", jnp.full((2, 2), jnp.nan))),
+    )
+
+    with pytest.raises(
+        CouplerError,
+        match="Component 'DORMANT' runtime fields field 'value'.*active domain",
+    ):
+        coupler.run(malformed)
+
+
+@pytest.mark.fast_always
+def test_runtime_store_finiteness_uses_route_mask_only_for_inbound_stores() -> None:
+    coupler = _make_coupler(steps=1)
+    prepared = coupler._ensure_prepared()
+    fractional_masks = {
+        route_id: jnp.ones((2, 2), dtype=jnp.float64)
+        for route_id in prepared.topology_maps.regridders
+    }
+    fractional_masks["OCN->ATM"] = jnp.asarray(
+        [[1.0, 0.0], [1.0, 1.0]],
+        dtype=jnp.float64,
+    )
+    replace_runtime_topology_maps(
+        coupler,
+        regridders=prepared.topology_maps.regridders,
+        fractional_masks=fractional_masks,
+    )
+    prepared = coupler._ensure_prepared()
+    state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
+    atmosphere = state._component_state("ATM")
+    inbound = (
+        jnp.asarray(atmosphere.fields.get("sea_surface_temperature"))
+        .at[0, 1]
+        .set(jnp.nan)
+    )
+    atmosphere = atmosphere.with_fields(
+        atmosphere.fields.set("sea_surface_temperature", inbound)
+    ).with_received(atmosphere.received.set("sea_surface_temperature", inbound))
+    route_inactive_state = state._with_component_state("ATM", atmosphere)
+
+    validate_prepared_runtime_state(route_inactive_state, prepared=prepared)
+
+    invalid_sent = atmosphere.with_sent(
+        atmosphere.sent.set(
+            "sensible_heat_flux",
+            jnp.asarray(atmosphere.sent.get("sensible_heat_flux"))
+            .at[0, 1]
+            .set(jnp.nan),
+        )
+    )
+    with pytest.raises(
+        CouplerError,
+        match="Component 'ATM' runtime sent field 'sensible_heat_flux'.*active domain",
+    ):
+        validate_prepared_runtime_state(
+            state._with_component_state("ATM", invalid_sent),
+            prepared=prepared,
+        )
 
 
 @pytest.mark.fast_always
