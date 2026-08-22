@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 
 
@@ -87,4 +90,46 @@ def assert_array_equal_compact(
         atol=0.0,
         equal_nan=equal_nan,
         label=label,
+    )
+
+
+def assert_finite_jvp_vjp(
+    objective: Callable[[Any], jax.Array],
+    primal: Any,
+    tangent: Any,
+    *,
+    rtol: float = 1e-6,
+    atol: float = 1e-8,
+) -> None:
+    """Assert one scalar objective has finite, mutually consistent JVP and VJP."""
+
+    eager_value = objective(primal)
+    jitted_value = jax.jit(objective)(primal)
+    jvp_value, forward = jax.jvp(objective, (primal,), (tangent,))
+    vjp_value, pullback = jax.vjp(objective, primal)
+    (reverse,) = pullback(jnp.ones_like(vjp_value))
+
+    leaves = jax.tree_util.tree_leaves(
+        (eager_value, jitted_value, jvp_value, forward, reverse)
+    )
+    assert all(bool(jnp.all(jnp.isfinite(leaf))) for leaf in leaves)
+    tangent_leaves = jax.tree_util.tree_leaves(tangent)
+    reverse_leaves = jax.tree_util.tree_leaves(reverse)
+    reverse_projection = sum(
+        (
+            jnp.vdot(tangent_leaf, reverse_leaf)
+            for tangent_leaf, reverse_leaf in zip(
+                tangent_leaves,
+                reverse_leaves,
+                strict=True,
+            )
+        ),
+        start=jnp.asarray(0.0, dtype=jnp.asarray(forward).dtype),
+    )
+    assert_allclose_compact(
+        forward,
+        reverse_projection,
+        rtol=rtol,
+        atol=atol,
+        equal_nan=False,
     )
