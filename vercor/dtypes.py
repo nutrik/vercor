@@ -28,6 +28,12 @@ class DTypePolicy:
 
         return cls(enable_x64=bool(jax.config.read("jax_enable_x64")))
 
+    def _ensure_jax_capability(self) -> None:
+        """Enable the process-wide JAX capability required by this policy."""
+
+        if self.enable_x64 and not bool(jax.config.read("jax_enable_x64")):
+            jax.config.update("jax_enable_x64", True)
+
     @property
     def jax_real(self) -> Any:
         """Return the canonical JAX real dtype."""

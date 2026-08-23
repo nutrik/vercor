@@ -72,6 +72,42 @@ def test_compute_ocn_lnd_masks_on_atm_grid_clips_and_builds_binary_land_mask() -
     assert_allclose_compact(reverse, np.full((2, 2), 1.5))
 
 
+def test_compute_ocn_lnd_masks_snaps_subthreshold_remap_residuals() -> None:
+    cutoff = 0.001
+    offset = 1.0e-6
+
+    class DummyRegridder:
+        def regrid(self, _arr: np.ndarray) -> jax.Array:
+            return jnp.asarray(
+                [
+                    [cutoff - offset, cutoff, cutoff + offset],
+                    [
+                        1.0 - (cutoff - offset),
+                        1.0 - cutoff,
+                        1.0 - (cutoff + offset),
+                    ],
+                ],
+                dtype=jnp.float64,
+            )
+
+    ocean_binary_mask = jnp.asarray([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
+    ocn_fmask, lnd_fmask, lnd_bmask = compute_ocn_lnd_masks_on_atm_grid(
+        ocean_binary_mask,
+        cast(Any, DummyRegridder()),
+    )
+
+    expected_ocean = np.asarray(
+        [
+            [0.0, cutoff, cutoff + offset],
+            [1.0, 1.0 - cutoff, 1.0 - (cutoff + offset)],
+        ]
+    )
+    assert_allclose_compact(ocn_fmask, expected_ocean)
+    assert_allclose_compact(lnd_fmask, 1.0 - expected_ocean)
+    assert_array_equal_compact(lnd_bmask, np.asarray([[1, 1, 1], [0, 1, 1]]))
+    assert_allclose_compact(ocn_fmask + lnd_fmask, np.ones((2, 3)))
+
+
 def test_mask_and_area_weighted_mean_kernels_have_finite_transforms() -> None:
     assert_finite_jvp_vjp(
         lambda ocean_fraction: jnp.sum(

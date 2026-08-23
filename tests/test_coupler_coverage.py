@@ -831,6 +831,36 @@ def test_build_exchange_topology_returns_runtime_topology_maps(
 
 
 @pytest.mark.fast_always
+def test_build_exchange_topology_defaults_to_target_active_domain() -> None:
+    components = _topology_components()
+    exchange = Exchange(
+        source="ATM",
+        target="OCN",
+        fields=["temperature"],
+        regridder_factory=bilinear,
+    )
+
+    topology_maps = build_exchange_topology(
+        components=cast(Any, components),
+        exchanges=(exchange,),
+        dtype=DTypePolicy(),
+        logger=cast(Any, _RecordingLogger()),
+    )
+
+    expected_mask = np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32)
+    assert_allclose_compact(
+        topology_maps.binary_masks["ATM->OCN"],
+        expected_mask,
+    )
+    assert_allclose_compact(
+        topology_maps.fractional_masks["ATM->OCN"],
+        expected_mask,
+    )
+    assert topology_maps.binary_masks["ATM->OCN"].dtype == jnp.float32
+    assert topology_maps.fractional_masks["ATM->OCN"].dtype == jnp.float32
+
+
+@pytest.mark.fast_always
 def test_build_exchange_topology_rejects_duplicate_topology_keys() -> None:
     components = _topology_components()
     logger = _RecordingLogger()

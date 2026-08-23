@@ -55,6 +55,8 @@ def build_coupler(
 ) -> Coupler:
     """Build the example coupler, reusing supplied model/data objects."""
 
+    runtime_dtype = DTypePolicy() if dtype is None else dtype
+    runtime_dtype._ensure_jax_capability()
     ocn = make_era5_ocean() if ocean is None else ocean
     jcm_setup = make_jcm_land_atmosphere(
         ocn.grid,
@@ -101,7 +103,7 @@ def build_coupler(
         ),
         run_order=[ocn.name, lnd.name, atm.name],
         runtime=RuntimeOptions(
-            dtype=DTypePolicy() if dtype is None else dtype,
+            dtype=runtime_dtype,
             topology=SurfaceMaskPolicy(),
         ),
         log_level=log_level,

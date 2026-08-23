@@ -32,6 +32,7 @@ from vercor.components import (
 from vercor.calendar import DateTime360
 from vercor.clock import Clock
 from vercor.coupler import Coupler
+from vercor.dtypes import DTypePolicy
 from vercor.exceptions import (
     AssetError,
     ComponentError,
@@ -1616,6 +1617,41 @@ def test_jcm_examples_use_public_input_loader_facade() -> None:
         encoding="utf-8"
     )
     assert "generate_jcm_coords_forcing_topography_files" not in jcm_veros_source
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    ("module_name", "first_factory_name"),
+    (
+        ("vercor.setups.gallery.run_jcm_with_slab", "load_jcm_inputs"),
+        ("vercor.setups.gallery.run_jcm_with_veros", "make_veros_gcm"),
+        ("vercor.setups.gallery.run_jcm_with_verosdata", "make_erainterim_ocean"),
+    ),
+)
+def test_jcm_galleries_enable_dtype_before_native_model_construction(
+    monkeypatch: pytest.MonkeyPatch,
+    module_name: str,
+    first_factory_name: str,
+) -> None:
+    module = importlib.import_module(module_name)
+    events: list[str] = []
+
+    monkeypatch.setattr(
+        DTypePolicy,
+        "_ensure_jax_capability",
+        lambda self: events.append("precision"),
+        raising=False,
+    )
+
+    def stop_at_first_factory(*args: object, **kwargs: object) -> None:
+        _ = args, kwargs
+        assert events == ["precision"]
+        raise RuntimeError("factory boundary reached")
+
+    monkeypatch.setattr(module, first_factory_name, stop_at_first_factory)
+
+    with pytest.raises(RuntimeError, match="factory boundary reached"):
+        module.run_setup(loglevel="error", float_type="float64")
 
 
 @pytest.mark.fast_always

@@ -94,3 +94,33 @@ def test_write_netcdf_dataset_writes_scalar_data_variables(
 
     with h5netcdf.File(output, "r") as actual:
         assert int(actual.variables["forecast_hour"][()]) == 12
+
+
+def test_write_netcdf_dataset_encodes_boolean_variables_as_int8(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "boolean-output.nc"
+
+    write_netcdf_dataset(
+        output=str(output),
+        coordinate_variables={
+            "selected": OutputVariable(
+                ("selected",),
+                np.asarray([True, False]),
+            ),
+        },
+        data_variables={
+            "is_active": OutputVariable(
+                ("selected",),
+                np.asarray([False, True]),
+            ),
+        },
+    )
+
+    with h5netcdf.File(output, "r") as actual:
+        selected = actual.variables["selected"]
+        is_active = actual.variables["is_active"]
+        assert selected.dtype == np.dtype(np.int8)
+        assert is_active.dtype == np.dtype(np.int8)
+        assert np.array_equal(np.asarray(selected), np.asarray([1, 0]))
+        assert np.array_equal(np.asarray(is_active), np.asarray([0, 1]))

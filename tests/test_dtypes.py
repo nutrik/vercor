@@ -3,6 +3,7 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from tests.assertions import assert_finite_jvp_vjp
 import vercor.dtypes as dtypes_module
@@ -41,6 +42,29 @@ def test_dtype_policy_enable_x64_maps_real_arrays_to_float64() -> None:
     assert jax_ones((2, 3), policy).dtype == jnp.float64
     assert jax_full((2, 3), 1.5, policy).dtype == jnp.float64
     assert jax_arange(0.0, 3.0, 1.0, policy).dtype == jnp.float64
+
+
+def test_dtype_policy_enables_requested_jax_process_capability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, object]] = []
+
+    def record_read(option: str) -> bool:
+        events.append(("read", option))
+        return False
+
+    def record_update(option: str, value: object) -> None:
+        events.append(("update", (option, value)))
+
+    monkeypatch.setattr(jax.config, "read", record_read)
+    monkeypatch.setattr(jax.config, "update", record_update)
+
+    DTypePolicy(enable_x64=True)._ensure_jax_capability()
+
+    assert events == [
+        ("read", "jax_enable_x64"),
+        ("update", ("jax_enable_x64", True)),
+    ]
 
 
 def test_dtypes_module_does_not_export_unused_copy_helper() -> None:

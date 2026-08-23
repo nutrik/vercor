@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 
-from vercor.dtypes import DTypePolicy, jax_ones
+from vercor.dtypes import DTypePolicy, as_jax_real_array, jax_ones
 from vercor.exceptions import CouplerError
 from vercor.exchanges import Exchange
 from vercor.fields import VectorField
@@ -56,14 +56,14 @@ def build_exchange_topology_maps(
                     f"Exchange route '{route_id}' requires a VectorRegridder capability."
                 )
             regridders[route_id] = regridder
-            binary_masks[route_id] = jax_ones(
-                components[exchange.target].grid.shape,
-                dtype,
+            target_grid = components[exchange.target].grid
+            target_active_mask = (
+                jax_ones(target_grid.shape, dtype)
+                if target_grid.binary_mask is None
+                else as_jax_real_array(target_grid.binary_mask, dtype)
             )
-            fractional_masks[route_id] = jax_ones(
-                components[exchange.target].grid.shape,
-                dtype,
-            )
+            binary_masks[route_id] = target_active_mask
+            fractional_masks[route_id] = target_active_mask
 
     return RuntimeTopologyMaps(
         regridders=regridders,

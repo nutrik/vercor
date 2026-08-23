@@ -122,6 +122,46 @@ def test_build_coupler_uses_injected_ocean_inputs_and_clock(
 
 
 @pytest.mark.fast_always
+def test_build_coupler_enables_dtype_before_jcm_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    example = importlib.import_module(GALLERY_MODULE)
+    ocean = SimpleNamespace(name="OCN", grid=object())
+    setup = SimpleNamespace(
+        land=SimpleNamespace(name="LND"),
+        atmosphere=SimpleNamespace(name="ATM"),
+    )
+    events: list[str] = []
+
+    monkeypatch.setattr(
+        DTypePolicy,
+        "_ensure_jax_capability",
+        lambda self: events.append("precision"),
+        raising=False,
+    )
+
+    def fake_make_jcm_land_atmosphere(*args: object, **kwargs: object) -> object:
+        _ = args, kwargs
+        assert events == ["precision"]
+        events.append("jcm")
+        return setup
+
+    monkeypatch.setattr(
+        example,
+        "make_jcm_land_atmosphere",
+        fake_make_jcm_land_atmosphere,
+    )
+    monkeypatch.setattr(example, "Coupler", _FakeCoupler)
+
+    example.build_coupler(
+        ocean=ocean,
+        dtype=DTypePolicy(enable_x64=True),
+    )
+
+    assert events == ["precision", "jcm"]
+
+
+@pytest.mark.fast_always
 def test_build_coupler_default_workflow_keeps_historic_clock(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

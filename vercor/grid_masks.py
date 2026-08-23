@@ -28,15 +28,20 @@ __all__ = [
     "create_lnd_mask_from_ocn",
 ]
 
+_FRACTIONAL_MASK_MINIMUM = 0.001
+
 
 def compute_land_mask(ocean_fractional_mask: Any) -> Any:
     """Compute land binary mask from an ocean fractional mask."""
 
-    fminval = 0.001
     fmaxval = 1.0
     land_binary_mask = 1.0 - _as_jax_real_array(ocean_fractional_mask)
     land_binary_mask = jnp.where(land_binary_mask > fmaxval, 1.0, land_binary_mask)
-    land_binary_mask = jnp.where(land_binary_mask < fminval, 0.0, land_binary_mask)
+    land_binary_mask = jnp.where(
+        land_binary_mask < _FRACTIONAL_MASK_MINIMUM,
+        0.0,
+        land_binary_mask,
+    )
     return cast(Any, jnp.where(land_binary_mask != 0.0, 1, 0))
 
 
@@ -46,10 +51,20 @@ def compute_ocn_lnd_masks_on_atm_grid(
     """Compute ocean and land fractional and binary masks on the atmosphere grid."""
 
     ocean_bmask = _as_jax_real_array(ocean_binary_mask)
-    ocn_fmask_on_atm_grid = jnp.clip(
+    remapped_ocean_fraction = jnp.clip(
         _as_jax_real_array(regridder.regrid(ocean_bmask)),
         0.0,
         1.0,
+    )
+    ocn_fmask_on_atm_grid = jnp.where(
+        remapped_ocean_fraction < _FRACTIONAL_MASK_MINIMUM,
+        0.0,
+        remapped_ocean_fraction,
+    )
+    ocn_fmask_on_atm_grid = jnp.where(
+        ocn_fmask_on_atm_grid > 1.0 - _FRACTIONAL_MASK_MINIMUM,
+        1.0,
+        ocn_fmask_on_atm_grid,
     )
     lnd_fmask_on_atm_grid = 1.0 - ocn_fmask_on_atm_grid
     lnd_bmask_on_atm_grid = compute_land_mask(ocn_fmask_on_atm_grid)
