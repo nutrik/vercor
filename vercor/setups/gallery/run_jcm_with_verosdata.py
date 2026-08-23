@@ -25,6 +25,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     """Run this setup through the shared VerCOR CLI contract."""
 
     dtype = DTypePolicy(enable_x64=float_type == "float64")
+    dtype._ensure_jax_capability()
     # This ocean data & grid is identical to Veros global setup (1deg. or 4deg.)
     ocn = make_erainterim_ocean(resolution="4deg")
 

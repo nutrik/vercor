@@ -470,6 +470,7 @@ def test_prepared_reuse_does_not_reinvoke_or_materialize_setup_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     prepared_module = importlib.import_module("vercor._runtime.prepared")
+    dtypes_module = importlib.import_module("vercor.dtypes")
     component = _CountingSetupStructuralComponent()
     coupler = Coupler(
         Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
@@ -483,13 +484,13 @@ def test_prepared_reuse_does_not_reinvoke_or_materialize_setup_fields(
         _ = args, kwargs
         raise AssertionError("prepared validation materialized array values")
 
-    prepared_jax = prepared_module.jax
+    dtype_jax = dtypes_module.jax
     monkeypatch.setattr(
-        prepared_module,
+        dtypes_module,
         "jax",
         SimpleNamespace(
-            config=prepared_jax.config,
-            core=prepared_jax.core,
+            config=dtype_jax.config,
+            core=dtype_jax.core,
             device_get=forbidden_array_materialization,
         ),
     )
@@ -795,7 +796,7 @@ def test_runtime_topology_maps_are_frozen_read_only_views() -> None:
 def test_precision_capability_and_allocation_policy_remain_distinct(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    prepared_module = importlib.import_module("vercor._runtime.prepared")
+    dtypes_module = importlib.import_module("vercor.dtypes")
 
     class FakeConfig:
         def __init__(self, enabled: bool) -> None:
@@ -812,7 +813,7 @@ def test_precision_capability_and_allocation_policy_remain_distinct(
             self.enabled = value
 
     fake_config = FakeConfig(enabled=False)
-    monkeypatch.setattr(prepared_module.jax, "config", fake_config)
+    monkeypatch.setattr(dtypes_module.jax, "config", fake_config)
     x64_component = DataComponent(
         "X64",
         make_test_grid(name="x64-capability"),

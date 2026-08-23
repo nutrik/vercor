@@ -1433,6 +1433,13 @@ def test_jax_gcm_snapshot_output_uses_final_runtime_payload_not_runtime_data(
         dynamics={
             "temperature": np.arange(18.0).reshape(3, 2, 3),
             "u_wind": np.full((3, 2, 3), 4.0),
+            "is_active": np.asarray(
+                [
+                    [[True, False, True], [False, True, False]],
+                    [[False, True, False], [True, False, True]],
+                    [[True, True, False], [False, False, True]],
+                ]
+            ),
         },
         physics={},
     )
@@ -1465,6 +1472,15 @@ def test_jax_gcm_snapshot_output_uses_final_runtime_payload_not_runtime_data(
         assert_allclose_compact(
             np.asarray(temperature)[0],
             np.transpose(jcm_state.dynamics["temperature"], axes=(0, 2, 1)),
+        )
+        is_active = actual.variables["is_active"]
+        assert is_active.dtype == np.dtype(np.int8)
+        assert np.array_equal(
+            np.asarray(is_active)[0],
+            np.transpose(
+                jcm_state.dynamics["is_active"].astype(np.int8),
+                axes=(0, 2, 1),
+            ),
         )
 
 

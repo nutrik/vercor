@@ -37,6 +37,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     """Run this setup through the shared VerCOR CLI contract."""
 
     dtype = DTypePolicy(enable_x64=float_type == "float64")
+    dtype._ensure_jax_capability()
 
     inputs = load_jcm_inputs()
     coords = inputs.coords

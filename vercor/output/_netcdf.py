@@ -39,13 +39,13 @@ def write_netcdf_dataset(
             output_variable = outfile.create_variable(
                 name,
                 variable.dims,
-                data=array_to_host(variable.values),
+                data=_netcdf_compatible_values(variable.values),
             )
             _write_attrs(output_variable.attrs, variable.attrs)
 
         for name, variable in data_variables.items():
             _ensure_dimensions(outfile, variable)
-            values = array_to_host(variable.values)
+            values = _netcdf_compatible_values(variable.values)
             create_kwargs: dict[str, Any] = {"data": values}
             if values.shape != ():
                 create_kwargs.update(compression="gzip", compression_opts=5)
@@ -55,6 +55,15 @@ def write_netcdf_dataset(
                 **create_kwargs,
             )
             _write_attrs(output_variable.attrs, variable.attrs)
+
+
+def _netcdf_compatible_values(values: Any) -> Any:
+    """Return host values using dtypes supported by the NetCDF data model."""
+
+    host_values = array_to_host(values)
+    if host_values.dtype.kind == "b":
+        return host_values.astype("int8")
+    return host_values
 
 
 def _ensure_dimensions(outfile: h5netcdf.File, variable: OutputVariable) -> None:

@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-import jax
-
 from vercor.clock import Clock
 from vercor.exchanges import Exchange
 from vercor.jax_logging import LoggerLike
@@ -55,7 +53,7 @@ def prepare_coupling(
 ) -> PreparedCoupling:
     """Initialize declarations once and build an immutable runtime boundary."""
 
-    _ensure_jax_precision_capability(runtime)
+    runtime.dtype._ensure_jax_capability()
     immutable_declarations = MappingProxyType(dict(components))
     immutable_exchanges = tuple(exchanges)
     immutable_run_order = tuple(run_order)
@@ -94,13 +92,6 @@ def prepare_coupling(
         runtime=runtime,
         interrupts=RuntimeInterruptController(),
     )
-
-
-def _ensure_jax_precision_capability(runtime: RuntimeOptions) -> None:
-    """Enable process x64 capability when requested by runtime policy."""
-
-    if runtime.dtype.enable_x64 and not bool(jax.config.read("jax_enable_x64")):
-        jax.config.update("jax_enable_x64", True)
 
 
 __all__ = ["PreparedCoupling", "prepare_coupling"]
