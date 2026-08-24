@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from tests._distribution_support import EXPECTED_VERSION
+
 pytest.importorskip("sphinx")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -107,13 +109,14 @@ def test_running_guide_does_not_claim_run_state_advances_the_clock_window() -> N
 
 @pytest.mark.fast_always
 def test_getting_started_runs_the_standalone_quickstart_with_python() -> None:
-    """Keep the standalone quickstart separate from the setup-runner contract."""
+    """Keep the standalone quickstart and released installer command current."""
     source = (DOCS_ROOT / "researchers" / "getting-started.rst").read_text(
         encoding="utf-8"
     )
 
     assert "   python quickstart.py" in source
     assert "     quickstart.py" not in source
+    assert f'python -m pip install "vercor=={EXPECTED_VERSION}"' in source
 
 
 @pytest.mark.fast_always

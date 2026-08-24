@@ -472,6 +472,14 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
         changelog,
         re.MULTILINE,
     )
+    assert (
+        f"[Unreleased]: https://github.com/nutrik/vercor/compare/v{EXPECTED_VERSION}...HEAD"
+        in changelog
+    )
+    assert (
+        f"[{EXPECTED_VERSION}]: https://github.com/nutrik/vercor/compare/v0.4.4...v{EXPECTED_VERSION}"
+        in changelog
+    )
     assert re.search(r"^## \[0\.4\.2\] - 2026-07-25$", changelog, re.MULTILINE)
     assert re.search(r"^## \[0\.4\.1\] - 2026-07-24$", changelog, re.MULTILINE)
     release_notes_path = PROJECT_ROOT / expected_release_notes
@@ -555,7 +563,9 @@ def test_release_transcripts_are_well_formed_and_shell_syntax_valid() -> None:
         fences = _markdown_fences(path.read_text(encoding="utf-8"), owner=str(path))
         transcripts = tuple(source for language, source in fences if language == "text")
         assert transcripts, f"{path} has no executable text transcript"
-        for transcript_number, source in enumerate(transcripts, start=1):
+        for fence_number, (language, source) in enumerate(fences, start=1):
+            if language not in {"bash", "text"}:
+                continue
             completed = subprocess.run(
                 ["bash", "-n"],
                 input=source,
@@ -564,11 +574,12 @@ def test_release_transcripts_are_well_formed_and_shell_syntax_valid() -> None:
                 check=False,
             )
             assert completed.returncode == 0, (
-                f"{path} transcript {transcript_number} fails bash -n:\n"
+                f"{path} {language} fence {fence_number} fails bash -n:\n"
                 f"{completed.stderr}"
             )
-            assert source.startswith("set -euo pipefail\n")
-            assert 'test -n "${RELEASE_COMMIT:-}"' in source
+            if language == "text":
+                assert source.startswith("set -euo pipefail\n")
+                assert 'test -n "${RELEASE_COMMIT:-}"' in source
 
 
 @pytest.mark.fast_always
