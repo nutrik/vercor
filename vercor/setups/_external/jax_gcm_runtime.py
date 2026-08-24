@@ -349,23 +349,13 @@ def record_jax_gcm_host_step(
     applied_forcing: Any,
     context: StepContext,
 ) -> None:
-    """Record host-side JAXGCM mirrors and optional period output."""
+    """Record host-side JAXGCM mirrors."""
 
-    logger = context.logger
     if isinstance(step_result.payload, JAXGCMRuntimePayload):
         state._state = step_result.payload.jcm_state
         state.forcing = applied_forcing
-    _, _, _, cold_surface_cells = _jax_gcm_fields.cleanup_surface_temperature_fields(
-        step_result.fields.get("land_surface_temperature"),
-        step_result.fields.get("sea_surface_temperature"),
-    )
-    if logger is not None:
-        logger.info(
-            "Number of cells with (SST + SKT) less than 250.0 K: {}",
-            jnp.sum(cold_surface_cells),
-        )
 
-    _ = prediction
+    _ = prediction, context
 
 
 def step_jax_gcm_component(
@@ -377,12 +367,6 @@ def step_jax_gcm_component(
     """Advance JAXGCM on immutable runtime state."""
 
     time = context.time
-    logger = context.logger
-    if logger is not None:
-        logger.info(
-            "Mean of SST: {}",
-            jnp.nanmean(jnp.asarray(fields.get("sea_surface_temperature"))),
-        )
 
     (
         step_result,

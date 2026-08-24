@@ -1170,10 +1170,11 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         sent=FieldStore.from_mapping(runtime_outgoing),
         payload=jax_gcm_runtime_module.create_jax_gcm_runtime_payload(component),
     )
+    step_logger = _RecordingLogger()
     step_context = StepContext(
         dt_seconds=timedelta(days=1).total_seconds(),
         time=datetime(2000, 1, 2),
-        logger=coupler.logger,
+        logger=cast(Any, step_logger),
     )
     step_result = jax_gcm_runtime_module.step_jax_gcm_component(
         component,
@@ -1246,6 +1247,8 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     assert_allclose_compact(data.get("model_level_height"), np.full((2, 2), 150.0))
     assert float(step_result.payload.jcm_state.dycore_state["marker"]) == 1.0
     assert float(step_result.payload.jcm_state.physics_carry["marker"]) == 12.0
+    assert component._state is step_result.payload.jcm_state
+    assert step_logger.messages == []
 
 
 def test_jax_gcm_runtime_rejects_missing_speedy_diagnostics() -> None:
