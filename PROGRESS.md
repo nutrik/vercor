@@ -1,6 +1,10 @@
 # VerCOR Progress
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
+- JAXGCM per-step diagnostics were quieted (2026-08-24): the two model-specific
+  information logs and their dead reductions were removed while the native
+  mirror still updates. The focused RED/GREEN command passed; release-wide
+  verification is not claimed yet.
 - Setup-gallery regressions after PRs #24/#25 repaired locally (2026-08-23).
   Default routes now inherit the target component's active-domain mask; ocean
   remapping snaps only values strictly outside the established 0.001 boundary
