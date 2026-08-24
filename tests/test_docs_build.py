@@ -44,6 +44,7 @@ PROJECT_RESOURCE_PAGES = (
     "plugin-authoring",
     "release-notes-0.4.3",
     "release-notes-0.4.4",
+    "release-notes-0.4.5",
     "releasing",
 )
 
@@ -181,7 +182,7 @@ def test_readme_is_a_concise_gateway_to_canonical_documentation() -> None:
     """Keep detailed guidance on Read the Docs instead of in the README."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert 'python -m pip install "vercor==0.4.4"' in readme
+    assert 'python -m pip install "vercor==0.4.5"' in readme
     assert "Development-only" not in readme
     assert "unreleased" not in readme.lower()
     assert "https://vercor.readthedocs.io/" in readme
