@@ -457,7 +457,7 @@ def test_migration_v0_4_snippet_runs_without_private_or_compat_imports(
 def test_release_files_and_metadata_describe_the_stable_release() -> None:
     """Bind release documentation to installed project metadata and artifact names."""
 
-    assert EXPECTED_VERSION == "0.4.4"
+    assert EXPECTED_VERSION == "0.4.5"
     expected_release_notes = f"docs/release-notes-{EXPECTED_VERSION}.md"
     project = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -468,7 +468,7 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
 
     changelog = CHANGELOG_PATH.read_text(encoding="utf-8")
     assert re.search(
-        rf"^## \[{re.escape(EXPECTED_VERSION)}\] - 2026-08-20$",
+        rf"^## \[{re.escape(EXPECTED_VERSION)}\] - 2026-08-24$",
         changelog,
         re.MULTILINE,
     )
@@ -477,18 +477,19 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
     release_notes_path = PROJECT_ROOT / expected_release_notes
     assert release_notes_path.is_file()
     release_notes = release_notes_path.read_text(encoding="utf-8")
+    release_notes_lower = release_notes.lower()
     for required in (
+        "jcm 2.0.1",
+        "fractional surface",
+        "no-nan",
         "setup gallery",
-        "command-line",
-        "documentation",
-        "JCM",
-        "dtype",
-        "release visibility",
+        "jaxgcm",
+        "logging",
     ):
-        assert required in release_notes
+        assert required in release_notes_lower
     releasing = RELEASING_PATH.read_text(encoding="utf-8")
-    assert "release/vercor-0.4.4" in releasing
-    assert "release/vercor-0.4.3" not in releasing
+    assert "release/vercor-0.4.5" in releasing
+    assert "release/vercor-0.4.4" not in releasing
     commands = "\n".join(re.findall(r"```bash\n(.*?)```", releasing, re.DOTALL))
     for command in (
         "python -m build",
@@ -736,9 +737,9 @@ def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
     branch_assignment = f'RELEASE_BRANCH="{expected_branch}"'
     exact_title = f'--title "Release {expected_title}"'
     exact_body = (
-        f'--body "Prepare {expected_title} with the packaged setup-gallery CLI, '
-        "expanded documentation, JCM dtype normalization, and hardened release "
-        'automation."'
+        f'--body "Prepare {expected_title} with the JCM 2.0.1 migration, '
+        "finite-gradient numerical safeguards, setup-gallery runtime fixes, "
+        'and quiet JAXGCM stepping."'
     )
 
     assert "refactor" not in guide

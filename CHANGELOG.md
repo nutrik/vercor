@@ -5,6 +5,25 @@ versioning; pre-releases may still refine new contracts.
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-08-24
+
+### Changed
+
+- Updated the optional atmosphere integration to Dinosaur 1.3.6 and JCM
+  2.0.1, including explicit immutable carry transitions and current SPEEDY
+  diagnostics.
+- Enforced finite active-domain values and transform-safe masked arithmetic
+  across runtime, exchange, regridding, flux, and bundled-model boundaries.
+
+### Fixed
+
+- Preserved complete land and sea temperatures on fractional JCM surface
+  cells, restoring finite forward- and reverse-mode coupled gradients.
+- Corrected setup-gallery target masks, conservative ocean-mask cutoffs, JAX
+  x64 initialization, and portable NetCDF boolean encoding.
+- Removed unsolicited per-step JAXGCM surface-temperature logging and its
+  unused reductions.
+
 ## [0.4.4] - 2026-08-20
 
 ### Added
@@ -144,7 +163,8 @@ versioning; pre-releases may still refine new contracts.
 This alpha does not ship legacy adapters. Follow
 `docs/migration-0.3-to-0.4.md` to migrate 0.3-only workflows directly.
 
-[Unreleased]: https://github.com/nutrik/vercor/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/nutrik/vercor/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/nutrik/vercor/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/nutrik/vercor/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/nutrik/vercor/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/nutrik/vercor/compare/v0.4.1...v0.4.2
