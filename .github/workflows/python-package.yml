@@ -287,7 +287,7 @@ jobs:
           python -m pip install --no-deps "git+https://github.com/Etienne-Meunier/veros.git@${VEROS_AD_COMMIT}"
       - name: Verify differentiable Veros capabilities
         run: |
-          python -c 'import importlib.metadata as metadata, json, os; record = json.loads(metadata.distribution("veros").read_text("direct_url.json")); assert record["vcs_info"]["commit_id"] == os.environ["VEROS_AD_COMMIT"], record'
+          python -c 'import importlib.metadata as metadata, json, os; record = json.loads(metadata.distribution("veros").read_text("direct_url.json")); assert record["url"] == "https://github.com/Etienne-Meunier/veros.git", record; assert record["vcs_info"]["vcs"] == "git", record; assert record["vcs_info"]["commit_id"] == os.environ["VEROS_AD_COMMIT"], record'
           python -c 'from veros import variables; from veros.core.operators import safe_sqrt; from veros.state import VerosState; assert callable(VerosState.copy), "missing VerosState.copy"; assert callable(safe_sqrt), "missing safe_sqrt"; assert all(name in variables.VARIABLES for name in ("c_k", "c_eps")), "missing c_k/c_eps"'
       - name: Run differentiable Veros rollouts
         run: >-

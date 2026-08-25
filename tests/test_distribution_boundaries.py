@@ -1180,6 +1180,8 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
     assert "--no-deps" in install["run"]
     assert "direct_url.json" in verify["run"]
     assert "VEROS_AD_COMMIT" in verify["run"]
+    assert f'record["url"] == "{VEROS_AD_REPOSITORY}"' in verify["run"]
+    assert 'record["vcs_info"]["vcs"] == "git"' in verify["run"]
     for capability in ("VerosState.copy", "safe_sqrt", "c_k", "c_eps"):
         assert capability in verify["run"]
     assert rollout["run"] == (

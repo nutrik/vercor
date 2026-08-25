@@ -331,9 +331,9 @@ external-extension smoke and strict mypy, optional base/JCM/Veros lanes, a
 macOS smoke, and `git diff --check`.
 
 CI keeps stock-Veros compatibility separate from differentiable-fork
-acceptance. The ordinary quality and installed-artifact jobs resolve the
-packaged `veros>=1.6.2,<1.7` requirement. A dedicated serial job installs the
-public differentiable fork without dependencies at immutable commit
+acceptance. The ordinary quality job and installed-artifact Veros matrix lane
+resolve the packaged `veros>=1.6.2,<1.7` requirement. A dedicated serial job
+installs the public differentiable fork without dependencies at immutable commit
 `7a8c964cf00b5aa0713c995edd760643a431b3c9`, verifies its PEP 610 commit record
 and required runtime capabilities, and runs the multi-step rollout module.
 Release publication depends on both lanes, so neither stock compatibility nor
