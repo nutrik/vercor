@@ -336,8 +336,12 @@ resolve the packaged `veros>=1.6.2,<1.7` requirement. A dedicated serial job
 installs the public differentiable fork without dependencies at immutable commit
 `7a8c964cf00b5aa0713c995edd760643a431b3c9`, verifies its PEP 610 commit record
 and required runtime capabilities, and runs the multi-step rollout module.
-Release publication depends on both lanes, so neither stock compatibility nor
-the differentiability contract can be bypassed.
+Both lanes collect relative-path branch data without applying a partial-suite
+threshold and upload distinct raw artifacts. A downstream job requires both
+artifacts, unions their executed lines and arcs with Coverage.py, enforces the
+90% project threshold, and sends one deterministic XML report to Codecov.
+Release publication depends on that combined gate, so neither stock
+compatibility nor the differentiability contract can be bypassed.
 
 Built-artifact tests run outside the checkout and verify origin, metadata,
 `py.typed`, the six-symbol root, every canonical owner manifest, central
