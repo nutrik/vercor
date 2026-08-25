@@ -282,7 +282,7 @@ jobs:
       - name: Install exact differentiable Veros fork
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ".[dev,jcm]"
+          python -m pip install ".[dev,jcm,veros]"
           python -m pip install ipdb==0.13.13
           python -m pip install --no-deps "git+https://github.com/Etienne-Meunier/veros.git@${VEROS_AD_COMMIT}"
       - name: Verify differentiable Veros capabilities

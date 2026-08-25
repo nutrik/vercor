@@ -1174,7 +1174,7 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
     assert autodiff["runs-on"] == "ubuntu-latest"
     assert autodiff["env"] == {"VEROS_AD_COMMIT": VEROS_AD_COMMIT}
     assert install_index < verify_index < rollout_index
-    assert 'python -m pip install ".[dev,jcm]"' in install["run"]
+    assert 'python -m pip install ".[dev,jcm,veros]"' in install["run"]
     assert "ipdb==0.13.13" in install["run"]
     assert f'"git+{VEROS_AD_REPOSITORY}@${{VEROS_AD_COMMIT}}"' in install["run"]
     assert "--no-deps" in install["run"]
