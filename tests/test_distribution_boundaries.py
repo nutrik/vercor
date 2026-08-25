@@ -56,6 +56,8 @@ PYPI_PUBLISH_ACTION = (
     "pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247"
 )
 CODECOV_ACTION = "codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac"
+VEROS_AD_COMMIT = "7a8c964cf00b5aa0713c995edd760643a431b3c9"
+VEROS_AD_REPOSITORY = "https://github.com/Etienne-Meunier/veros.git"
 EXPECTED_INSTALLED_ROOT = (
     "Clock",
     "Coupler",
@@ -598,6 +600,7 @@ def test_version_tag_deploys_exact_tested_distributions() -> None:
         "external-extension-contract-tests",
         "macos-smoke",
         "quality",
+        "veros-autodiff",
     ]
     assert publish["runs-on"] == "ubuntu-latest"
     assert publish["environment"] == {
@@ -906,7 +909,7 @@ def test_release_provenance_actions_are_immutable_and_checkouts_drop_credentials
         for step in job["steps"]
         if step.get("uses") == CHECKOUT_ACTION
     )
-    assert len(checkout_steps) == 6
+    assert len(checkout_steps) == 7
     assert all(
         step.get("with", {}).get("persist-credentials") is False
         for step in checkout_steps
@@ -1134,6 +1137,62 @@ def test_ci_quality_job_installs_canonical_docs_environment() -> None:
 
 
 @pytest.mark.fast_always
+def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
+    """Keep stock compatibility and fork-only rollout acceptance independent."""
+
+    workflow = yaml.safe_load(
+        (PROJECT_ROOT / ".github/workflows/python-package.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    jobs = workflow["jobs"]
+    quality_steps = jobs["quality"]["steps"]
+    quality_commands = "\n".join(step.get("run", "") for step in quality_steps)
+    stock_full = next(
+        step for step in quality_steps if step.get("name") == "Run full test suite"
+    )
+    stock_coverage = next(
+        step for step in quality_steps if step.get("name") == "Enforce branch coverage"
+    )
+    autodiff = jobs["veros-autodiff"]
+    install_index, install = next(
+        (index, step)
+        for index, step in enumerate(autodiff["steps"])
+        if step.get("name") == "Install exact differentiable Veros fork"
+    )
+    verify_index, verify = next(
+        (index, step)
+        for index, step in enumerate(autodiff["steps"])
+        if step.get("name") == "Verify differentiable Veros capabilities"
+    )
+    rollout_index, rollout = next(
+        (index, step)
+        for index, step in enumerate(autodiff["steps"])
+        if step.get("name") == "Run differentiable Veros rollouts"
+    )
+
+    assert autodiff["runs-on"] == "ubuntu-latest"
+    assert autodiff["env"] == {"VEROS_AD_COMMIT": VEROS_AD_COMMIT}
+    assert install_index < verify_index < rollout_index
+    assert 'python -m pip install ".[dev,jcm]"' in install["run"]
+    assert "ipdb==0.13.13" in install["run"]
+    assert f'"git+{VEROS_AD_REPOSITORY}@${{VEROS_AD_COMMIT}}"' in install["run"]
+    assert "--no-deps" in install["run"]
+    assert "direct_url.json" in verify["run"]
+    assert "VEROS_AD_COMMIT" in verify["run"]
+    for capability in ("VerosState.copy", "safe_sqrt", "c_k", "c_eps"):
+        assert capability in verify["run"]
+    assert rollout["run"] == (
+        "python -m pytest tests/test_veros_autodiff_rollouts.py "
+        "-q -n0 -m veros_autodiff --tb=short"
+    )
+    assert 'python -m pip install ".[dev,jcm,veros]"' in quality_commands
+    for stock_step in (stock_full, stock_coverage):
+        assert '-m "not veros_autodiff"' in stock_step["run"]
+    assert "veros-autodiff" in jobs["publish-release"]["needs"]
+
+
+@pytest.mark.fast_always
 def test_ci_quality_job_enforces_static_full_and_coverage_gates() -> None:
     workflow = yaml.safe_load(
         (PROJECT_ROOT / ".github/workflows/python-package.yml").read_text(
@@ -1170,7 +1229,7 @@ def test_ci_quality_job_enforces_static_full_and_coverage_gates() -> None:
     assert "--exit-zero" not in commands
     assert "mypy vercor tests" in commands
     assert "compileall -q vercor tests" in commands
-    assert "pytest tests/ -q --tb=short" in commands
+    assert 'pytest tests/ -q -m "not veros_autodiff" --tb=short' in commands
     assert "--cov=vercor" in commands
     assert "--cov-branch" in commands
     assert "--cov-fail-under=90" in commands

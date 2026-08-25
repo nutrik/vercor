@@ -593,7 +593,7 @@ def test_release_workflow_checks_out_the_exact_triggering_commit() -> None:
         for step in job["steps"]
         if step.get("uses") == CHECKOUT_ACTION
     )
-    assert len(checkout_steps) == 6
+    assert len(checkout_steps) == 7
     for step in checkout_steps:
         assert step.get("with", {}).get("ref") == (
             "${{ github.event.pull_request.head.sha || github.sha }}"

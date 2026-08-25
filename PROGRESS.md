@@ -4,11 +4,10 @@ This is the bounded orientation log for active development. Detailed history is 
 - Multi-step Veros autodiff completed functionally (2026-08-25): the clean
   stock-Veros baseline passed 801 fast tests; exact editable fork
   `7a8c964cf00b5aa0713c995edd760643a431b3c9` is installed with `--no-deps` in
-  `scipy`. RED covered calm ocean/ice wind, Monin-Obukhov/cold-air thresholds,
-  the JAX `time=None` no-op, and global zero-stress TKE. GREEN preserves forward
-  values, centralizes physical JAXGCM prefills (288.15 K, 1.2 kg/m³, 50 m),
-  checkpoints scan steps, and adds capability-gated host/JAX Veros lanes with
-  native PyTree copying, traced forcing, isolated solvers, and JAX setup adapters.
+  `scipy`. RED covered the four derivative boundaries, the JAX `time=None`
+  no-op, and global zero-stress TKE. GREEN adds physical JAXGCM prefills,
+  checkpointed scans, and capability-gated host/JAX Veros lanes with native
+  PyTree copying, traced forcing, isolated solvers, and JAX setup adapters.
 - Mandatory x64 serial rollouts passed (2026-08-25): three-step ACC temperature,
   twenty-step ACC `c_k`, and five-step JAXGCM-land-global-Veros have finite
   nonzero gradients, matching JVP/VJP, stable PyTrees, and required `1e-3`/`1e-2`
@@ -17,10 +16,12 @@ This is the bounded orientation log for active development. Detailed history is 
   thresholded `mean(kappaM)` was unstable at 20 days, so a wet-cell downstream
   temperature is used; the first safe helper was undispatched until the JAX-only
   global adapter overrode inherited stock-kernel routing. Final gates passed:
-  compiled Jaxpr contains rematerialization; Black (250 files), flake8 (0), mypy
-  (250 sources), compileall, focused rollouts (4/4), fast/full suites, branch
-  coverage (91.80%; 7,939 statements, 1,700 branches), package build, and diff
-  checks are green; final review found no remaining implementation issues.
+  compiled-Jaxpr rematerialization, static gates, rollouts (4/4), fast/full,
+  91.80% branch coverage, package build, and diff checks are green.
+- CI fork isolation verified (2026-08-25): stock Veros 1.6.2 passes fast/full
+  and 90.73% branch coverage; the release-gating serial job verifies the exact
+  public-fork commit and passes all four autodiff rollouts. Workflow/static
+  gates are green, and the exact editable local fork is restored in `scipy`.
 - Final-review test gaps were closed and verified (2026-08-24): release-transcript syntax coverage now checks every `bash` and `text` fence while retaining transcript-only `set -euo pipefail` and `RELEASE_COMMIT` assertions; focused contracts also bind the researcher install command and both 0.4.5 changelog comparison identities. The intentionally malformed-`bash` RED mutation failed with the document/language/fence diagnostic and was restored before GREEN 3/3. Black (2 changed tests), flake8 (0), mypy (248), compileall, strict 30-source Sphinx, workflow YAML parsing, fast/full suites, branch coverage (91.44%; 7,797 statements, 1,664 branches), and `git diff --check` passed; expected third-party Flax/JAX and JCM/xarray warnings remain unchanged.
 - VerCOR 0.4.5 release-candidate evidence was refreshed after the README and release-runbook corrections (2026-08-24): the independent whole-candidate review approved the range `b71dc01..7f07aed` with no Critical, Important, or Minor findings. Fresh Black exited 0 with 248 files unchanged and its known Python-3.13/target-Python-3.15 safety-parse advisory; flake8 reported 0; mypy passed 248 source files; compileall passed; workflow YAML parsing passed; and the strict 30-source Sphinx HTML build passed without warnings. Focused release, documentation, distribution-boundary, and versioning verification passed 205 selected fast tests; the configured fast suite passed 801 selected tests with four known Flax/JAX `Effect` deprecation warnings; the full and branch-coverage suites passed 1,648 tests with six known third-party warnings (four Flax/JAX `Effect` deprecations, one JCM/xarray `compat` future warning, and one Flax tracer deprecation). Branch coverage was 91.44% across 7,797 statements and 1,664 branches. A fresh exactly-two-file final build in `/private/tmp/vercor-0.4.5-final.T1KkmG` passed Twine and both metadata probes: `vercor-0.4.5-py3-none-any.whl`, 236267 B, SHA-256 `71df593f21ac637d41b6f7fd47d3d10827ac0d157e0ae674115c817f8f93c5da`; `vercor-0.4.5.tar.gz`, 166872 B, SHA-256 `61c7f4dfad0b74588c7dc6ab05c8941776949d56d3b6c746b06b51823d8c980e`. The supplied-artifact distribution boundary passed 27/27. Outside the checkout, the dependency-free installed wheel reported metadata `0.4.5`, imported root `Clock`, `Coupler`, `Exchange`, `RectilinearGrid`, `RunState`, and `RuntimeOptions` from `/private/tmp/vercor-0.4.5-smoke.fkxF3b/site`, and `vercor --version` printed `vercor, version 0.4.5`. No tag, merge, publication, upload, or GitHub Release occurred.
 - JAXGCM per-step diagnostics were quieted (2026-08-24): the two model-specific

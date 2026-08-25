@@ -1751,8 +1751,8 @@ def test_veros_jax_capability_check_rejects_stock_veros(
     import veros.variables as veros_variables
     from veros.state import VerosState
 
-    monkeypatch.delattr(VerosState, "copy")
-    monkeypatch.delattr(veros_operators, "safe_sqrt")
+    monkeypatch.delattr(VerosState, "copy", raising=False)
+    monkeypatch.delattr(veros_operators, "safe_sqrt", raising=False)
     monkeypatch.setattr(
         veros_variables,
         "VARIABLES",

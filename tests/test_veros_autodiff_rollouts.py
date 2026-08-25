@@ -35,7 +35,7 @@ from vercor.setups._external.veros_state import _replace_veros_variable
 from vercor.state import RunState
 from vercor.topology import SurfaceMaskPolicy
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.veros_autodiff]
 
 
 def test_global_zero_surface_stress_forcing_has_finite_derivatives() -> None:
