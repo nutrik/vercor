@@ -492,9 +492,9 @@ def test_runtime_modules_use_current_domain_owners() -> None:
         "def make_veros_gcm(", 1
     )
     assert "import vercor.setups._external.veros_gcm_state" in veros_loader_source
-    assert "configure_veros_runtime()" in veros_factory_source
+    assert "configure_veros_runtime(config.execution)" in veros_factory_source
     assert veros_factory_source.index(
-        "configure_veros_runtime()"
+        "configure_veros_runtime(config.execution)"
     ) < veros_factory_source.index("_load_veros_implementation()")
     assert "def configure_veros_runtime" in veros_runtime_settings_source
     signature = camulator_land_source.split("def step(", 1)[1].split(") ->", 1)[0]

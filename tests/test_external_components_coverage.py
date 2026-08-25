@@ -1717,19 +1717,92 @@ def test_custom_global_four_degree_set_diagnostics_populates_outputs() -> None:
     ]
 
 
-def test_configure_veros_runtime_sets_diskless_mode(
+@pytest.mark.parametrize(
+    ("execution", "expected_backend", "expected_solver"),
+    (("host", "numpy", "best"), ("jax", "jax", "scipy_jax")),
+)
+def test_configure_veros_runtime_selects_execution_backend_and_solver(
     monkeypatch: pytest.MonkeyPatch,
+    execution: Literal["host", "jax"],
+    expected_backend: str,
+    expected_solver: str,
 ) -> None:
     runtime_settings = SimpleNamespace()
     fake_veros = ModuleType("veros")
     setattr(fake_veros, "runtime_settings", runtime_settings)
     monkeypatch.setitem(sys.modules, "veros", fake_veros)
 
-    veros_runtime_settings_module.configure_veros_runtime()
+    veros_runtime_settings_module.configure_veros_runtime(execution)
 
-    assert runtime_settings.backend == "numpy"
-    assert runtime_settings.force_overwrite is True
-    assert getattr(runtime_settings, "diskless_mode") is True
+    assert runtime_settings.backend == expected_backend
+    assert runtime_settings.linear_solver == expected_solver
+    if execution == "host":
+        assert runtime_settings.force_overwrite is True
+        assert getattr(runtime_settings, "diskless_mode") is True
+    else:
+        assert not hasattr(runtime_settings, "force_overwrite")
+        assert not hasattr(runtime_settings, "diskless_mode")
+
+
+def test_veros_jax_capability_check_rejects_stock_veros(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import veros.core.operators as veros_operators
+    import veros.variables as veros_variables
+    from veros.state import VerosState
+
+    monkeypatch.delattr(VerosState, "copy")
+    monkeypatch.delattr(veros_operators, "safe_sqrt")
+    monkeypatch.setattr(
+        veros_variables,
+        "VARIABLES",
+        {
+            name: metadata
+            for name, metadata in veros_variables.VARIABLES.items()
+            if name not in {"c_k", "c_eps"}
+        },
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="differentiable Veros fork.*7a8c964",
+    ):
+        veros_runtime_settings_module.require_differentiable_veros_capabilities()
+
+
+def test_veros_runtime_conflict_requires_a_separate_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class LockedRuntimeSettings:
+        backend = "numpy"
+        linear_solver = "best"
+
+        def __setattr__(self, name: str, value: Any) -> None:
+            _ = name, value
+            raise RuntimeError("runtime settings are locked")
+
+    fake_veros = ModuleType("veros")
+    setattr(fake_veros, "runtime_settings", LockedRuntimeSettings())
+    monkeypatch.setitem(sys.modules, "veros", fake_veros)
+
+    with pytest.raises(
+        RuntimeError,
+        match="already locked.*backend='numpy'.*requested 'jax'.*separate Python",
+    ):
+        veros_runtime_settings_module.configure_veros_runtime("jax")
+
+
+def test_veros_config_validates_setup_and_execution() -> None:
+    config = VerosConfig(setup="acc", execution="jax")
+
+    assert config.setup == "acc"
+    assert config.execution == "jax"
+    assert config.jitted is False
+
+    with pytest.raises(ValueError, match="setup must be 'global_4deg' or 'acc'"):
+        VerosConfig(setup=cast(Any, "unknown"))
+    with pytest.raises(ValueError, match="execution must be 'host' or 'jax'"):
+        VerosConfig(execution=cast(Any, "unknown"))
 
 
 def test_veros_copy_state_jitted_path_deep_copies_state(
@@ -1767,6 +1840,51 @@ def test_veros_copy_state_jitted_path_deep_copies_state(
     assert copied.settings.__metadata__ is not state.settings.__metadata__
 
 
+def test_veros_copy_state_jax_path_uses_native_pytree_copy() -> None:
+    copied_state = SimpleNamespace(marker="copied")
+
+    class NativeCopyState:
+        def __init__(self) -> None:
+            self.copy_calls = 0
+
+        def copy(self) -> Any:
+            self.copy_calls += 1
+            return copied_state
+
+    state = NativeCopyState()
+
+    result = veros_state_module.copy_state(
+        cast(Any, state),
+        jitted=False,
+        execution="jax",
+    )
+
+    assert result is copied_state
+    assert state.copy_calls == 1
+
+
+def test_private_veros_variable_replacement_is_immutable() -> None:
+    source = _make_copyable_fake_veros_state(surface_temperature=10.0)
+
+    def native_copy() -> Any:
+        copied = _make_copyable_fake_veros_state(surface_temperature=10.0)
+        copied._variables = deepcopy(source._variables)
+        return copied
+
+    source.copy = native_copy
+
+    updated = veros_state_module._replace_veros_variable(
+        source,
+        "temp",
+        jnp.asarray(7.0),
+    )
+
+    assert updated is not source
+    assert isinstance(updated.variables.temp, jax.Array)
+    assert_allclose_compact(updated.variables.temp, 7.0)
+    assert_allclose_compact(source.variables.temp, 10.0)
+
+
 @pytest.mark.parametrize("jitted", (False, True))
 def test_veros_copy_state_returns_deepcopy_compatible_state(
     monkeypatch: pytest.MonkeyPatch,
@@ -1799,7 +1917,7 @@ def test_veros_pure_reuses_component_solver_for_copied_states(
     monkeypatch.setattr(
         veros_state_module,
         "copy_state",
-        lambda state, jitted=True: next(copied_states),
+        lambda state, jitted=True, execution="host": next(copied_states),
     )
 
     stepped_states: list[Any] = []
@@ -1844,7 +1962,7 @@ def test_veros_pure_restores_solver_cache_when_step_fails(
     monkeypatch.setattr(
         veros_state_module,
         "copy_state",
-        lambda state, jitted=True: copied_state,
+        lambda state, jitted=True, execution="host": copied_state,
     )
 
     def failing_step(state: Any) -> None:
@@ -1888,7 +2006,7 @@ def test_veros_component_solvers_are_isolated_and_release_owner_entries(
     monkeypatch.setattr(
         veros_state_module,
         "copy_state",
-        lambda state, jitted=True: copied_states[state],
+        lambda state, jitted=True, execution="host": copied_states[state],
     )
 
     assert veros_state_module.get_component_linear_solver(first_owner) is first_solver
@@ -2373,7 +2491,13 @@ def test_apply_veros_forcing_fields_copies_once_and_updates_all_fields(
     state = SimpleNamespace(variables=variables)
     copy_calls: list[bool] = []
 
-    def recording_copy(value: Any, jitted: bool = True) -> Any:
+    def recording_copy(
+        value: Any,
+        jitted: bool = True,
+        *,
+        execution: str = "host",
+    ) -> Any:
+        assert execution == "host"
         copy_calls.append(jitted)
         return deepcopy(value)
 
@@ -2411,6 +2535,44 @@ def test_apply_veros_forcing_fields_copies_once_and_updates_all_fields(
         assert np.count_nonzero(result_value[:, :2, :]) == 0
         assert np.count_nonzero(result_value[:, -2:, :]) == 0
         assert np.count_nonzero(getattr(state.variables, name)) == 0
+
+
+def test_apply_veros_forcing_fields_preserves_jax_arrays_in_jax_execution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    variables = _FakeVariableStore(
+        **{
+            name: jnp.zeros((8, 8, 1), dtype=jnp.float64)
+            for name in ("taux", "tauy", "qnet", "qnec")
+        }
+    )
+    state = SimpleNamespace(variables=variables)
+    copy_calls: list[tuple[bool, str]] = []
+
+    def recording_copy(
+        value: Any,
+        jitted: bool = True,
+        *,
+        execution: str = "host",
+    ) -> Any:
+        copy_calls.append((jitted, execution))
+        return deepcopy(value)
+
+    monkeypatch.setattr(veros_state_module, "copy_state", recording_copy)
+    forcing = veros_state_module.VerosForcingFields(
+        *(jnp.full((4, 4, 1), value) for value in (1.0, 2.0, 3.0, 4.0))
+    )
+
+    result = veros_state_module.apply_veros_forcing_fields(
+        state,
+        forcing,
+        jitted=False,
+        execution="jax",
+    )
+
+    assert copy_calls == [(False, "jax")]
+    for name in ("taux", "tauy", "qnet", "qnec"):
+        assert isinstance(getattr(result.variables, name), jax.Array)
 
 
 def test_veros_initialize_validates_timestep_multiple() -> None:
@@ -2495,12 +2657,14 @@ def test_veros_constructor_builds_jax_backed_grid(
         veros_setup_module, "CustomGlobalFourDegree", _FakeGlobalFourDegree
     )
     monkeypatch.setattr(
-        veros_state_module, "copy_state", lambda tree, jitted=True: tree
+        veros_state_module,
+        "copy_state",
+        lambda tree, jitted=True, execution="host": tree,
     )
     monkeypatch.setattr(
         veros_runtime_settings_module,
         "configure_veros_runtime",
-        lambda: None,
+        lambda execution: None,
     )
     component_solver = object()
     solver_states: list[Any] = []
@@ -2653,6 +2817,51 @@ def test_veros_step_requires_native_runtime_payload() -> None:
         veros_runtime_module.step_veros_runtime(resources, {}, context, None)
 
 
+def test_veros_acc_jax_step_uses_internal_forcing_without_host_logging(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resources = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
+    resources.name = "OCN"
+    resources.execution = "jax"
+    resources.jitted = False
+    resources.uses_atmosphere_forcing = False
+    resources.restore_to_climatology = False
+    resources.model_substeps = 1
+    stepped_states: list[Any] = []
+
+    def step_function(state: Any) -> Any:
+        stepped_states.append(state)
+        return state
+
+    resources._step_function = step_function
+    native_state = _make_fake_veros_state(surface_temperature=10.0)
+    logger = _RecordingLogger()
+    context = StepContext(
+        dt_seconds=20.0,
+        time=None,
+        logger=cast(Any, logger),
+    )
+
+    monkeypatch.setattr(
+        veros_fluxes_module,
+        "compute_fluxes",
+        lambda *args, **kwargs: pytest.fail("ACC must use native internal forcing"),
+    )
+
+    result = veros_runtime_module.step_veros_runtime(
+        resources,
+        {},
+        context,
+        native_state,
+    )
+
+    assert result.payload is native_state
+    assert stepped_states == [native_state]
+    assert logger.messages == []
+
+
 def test_veros_step_nan_cleans_forcing_fields_before_apply(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2678,8 +2887,10 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
         forcing_fields: veros_state_module.VerosForcingFields,
         *,
         jitted: bool,
+        execution: str = "host",
     ) -> Any:
         assert jitted is True
+        assert execution == "host"
         assert all(isinstance(value, jax.Array) for value in forcing_fields)
         assert all(np.all(np.isfinite(np.asarray(value))) for value in forcing_fields)
         forcing_calls.append(forcing_fields)

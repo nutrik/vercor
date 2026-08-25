@@ -7,6 +7,21 @@ from veros.setups.global_4deg import GlobalFourDegreeSetup
 from veros.tools import get_periodic_interval
 
 
+def _surface_tke_forcing(stress_x, stress_y, density):  # type: ignore[no-untyped-def]
+    """Return wind-work TKE forcing with a finite calm-stress JAX derivative."""
+
+    stress_squared = (stress_x / density) ** 2 + (stress_y / density) ** 2
+    from veros import runtime_settings
+
+    if runtime_settings.backend == "jax":
+        from veros.core.operators import safe_sqrt
+
+        stress_norm = safe_sqrt(stress_squared)
+    else:
+        stress_norm = npx.sqrt(stress_squared)
+    return stress_norm**1.5
+
+
 class CustomGlobalFourDegree(GlobalFourDegreeSetup):
     """Veros global 4-degree setup with VerCOR-controlled forcing fields."""
 
@@ -27,21 +42,11 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
             vs.forc_tke_surface = update(
                 vs.forc_tke_surface,
                 at[1:-1, 1:-1],
-                npx.sqrt(
-                    (
-                        0.5
-                        * (vs.surface_taux[1:-1, 1:-1] + vs.surface_taux[:-2, 1:-1])
-                        / settings.rho_0
-                    )
-                    ** 2
-                    + (
-                        0.5
-                        * (vs.surface_tauy[1:-1, 1:-1] + vs.surface_tauy[1:-1, :-2])
-                        / settings.rho_0
-                    )
-                    ** 2
-                )
-                ** 1.5,
+                _surface_tke_forcing(
+                    0.5 * (vs.surface_taux[1:-1, 1:-1] + vs.surface_taux[:-2, 1:-1]),
+                    0.5 * (vs.surface_tauy[1:-1, 1:-1] + vs.surface_tauy[1:-1, :-2]),
+                    settings.rho_0,
+                ),
             )
 
         cp_0 = 3991.86795711963

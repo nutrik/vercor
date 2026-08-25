@@ -1389,7 +1389,7 @@ def test_veros_runtime_settings_imports_runtime_settings_lazily() -> None:
         encoding="utf-8"
     )
     before_function, function_body = source.split(
-        "def configure_veros_runtime() -> None:",
+        "def configure_veros_runtime(",
         1,
     )
 
@@ -1477,11 +1477,11 @@ def test_veros_factory_binds_current_runtime_step_and_setup() -> None:
     assert (
         "import vercor.setups._external.veros_runtime as veros_runtime" in loader_source
     )
-    assert "configure_veros_runtime()" in factory_source
+    assert "configure_veros_runtime(config.execution)" in factory_source
     assert "_load_veros_implementation()" in factory_source
-    assert factory_source.index("configure_veros_runtime()") < factory_source.index(
-        "_load_veros_implementation()"
-    )
+    assert factory_source.index(
+        "configure_veros_runtime(config.execution)"
+    ) < factory_source.index("_load_veros_implementation()")
     assert "partial(_veros_runtime.step_veros_runtime, state)" in factory_source
     assert "LifecycleHooks(setup=state.setup)" in factory_source
     assert "_veros_output.veros_output_provider()" in factory_source

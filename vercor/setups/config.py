@@ -47,6 +47,8 @@ class VerosConfig:
     """Configuration for the bundled Veros ocean setup factory."""
 
     name: str = "OCN"
+    setup: Literal["global_4deg", "acc"] = "global_4deg"
+    execution: Literal["host", "jax"] = "host"
     custom_parameters: Mapping[str, Any] | None = None
     restore_to_climatology: bool = False
     spinup: Spinup = field(default_factory=Spinup)
@@ -54,7 +56,12 @@ class VerosConfig:
     jitted: bool = False
 
     def __post_init__(self) -> None:
-        """Copy mutable caller-provided mappings into owned config state."""
+        """Validate execution policy and copy caller mappings into owned state."""
+
+        if self.setup not in ("global_4deg", "acc"):
+            raise ValueError("setup must be 'global_4deg' or 'acc'")
+        if self.execution not in ("host", "jax"):
+            raise ValueError("execution must be 'host' or 'jax'")
 
         if self.custom_parameters is not None:
             object.__setattr__(

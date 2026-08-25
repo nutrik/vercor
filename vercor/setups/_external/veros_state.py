@@ -1,8 +1,10 @@
+"""Immutable state operations shared by host and JAX Veros execution."""
+
 from __future__ import annotations
 
 from collections.abc import MutableMapping
 from copy import deepcopy
-from typing import Any, Callable, NamedTuple, cast
+from typing import Any, Callable, Literal, NamedTuple, cast
 
 import jax
 import jax.numpy as jnp
@@ -15,7 +17,7 @@ from veros.state import VerosState
 
 
 class VerosForcingFields(NamedTuple):
-    """Prepared Veros surface forcing fields in host-state variable order."""
+    """Prepared Veros surface forcing fields in native-state variable order."""
 
     taux: jax.Array
     tauy: jax.Array
@@ -73,8 +75,24 @@ def extract_surface_temperature(
     return temperature_array[2:-2, 2:-2, -1, tau_index].T + 273.15
 
 
-def copy_state(tree: VerosState, jitted: bool = True) -> VerosState:
+def copy_state(
+    tree: VerosState,
+    jitted: bool = True,
+    *,
+    execution: Literal["host", "jax"] = "host",
+) -> VerosState:
     """Return a copy of a Veros state suitable for copy-before-mutate stepping."""
+
+    if execution == "jax":
+        native_copy = getattr(tree, "copy", None)
+        if not callable(native_copy):
+            raise RuntimeError(
+                "JAX Veros state copying requires the differentiable fork's "
+                "VerosState.copy capability."
+            )
+        return cast(VerosState, native_copy())
+    if execution != "host":
+        raise ValueError("execution must be 'host' or 'jax'")
 
     if jitted:
         dimensions = deepcopy(tree._dimensions)
@@ -102,6 +120,27 @@ def copy_state(tree: VerosState, jitted: bool = True) -> VerosState:
         tuple(state_copy.settings.__fields__),
     )
     return state_copy
+
+
+def _replace_veros_variable(
+    state: VerosState,
+    name: str,
+    value: object,
+) -> VerosState:
+    """Return a JAX-native state copy with one native variable replaced."""
+
+    updated_state = copy_state(state, jitted=True, execution="jax")
+    variables = updated_state.variables
+    current = getattr(variables, name)
+    value_array = jnp.asarray(value)
+    updated_value = (
+        jnp.full_like(jnp.asarray(current), value_array)
+        if value_array.ndim == 0 and jnp.asarray(current).ndim > 0
+        else value_array
+    )
+    with variables.unlock():
+        setattr(variables, name, updated_value)
+    return updated_state
 
 
 def _get_veros_linear_solver_interface() -> (
@@ -142,10 +181,11 @@ def pure(
     jitted: bool,
     step: Callable[[VerosState], None],
     linear_solver: Any,
+    execution: Literal["host", "jax"] = "host",
 ) -> VerosState:
     """Copy state and run one native step with the component-owned solver."""
 
-    next_state = copy_state(state, jitted=jitted)
+    next_state = copy_state(state, jitted=jitted, execution=execution)
     _, solver_cache = _get_veros_linear_solver_interface()
     cache_key = (next_state,)
     missing = object()
@@ -178,10 +218,11 @@ def apply_veros_forcing_fields(
     forcing_fields: VerosForcingFields,
     *,
     jitted: bool,
+    execution: Literal["host", "jax"] = "host",
 ) -> VerosState:
     """Write prepared VerCOR forcing fields into Veros state variables."""
 
-    updated_state = copy_state(state, jitted=jitted)
+    updated_state = copy_state(state, jitted=jitted, execution=execution)
     variables = updated_state.variables
     with variables.unlock():
         for variable_name, variable_value in zip(
@@ -191,7 +232,11 @@ def apply_veros_forcing_fields(
         ):
             current = getattr(variables, variable_name)
             updated = update_veros_interior(current, variable_value)
-            setattr(variables, variable_name, runtime_array_to_host(updated))
+            setattr(
+                variables,
+                variable_name,
+                updated if execution == "jax" else runtime_array_to_host(updated),
+            )
     return updated_state
 
 
@@ -202,7 +247,7 @@ def advance_veros_substeps(
     model_substeps: int,
     logger: Any | None,
 ) -> VerosState:
-    """Advance Veros through the configured number of host substeps."""
+    """Advance Veros through the configured number of native substeps."""
 
     updated_state = state
     for i in range(model_substeps):
