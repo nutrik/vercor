@@ -13,6 +13,8 @@ from vercor.fluxes.vertical_coordinates import (
 )
 
 REFERENCE_SURFACE_TEMPERATURE = 273.15 + 15.0
+REFERENCE_AIR_DENSITY = 1.2
+REFERENCE_MODEL_LEVEL_HEIGHT = 50.0
 COLD_SURFACE_TEMPERATURE_THRESHOLD = 250.0
 JAXGCM_INPUT_GRID_FIELD_NAMES = (
     "land_surface_temperature",
@@ -189,6 +191,8 @@ __all__ = [
     "JAXGCM_INPUT_GRID_FIELD_NAMES",
     "JAXGCM_OUTPUT_GRID_FIELD_NAMES",
     "JAXGCM_REQUIRED_GRID_FIELD_NAMES",
+    "REFERENCE_AIR_DENSITY",
+    "REFERENCE_MODEL_LEVEL_HEIGHT",
     "REFERENCE_SURFACE_TEMPERATURE",
     "cleanup_surface_temperature_fields",
     "map_jcm_output_fields",

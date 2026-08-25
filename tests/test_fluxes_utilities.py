@@ -12,6 +12,7 @@ from jax.experimental import checkify
 
 from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
 from vercor.exceptions import CouplerError
+import vercor.fluxes.bulk_formula_cesm as bulk_formula_module
 import vercor.fluxes.utilities as flux_utilities_module
 from vercor.fluxes.bulk_formula_cesm import (
     compute_ocean_surface_fluxes,
@@ -693,6 +694,135 @@ def test_flux_kernels_support_jit_and_gradients() -> None:
         ),
         jnp.asarray([[270.0]]),
         jnp.ones((1, 1)),
+        rtol=1e-5,
+        atol=1e-7,
+    )
+
+
+def test_calm_ocean_wind_has_finite_jvp_and_vjp() -> None:
+    constants = PhysicalConstants()
+    state = _ocean_state(shape=(1, 1))
+    state["us"] = np.zeros((1, 1))
+    state["vs"] = np.zeros((1, 1))
+
+    def objective(wind: jax.Array) -> jax.Array:
+        outputs = compute_ocean_surface_fluxes(
+            constants,
+            state["mask"],
+            state["zbot"],
+            jnp.full((1, 1), wind[0]),
+            jnp.full((1, 1), wind[1]),
+            state["thbot"],
+            state["qbot"],
+            state["rbot"],
+            state["tbot"],
+            state["us"],
+            state["vs"],
+            jnp.asarray([[300.0]]),
+        )
+        return sum((jnp.sum(value) for value in outputs), start=jnp.asarray(0.0))
+
+    assert_finite_jvp_vjp(
+        objective,
+        jnp.zeros(2),
+        jnp.ones(2),
+        rtol=1e-5,
+        atol=1e-7,
+    )
+
+
+def test_calm_ice_wind_has_finite_jvp_and_vjp() -> None:
+    constants = PhysicalConstants()
+    state = _ocean_state(shape=(1, 1))
+    state["thbot"] = np.full((1, 1), 266.0)
+    state["qbot"] = np.full((1, 1), 0.004)
+    state["rbot"] = np.full((1, 1), 1.3)
+    state["tbot"] = np.full((1, 1), 266.0)
+
+    def objective(wind: jax.Array) -> jax.Array:
+        outputs = shr_flux_atmIce(
+            constants,
+            state["mask"],
+            state["zbot"],
+            jnp.full((1, 1), wind[0]),
+            jnp.full((1, 1), wind[1]),
+            state["thbot"],
+            state["qbot"],
+            state["rbot"],
+            state["tbot"],
+            jnp.asarray([[270.0]]),
+        )
+        return sum((jnp.sum(value) for value in outputs), start=jnp.asarray(0.0))
+
+    assert_finite_jvp_vjp(
+        objective,
+        jnp.zeros(2),
+        jnp.ones(2),
+        rtol=1e-5,
+        atol=1e-7,
+    )
+
+
+def test_stability_threshold_has_finite_jvp_and_vjp() -> None:
+    constants = PhysicalConstants()
+    target_hol = 1.0 / 16.0
+    thref = jnp.asarray(300.0)
+    tstar = jnp.asarray(
+        target_hol * thref / (constants.von_karman_constant * constants.gravity)
+    )
+
+    def objective(tstar_value: jax.Array) -> jax.Array:
+        _hol, _stable, psimh, psixh = bulk_formula_module._compute_stability_terms(
+            constants,
+            jnp.asarray(1.0),
+            thref,
+            jnp.asarray(0.0),
+            jnp.asarray(1.0),
+            tstar_value,
+            jnp.asarray(0.0),
+        )
+        return psimh + psixh
+
+    assert_finite_jvp_vjp(
+        objective,
+        tstar,
+        jnp.asarray(1.0),
+        rtol=1e-5,
+        atol=1e-7,
+    )
+
+
+def test_cold_air_threshold_has_finite_jvp_and_vjp() -> None:
+    constants = PhysicalConstants()
+    state = _ocean_state(shape=(1, 1))
+    state["ubot"] = np.full((1, 1), 2.0)
+    state["vbot"] = np.full((1, 1), 1.0)
+    state["us"] = np.zeros((1, 1))
+    state["vs"] = np.zeros((1, 1))
+    state["thbot"] = np.full((1, 1), 290.0)
+
+    def objective(tbot: jax.Array) -> jax.Array:
+        outputs = compute_ocean_surface_fluxes(
+            constants,
+            state["mask"],
+            state["zbot"],
+            state["ubot"],
+            state["vbot"],
+            state["thbot"],
+            state["qbot"],
+            state["rbot"],
+            jnp.full((1, 1), tbot),
+            state["us"],
+            state["vs"],
+            jnp.asarray([[300.0]]),
+            use_coldair_outbreak_mod=True,
+        )
+        return sum((jnp.sum(value) for value in outputs), start=jnp.asarray(0.0))
+
+    assert_finite_jvp_vjp(
+        objective,
+        jnp.asarray(290.0),
+        jnp.asarray(1.0),
         rtol=1e-5,
         atol=1e-7,
     )

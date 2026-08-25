@@ -48,7 +48,7 @@ def _compute_stability_terms(
     )
     hol = jnp.minimum(jnp.abs(hol), 10.0) * jnp.sign(hol)
     stable = 0.5 + 0.5 * jnp.sign(hol)
-    xsq = jnp.maximum(jnp.sqrt(jnp.abs(1.0 - 16.0 * hol)), 1.0)
+    xsq = jnp.sqrt(jnp.maximum(jnp.abs(1.0 - 16.0 * hol), 1.0))
     xqq = jnp.sqrt(xsq)
     psimh = -5.0 * hol * stable + (1.0 - stable) * psimhu(xqq)
     psixh = -5.0 * hol * stable + (1.0 - stable) * psixhu(xqq)
@@ -221,17 +221,21 @@ def compute_ocean_surface_fluxes(
     tdiff = tbot_array - ts_array
     al2 = jnp.log(zref / ztref)
 
-    vmag = jnp.maximum(
-        constants.ocean_minimum_wind_speed,
-        jnp.sqrt((ubot_array - us_array) ** 2 + (vbot_array - vs_array) ** 2),
-    )
+    speed_squared = (ubot_array - us_array) ** 2 + (vbot_array - vs_array) ** 2
+    vmag = jnp.sqrt(jnp.maximum(constants.ocean_minimum_wind_speed**2, speed_squared))
     coldair_outbreak_mask = tdiff < td0
+    use_coldair = jnp.asarray(use_coldair_outbreak_mod)
+    apply_coldair_outbreak_mod = use_coldair & coldair_outbreak_mask
+    coldair_temperature_distance = jnp.where(
+        apply_coldair_outbreak_mod,
+        jnp.abs(tdiff - td0),
+        jnp.ones_like(tdiff),
+    )
     vscl = jnp.minimum(
-        1.0 + alpha * (jnp.abs(tdiff - td0) ** 0.5 / jnp.abs(vmag)),
+        1.0 + alpha * (jnp.sqrt(coldair_temperature_distance) / jnp.abs(vmag)),
         maxscl,
     )
-    use_coldair = jnp.asarray(use_coldair_outbreak_mod)
-    vmag = jnp.where(use_coldair & coldair_outbreak_mask, vmag * vscl, vmag)
+    vmag = jnp.where(apply_coldair_outbreak_mod, vmag * vscl, vmag)
 
     ssq = 0.98 * qsat(ts_array) / rbot_array
     delt = thbot_array - ts_array
@@ -350,7 +354,7 @@ def compute_ocean_surface_fluxes(
     evap = lat / constants.latent_heat_of_vaporization * mask_array
 
     hol_2m = hol * ztref / zbot_array
-    xsq = jnp.maximum(1.0, jnp.sqrt(jnp.abs(1.0 - 16.0 * hol_2m)))
+    xsq = jnp.sqrt(jnp.maximum(1.0, jnp.abs(1.0 - 16.0 * hol_2m)))
     xqq = jnp.sqrt(xsq)
     psix2 = -5.0 * hol_2m * stable + (1.0 - stable) * psixhu(xqq)
     fac = (rh / constants.von_karman_constant) * (alz + al2 - psixh + psix2)
@@ -478,10 +482,8 @@ def shr_flux_atmIce(
     ztref = constants.air_temperature_reference_height
     zzsice = 0.0005
 
-    vmag = jnp.maximum(
-        constants.ice_minimum_wind_speed,
-        jnp.sqrt(ubot_array**2 + vbot_array**2),
-    )
+    speed_squared = ubot_array**2 + vbot_array**2
+    vmag = jnp.sqrt(jnp.maximum(constants.ice_minimum_wind_speed**2, speed_squared))
     thvbot = thbot_array * (
         1.0 + constants.water_vapor_mass_ratio_correction * qbot_array
     )

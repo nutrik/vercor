@@ -122,7 +122,7 @@ def build_jax_chunk_executor(
             return carry, None
 
         final_state, _ = jax.lax.scan(
-            run_step,
+            jax.checkpoint(run_step),
             runtime_state,
             (step_indices, step_infos),
             length=step_indices.shape[0],

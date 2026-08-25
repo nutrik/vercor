@@ -422,6 +422,33 @@ def test_jcm_surface_cleanup_rejects_infinity(bad_value: float) -> None:
         )
 
 
+def test_jax_gcm_prefill_uses_physical_bulk_flux_defaults() -> None:
+    grid = make_test_grid(name="jax-gcm-physical-prefill")
+    state = SimpleNamespace(
+        _dtype_policy=DTypePolicy(enable_x64=True),
+        sigma_levels=jnp.asarray([0.25, 0.75]),
+    )
+    component = DataComponent(name="ATM", grid=grid)
+
+    result = jax_gcm_runtime_module.prefill_jax_gcm_runtime_fields(
+        cast(Any, state),
+        component,
+        PrefillContext(fields={}, received={}, sent={}),
+    )
+
+    expected = {
+        "temperature": 288.15,
+        "potential_temperature": 288.15,
+        "density": 1.2,
+        "model_level_height": 50.0,
+    }
+    for field_name, value in expected.items():
+        assert_allclose_compact(
+            cast(Any, result.fields)[field_name],
+            np.full(grid.shape, value),
+        )
+
+
 @pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
 def test_compiled_jcm_surface_cleanup_rejects_infinity(bad_value: float) -> None:
     with pytest.raises(JaxRuntimeError, match="JCM.*surface temperature.*infinity"):
