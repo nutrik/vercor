@@ -163,7 +163,11 @@ default `SequentialWorkflow` repeats the constructor run order.
 The private coordinator validates the plan, groups compatible consecutive
 schedules, and splits at output boundaries. Each `ExecutionChunk` retains
 absolute clock indices. Output-free uniform workflows preserve one JIT-wrapped
-`jax.lax.scan`; a run-local executor is reused for repeated schedules.
+`jax.lax.scan`; a run-local executor is reused for repeated schedules. The
+fixed-shape scan step is wrapped in `jax.checkpoint`, so reverse-mode rollouts
+rematerialize per-step intermediates instead of retaining the complete
+trajectory. Scan length, callback order, progress reporting, interrupt checks,
+and carry structure are unchanged.
 
 An `ExecutionBackend.execute(...)` receives state, public context, a core-owned
 chunk, and `RuntimeDriver`. It must consume every plan exactly once and in order
@@ -263,6 +267,33 @@ because it is not implemented. CAMulator forcing alignment is explicitly
 `strict` or `forcing_start`; both policies require a standard-library
 `datetime` clock because no-leap and 360-day CAMulator conversion is not
 implemented.
+
+`VerosConfig` selects `setup="global_4deg"` or `setup="acc"` and an
+`execution="host"` or `execution="jax"` lane. Host is the compatibility
+default and configures stock Veros with the NumPy backend and its best
+available solver; its existing `jitted=False` behavior is unchanged. JAX
+execution configures the JAX backend with `scipy_jax`, internally forces the
+immutable native path, and requires runtime capabilities supplied by the
+approved differentiable fork: native `VerosState.copy`, differentiable
+operators, and traced `c_k`/`c_eps` variables. Runtime settings lock on first
+Veros use, so conflicting host/JAX components must run in separate Python
+processes. The packaged optional requirement remains `veros>=1.6.2,<1.7`;
+fork selection is capability-gated rather than globally pinned.
+
+The JAX global adapter consumes external atmospheric forcing, disables
+streamfunction and diagnostics that would change the payload PyTree, and uses
+the fork's finite-derivative calm-stress norm. The JAX ACC adapter retains its
+native internal forcing and topology while leaving variable-owned turbulence
+parameters at their fork defaults. JAXGCM uses one physical default mapping
+everywhere fields are declared, initialized, or prefilled: temperature and
+potential temperature are 288.15 K, density is 1.2 kg/m³, and model-level
+height is 50 m. These defaults prevent a not-yet-stepped atmosphere from
+feeding valid-looking zero divisors and logarithm inputs into the ocean.
+
+Here, fully differentiable means finite first-order JVP, VJP, and reverse-mode
+gradients for output-free fixed-plan JAX rollouts over physically valid
+continuous inputs. Output I/O, setup-time/static values, stock-host execution,
+and second derivatives are outside this contract.
 
 Every slab and data factory accepts a final keyword-only
 `output: OutputSpec | None` argument. Omission selects `OutputSpec()`; a
