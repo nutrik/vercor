@@ -127,7 +127,7 @@
     "vercor.setups.JCMLandAtmosphereSetup": "(land: vercor.components.DataComponent, atmosphere: vercor.components.Component, coords: Any, terrain: Any, forcing: Any) -> None",
     "vercor.setups.JCMInputs": "(coords: Any, terrain: Any, forcing: Any) -> None",
     "vercor.setups.Spinup": "(enabled: bool = False, duration: datetime.timedelta = datetime.timedelta(days=2)) -> None",
-    "vercor.setups.VerosConfig": "(name: str = 'OCN', setup: Literal['global_4deg', 'acc'] = 'global_4deg', execution: Literal['host', 'jax'] = 'host', custom_parameters: collections.abc.Mapping[str, typing.Any] | None = None, restore_to_climatology: bool = False, spinup: vercor.setups.Spinup = <factory>, output: vercor.output.OutputSpec = <factory>, jitted: bool = False) -> None",
+    "vercor.setups.VerosConfig": "(name: str = 'OCN', setup: Literal['global_4deg', 'acc'] = 'global_4deg', execution: Literal['host', 'jax'] = 'host', custom_parameters: collections.abc.Mapping[str, typing.Any] | None = None, restore_to_climatology: bool = False, spinup: vercor.setups.Spinup = <factory>, output: vercor.output.OutputSpec = <factory>) -> None",
     "vercor.setups.load_jcm_inputs": "(*, resolution: int = 31, input_data_directory: pathlib.Path | None = None) -> vercor.setups.JCMInputs",
     "vercor.setups.make_slab_atmosphere": "(grid: vercor.grids.RectilinearGrid, name: str = 'ATM', *, output: vercor.output.OutputSpec | None = None) -> vercor.components.Component",
     "vercor.setups.make_slab_land": "(grid: vercor.grids.RectilinearGrid, name: str = 'LND', *, output: vercor.output.OutputSpec | None = None) -> vercor.components.Component",

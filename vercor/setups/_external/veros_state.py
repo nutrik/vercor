@@ -77,11 +77,10 @@ def extract_surface_temperature(
 
 def copy_state(
     tree: VerosState,
-    jitted: bool = True,
     *,
-    execution: Literal["host", "jax"] = "host",
+    execution: Literal["host", "jax"],
 ) -> VerosState:
-    """Return a copy of a Veros state suitable for copy-before-mutate stepping."""
+    """Copy a complete native Veros state for the selected execution lane."""
 
     if execution == "jax":
         native_copy = getattr(tree, "copy", None)
@@ -94,32 +93,11 @@ def copy_state(
     if execution != "host":
         raise ValueError("execution must be 'host' or 'jax'")
 
-    if jitted:
-        dimensions = deepcopy(tree._dimensions)
-        settings_meta = deepcopy(tree.settings.__metadata__)
-        plugin_interfaces = deepcopy(tree._plugin_interfaces)
-        var_meta = deepcopy(tree._var_meta)
-
-        state_copy = VerosState(
-            var_meta, settings_meta, dimensions, plugin_interfaces=plugin_interfaces
-        )
-
-        with state_copy.settings.unlock():
-            for k, v in tree.settings.items():
-                state_copy.settings.__setattr__(k, v)
-
-        state_copy._variables = deepcopy(tree._variables)
-        state_copy.timers = deepcopy(tree.timers)
-        state_copy.profile_timers = deepcopy(tree.profile_timers)
-    else:
-        state_copy = tree
-
-    object.__setattr__(
-        state_copy.settings,
-        "__fields__",
-        tuple(state_copy.settings.__fields__),
+    setting_fields = tree.settings.__fields__
+    return cast(
+        VerosState,
+        deepcopy(tree, {id(setting_fields): tuple(setting_fields)}),
     )
-    return state_copy
 
 
 def _get_veros_linear_solver_interface() -> (
@@ -157,14 +135,16 @@ def get_component_linear_solver(state: VerosState) -> Any:
 
 def pure(
     state: VerosState,
-    jitted: bool,
     step: Callable[[VerosState], None],
     linear_solver: Any,
-    execution: Literal["host", "jax"] = "host",
+    *,
+    execution: Literal["host", "jax"],
 ) -> VerosState:
-    """Copy state and run one native step with the component-owned solver."""
+    """Run one native step with the component-owned solver."""
 
-    next_state = copy_state(state, jitted=jitted, execution=execution)
+    next_state = (
+        state if execution == "host" else copy_state(state, execution=execution)
+    )
     _, solver_cache = _get_veros_linear_solver_interface()
     cache_key = (next_state,)
     missing = object()
@@ -196,12 +176,13 @@ def apply_veros_forcing_fields(
     state: VerosState,
     forcing_fields: VerosForcingFields,
     *,
-    jitted: bool,
-    execution: Literal["host", "jax"] = "host",
+    execution: Literal["host", "jax"],
 ) -> VerosState:
     """Write prepared VerCOR forcing fields into Veros state variables."""
 
-    updated_state = copy_state(state, jitted=jitted, execution=execution)
+    updated_state = (
+        state if execution == "host" else copy_state(state, execution=execution)
+    )
     variables = updated_state.variables
     with variables.unlock():
         for variable_name, variable_value in zip(

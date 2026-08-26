@@ -53,7 +53,6 @@ class VerosConfig:
     restore_to_climatology: bool = False
     spinup: Spinup = field(default_factory=Spinup)
     output: OutputSpec = field(default_factory=OutputSpec)
-    jitted: bool = False
 
     def __post_init__(self) -> None:
         """Validate execution policy and copy caller mappings into owned state."""

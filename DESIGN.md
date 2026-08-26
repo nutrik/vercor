@@ -271,14 +271,20 @@ implemented.
 `VerosConfig` selects `setup="global_4deg"` or `setup="acc"` and an
 `execution="host"` or `execution="jax"` lane. Host is the compatibility
 default and configures stock Veros with the NumPy backend and its best
-available solver; its existing `jitted=False` behavior is unchanged. JAX
-execution configures the JAX backend with `scipy_jax`, internally forces the
-immutable native path, and requires runtime capabilities supplied by the
-approved differentiable fork: native `VerosState.copy`, differentiable
-operators, and traced `c_k`/`c_eps` variables. Runtime settings lock on first
-Veros use, so conflicting host/JAX components must run in separate Python
-processes. The packaged optional requirement remains `veros>=1.6.2,<1.7`;
-fork selection is capability-gated rather than globally pinned.
+available solver. Adapter construction deep-copies the complete native state,
+substituting an immutable tuple for Veros' non-copyable settings `dict_keys`
+view without modifying the source. On every host step, the generic component
+runtime ownership boundary copies that normalized payload exactly once before
+the adapter mutates it through forcing and model substeps. JAX execution
+configures the JAX backend with `scipy_jax`, uses the fork's native PyTree-aware
+`VerosState.copy()` at functional mutation boundaries, and requires runtime
+capabilities supplied by the approved differentiable fork: native state
+copying, differentiable operators, and traced `c_k`/`c_eps` variables.
+`execution` is the sole Veros copy and compilation policy; there is no separate
+`jitted` option. Runtime settings lock on first Veros use, so conflicting
+host/JAX components must run in separate Python processes. The packaged
+optional requirement remains `veros>=1.6.2,<1.7`; fork selection is
+capability-gated rather than globally pinned.
 
 The JAX global adapter consumes external atmospheric forcing, disables
 streamfunction and diagnostics that would change the payload PyTree, and uses

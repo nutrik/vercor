@@ -30,12 +30,6 @@ def step_veros_runtime(
     )
     uses_atmosphere_forcing = getattr(resources, "uses_atmosphere_forcing", True)
     native_state = payload
-    if execution == "host" and not resources.jitted:
-        native_state = _veros_state.copy_state(
-            native_state,
-            jitted=True,
-            execution="host",
-        )
     time = context.time
     if execution == "host" and time is None:
         return StepResult(payload=native_state)
@@ -54,7 +48,6 @@ def step_veros_runtime(
         native_state = _veros_state.apply_veros_forcing_fields(
             native_state,
             forcing_fields,
-            jitted=resources.jitted,
             execution=execution,
         )
     native_state = _veros_state.advance_veros_substeps(

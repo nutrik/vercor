@@ -1,13 +1,13 @@
 # VerCOR Progress
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
-- Multi-step Veros autodiff completed functionally (2026-08-25): the clean
-  stock-Veros baseline passed 801 fast tests; exact editable fork
-  `7a8c964cf00b5aa0713c995edd760643a431b3c9` is installed with `--no-deps` in
-  `scipy`. RED covered the four derivative boundaries, the JAX `time=None`
-  no-op, and global zero-stress TKE. GREEN adds physical JAXGCM prefills,
-  checkpointed scans, and capability-gated host/JAX Veros lanes with native
-  PyTree copying, traced forcing, isolated solvers, and JAX setup adapters. Follow-up cleanup (2026-08-26) removed production `_replace_veros_variable`, which had only test callers, and localized rollout seeding to its test module; exact-submodule rollouts 4/4, Black/flake8/mypy/compileall, fast 805, and full 1,667 passed.
+- Multi-step Veros autodiff and state-copy audit completed (2026-08-26): stock
+  1.6.2 cannot deep-copy settings `dict_keys`; the old reconstruction dropped
+  diagnostics. Host normalizes the complete state with a memoized tuple, then
+  the generic runtime owns one copy per step; JAX keeps native PyTree copying,
+  and `execution` replaces Veros `jitted`. TDD and a real stock ACC step retain
+  all eight attributes, six diagnostics, aliases, and isolation. Exact fork `7a8c964cf00b5aa0713c995edd760643a431b3c9`
+  rollouts pass 4/4; Black/flake8/mypy/compileall, fast 806, and full 1,666 pass.
 - Mandatory x64 serial rollouts passed (2026-08-25): three-step ACC temperature,
   twenty-step ACC `c_k`, and five-step JAXGCM-land-global-Veros have finite
   nonzero gradients, matching JVP/VJP, stable PyTrees, and required `1e-3`/`1e-2`

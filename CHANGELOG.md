@@ -5,6 +5,19 @@ versioning; pre-releases may still refine new contracts.
 
 ## [Unreleased]
 
+### Changed
+
+- Made `VerosConfig.execution` the sole Veros execution-policy option and
+  removed the misleading `jitted` flag, which never compiled NumPy-backed
+  host execution and was redundant for differentiable JAX execution.
+
+### Fixed
+
+- Copy complete stock-Veros states without enumerating native attributes,
+  preserving diagnostics and future additions. Each host step now relies on
+  the generic runtime's single ownership copy, while the differentiable fork
+  retains its native PyTree copy path.
+
 ## [0.4.5] - 2026-08-24
 
 ### Changed

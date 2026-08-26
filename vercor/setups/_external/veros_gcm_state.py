@@ -82,7 +82,6 @@ class VerosGCMSetupState:
         custom_parameters: Mapping[str, Any] | None = None,
         restore_to_climatology: bool = False,
         do_spinup: bool = False,
-        jitted: bool = False,
     ) -> None:
         """Build Veros model resources and the VerCOR ocean grid."""
 
@@ -97,17 +96,14 @@ class VerosGCMSetupState:
         self.model = setup_class(override=override)
         self.model.setup()
         self._linear_solver = _veros_state.get_component_linear_solver(self.model.state)
-        native_jitted = jitted or execution == "jax"
         self._veros_state = _veros_state.copy_state(
             self.model.state,
-            jitted=native_jitted,
             execution=execution,
         )
         step_function = cast(
             Callable[[Any], Any],
             partial(
                 _veros_state.pure,
-                jitted=native_jitted,
                 step=self.model.step,
                 linear_solver=self._linear_solver,
                 execution=execution,
@@ -122,7 +118,6 @@ class VerosGCMSetupState:
         self.do_spinup = do_spinup
         self.spinup_time = spinup_time
         self.restore_to_climatology = restore_to_climatology
-        self.jitted = jitted
 
         self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
         self.spinup_steps = int(self.spinup_time.total_seconds() // self.dt_tracer)

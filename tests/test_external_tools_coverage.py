@@ -397,7 +397,7 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
     )
 
 
-def test_veros_state_helpers_cover_non_jitted_paths() -> None:
+def test_veros_state_helpers_cover_owned_host_mutation_paths() -> None:
     state = _FakeVerosState(
         variables=_FakeVariableStore(
             taux=np.zeros((8, 8, 1), dtype=float),
@@ -407,8 +407,6 @@ def test_veros_state_helpers_cover_non_jitted_paths() -> None:
         )
     )
 
-    assert veros_state_module.copy_state(state, jitted=False) is state
-
     calls: dict[str, int] = {"step": 0}
 
     def fake_step(current_state: Any) -> None:
@@ -417,9 +415,9 @@ def test_veros_state_helpers_cover_non_jitted_paths() -> None:
 
     pure_state = veros_state_module.pure(
         state,
-        jitted=False,
         step=fake_step,
         linear_solver=object(),
+        execution="host",
     )
     assert pure_state is state
     assert calls["step"] == 1
@@ -434,7 +432,7 @@ def test_veros_state_helpers_cover_non_jitted_paths() -> None:
     result_state = veros_state_module.apply_veros_forcing_fields(
         state,
         forcing,
-        jitted=False,
+        execution="host",
     )
 
     assert result_state is state
