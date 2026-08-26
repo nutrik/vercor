@@ -1863,28 +1863,6 @@ def test_veros_copy_state_jax_path_uses_native_pytree_copy() -> None:
     assert state.copy_calls == 1
 
 
-def test_private_veros_variable_replacement_is_immutable() -> None:
-    source = _make_copyable_fake_veros_state(surface_temperature=10.0)
-
-    def native_copy() -> Any:
-        copied = _make_copyable_fake_veros_state(surface_temperature=10.0)
-        copied._variables = deepcopy(source._variables)
-        return copied
-
-    source.copy = native_copy
-
-    updated = veros_state_module._replace_veros_variable(
-        source,
-        "temp",
-        jnp.asarray(7.0),
-    )
-
-    assert updated is not source
-    assert isinstance(updated.variables.temp, jax.Array)
-    assert_allclose_compact(updated.variables.temp, 7.0)
-    assert_allclose_compact(source.variables.temp, 10.0)
-
-
 @pytest.mark.parametrize("jitted", (False, True))
 def test_veros_copy_state_returns_deepcopy_compatible_state(
     monkeypatch: pytest.MonkeyPatch,

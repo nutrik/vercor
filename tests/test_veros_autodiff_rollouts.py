@@ -31,7 +31,6 @@ from vercor.setups import (
     make_jcm_land_atmosphere,
     make_veros_gcm,
 )
-from vercor.setups._external.veros_state import _replace_veros_variable
 from vercor.state import RunState
 from vercor.topology import SurfaceMaskPolicy
 
@@ -123,6 +122,19 @@ def _ocean_payload(state: RunState) -> Any:
     return payload
 
 
+def _replace_native_veros_variable(
+    native_state: Any,
+    name: str,
+    value: jax.Array,
+) -> Any:
+    """Copy a native Veros state and replace one test-controlled variable."""
+
+    updated_state = native_state.copy()
+    with updated_state.variables.unlock():
+        setattr(updated_state.variables, name, value)
+    return updated_state
+
+
 def _replace_ocean_surface_temperature(
     state: RunState,
     temperature: jax.Array,
@@ -137,7 +149,7 @@ def _replace_ocean_surface_temperature(
         baseline[:, :, -1, :],
     )
     seeded_temperature = baseline.at[:, :, -1, :].set(seeded_surface)
-    seeded_payload = _replace_veros_variable(
+    seeded_payload = _replace_native_veros_variable(
         native_state,
         "temp",
         seeded_temperature,
@@ -154,7 +166,11 @@ def _replace_ocean_parameter(
     value: jax.Array,
 ) -> RunState:
     component_state = state._component_state("OCN")
-    seeded_payload = _replace_veros_variable(_ocean_payload(state), name, value)
+    seeded_payload = _replace_native_veros_variable(
+        _ocean_payload(state),
+        name,
+        value,
+    )
     return state._with_component_state(
         "OCN",
         component_state.with_payload(seeded_payload),

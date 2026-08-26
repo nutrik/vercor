@@ -122,27 +122,6 @@ def copy_state(
     return state_copy
 
 
-def _replace_veros_variable(
-    state: VerosState,
-    name: str,
-    value: object,
-) -> VerosState:
-    """Return a JAX-native state copy with one native variable replaced."""
-
-    updated_state = copy_state(state, jitted=True, execution="jax")
-    variables = updated_state.variables
-    current = getattr(variables, name)
-    value_array = jnp.asarray(value)
-    updated_value = (
-        jnp.full_like(jnp.asarray(current), value_array)
-        if value_array.ndim == 0 and jnp.asarray(current).ndim > 0
-        else value_array
-    )
-    with variables.unlock():
-        setattr(variables, name, updated_value)
-    return updated_state
-
-
 def _get_veros_linear_solver_interface() -> (
     tuple[Callable[[VerosState], Any], MutableMapping[tuple[VerosState], Any]]
 ):

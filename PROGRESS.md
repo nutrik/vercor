@@ -7,7 +7,7 @@ This is the bounded orientation log for active development. Detailed history is 
   `scipy`. RED covered the four derivative boundaries, the JAX `time=None`
   no-op, and global zero-stress TKE. GREEN adds physical JAXGCM prefills,
   checkpointed scans, and capability-gated host/JAX Veros lanes with native
-  PyTree copying, traced forcing, isolated solvers, and JAX setup adapters.
+  PyTree copying, traced forcing, isolated solvers, and JAX setup adapters. Follow-up cleanup (2026-08-26) removed production `_replace_veros_variable`, which had only test callers, and localized rollout seeding to its test module; exact-submodule rollouts 4/4, Black/flake8/mypy/compileall, fast 805, and full 1,667 passed.
 - Mandatory x64 serial rollouts passed (2026-08-25): three-step ACC temperature,
   twenty-step ACC `c_k`, and five-step JAXGCM-land-global-Veros have finite
   nonzero gradients, matching JVP/VJP, stable PyTrees, and required `1e-3`/`1e-2`
