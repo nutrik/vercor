@@ -1,14 +1,13 @@
 # VerCOR Progress
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
-- Semantic pre-v0.4 matcher unit completed (2026-08-27): generated ownership, external-artifact, numerical, Python, Read the Docs, and migration-path cases recorded 21/21 expected RED missing-function failures, then 21/21 focused GREEN and 163/163 complete version-policy GREEN. Live-tree integration is intentionally deferred to the next cleanup task.
-- Hybrid-sigma hypsometric audit completed (2026-08-27): independent `A + B * ps`
-  cases reproduce 95,000/85,700 Pa; the IFS half-level height discretization has
-  dry/moist literals and surface-pressure JVP/VJP; six RED eager/JIT layouts now
+- Complete tracked-tree boundary cleanup completed (2026-08-27): the Task 1 matchers recorded a 94-violation live-tree RED (93 line diagnostics plus the obsolete migration path), then the five-file semantic focus passed 257/257 and the complete policy passed 164/164.
+  Migration-page test/navigation/link ownership was deleted; active guidance, the protected archive, and 15 retained Superpowers records now preserve decisions without unsupported VerCOR labels. The protected archive SHA-256 is `ea0c1cc72405b61bcdfc5470dd64112cacbc0e29ec37636b15c2247c60377f17` and its integrity test passes 1/1.
+  Strict Sphinx built 29 sources without warnings; the complete fast suite passed 828/828 with four known Flax/JAX warnings. Raw audit found zero forbidden paths and 11 inspected text collisions: independently versioned fixture artifacts, JCM/Dinosaur dependency versions, and matcher-definition data.
+  Failed approach: the first archive-integrity command used a stale node name and collected no test; rerunning the current `test_active_memory_is_current_and_historical_detail_is_archived` node passed.
+- Hybrid-sigma hypsometric audit completed (2026-08-27): independent `A + B * ps` cases reproduce 95,000/85,700 Pa; the IFS half-level height discretization has dry/moist literals and surface-pressure JVP/VJP; six RED eager/JIT layouts now
   fail explicitly; focused 11/11, static gates, fast 807, and full branch coverage 1,680/1,680 at 91.80% pass.
-- JCM sigma altitude corrected (2026-08-27): anchoring `sigma=0.95` at zero
-  yielded 1094.34 m, not 435.03 m AGL. Exact eight-level AD passes; local JVP/VJP agrees to `4.8e-16`.
-  Global FD is unstable; five-day `c_k` JVP/VJP is strict; fast 809/full 1,669 pass.
+- JCM sigma altitude corrected (2026-08-27): anchoring `sigma=0.95` at zero yielded 1094.34 m, not 435.03 m AGL. Exact eight-level AD passes; local JVP/VJP agrees to `4.8e-16`. Global FD is unstable; five-day `c_k` JVP/VJP is strict; fast 809/full 1,669 pass.
 - Multi-step Veros autodiff and state-copy audit completed (2026-08-26): stock
   1.6.2 cannot deep-copy settings `dict_keys`; the old reconstruction dropped
   diagnostics. Host normalizes the complete state with a memoized tuple, then
@@ -162,7 +161,7 @@ This is the bounded orientation log for active development. Detailed history is 
 - JCM, Veros, and CAMulator imports remain lazy. CAMulator is not installed or pinned.
 ## Release Candidate Handoff
 
-- The executable review validates the exact eight sections, all canonical public manifests, central/root signatures, all 119 non-public modules, runnable README/migration snippets, archive SHA-256, Task 9 absence, and release metadata.
+- The executable review validates the exact eight sections, all canonical public manifests, central/root signatures, all 119 non-public modules, the runnable README quick start, archive SHA-256, Task 9 absence, and release metadata.
 - CI encodes Python 3.12/3.13 base/JCM/Veros artifact lanes, Python 3.12/3.13 native-v0.4 plugin lanes, and a macOS installed-plugin smoke. GitHub-hosted jobs have not run locally.
 - The Task 10 documentation/release commit is present in repository history; do not tag, push, or publish without separate authority.
 

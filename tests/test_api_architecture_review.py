@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 import subprocess
 import tomllib
-from typing import Any, cast, get_type_hints
+from typing import cast, get_type_hints
 
 import numpy as np
 import pytest
@@ -28,8 +28,6 @@ from tests._signature_support import canonicalize_external_typing_aliases
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REVIEW_PATH = PROJECT_ROOT / "docs" / "api-architecture-review.md"
 README_PATH = PROJECT_ROOT / "README.md"
-DESIGN_PATH = PROJECT_ROOT / "DESIGN.md"
-MIGRATION_PATH = PROJECT_ROOT / "docs" / "migration-0.3-to-0.4.md"
 RELEASING_PATH = PROJECT_ROOT / "docs" / "releasing.md"
 WORKFLOW_PATH = PROJECT_ROOT / ".github" / "workflows" / "python-package.yml"
 CHECKOUT_ACTION = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
@@ -42,12 +40,11 @@ PROGRESS_PATH = PROJECT_ROOT / "PROGRESS.md"
 SIGNATURE_CONTRACT_PATH = (
     PROJECT_ROOT / "tests" / "contracts" / "vercor-0.4.0-public-signatures.json"
 )
-DEPENDENCIES_PATH = PROJECT_ROOT / "DEPENDENCIES.md"
 PROGRESS_ARCHIVE_PATH = (
     PROJECT_ROOT / "docs" / "progress-archive-2026-05-16-to-2026-07-14.md"
 )
 PROGRESS_ARCHIVE_SHA256 = (
-    "77a1d4a3c536901053718e9d7d31474a955922f8c2872f6e53f1c7fdbc70f69e"
+    "ea0c1cc72405b61bcdfc5470dd64112cacbc0e29ec37636b15c2247c60377f17"
 )
 
 REQUIRED_REVIEW_HEADINGS = (
@@ -428,28 +425,6 @@ def test_readme_python_snippets_run_as_one_public_quick_start(
     sea_surface_temperature = np.asarray(namespace["sea_surface_temperature"])
     assert sea_surface_temperature.shape == (2, 2)
     assert np.all(np.isfinite(sea_surface_temperature))
-    assert not tuple(tmp_path.iterdir())
-
-
-@pytest.mark.fast_always
-def test_migration_v0_4_snippet_runs_without_private_or_compat_imports(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Execute the supported 0.4 migration result and verify its observable state."""
-
-    snippets = _python_fences(MIGRATION_PATH.read_text(encoding="utf-8"))
-    assert len(snippets) == 1
-    source = snippets[0]
-    _assert_public_imports_only(source, owner="docs/migration-0.3-to-0.4.md")
-    assert "vercor.compat" not in source
-    monkeypatch.chdir(tmp_path)
-
-    namespace: dict[str, object] = {}
-    exec(compile(source, str(MIGRATION_PATH), "exec"), namespace)
-
-    migrated_temperature = cast(Any, namespace["migrated_temperature"])
-    assert float(migrated_temperature[0, 0]) == pytest.approx(282.0)
     assert not tuple(tmp_path.iterdir())
 
 
@@ -1105,8 +1080,3 @@ def test_active_memory_is_current_and_historical_detail_is_archived() -> None:
         == PROGRESS_ARCHIVE_SHA256
     )
     assert "VerCOR 0.4.0 release verification" in progress
-
-    design = DESIGN_PATH.read_text(encoding="utf-8")
-    dependencies = DEPENDENCIES_PATH.read_text(encoding="utf-8")
-    assert "vercor.compat.v0_3" not in design
-    assert "vercor.compat.v0_3" not in dependencies

@@ -288,7 +288,7 @@ def test_github_tag_absence_accepts_paginated_unrelated_releases(
 
     completed = _run_github_tag_absent_validator(
         tmp_path,
-        [[{"id": 7, "tag_name": "v0.3.0", "draft": False}], []],
+        [[{"id": 7, "tag_name": "v0.4.4", "draft": False}], []],
     )
 
     assert completed.returncode == 0, completed.stderr

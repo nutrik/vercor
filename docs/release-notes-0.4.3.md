@@ -23,13 +23,13 @@ python -m pip install --upgrade "vercor==0.4.3"
 
 ## Compatibility and migration
 
-VerCOR requires Python 3.12 or 3.13. Version 0.4 is intentionally
-source-breaking for 0.3 applications; follow the
-[migration guide](migration-0.3-to-0.4.md). Third-party plugins should depend on
-`vercor>=0.4.0,<0.5` and use the documented stable extension modules.
+VerCOR requires Python 3.12 or 3.13. The 0.4 API does not include legacy
+compatibility adapters; use the current researcher and developer guides.
+Third-party plugins should depend on `vercor>=0.4.0,<0.5` and use the documented
+stable extension modules.
 
 ## Known limitations
 
 CAMulator requires a separately installed compatible MILES-CREDIT
 environment; an exact compatible release is not yet pinned. CAMulator
-spinup is not implemented. No legacy 0.3 adapter namespace is included.
+spinup is not implemented. No legacy compatibility adapter namespace is included.

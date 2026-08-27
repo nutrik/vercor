@@ -192,8 +192,9 @@ historical commands, failure messages, or detailed validation notes.
   NumPy ownership, nested payload ownership, immutable mappings, payload
   preserve/clear/replace PyTrees, and setup-payload JVP/reverse gradients. The
   current installed plugin is migrated to strict-mypy v0.4 authoring; the frozen
-  0.3 plugin and 0.3.2 compatibility baseline remain unchanged and demonstrate
-  the intentional break. Final verification passes the exact 202-test
+  legacy plugin and pre-redesign compatibility baseline remain unchanged and
+  demonstrate the intentional break. Final verification passes the exact
+  202-test
   component/API/plugin/gradient focus, all 416 fast-selected tests, and all 872
   full-suite tests with only the two known third-party `FutureWarning`s. Black
   leaves all 237 files unchanged, strict flake8 reports zero findings, full
@@ -212,7 +213,8 @@ historical commands, failure messages, or detailed validation notes.
   receive physics and precision separately; production contains zero direct
   physical reads from `Settings` and zero `Settings` arguments to dtype
   helpers. Task 4 has since removed the primary Settings and legacy physical-
-  constants modules; future v0.3 compatibility remains explicitly deferred. TDD began with 7/7 intended missing-
+  constants modules; future legacy compatibility remains explicitly deferred.
+  TDD began with 7/7 intended missing-
   module failures; the later mixed-precision regression also failed before the
   runtime boundary cast. Final focused physics tests pass 8/8, the requested
   precision-owner cluster passes 63/63, the fast suite passes 467 selected
@@ -238,16 +240,17 @@ historical commands, failure messages, or detailed validation notes.
   issues in 240 files, and compileall plus whitespace checks pass.
 - VerCOR 0.4 milestone 1 Task 1 compatibility baseline implemented locally on
   2026-07-13. The static manifest pins clean reference commit
-  `9f0b9131c889bed5c1c2d8ded260add3cfef9524`, version 0.3.2, the exact
+  `9f0b9131c889bed5c1c2d8ded260add3cfef9524`, the pre-redesign version, the exact
   48-symbol root surface, 13 canonical owner-module export lists, and 37 public
-  signatures needed by the future v0.3 adapter. The focused test recorded the
+  signatures needed by the future legacy adapter. The focused test recorded the
   intended missing-manifest RED. Review follow-up then recorded two intended
   failures for the omitted setup/protocol contract and missing clean-reference
   builder. The non-optional test now creates a clean source tree with
   `git archive` of the pinned commit, builds its wheel offline through the
   established distribution cache fallback, and inspects it in an isolated
-  bounded subprocess; the evolving live checkout is not compared with the v0.3
-  manifest, and the later 0.3 fixture is rejected as baseline evidence. A
+  bounded subprocess; the evolving live checkout is not compared with the
+  pre-redesign manifest, and the later legacy fixture is rejected as baseline
+  evidence. A
   follow-up CI audit reproduced `fatal: not a tree object` for the reference
   SHA in a real depth-1 clone and recorded the intended workflow-boundary RED
   (`fetch-depth` absent). The quality job is the only current job that collects
@@ -257,7 +260,7 @@ historical commands, failure messages, or detailed validation notes.
   three baseline tests (4/4). Final default validation passes 464 tests with
   397 deselections in fast mode; the full suite passes 861 tests with only the
   two known third-party `FutureWarning`s.
-- VerCOR 0.3.2 API hardening documented on 2026-07-13. Task 1 established the
+- Pre-redesign API hardening documented on 2026-07-13. Task 1 established the
   single component contract validator, authoritative `ComponentSpec.lifecycle`,
   and a non-materializing structural prepared-configuration snapshot (focused
   148/148). Lifecycle/spec callables are identity-only so validation event logs
@@ -265,8 +268,9 @@ historical commands, failure messages, or detailed validation notes.
   default mutable state is outside the supported configuration contract. Task 2
   added deterministic exchange fan-in rejection, legal feedback
   overlap, shape-stable state/backend schemas, strict topology masks, and
-  settings/payload gradient regressions (focused 93/93). Task 3 proved current-0.3.1
-  and frozen-0.3 installed plugins and added strict CI quality/coverage
+  settings/payload gradient regressions (focused 93/93). Task 3 proved a
+  superseded installed plugin and a frozen legacy installed plugin and added
+  strict CI quality/coverage
   enforcement (focused 50/50; historical branch coverage 90.53%). Task 4's
   strengthened documentation contracts pass 10/10, including exact
   heading/export inventories, line-break-independent stale-API guards, bounded
@@ -276,7 +280,7 @@ historical commands, failure messages, or detailed validation notes.
   whitespace checks pass; the fast suite passes 461/461 with 397 deselected; and
   the full suite passes 858/858 with only the two known third-party
   FutureWarnings.
-- VerCOR 0.3.2 Task 2 runtime-state semantics completed locally on 2026-07-13.
+- Pre-redesign Task 2 runtime-state semantics completed locally on 2026-07-13.
   Exchange contract construction now rejects deterministic scalar/vector fan-in
   conflicts while allowing receive/step/send feedback fields; the slab driver
   retains only its bilinear ocean-to-sea-ice temperature route. Runtime field
@@ -294,7 +298,7 @@ historical commands, failure messages, or detailed validation notes.
   842/842 with only the two known third-party FutureWarnings. The final Conda
   launcher attempt hit the known Rattler NULL-object panic before pytest; direct
   execution with the `scipy` environment Python passed all final suites.
-- VerCOR 0.3.1 API consolidation release validation completed locally on
+- Superseded API consolidation release validation completed locally on
   2026-07-10 with the direct
   `/Users/romannuterman/miniforge3/envs/scipy/bin/python` fallback for the known
   Conda/Rattler launcher panic. The exact eight-section architecture review is
@@ -302,7 +306,7 @@ historical commands, failure messages, or detailed validation notes.
   structural JAX, host, custom backend, custom topology, and lifecycle/output
   workflows using public imports only. The release owns exchange recipes
   directly in `vercor.recipes`, uses `ComponentStepReturn` on every public step
-  callback annotation, and reports version 0.3.1. Contract tests recorded the
+  callback annotation, and reports the superseded release version. Contract tests recorded the
   expected five-test RED before the document/version changes and now pass 5/5;
   the native Veros/CAMulator output regression recorded two expected RED
   failures and now passes 3/3, including a mixed native/generic plan. The first
@@ -317,15 +321,15 @@ historical commands, failure messages, or detailed validation notes.
   compileall passes, the injected/preloaded JCM smoke passes 9/9, the fast suite
   passes 386/386, the full suite passes 782/782, and coverage is 90.52% (91%
   reported) against the 90% gate. Distribution checks pass 10/10. Retained
-  artifacts at
-  `/private/tmp/vercor-release-0.3.1-final.VBJ8SP/distribution-build0/dist` are
-  `vercor-0.3.1-py3-none-any.whl`, `vercor-0.3.1.tar.gz`, and the 0.1.0 public
-  plugin wheel; wheel/sdist `py.typed`, installed origin/version 0.3.1, plugin
+  artifacts in the historical distribution-build directory are the superseded
+  baseline wheel,
+  the superseded baseline source archive, and the 0.1.0 public plugin wheel;
+  wheel/sdist `py.typed`, installed origin/version checks, plugin
   smoke, and strict external mypy (4 files) pass. JCM 1.1.1 and Veros 1.6.2 are
   available; CREDIT is absent and remains uninstalled/unpinned. The final
   read-only review approved with no remaining Critical, Important, or Minor
   findings after correcting the CI wheel filename, exact 48-symbol root
-  inventory, verified 0.2.1 migration history, runtime-resolvable public step
+  inventory, verified legacy migration history, runtime-resolvable public step
   annotations, and CAMulator period-output path wording.
 - Native bundled period-output compatibility fixed locally on 2026-07-10.
   Period-enabled Veros and CAMulator factory components now mark their host
@@ -454,7 +458,7 @@ historical commands, failure messages, or detailed validation notes.
   whole-run `RuntimeOptions` backend selection. Focused fast (132 tests) and
   full fast (318 tests) pytest passed; final Black, flake8, mypy, and whitespace
   checks are recorded in `.superpowers/sdd/task-1-report.md`.
-- Latest local VerCOR 0.3.0 API-boundary validation passed as of
+- Latest local superseded API-boundary validation passed as of
   2026-07-09. The breaking cleanup removes the `vercor.config` compatibility
   owner, moves surface-mask customization to public `vercor.topology`,
   replaces `RuntimeOptions.surface_masks` with
@@ -470,11 +474,11 @@ historical commands, failure messages, or detailed validation notes.
   3.13/target-3.14 warning; full pytest/coverage emitted only the existing
   external JAX dtype-promotion `FutureWarning` and xarray merge
   `FutureWarning` in JAXGCM coverage.
-- Latest local VerCOR 0.2.1 API-boundary validation passed as of 2026-07-09
-  using the direct `scipy` environment executable: focused v0.2.1 API-boundary
+- Latest local earlier API-boundary validation passed as of 2026-07-09
+  using the direct `scipy` environment executable: focused legacy API-boundary
   pytest, custom component/backend smoke check, full fast pytest, full pytest,
   coverage pytest at 90% total, Black, flake8, mypy, example/package/test
-  `compileall`, and `git diff --check`. The breaking v0.2.1 cleanup moves
+  `compileall`, and `git diff --check`. The breaking legacy cleanup moves
   canonical runtime contracts to public `vercor.runtime`, keeps
   `vercor.config` as a compatibility alias, adds public `ExecutionContext` and
   `RuntimeDriver` for custom backends, makes `RuntimeOptions.surface_masks`
@@ -483,15 +487,16 @@ historical commands, failure messages, or detailed validation notes.
   host execution through `ComponentSpec.execution`, exposes read-only
   `ComponentInfo`, moves `CouplerSpec` to `vercor.coupling`, updates bundled
   examples to opt into `SurfaceMaskPolicy()`, and bumps the package version to
-  0.2.1. Black emitted the recurring Python 3.13/target-3.14 warning; full
+  the superseded release. Black emitted the recurring Python
+  3.13/target-3.14 warning; full
   pytest/coverage emitted only the existing external JAX dtype-promotion
   `FutureWarning` and xarray merge `FutureWarning` in JAXGCM coverage.
-- Latest local VerCOR 0.2.0 API/plugin-boundary validation passed as of
+- Latest local earlier API/plugin-boundary validation passed as of
   2026-07-09 using the direct `scipy` environment executable: focused
   red/green plugin-architecture pytest, affected API/setup/runtime fast pytest,
   full fast pytest, full pytest, coverage pytest at 90% total, Black, flake8,
   mypy, example/package/test `compileall`, and `git diff --check`. The
-  breaking v0.2.0 cleanup moves core runtime policy to public `vercor.config`
+  breaking legacy cleanup moves core runtime policy to public `vercor.config`
   (`RuntimeOptions`, `SurfaceMaskPolicy`, `ExecutionBackend`, `DTypePolicy`),
   removes the old `vercor.setup_config` module, replaces `Coupler`'s
   `surface_mask_policy=` keyword with `runtime=RuntimeOptions(...)`, adds
@@ -500,8 +505,8 @@ historical commands, failure messages, or detailed validation notes.
   data-import behavior from mutable `Settings` to `ComponentSpec.import_policy`,
   freezes component/setup config mappings, adds private runtime backend owners
   for built-in and custom execution paths, adds `CouplerSpec`, and bumps the
-  package version to 0.2.0. Black emitted the recurring Python
-  3.13/target-3.14 warning; full pytest/coverage emitted only the existing
+  package version to the superseded release. Black emitted the recurring
+  Python 3.13/target-3.14 warning; full pytest/coverage emitted only the existing
   external JAX dtype-promotion `FutureWarning` and xarray merge
   `FutureWarning` in JAXGCM coverage.
 - Latest local VerCOR 0.8 setup-config/API-boundary validation passed as of
@@ -651,7 +656,7 @@ historical commands, failure messages, or detailed validation notes.
   emitted only the existing external JAX dtype-promotion `FutureWarning` and
   xarray merge `FutureWarning` in JAXGCM coverage. No VerCOR deprecation
   warnings remain in active validation output.
-- Latest local v0.2.0 API boundary rewrite validation passed as of 2026-07-08
+- Latest local legacy API boundary rewrite validation passed as of 2026-07-08
   using the direct `scipy` environment executable: Black, flake8, mypy, full
   fast pytest, full pytest, coverage pytest at 90% total, example
   `compileall`, and `git diff --check`. Black emitted the recurring Python
@@ -668,7 +673,7 @@ historical commands, failure messages, or detailed validation notes.
   `grid_geometry.make_rectilinear_grid`, exports root `vector`, and makes
   `RunState.component(...)` / `RunState.components(...)` the canonical runtime
   view API.
-- Latest local v0.2.0 API redesign validation passed as of 2026-07-07 using the
+- Latest local legacy API redesign validation passed as of 2026-07-07 using the
   direct `scipy` environment executable: Black, flake8, mypy, fast pytest,
   full pytest, coverage pytest at 90% total, and `git diff --check`. Black
   emitted the recurring Python 3.13/target-3.14 warning; full pytest/coverage
@@ -1033,8 +1038,8 @@ historical commands, failure messages, or detailed validation notes.
   whitespace check passed as of 2026-07-03 using `conda run -n scipy`.
   Black emitted the recurring Python 3.13/target-3.14 warning, and full
   pytest/coverage emitted the recurring JAX dtype-promotion `FutureWarning`.
-- Latest local v0.2.1 public API facade cleanup validation: focused v0.2.1 API-boundary
-  pytest, focused regression pytest, Black, flake8, mypy, example py_compile,
+- Latest local legacy public API facade cleanup validation: focused legacy
+  API-boundary pytest, focused regression pytest, Black, flake8, mypy, example py_compile,
   full fast pytest, full pytest, coverage pytest at 90% total, and git diff
   whitespace check passed as of 2026-07-03 using the direct `scipy`
   environment executable. Black emitted the recurring Python 3.13/target-3.14
@@ -1047,7 +1052,7 @@ historical commands, failure messages, or detailed validation notes.
   environment executable. Black emitted the recurring Python 3.13/target-3.14
   warning, and full pytest/coverage emitted the recurring JAX dtype-promotion
   `FutureWarning`.
-- Latest local VerCOR 0.2.0 expired API cleanup validation: focused red/green
+- Latest local expired API cleanup validation: focused red/green
   API/runtime-state pytest, Black, flake8, mypy, full fast pytest, and full
   pytest passed as of 2026-07-06 using the direct `scipy` environment
   executable. Black emitted the recurring Python 3.13/target-3.14 warning, and
@@ -1064,7 +1069,7 @@ historical commands, failure messages, or detailed validation notes.
   `conda run -n scipy` fast pytest passed as of 2026-07-06. Black emitted the
   recurring Python 3.13/target-3.14 warning, and full pytest/coverage emitted
   the recurring JAX dtype-promotion `FutureWarning`.
-- Latest local V0.3 API redesign implementation validation: focused V0.3
+- Latest local pre-redesign API implementation validation: focused pre-redesign
   API-boundary red/green pytest, focused removed-import-path pytest, full fast
   pytest, Black check, flake8, mypy, full pytest, coverage pytest at 90%
   total, and `conda run -n scipy` fast pytest passed as of 2026-07-06 using
@@ -1129,13 +1134,13 @@ historical commands, failure messages, or detailed validation notes.
   the existing external JAX dtype-promotion `FutureWarning` and xarray merge
   `FutureWarning` in JAXGCM coverage.
 
-### 2026-07-08: v0.2.0 Deprecation Cleanup
+### 2026-07-08: Legacy Deprecation Cleanup
 
 - Removed the remaining public conservative-regridder compatibility keyword:
   `vercor.regridding.conservative(...)` now accepts `radius_km` only and passes
   that value to the private conservative regridder's internal `radius`
   parameter.
-- Added v0.2.0 boundary coverage so the public conservative factory keeps
+- Added legacy boundary coverage so the public conservative factory keeps
   `radius` absent and active docs do not advertise removed transition APIs such
   as `ComponentView`, `Coupler.state()`, public `Coupler.initialize()`,
   public `Component.data` / `Component.setup_metadata`, or callable
@@ -1225,9 +1230,9 @@ historical commands, failure messages, or detailed validation notes.
   `FutureWarning` and the existing xarray merge `FutureWarning` in the real
   JAXGCM payload test.
 
-### 2026-07-06: V0.3 API Redesign Implementation
+### 2026-07-06: Pre-redesign API Implementation
 
-- Added the V0.3 public field vocabulary in `vercor.fields`, including
+- Added the pre-redesign public field vocabulary in `vercor.fields`, including
   `VectorField`, `vector(...)`, field-item normalization, field flattening, and
   shared valid-field vocabulary ownership.
 - Exposed stable public `CouplerState` and `ComponentView` names, typed
@@ -1238,8 +1243,8 @@ historical commands, failure messages, or detailed validation notes.
 - Migrated public grid construction to
   `rectilinear_grid(..., longitude=..., latitude=..., binary_mask=...)`,
   made `DataComponent.from_fields(...)` optional arguments keyword-only, and
-  updated examples/tests to use V0.3 exchange vector fields instead of tuple
-  vectors.
+  updated examples/tests to use pre-redesign exchange vector fields instead of
+  tuple vectors.
 - Exported public exception classes from `vercor` and updated facade imports so
   public workflows can use top-level `rectilinear_grid`, `bilinear`,
   `conservative`, `VectorField`, and `vector`.
@@ -1248,7 +1253,7 @@ historical commands, failure messages, or detailed validation notes.
   and `vercor.regridders` -> `vercor._regridders`; normal user imports go
   through the public facades.
 - Bumped the package version to `0.4.0` for the breaking public API change.
-- Validation run for this change: focused V0.3 API-boundary pytest, focused
+- Validation run for this change: focused pre-redesign API-boundary pytest, focused
   removed-import-path pytest, full fast pytest, Black check, flake8, mypy, full
   pytest, coverage pytest at 90% total, and
   `conda run -n scipy pytest tests/ -q --fast` passed. Black emitted the
@@ -1277,7 +1282,7 @@ historical commands, failure messages, or detailed validation notes.
 
 ### 2026-07-06: Staged Public API Redesign Compatibility
 
-- Added the v0.3-compatible public names from the API redesign plan:
+- Added the legacy-compatible public names from the API redesign plan:
   `Settings`, `SettingSpec`, `Clock(calendar=...)`,
   `grids.rectilinear_grid(...)`, `Coupler(run_order=...)`,
   `Coupler.write_outputs(...)`, `DataComponent.from_fields(outputs=...)`, and
@@ -1299,7 +1304,7 @@ historical commands, failure messages, or detailed validation notes.
 
 ### 2026-07-06: Evidence-Only Deprecation Wording Cleanup
 
-- Audited active source and tests after the 0.2.0 cleanup and found no live
+- Audited active source and tests after the legacy cleanup and found no live
   VerCOR deprecation warning machinery, deprecated wrappers, or shim modules to
   remove.
 - Renamed active tests and design text to avoid legacy-looking wording around
@@ -1314,9 +1319,9 @@ historical commands, failure messages, or detailed validation notes.
   Black emitted the recurring Python 3.13/target-3.14 warning, and full pytest
   emitted the recurring JAX dtype-promotion `FutureWarning`.
 
-### 2026-07-06: Vercor 0.2.0 Expired Deprecation Cleanup
+### 2026-07-06: Vercor Expired Deprecation Cleanup
 
-- Removed expired 0.2.0 public shim surfaces: component-prefixed aliases,
+- Removed expired legacy public shim surfaces: component-prefixed aliases,
   `HostRuntimeComponent`, `from_model()`, `default_fields`, exchange legacy
   names, short exchange recipe aliases, regridder short aliases, long coupler
   method wrappers, setup orchestration helpers, and the shared deprecation
@@ -1351,9 +1356,9 @@ historical commands, failure messages, or detailed validation notes.
 - Updated `DESIGN.md`, `DEPENDENCIES.md`, examples, and API-boundary tests to
   document the canonical public/private split.
 
-### 2026-07-03: V0.2.1 Public API Facade Cleanup
+### 2026-07-03: Legacy Public API Facade Cleanup
 
-- Added the v0.2.1 orchestration facade: `Coupler.from_components(...)`,
+- Added the legacy orchestration facade: `Coupler.from_components(...)`,
   `run_order`, `state()`, `view()`, `views()`, `add_component()`, and
   `add_exchanges()` while retaining compatibility wrappers for the old runtime
   and run-sequence names.
@@ -1368,7 +1373,7 @@ historical commands, failure messages, or detailed validation notes.
 - Added shallow public facades for `vercor.exchanges`, `vercor.grids`,
   `vercor.regridding`, and `vercor.setups`; updated examples to use the new
   public APIs instead of setup-helper and runtime-view wiring.
-- Validation run for this change: focused v0.2.1 API-boundary pytest, focused
+- Validation run for this change: focused legacy API-boundary pytest, focused
   regression pytest, Black, flake8, mypy, example py_compile, full fast
   pytest, full pytest, coverage pytest at 90% total, and `git diff --check`
   passed using the direct `scipy` environment executable. Black emitted the

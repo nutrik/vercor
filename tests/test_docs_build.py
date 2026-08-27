@@ -42,7 +42,6 @@ TUTORIAL_PAGES = (
 )
 
 PROJECT_RESOURCE_PAGES = (
-    "migration-0.3-to-0.4",
     "plugin-authoring",
     "release-notes-0.4.3",
     "release-notes-0.4.4",
@@ -193,7 +192,6 @@ def test_readme_is_a_concise_gateway_to_canonical_documentation() -> None:
         "[Researcher guide](https://vercor.readthedocs.io/en/latest/researchers/)",
         "[Developer guide](https://vercor.readthedocs.io/en/latest/developers/)",
         "[Python API](https://vercor.readthedocs.io/en/latest/api/)",
-        "[Migration guide](https://vercor.readthedocs.io/en/latest/migration-0.3-to-0.4.html)",
         "[Plugin authoring](https://vercor.readthedocs.io/en/latest/plugin-authoring.html)",
     ):
         assert canonical_link in readme

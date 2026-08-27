@@ -272,9 +272,8 @@ MyST does not leave discovered documents outside a toctree:
 ```rst
 .. toctree::
    :maxdepth: 1
-   :caption: Migration and extension
+   :caption: Extension guidance
 
-   migration-0.3-to-0.4
    plugin-authoring
 
 .. toctree::
@@ -1041,7 +1040,6 @@ def test_project_resources_publish_maintained_markdown() -> None:
     """Expose active project guides without publishing archives."""
     source = (DOCS_ROOT / "project-resources.rst").read_text(encoding="utf-8")
     for page in (
-        "migration-0.3-to-0.4",
         "plugin-authoring",
         "release-notes-0.4.3",
         "release-notes-0.4.2",
@@ -1064,9 +1062,8 @@ Create `docs/project-resources.rst` with short descriptions and:
 ```rst
 .. toctree::
    :maxdepth: 1
-   :caption: Migration and extension
+   :caption: Extension guidance
 
-   migration-0.3-to-0.4
    plugin-authoring
 
 .. toctree::
@@ -1096,8 +1093,8 @@ Keep:
   `docs/_examples/quickstart.py`;
 - the current `0.4.3` stability/migration note;
 - a short optional-dependency warning for CAMulator; and
-- links labelled `Researcher guide`, `Developer guide`, `Python API`,
-  `Migration guide`, and `Plugin authoring`.
+- links labelled `Researcher guide`, `Developer guide`, `Python API`, and
+  `Plugin authoring`.
 
 Use the canonical base URL `https://vercor.readthedocs.io/` and version-neutral
 `en/latest/` paths for the three main guides. Remove detailed custom-component,

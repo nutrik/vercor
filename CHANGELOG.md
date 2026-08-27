@@ -129,8 +129,8 @@ versioning; pre-releases may still refine new contracts.
 ### Compatibility
 
 - VerCOR supports Python 3.12 and 3.13.
-- Version 0.4 is intentionally source-breaking for 0.3 applications; follow
-  `docs/migration-0.3-to-0.4.md`.
+- The 0.4 API does not include legacy compatibility adapters; use the current
+  researcher and developer guides.
 - No legacy adapter namespace is included.
 
 ### Known limitations
@@ -166,15 +166,15 @@ versioning; pre-releases may still refine new contracts.
 
 ### Removed
 
-- Primary 0.3 aliases, settings, authoring mixins, coupler recipes/mutators,
+- Primary legacy aliases, settings, authoring mixins, coupler recipes/mutators,
   callable-derived route identity, backend-owned output, and public preparation
   internals.
 - Duplicate native/generic output accumulators and hidden output markers.
 
 ### Compatibility
 
-This alpha does not ship legacy adapters. Follow
-`docs/migration-0.3-to-0.4.md` to migrate 0.3-only workflows directly.
+This alpha does not ship legacy compatibility adapters. Use the current
+researcher and developer guides for supported workflows.
 
 [Unreleased]: https://github.com/nutrik/vercor/compare/v0.4.5...HEAD
 [0.4.5]: https://github.com/nutrik/vercor/compare/v0.4.4...v0.4.5
@@ -183,4 +183,4 @@ This alpha does not ship legacy adapters. Follow
 [0.4.2]: https://github.com/nutrik/vercor/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/nutrik/vercor/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/nutrik/vercor/compare/v0.4.0a1...v0.4.0
-[0.4.0a1]: https://github.com/Roman-N/VerCOR/compare/v0.3.2...v0.4.0a1
+[0.4.0a1]: https://github.com/Roman-N/VerCOR/releases/tag/v0.4.0a1

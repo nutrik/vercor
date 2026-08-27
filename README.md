@@ -21,9 +21,9 @@ VerCOR is built on [JAX](https://github.com/jax-ml/jax). Output-free JAX
 workflows remain differentiable end to end, supporting sensitivity analysis,
 automatic differentiation, and gradient-based experiments.
 
-> **Stable release:** Version `0.4.5` is the current release. VerCOR 0.3
-> applications should follow the
-> [Migration guide](https://vercor.readthedocs.io/en/latest/migration-0.3-to-0.4.html).
+> **Stable release:** Version `0.4.5` is the current release. Use the current
+> [researcher](https://vercor.readthedocs.io/en/latest/researchers/) and
+> [developer](https://vercor.readthedocs.io/en/latest/developers/) guides.
 
 ## Key capabilities
 
@@ -136,7 +136,6 @@ Read the canonical documentation at
 - [Researcher guide](https://vercor.readthedocs.io/en/latest/researchers/)
 - [Developer guide](https://vercor.readthedocs.io/en/latest/developers/)
 - [Python API](https://vercor.readthedocs.io/en/latest/api/)
-- [Migration guide](https://vercor.readthedocs.io/en/latest/migration-0.3-to-0.4.html)
 - [Plugin authoring](https://vercor.readthedocs.io/en/latest/plugin-authoring.html)
 
 Repository resources:

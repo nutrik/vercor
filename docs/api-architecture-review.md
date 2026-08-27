@@ -6,7 +6,7 @@ and behavior tests—not by the layout of private implementation modules.
 
 ## 1. Executive summary
 
-VerCOR 0.4 is a deliberate protocol-first break from 0.3. A configured
+VerCOR 0.4 is a deliberate protocol-first redesign. A configured
 `Coupler` normalizes structural components once, validates stable exchange
 routes and topology, asks a workflow for an exact clock-step plan, executes
 core-defined chunks through a backend and validated driver, and coordinates all
@@ -418,13 +418,12 @@ because a compatible external release is not yet pinned.
 
 ## 7. Compatibility plan
 
-VerCOR 0.4 is intentionally source-breaking and version 0.4.0 does not ship a
-0.3 adapter namespace. Task 9 was explicitly skipped. Applications migrate
-imports and construction directly using `docs/migration-0.3-to-0.4.md`;
-primary 0.4 modules remain alias-free.
+The 0.4 API does not include legacy compatibility adapters. Task 9 was
+explicitly skipped. Applications use the current researcher and developer
+guides for imports and construction; primary 0.4 modules remain alias-free.
 
-No legacy adapter namespace or executable VerCOR 0.3 evidence ships. No earlier
-API is restored.
+No legacy compatibility adapter namespace or executable pre-redesign evidence
+ships. No earlier API is restored.
 
 Compatibility within the 0.4.x line is defined by canonical public owner
 manifests, signatures, public-only plugin behavior, output-free gradients, and

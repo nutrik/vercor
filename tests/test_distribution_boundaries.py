@@ -506,7 +506,6 @@ def test_ci_validates_installed_artifacts_across_supported_environments() -> Non
     }
     assert 'WHEEL_PATH="${GITHUB_WORKSPACE}/dist/${WHEEL_NAME}"' in installed_commands
     assert 'SDIST_PATH="${GITHUB_WORKSPACE}/dist/${SDIST_NAME}"' in installed_commands
-    assert "vercor-0.3.0-py3-none-any.whl" not in installed_commands
     assert (
         "tests/fixtures/external_extension_test_fixture/src" not in installed_commands
     )

@@ -542,16 +542,16 @@ python -m pip install --upgrade "vercor==0.4.1"
 
 ## Compatibility and migration
 
-VerCOR requires Python 3.12 or 3.13. Version 0.4 is intentionally
-source-breaking for 0.3 applications; follow
-`docs/migration-0.3-to-0.4.md`. Third-party plugins should depend on
-`vercor>=0.4.0,<0.5` and use the documented stable extension modules.
+VerCOR requires Python 3.12 or 3.13. The 0.4 API does not include legacy
+compatibility adapters; use the current researcher and developer guides.
+Third-party plugins should depend on `vercor>=0.4.0,<0.5` and use the documented
+stable extension modules.
 
 ## Known limitations
 
 CAMulator requires a separately installed compatible MILES-CREDIT environment;
 an exact compatible release is not yet pinned. CAMulator spinup is not
-implemented. No legacy 0.3 adapter namespace is included.
+implemented. No legacy compatibility adapter namespace is included.
 ````
 
 - [ ] **Step 4: Move the active release guide to 0.4.1**
@@ -565,11 +565,11 @@ v0.4.0 -> v0.4.1
 docs/release-notes-0.4.0.md -> docs/release-notes-0.4.1.md
 ```
 
-Retain compatibility floors and migration paths exactly:
+Retain the compatibility floor and current guide direction exactly:
 
 ```text
 vercor>=0.4.0,<0.5
-docs/migration-0.3-to-0.4.md
+current researcher and developer guides
 ```
 
 Ensure each `generate-notes` block uses `tag_name=v0.4.1` and its enclosing
