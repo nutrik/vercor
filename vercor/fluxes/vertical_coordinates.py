@@ -1,3 +1,5 @@
+"""Differentiable pressure and altitude kernels for atmospheric coordinates."""
+
 from __future__ import annotations
 
 from typing import TypeAlias, cast
@@ -31,11 +33,25 @@ def compute_hybrid_pressure_levels(
     hya: RuntimeArray,
     hyb: RuntimeArray,
 ) -> jax.Array:
-    """Compute ECMWF-style hybrid-sigma pressure levels."""
+    """Compute ECMWF-style hybrid-sigma pressures ``A + B * ps``.
+
+    ``sp`` has shape ``(nlat, nlon)``. The pressure-valued ``hya`` coefficients
+    and dimensionless ``hyb`` coefficients are one-dimensional and share the
+    model's top-to-bottom level order. The returned array has shape
+    ``(nlat, nlon, nlevel)`` in that same order.
+    """
 
     sp_array = as_jax_real_array(sp)
     hya_array = as_jax_real_array(hya)
     hyb_array = as_jax_real_array(hyb)
+
+    if sp_array.ndim != 2:
+        raise ValueError("surface_pressure must be a 2D array")
+    if hya_array.ndim != 1 or hyb_array.ndim != 1:
+        raise ValueError("hybrid A and B coefficients must be 1D arrays")
+    if hya_array.shape != hyb_array.shape:
+        raise ValueError("hybrid A and B coefficients must have identical shapes")
+
     return (
         hya_array[jnp.newaxis, jnp.newaxis, :]
         + hyb_array[jnp.newaxis, jnp.newaxis, :] * sp_array[:, :, jnp.newaxis]
@@ -48,7 +64,19 @@ def get_altitudes_hybrid_sigma_levels(
     q: RuntimeArray,
     ph: RuntimeArray,
 ) -> jax.Array:
-    """Compute geometric altitudes at ECMWF-IFS hybrid-sigma full levels."""
+    """Compute ECMWF-IFS hybrid-sigma full-level heights above ground.
+
+    Temperature and specific humidity in kg/kg have shape
+    ``(nlat, nlon, nlevel)``. ``ph`` contains the bounding interface pressures
+    with shape ``(nlat, nlon, nlevel + 1)``. All inputs are ordered
+    top-to-bottom; returned geometric heights are ordered bottom-to-top. The
+    integration uses zero surface geopotential, so the result is height above
+    ground rather than altitude above mean sea level.
+
+    The discretization follows IFS equations 2.20--2.23. In particular, it uses
+    the model's interface coefficients instead of approximating a full-level
+    height directly from the arithmetic midpoint pressure.
+    """
 
     return compute_hybrid_sigma_full_level_altitudes(
         t,
@@ -71,27 +99,61 @@ def compute_hybrid_sigma_full_level_altitudes(
     rdair: ScalarPhysicsValue,
     zvir: ScalarPhysicsValue,
 ) -> jax.Array:
-    """Return bottom-to-top hybrid-sigma full-level geometric altitudes."""
+    """Return bottom-to-top IFS hybrid full-level geometric AGL heights.
 
-    ph_array = as_jax_real_array(ph)
-    virtual_temperature = _virtual_temperature_from_specific_humidity(t, q, zvir)
+    ``t`` and ``q`` must be top-to-bottom ``(nlat, nlon, nlevel)`` arrays;
+    ``ph`` must contain their ``nlevel + 1`` top-to-bottom interface pressures.
+    The hydrostatic integration starts from zero surface geopotential. A zero
+    top interface uses the IFS ``0.1 Pa`` logarithm and ``log(2)`` full-level
+    limit. Physics constants are explicit so they remain JAX-traced.
+    """
 
-    lower_half_pressure = ph_array[:, :, :-1]
-    upper_half_pressure = ph_array[:, :, 1:]
-    zero_lower_half_pressure = lower_half_pressure == 0.0
-    safe_lower_half_pressure = jnp.where(
-        zero_lower_half_pressure,
-        0.1,
-        lower_half_pressure,
+    temperature = as_jax_real_array(t)
+    specific_humidity = as_jax_real_array(q)
+    half_level_pressure = as_jax_real_array(ph)
+
+    if (
+        temperature.ndim != 3
+        or specific_humidity.ndim != 3
+        or half_level_pressure.ndim != 3
+    ):
+        raise ValueError(
+            "temperature, specific_humidity, and half_level_pressure must be 3D"
+        )
+    if temperature.shape != specific_humidity.shape:
+        raise ValueError("temperature and specific_humidity must have identical shapes")
+    expected_half_level_shape = (
+        *temperature.shape[:2],
+        temperature.shape[2] + 1,
+    )
+    if half_level_pressure.shape != expected_half_level_shape:
+        raise ValueError(
+            "half_level_pressure must match the horizontal shape and contain "
+            "one more vertical level"
+        )
+
+    virtual_temperature = _virtual_temperature_from_specific_humidity(
+        temperature,
+        specific_humidity,
+        zvir,
     )
 
-    dlog_p = jnp.log(upper_half_pressure / safe_lower_half_pressure)
+    upper_interface_pressure = half_level_pressure[:, :, :-1]
+    lower_interface_pressure = half_level_pressure[:, :, 1:]
+    zero_upper_interface_pressure = upper_interface_pressure == 0.0
+    safe_upper_interface_pressure = jnp.where(
+        zero_upper_interface_pressure,
+        0.1,
+        upper_interface_pressure,
+    )
+
+    dlog_p = jnp.log(lower_interface_pressure / safe_upper_interface_pressure)
     alpha_general = 1.0 - (
-        safe_lower_half_pressure
-        / (upper_half_pressure - safe_lower_half_pressure)
+        safe_upper_interface_pressure
+        / (lower_interface_pressure - safe_upper_interface_pressure)
         * dlog_p
     )
-    alpha = jnp.where(zero_lower_half_pressure, jnp.log(2.0), alpha_general)
+    alpha = jnp.where(zero_upper_interface_pressure, jnp.log(2.0), alpha_general)
 
     moist_temperature_rd = virtual_temperature * rdair
     half_level_geopotential_increment = jnp.flip(

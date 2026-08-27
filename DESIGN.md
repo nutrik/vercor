@@ -300,6 +300,18 @@ altitude above ground. The adapter anchors the pressure ratio at the surface
 and uses the lowest model-level virtual temperature for the unresolved
 surface-to-center layer.
 
+ERA5 and CAMulator instead use the distinct ECMWF hybrid-sigma coordinate.
+Interface pressure is `A + B * ps`; temperature, specific humidity, and
+interfaces enter the height kernel top-to-bottom. The kernel follows the IFS
+half-level hydrostatic discretization, integrates upward from zero surface
+geopotential, and returns full-level geometric heights above ground in
+bottom-to-top order. It therefore uses the bounding interface pressures rather
+than treating an arithmetic full-level pressure as an exact hydrostatic
+location. Any nonzero pressure component makes the effective pressure ratio
+and height depend on local surface pressure. Static layout checks reject
+ambiguous ranks, mismatched thermodynamic fields, and missing interfaces before
+JAX arithmetic can broadcast them silently.
+
 Here, fully differentiable means finite first-order JVP, VJP, and reverse-mode
 gradients for output-free fixed-plan JAX rollouts over physically valid
 continuous inputs. Output I/O, setup-time/static values, stock-host execution,

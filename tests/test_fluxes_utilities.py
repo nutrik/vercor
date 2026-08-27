@@ -171,6 +171,73 @@ def test_compute_hybrid_pressure_levels_matches_hybrid_definition() -> None:
         assert_allclose_compact(ph[:, :, k], hya[k] + hyb[k] * sp)
 
 
+def test_compute_hybrid_pressure_levels_matches_supplied_pressure_cases() -> None:
+    surface_pressure = jnp.asarray([[100_000.0, 90_000.0]])
+    pressure_component = jnp.asarray([2_000.0])
+    terrain_component = jnp.asarray([0.93])
+
+    pressure = compute_hybrid_pressure_levels(
+        surface_pressure,
+        pressure_component,
+        terrain_component,
+    )
+
+    assert_allclose_compact(
+        pressure,
+        np.asarray([[[95_000.0], [85_700.0]]]),
+    )
+    assert_allclose_compact(
+        pressure[..., 0] / surface_pressure,
+        np.asarray([[0.95, 0.9522222222222222]]),
+    )
+
+
+@pytest.mark.parametrize(
+    ("surface_pressure", "pressure_component", "terrain_component", "message"),
+    [
+        (
+            jnp.asarray([100_000.0]),
+            jnp.asarray([2_000.0]),
+            jnp.asarray([0.93]),
+            "surface_pressure must be a 2D array",
+        ),
+        (
+            jnp.asarray([[100_000.0]]),
+            jnp.asarray([[2_000.0]]),
+            jnp.asarray([0.93]),
+            "hybrid A and B coefficients must be 1D arrays",
+        ),
+        (
+            jnp.asarray([[100_000.0]]),
+            jnp.asarray([2_000.0, 1_000.0]),
+            jnp.asarray([0.93]),
+            "hybrid A and B coefficients must have identical shapes",
+        ),
+    ],
+)
+def test_compute_hybrid_pressure_levels_rejects_invalid_layouts(
+    surface_pressure: jax.Array,
+    pressure_component: jax.Array,
+    terrain_component: jax.Array,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        compute_hybrid_pressure_levels(
+            surface_pressure,
+            pressure_component,
+            terrain_component,
+        )
+
+
+def test_compute_hybrid_pressure_levels_rejects_invalid_layout_under_jit() -> None:
+    with pytest.raises(ValueError, match="surface_pressure must be a 2D array"):
+        jax.jit(compute_hybrid_pressure_levels)(
+            jnp.asarray([100_000.0]),
+            jnp.asarray([2_000.0]),
+            jnp.asarray([0.93]),
+        )
+
+
 def test_get_altitudes_hybrid_sigma_levels_returns_finite_increasing_profile() -> None:
     constants = PhysicalConstants()
     sp = np.full((2, 2), 101_325.0)
@@ -187,6 +254,141 @@ def test_get_altitudes_hybrid_sigma_levels_returns_finite_increasing_profile() -
     assert np.all(np.isfinite(alt))
     assert np.all(alt > 0.0)
     assert np.all(np.diff(alt, axis=2) > 0.0)
+
+
+def test_hybrid_sigma_full_level_altitude_matches_ifs_interface_discretization() -> (
+    None
+):
+    """Check the supplied full-level cases using their IFS interface equivalent."""
+
+    constants = PhysicalConstants()
+    surface_pressure = jnp.asarray([[100_000.0, 90_000.0]])
+    # Midpoint pressure is 2,000 + 0.93 * ps when the bounding interfaces
+    # are (4,000 + 0.86 * ps) and ps, respectively.
+    interface_pressure = compute_hybrid_pressure_levels(
+        surface_pressure,
+        jnp.asarray([4_000.0, 0.0]),
+        jnp.asarray([0.86, 1.0]),
+    )
+    temperature = jnp.full((1, 2, 1), 288.0)
+
+    dry_altitude = get_altitudes_hybrid_sigma_levels(
+        constants,
+        temperature,
+        jnp.zeros_like(temperature),
+        interface_pressure,
+    )
+    moist_altitude = get_altitudes_hybrid_sigma_levels(
+        constants,
+        temperature,
+        jnp.full_like(temperature, 0.010),
+        interface_pressure,
+    )
+
+    assert_allclose_compact(
+        dry_altitude,
+        np.asarray([[[436.16818619516124], [416.12116144908765]]]),
+        rtol=1e-6,
+        atol=1e-5,
+    )
+    assert_allclose_compact(
+        moist_altitude,
+        np.asarray([[[438.82027142436266], [418.6513443632295]]]),
+        rtol=1e-6,
+        atol=1e-5,
+    )
+    assert np.all(np.asarray(moist_altitude) > np.asarray(dry_altitude))
+
+
+def test_hybrid_sigma_height_surface_pressure_derivative_matches_closed_form() -> None:
+    constants = PhysicalConstants()
+    temperature = jnp.full((1, 2, 1), 288.0)
+    humidity = jnp.full_like(temperature, 0.010)
+
+    def altitude_sum(surface_pressure: jax.Array) -> jax.Array:
+        interface_pressure = compute_hybrid_pressure_levels(
+            surface_pressure,
+            jnp.asarray([4_000.0, 0.0]),
+            jnp.asarray([0.86, 1.0]),
+        )
+        return jnp.sum(
+            get_altitudes_hybrid_sigma_levels(
+                constants,
+                temperature,
+                humidity,
+                interface_pressure,
+            )
+        )
+
+    surface_pressure = jnp.asarray([[100_000.0, 90_000.0]])
+    gradient = jax.grad(altitude_sum)(surface_pressure)
+
+    # For p_upper = A + B * ps and p_lower = ps,
+    # d(alpha)/d(ps) = A * (log(p_lower / p_upper) / delta_p**2
+    #                        - 1 / (ps * delta_p)); the literals also include
+    # the virtual-temperature and geopotential-to-geometric-height derivatives.
+    assert_allclose_compact(
+        gradient,
+        np.asarray([[0.001818142120282174, 0.002237372728699144]]),
+        rtol=2e-5,
+        atol=1e-8,
+    )
+    assert_finite_jvp_vjp(
+        altitude_sum,
+        surface_pressure,
+        jnp.ones_like(surface_pressure),
+    )
+
+
+@pytest.mark.parametrize(
+    ("temperature", "humidity", "interface_pressure", "message"),
+    [
+        (
+            jnp.full((2, 1), 288.0),
+            jnp.zeros((2, 1)),
+            jnp.full((2, 2), 90_000.0),
+            "temperature, specific_humidity, and half_level_pressure must be 3D",
+        ),
+        (
+            jnp.full((1, 1, 2), 288.0),
+            jnp.zeros((1, 2, 2)),
+            jnp.asarray([90_000.0, 95_000.0, 100_000.0])[None, None, :],
+            "temperature and specific_humidity must have identical shapes",
+        ),
+        (
+            jnp.full((1, 1, 2), 288.0),
+            jnp.zeros((1, 1, 2)),
+            jnp.asarray([90_000.0, 100_000.0])[None, None, :],
+            "half_level_pressure must match the horizontal shape and contain one more vertical level",
+        ),
+    ],
+)
+def test_hybrid_sigma_full_level_altitude_rejects_invalid_layouts(
+    temperature: jax.Array,
+    humidity: jax.Array,
+    interface_pressure: jax.Array,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        get_altitudes_hybrid_sigma_levels(
+            PhysicalConstants(),
+            temperature,
+            humidity,
+            interface_pressure,
+        )
+
+
+def test_hybrid_sigma_full_level_altitude_rejects_invalid_layout_under_jit() -> None:
+    with pytest.raises(
+        ValueError,
+        match="temperature, specific_humidity, and half_level_pressure must be 3D",
+    ):
+        jax.jit(get_altitudes_hybrid_sigma_levels)(
+            PhysicalConstants(),
+            jnp.full((2, 1), 288.0),
+            jnp.zeros((2, 1)),
+            jnp.full((2, 2), 90_000.0),
+        )
 
 
 def test_get_altitudes_hybrid_sigma_levels_handles_zero_top_half_level() -> None:
