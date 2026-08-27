@@ -295,6 +295,10 @@ everywhere fields are declared, initialized, or prefilled: temperature and
 potential temperature are 288.15 K, density is 1.2 kg/m³, and model-level
 height is 50 m. These defaults prevent a not-yet-stepped atmosphere from
 feeding valid-looking zero divisors and logarithm inputs into the ocean.
+After a JAXGCM step, model-level height is the surface-nearest sigma-center
+altitude above ground. The adapter anchors the pressure ratio at the surface
+and uses the lowest model-level virtual temperature for the unresolved
+surface-to-center layer.
 
 Here, fully differentiable means finite first-order JVP, VJP, and reverse-mode
 gradients for output-free fixed-plan JAX rollouts over physically valid

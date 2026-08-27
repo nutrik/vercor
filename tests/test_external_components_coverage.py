@@ -511,6 +511,85 @@ def test_prepare_surface_temperature_forcing_preserves_fractional_cells() -> Non
     )
 
 
+def _map_uniform_jcm_column(
+    temperature: jax.Array | float,
+    normalized_surface_pressure: jax.Array | float = 0.9,
+) -> dict[str, jax.Array]:
+    """Map the default eight-level JCM column with lowest center sigma 0.95."""
+
+    sigma_levels = jnp.asarray([0.025, 0.095, 0.2, 0.34, 0.51, 0.685, 0.835, 0.95])
+    temperature_profile = jnp.broadcast_to(
+        jnp.asarray(temperature),
+        (sigma_levels.shape[0], 1, 1),
+    )
+    return cast(
+        dict[str, jax.Array],
+        jax_gcm_fields_module.map_jcm_output_fields(
+            2.5e6,
+            1.0e5,
+            sigma_levels,
+            28.966,
+            8314.47,
+            1.0e5,
+            0.286,
+            jnp.zeros((1, 1, 1)),
+            jnp.zeros((1, 1, 1)),
+            jnp.zeros((1, 1)),
+            jnp.zeros((1, 1)),
+            jnp.broadcast_to(jnp.asarray(normalized_surface_pressure), (1, 1)),
+            jnp.zeros_like(temperature_profile),
+            jnp.zeros_like(temperature_profile),
+            temperature_profile,
+            jnp.full_like(temperature_profile, 10.0),
+            dtype=DTypePolicy(),
+        ),
+    )
+
+
+def test_map_jcm_output_fields_anchors_sigma_095_height_at_surface() -> None:
+    mapped_fields = _map_uniform_jcm_column(288.0)
+
+    model_level_height = mapped_fields["model_level_height"]
+
+    assert 300.0 < float(model_level_height[0, 0]) < 500.0
+    assert_allclose_compact(model_level_height, np.asarray([[435.0322]]), atol=0.05)
+
+
+def test_map_jcm_output_fields_sigma_095_height_derivative_uses_surface_layer() -> None:
+    def height(temperature: jax.Array) -> jax.Array:
+        return _map_uniform_jcm_column(temperature)["model_level_height"][0, 0]
+
+    temperature = jnp.asarray(288.0)
+    _, tangent = jax.jvp(height, (temperature,), (jnp.asarray(1.0),))
+    gradient = jax.grad(height)(temperature)
+
+    assert_allclose_compact(tangent, 1.5105285, atol=1e-5)
+    assert_allclose_compact(gradient, 1.5105285, atol=1e-5)
+
+
+def test_map_jcm_output_fields_sigma_height_is_independent_of_surface_pressure() -> (
+    None
+):
+    def height(normalized_surface_pressure: jax.Array) -> jax.Array:
+        return _map_uniform_jcm_column(
+            288.0,
+            normalized_surface_pressure,
+        )[
+            "model_level_height"
+        ][0, 0]
+
+    normalized_surface_pressure = jnp.asarray(0.9)
+    _, tangent = jax.jvp(
+        height,
+        (normalized_surface_pressure,),
+        (jnp.asarray(1.0),),
+    )
+    gradient = jax.grad(height)(normalized_surface_pressure)
+
+    assert float(tangent) == 0.0
+    assert float(gradient) == 0.0
+
+
 def test_map_jcm_output_fields_supports_jit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -526,13 +605,8 @@ def test_map_jcm_output_fields_supports_jit(
     )
     monkeypatch.setattr(
         jax_gcm_fields_module,
-        "get_altitudes_sigma_levels",
-        lambda temperature, pressure, specific_humidity: jnp.asarray(
-            [
-                jnp.full((2, 2), 50.0),
-                jnp.full((2, 2), 150.0),
-            ]
-        ),
+        "_compute_surface_nearest_sigma_level_altitude",
+        lambda temperature, sigma_level, specific_humidity: jnp.full((2, 2), 150.0),
     )
 
     mapped_fields = jax.jit(
@@ -1163,13 +1237,8 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     )
     monkeypatch.setattr(
         jax_gcm_fields_module,
-        "get_altitudes_sigma_levels",
-        lambda temperature, pressure, specific_humidity: jnp.asarray(
-            [
-                np.full((2, 2), 50.0),
-                np.full((2, 2), 150.0),
-            ]
-        ),
+        "_compute_surface_nearest_sigma_level_altitude",
+        lambda temperature, sigma_level, specific_humidity: jnp.full((2, 2), 150.0),
     )
     cast(Any, jax_gcm_fields_module.map_jcm_output_fields).clear_cache()
 

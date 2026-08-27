@@ -138,6 +138,26 @@ def compute_sigma_pressure_levels(
     return p_top_bcast + sigma[:, jnp.newaxis, jnp.newaxis] * (ps - p_top_bcast)
 
 
+def _compute_surface_nearest_sigma_level_altitude(
+    temperature: RuntimeArray,
+    sigma_level: RuntimeArray | float,
+    specific_humidity: RuntimeArray,
+    *,
+    g: float = 9.80665,
+    Rd: float = 287.05,
+    Rv: float = 461.5,
+) -> jax.Array:
+    """Return one sigma-center altitude above its surface pressure."""
+
+    virtual_temperature = _virtual_temperature_from_specific_humidity(
+        temperature,
+        specific_humidity,
+        Rv / Rd - 1.0,
+    )
+    sigma = as_jax_real_array(sigma_level)
+    return cast(jax.Array, -(Rd / g) * virtual_temperature * jnp.log(sigma))
+
+
 def get_altitudes_sigma_levels(
     temperature: RuntimeArray,
     pressure: RuntimeArray,
@@ -148,7 +168,12 @@ def get_altitudes_sigma_levels(
     Rd: float = 287.05,
     Rv: float = 461.5,
 ) -> jax.Array:
-    """Compute geometric altitude on pressure levels with the hypsometric equation."""
+    """Compute surface-up geometric altitudes with the hypsometric equation.
+
+    Temperature and specific humidity in kg/kg are sampled at the supplied full
+    levels. The first pressure level is anchored at ``z0``; subsequent levels
+    must be ordered upward with decreasing pressure.
+    """
 
     temperature_array = as_jax_real_array(temperature)
     pressure_array = as_jax_real_array(pressure)

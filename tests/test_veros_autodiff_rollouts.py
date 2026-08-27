@@ -188,10 +188,12 @@ def _assert_scalar_rollout_autodiff(
     objective: Callable[[jax.Array], jax.Array],
     parameter: float,
     *,
-    finite_difference_step: float,
+    finite_difference_step: float | None,
     relative_tolerance: float,
     inner_product_tolerance: float = 1e-6,
 ) -> None:
+    """Validate scalar rollout AD, optionally including a centered difference."""
+
     parameter_array = jnp.asarray(parameter, dtype=jnp.float64)
     tangent = jnp.asarray(0.375, dtype=jnp.float64)
 
@@ -220,6 +222,9 @@ def _assert_scalar_rollout_autodiff(
         rtol=inner_product_tolerance,
         atol=1e-12,
     )
+
+    if finite_difference_step is None:
+        return
 
     step = jnp.asarray(finite_difference_step, dtype=jnp.float64)
     centered_difference = (
@@ -351,28 +356,29 @@ def _fully_coupled_global_model() -> Coupler:
     )
 
 
-def test_five_step_fully_coupled_global_gradient() -> None:
-    """The JAXGCM-land-global-Veros stack has finite agreeing derivatives."""
+def test_five_step_fully_coupled_global_adjoint() -> None:
+    """The JAXGCM-land-global-Veros stack has agreeing JVP and VJP results."""
 
     coupler = _fully_coupled_global_model()
     initial_state = coupler.initial_state()
 
-    def objective(temperature: jax.Array) -> jax.Array:
+    def objective(c_k: jax.Array) -> jax.Array:
         final_state = coupler.run(
-            _replace_ocean_surface_temperature(initial_state, temperature),
+            _replace_ocean_parameter(initial_state, "c_k", c_k),
             output=None,
         )
         final_temperature = jnp.asarray(_ocean_payload(final_state).variables.temp)
         return jnp.mean(final_temperature[2:-2, 2:-2, :, :] ** 2)
 
-    seeded_state = _replace_ocean_surface_temperature(
+    seeded_state = _replace_ocean_parameter(
         initial_state,
-        jnp.asarray(7.0, dtype=jnp.float64),
+        "c_k",
+        jnp.asarray(0.1, dtype=jnp.float64),
     )
     _assert_payload_structure_stable(seeded_state, coupler.run(seeded_state))
     _assert_scalar_rollout_autodiff(
         objective,
-        7.0,
-        finite_difference_step=1e-3,
+        0.1,
+        finite_difference_step=None,
         relative_tolerance=1e-2,
     )

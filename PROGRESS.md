@@ -1,6 +1,9 @@
 # VerCOR Progress
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
+- JCM sigma altitude corrected (2026-08-27): anchoring `sigma=0.95` at zero
+  yielded 1094.34 m, not 435.03 m AGL. Exact eight-level AD passes; local JVP/VJP agrees to `4.8e-16`.
+  Global FD is unstable; five-day `c_k` JVP/VJP is strict; fast 809/full 1,669 pass.
 - Multi-step Veros autodiff and state-copy audit completed (2026-08-26): stock
   1.6.2 cannot deep-copy settings `dict_keys`; the old reconstruction dropped
   diagnostics. Host normalizes the complete state with a memoized tuple, then
@@ -111,12 +114,9 @@ This is the bounded orientation log for active development. Detailed history is 
 - VerCOR 0.4.0a1 Task 10 candidate preparation was completed and committed in
   repository history on 2026-07-14. Tagging, pushing, and publication remain
   intentionally unperformed pending separate authority.
+- Tasks 1-8 plus Task 10 form the complete alpha series: six-symbol root,
+  protocol components, traced constants, strict runtime/output, migrated setups/examples, and public-only 0.4 plugin.
   Task 9 was explicitly skipped: no legacy adapter namespace is implemented.
-- Tasks 1-8 plus Task 10 form the complete alpha series. The current API has a six-symbol root,
-  protocol-first components, constructor-only coupling, traced physical
-  constants, stable route IDs, strict state validation, workflow-planned chunk
-  execution, unified output providers, migrated bundled setups/examples, and a
-  public-only installed 0.4 plugin.
 - VerCOR 0.4.0a1 release verification completed locally (2026-07-15) from
   build HEAD `31e803c06a4e65e8e72ee77937b056eac540eb44`. Black warned Python 3.13
   cannot perform its safety parse for configured Python 3.15, while exit
