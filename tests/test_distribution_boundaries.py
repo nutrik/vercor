@@ -2116,3 +2116,34 @@ def test_supplied_wheels_install_and_run_without_build_environment(
     evidence = json.loads(smoke.stdout.splitlines()[-1])
     assert evidence["temperature"] == 12.0
     assert evidence["host_value"] == 17.0
+
+
+@pytest.mark.fast_always
+def test_supplied_wheel_console_uses_explicit_target_pythonpath(
+    built_distributions: BuiltDistributions,
+    tmp_path: Path,
+) -> None:
+    """Run the supplied wheel's target-installed console script outside checkout."""
+
+    assert built_distributions.build_pythonpath == ""
+    target = tmp_path / "supplied-console-target"
+    install_local_target(wheel=built_distributions.wheel, target=target)
+    installed_console = (
+        target
+        / ("Scripts" if os.name == "nt" else "bin")
+        / ("vercor.exe" if os.name == "nt" else "vercor")
+    )
+    assert installed_console.is_file()
+
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(target)
+    version_probe = subprocess.run(
+        [str(installed_console), "--version"],
+        cwd=tmp_path,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert version_probe.stdout.strip() == f"vercor, version {EXPECTED_VERSION}"
