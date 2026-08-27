@@ -637,16 +637,10 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
         "tools/validate_release_state.py github-tag-absent"
     )
     prepare_capability_index = prepare.index(capability_probe)
-    assert (
-        prepare_enumeration_index
-        < prepare_absence_index
-        < prepare_capability_index
-    )
+    assert prepare_enumeration_index < prepare_absence_index < prepare_capability_index
     tag_capability_index = tag.index(capability_probe)
     tag_enumeration_index = tag.index(release_enumeration)
-    tag_absence_index = tag.index(
-        "tools/validate_release_state.py github-tag-absent"
-    )
+    tag_absence_index = tag.index("tools/validate_release_state.py github-tag-absent")
     assert tag_capability_index < tag_enumeration_index < tag_absence_index
 
     assert ancestry_check in prepare
