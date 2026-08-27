@@ -56,6 +56,8 @@ PYPI_PUBLISH_ACTION = (
     "pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247"
 )
 CODECOV_ACTION = "codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac"
+VEROS_AD_COMMIT = "7a8c964cf00b5aa0713c995edd760643a431b3c9"
+VEROS_AD_REPOSITORY = "https://github.com/Etienne-Meunier/veros.git"
 EXPECTED_INSTALLED_ROOT = (
     "Clock",
     "Coupler",
@@ -198,6 +200,7 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
 
     coverage = metadata["tool"]["coverage"]
     assert coverage["run"]["branch"] is True
+    assert coverage["run"]["relative_files"] is True
     assert coverage["run"]["omit"] == ["vercor/setups/gallery/*"]
     assert coverage["report"]["fail_under"] == 90
 
@@ -597,7 +600,7 @@ def test_version_tag_deploys_exact_tested_distributions() -> None:
         "installed-artifact-tests",
         "external-extension-contract-tests",
         "macos-smoke",
-        "quality",
+        "combined-coverage",
     ]
     assert publish["runs-on"] == "ubuntu-latest"
     assert publish["environment"] == {
@@ -906,7 +909,7 @@ def test_release_provenance_actions_are_immutable_and_checkouts_drop_credentials
         for step in job["steps"]
         if step.get("uses") == CHECKOUT_ACTION
     )
-    assert len(checkout_steps) == 6
+    assert len(checkout_steps) == 8
     assert all(
         step.get("with", {}).get("persist-credentials") is False
         for step in checkout_steps
@@ -1134,7 +1137,193 @@ def test_ci_quality_job_installs_canonical_docs_environment() -> None:
 
 
 @pytest.mark.fast_always
-def test_ci_quality_job_enforces_static_full_and_coverage_gates() -> None:
+def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
+    """Keep stock compatibility and fork-only rollout acceptance independent."""
+
+    workflow = yaml.safe_load(
+        (PROJECT_ROOT / ".github/workflows/python-package.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    jobs = workflow["jobs"]
+    quality_steps = jobs["quality"]["steps"]
+    quality_commands = "\n".join(step.get("run", "") for step in quality_steps)
+    stock_full = next(
+        step for step in quality_steps if step.get("name") == "Run full test suite"
+    )
+    stock_coverage = next(
+        (
+            step
+            for step in quality_steps
+            if step.get("name") == "Collect stock branch coverage"
+        ),
+        None,
+    )
+    assert stock_coverage is not None
+    autodiff = jobs["veros-autodiff"]
+    install_index, install = next(
+        (index, step)
+        for index, step in enumerate(autodiff["steps"])
+        if step.get("name") == "Install exact differentiable Veros fork"
+    )
+    verify_index, verify = next(
+        (index, step)
+        for index, step in enumerate(autodiff["steps"])
+        if step.get("name") == "Verify differentiable Veros capabilities"
+    )
+    rollout_index, rollout = next(
+        (index, step)
+        for index, step in enumerate(autodiff["steps"])
+        if step.get("name") == "Run differentiable Veros rollouts"
+    )
+
+    assert autodiff["runs-on"] == "ubuntu-latest"
+    assert autodiff["env"] == {"VEROS_AD_COMMIT": VEROS_AD_COMMIT}
+    assert install_index < verify_index < rollout_index
+    assert 'python -m pip install ".[dev,jcm,veros]"' in install["run"]
+    assert "ipdb==0.13.13" in install["run"]
+    assert f'"git+{VEROS_AD_REPOSITORY}@${{VEROS_AD_COMMIT}}"' in install["run"]
+    assert "--no-deps" in install["run"]
+    assert "direct_url.json" in verify["run"]
+    assert "VEROS_AD_COMMIT" in verify["run"]
+    assert f'record["url"] == "{VEROS_AD_REPOSITORY}"' in verify["run"]
+    assert 'record["vcs_info"]["vcs"] == "git"' in verify["run"]
+    for capability in ("VerosState.copy", "safe_sqrt", "c_k", "c_eps"):
+        assert capability in verify["run"]
+    assert rollout["run"] == (
+        "python -m pytest tests/test_veros_autodiff_rollouts.py "
+        "-q -n0 -m veros_autodiff --tb=short "
+        "--cov=vercor --cov-branch --cov-report= --cov-fail-under=0"
+    )
+    assert 'python -m pip install ".[dev,jcm,veros]"' in quality_commands
+    for stock_step in (stock_full, stock_coverage):
+        assert '-m "not veros_autodiff"' in stock_step["run"]
+    assert "combined-coverage" in jobs["publish-release"]["needs"]
+
+
+@pytest.mark.fast_always
+def test_ci_combines_stock_and_autodiff_coverage_before_upload() -> None:
+    """Enforce one portable branch-coverage union and one Codecov upload."""
+
+    workflow = yaml.safe_load(
+        (PROJECT_ROOT / ".github/workflows/python-package.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    jobs = workflow["jobs"]
+    quality_steps = jobs["quality"]["steps"]
+    autodiff_steps = jobs["veros-autodiff"]["steps"]
+    assert "combined-coverage" in jobs
+    combined = jobs["combined-coverage"]
+
+    quality_names = {step.get("name") for step in quality_steps}
+    autodiff_names = {step.get("name") for step in autodiff_steps}
+    assert {
+        "Collect stock branch coverage",
+        "Stage stock coverage data",
+        "Upload stock coverage data",
+    }.issubset(quality_names)
+    assert {
+        "Run differentiable Veros rollouts",
+        "Stage autodiff coverage data",
+        "Upload autodiff coverage data",
+    }.issubset(autodiff_names)
+
+    stock_collect_index, stock_collect = next(
+        (index, step)
+        for index, step in enumerate(quality_steps)
+        if step.get("name") == "Collect stock branch coverage"
+    )
+    stock_stage_index, stock_stage = next(
+        (index, step)
+        for index, step in enumerate(quality_steps)
+        if step.get("name") == "Stage stock coverage data"
+    )
+    stock_upload_index, stock_upload = next(
+        (index, step)
+        for index, step in enumerate(quality_steps)
+        if step.get("name") == "Upload stock coverage data"
+    )
+    autodiff_collect_index, autodiff_collect = next(
+        (index, step)
+        for index, step in enumerate(autodiff_steps)
+        if step.get("name") == "Run differentiable Veros rollouts"
+    )
+    autodiff_stage_index, autodiff_stage = next(
+        (index, step)
+        for index, step in enumerate(autodiff_steps)
+        if step.get("name") == "Stage autodiff coverage data"
+    )
+    autodiff_upload_index, autodiff_upload = next(
+        (index, step)
+        for index, step in enumerate(autodiff_steps)
+        if step.get("name") == "Upload autodiff coverage data"
+    )
+
+    assert stock_collect_index < stock_stage_index < stock_upload_index
+    assert autodiff_collect_index < autodiff_stage_index < autodiff_upload_index
+    for collect in (stock_collect, autodiff_collect):
+        assert "--cov=vercor" in collect["run"]
+        assert "--cov-branch" in collect["run"]
+        assert "--cov-report=" in collect["run"]
+        assert "--cov-fail-under=0" in collect["run"]
+    assert "coverage-data/stock.coverage" in stock_stage["run"]
+    assert "coverage-data/autodiff.coverage" in autodiff_stage["run"]
+    assert stock_upload["uses"] == UPLOAD_ARTIFACT_ACTION
+    assert stock_upload["with"] == {
+        "name": "coverage-stock",
+        "path": "coverage-data/stock.coverage",
+        "if-no-files-found": "error",
+    }
+    assert autodiff_upload["uses"] == UPLOAD_ARTIFACT_ACTION
+    assert autodiff_upload["with"] == {
+        "name": "coverage-autodiff",
+        "path": "coverage-data/autodiff.coverage",
+        "if-no-files-found": "error",
+    }
+
+    assert set(combined["needs"]) == {"quality", "veros-autodiff"}
+    combined_steps = combined["steps"]
+    downloads = tuple(
+        step for step in combined_steps if step.get("uses") == DOWNLOAD_ARTIFACT_ACTION
+    )
+    assert tuple(step["with"]["name"] for step in downloads) == (
+        "coverage-stock",
+        "coverage-autodiff",
+    )
+    assert all(step["with"]["path"] == "coverage-inputs" for step in downloads)
+    combine_index, combine = next(
+        (index, step)
+        for index, step in enumerate(combined_steps)
+        if step.get("name") == "Combine and enforce branch coverage"
+    )
+    codecov_index, codecov = next(
+        (index, step)
+        for index, step in enumerate(combined_steps)
+        if step.get("uses") == CODECOV_ACTION
+    )
+    assert combine_index < codecov_index
+    for filename in ("stock.coverage", "autodiff.coverage"):
+        assert f'test -f "coverage-inputs/{filename}"' in combine["run"]
+    assert (
+        "python -m coverage combine coverage-inputs/stock.coverage "
+        "coverage-inputs/autodiff.coverage"
+    ) in combine["run"]
+    assert "python -m coverage report --fail-under=90" in combine["run"]
+    assert "python -m coverage xml -o coverage.xml" in combine["run"]
+    assert codecov["with"] == {
+        "token": "${{ secrets.CODECOV_TOKEN }}",
+        "files": "./coverage.xml",
+        "disable_search": True,
+        "fail_ci_if_error": True,
+    }
+    assert all(
+        step.get("uses") != CODECOV_ACTION for step in (*quality_steps, *autodiff_steps)
+    )
+
+
+@pytest.mark.fast_always
+def test_ci_quality_job_enforces_static_gates_and_collects_stock_coverage() -> None:
     workflow = yaml.safe_load(
         (PROJECT_ROOT / ".github/workflows/python-package.yml").read_text(
             encoding="utf-8"
@@ -1170,10 +1359,11 @@ def test_ci_quality_job_enforces_static_full_and_coverage_gates() -> None:
     assert "--exit-zero" not in commands
     assert "mypy vercor tests" in commands
     assert "compileall -q vercor tests" in commands
-    assert "pytest tests/ -q --tb=short" in commands
+    assert 'pytest tests/ -q -m "not veros_autodiff" --tb=short' in commands
     assert "--cov=vercor" in commands
     assert "--cov-branch" in commands
-    assert "--cov-fail-under=90" in commands
+    assert "--cov-fail-under=0" in commands
+    assert "--cov-fail-under=90" not in commands
 
 
 def test_distribution_helper_reuses_explicit_artifact_directory_without_building(

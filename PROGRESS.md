@@ -1,12 +1,36 @@
 # VerCOR Progress
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
+- Hybrid-sigma hypsometric audit completed (2026-08-27): independent `A + B * ps`
+  cases reproduce 95,000/85,700 Pa; the IFS half-level height discretization has
+  dry/moist literals and surface-pressure JVP/VJP; six RED eager/JIT layouts now
+  fail explicitly; focused 11/11, static gates, fast 807, and full branch coverage 1,680/1,680 at 91.80% pass.
+- JCM sigma altitude corrected (2026-08-27): anchoring `sigma=0.95` at zero
+  yielded 1094.34 m, not 435.03 m AGL. Exact eight-level AD passes; local JVP/VJP agrees to `4.8e-16`.
+  Global FD is unstable; five-day `c_k` JVP/VJP is strict; fast 809/full 1,669 pass.
+- Multi-step Veros autodiff and state-copy audit completed (2026-08-26): stock
+  1.6.2 cannot deep-copy settings `dict_keys`; the old reconstruction dropped
+  diagnostics. Host normalizes the complete state with a memoized tuple, then
+  the generic runtime owns one copy per step; JAX keeps native PyTree copying,
+  and `execution` replaces Veros `jitted`. TDD and a real stock ACC step retain
+  all eight attributes, six diagnostics, aliases, and isolation. Exact fork `7a8c964cf00b5aa0713c995edd760643a431b3c9`
+  rollouts pass 4/4; Black/flake8/mypy/compileall, fast 806, and full 1,666 pass.
+- Mandatory x64 serial rollouts passed (2026-08-25): three-step ACC temperature,
+  twenty-step ACC `c_k`, and five-step JAXGCM-land-global-Veros have finite
+  nonzero gradients, matching JVP/VJP, stable PyTrees, and required `1e-3`/`1e-2`
+  finite differences. Bottom-up tracing reduced non-finite `forc_tke_surface`/
+  `tke`/`tke_diss` tangents from 3,864/29,791/28,497 to zero. Failed approaches:
+  thresholded `mean(kappaM)` was unstable at 20 days, so a wet-cell downstream
+  temperature is used; the first safe helper was undispatched until the JAX-only
+  global adapter overrode inherited stock-kernel routing. Final gates passed:
+  compiled-Jaxpr rematerialization, static gates, rollouts (4/4), fast/full,
+  91.80% branch coverage, package build, and diff checks are green.
+- Combined Veros coverage implemented locally (2026-08-25): PR #28 exposed a stock-only Codecov report at 89.52%; both
+  isolated lanes now emit relative-path branch data and a downstream gate unions the raw artifacts before enforcing 90%
+  and uploading one XML report. RED/focused GREEN passed 23/23; the real stock-plus-fork union passes at 91.80%. The first
+  local fork producer hit the sandboxed `~/.veros` asset lock; the permission-correct rerun passed 4/4. Hosted CI is pending.
 - Final-review test gaps were closed and verified (2026-08-24): release-transcript syntax coverage now checks every `bash` and `text` fence while retaining transcript-only `set -euo pipefail` and `RELEASE_COMMIT` assertions; focused contracts also bind the researcher install command and both 0.4.5 changelog comparison identities. The intentionally malformed-`bash` RED mutation failed with the document/language/fence diagnostic and was restored before GREEN 3/3. Black (2 changed tests), flake8 (0), mypy (248), compileall, strict 30-source Sphinx, workflow YAML parsing, fast/full suites, branch coverage (91.44%; 7,797 statements, 1,664 branches), and `git diff --check` passed; expected third-party Flax/JAX and JCM/xarray warnings remain unchanged.
 - VerCOR 0.4.5 release-candidate evidence was refreshed after the README and release-runbook corrections (2026-08-24): the independent whole-candidate review approved the range `b71dc01..7f07aed` with no Critical, Important, or Minor findings. Fresh Black exited 0 with 248 files unchanged and its known Python-3.13/target-Python-3.15 safety-parse advisory; flake8 reported 0; mypy passed 248 source files; compileall passed; workflow YAML parsing passed; and the strict 30-source Sphinx HTML build passed without warnings. Focused release, documentation, distribution-boundary, and versioning verification passed 205 selected fast tests; the configured fast suite passed 801 selected tests with four known Flax/JAX `Effect` deprecation warnings; the full and branch-coverage suites passed 1,648 tests with six known third-party warnings (four Flax/JAX `Effect` deprecations, one JCM/xarray `compat` future warning, and one Flax tracer deprecation). Branch coverage was 91.44% across 7,797 statements and 1,664 branches. A fresh exactly-two-file final build in `/private/tmp/vercor-0.4.5-final.T1KkmG` passed Twine and both metadata probes: `vercor-0.4.5-py3-none-any.whl`, 236267 B, SHA-256 `71df593f21ac637d41b6f7fd47d3d10827ac0d157e0ae674115c817f8f93c5da`; `vercor-0.4.5.tar.gz`, 166872 B, SHA-256 `61c7f4dfad0b74588c7dc6ab05c8941776949d56d3b6c746b06b51823d8c980e`. The supplied-artifact distribution boundary passed 27/27. Outside the checkout, the dependency-free installed wheel reported metadata `0.4.5`, imported root `Clock`, `Coupler`, `Exchange`, `RectilinearGrid`, `RunState`, and `RuntimeOptions` from `/private/tmp/vercor-0.4.5-smoke.fkxF3b/site`, and `vercor --version` printed `vercor, version 0.4.5`. No tag, merge, publication, upload, or GitHub Release occurred.
-- JAXGCM per-step diagnostics were quieted (2026-08-24): the two model-specific
-  information logs and their dead reductions were removed while the native
-  mirror still updates. The focused RED/GREEN command passed; release-wide
-  verification is not claimed yet.
 - Setup-gallery regressions after PRs #24/#25 repaired locally (2026-08-23).
   Default routes now inherit the target component's active-domain mask; ocean
   remapping snaps only values strictly outside the established 0.001 boundary
@@ -90,12 +114,9 @@ This is the bounded orientation log for active development. Detailed history is 
 - VerCOR 0.4.0a1 Task 10 candidate preparation was completed and committed in
   repository history on 2026-07-14. Tagging, pushing, and publication remain
   intentionally unperformed pending separate authority.
+- Tasks 1-8 plus Task 10 form the complete alpha series: six-symbol root,
+  protocol components, traced constants, strict runtime/output, migrated setups/examples, and public-only 0.4 plugin.
   Task 9 was explicitly skipped: no legacy adapter namespace is implemented.
-- Tasks 1-8 plus Task 10 form the complete alpha series. The current API has a six-symbol root,
-  protocol-first components, constructor-only coupling, traced physical
-  constants, stable route IDs, strict state validation, workflow-planned chunk
-  execution, unified output providers, migrated bundled setups/examples, and a
-  public-only installed 0.4 plugin.
 - VerCOR 0.4.0a1 release verification completed locally (2026-07-15) from
   build HEAD `31e803c06a4e65e8e72ee77937b056eac540eb44`. Black warned Python 3.13
   cannot perform its safety parse for configured Python 3.15, while exit

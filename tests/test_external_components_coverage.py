@@ -35,11 +35,13 @@ import vercor.setups._external.veros_runtime as veros_runtime_module
 import vercor.setups._external.veros_runtime_settings as veros_runtime_settings_module
 import vercor.setups._external.veros_setup as veros_setup_module
 import vercor.setups._external.veros_state as veros_state_module
+import vercor.components.runtime_execution as component_runtime_execution_module
 from tests._coverage_support import capture_logger_output, make_test_grid
 from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
 from vercor.calendar import DateTime360, DateTime365
 from vercor.components.contracts import PrefillContext
-from vercor.components import StepResult
+from vercor.components import CallableComponent, ComponentSpec
+from vercor.components.runtime_execution import step_component_runtime_state
 from vercor.components.data import DataComponent
 from vercor.components.contexts import SetupContext, StepContext
 from vercor.exceptions import ComponentError, CouplerError
@@ -422,6 +424,33 @@ def test_jcm_surface_cleanup_rejects_infinity(bad_value: float) -> None:
         )
 
 
+def test_jax_gcm_prefill_uses_physical_bulk_flux_defaults() -> None:
+    grid = make_test_grid(name="jax-gcm-physical-prefill")
+    state = SimpleNamespace(
+        _dtype_policy=DTypePolicy(enable_x64=True),
+        sigma_levels=jnp.asarray([0.25, 0.75]),
+    )
+    component = DataComponent(name="ATM", grid=grid)
+
+    result = jax_gcm_runtime_module.prefill_jax_gcm_runtime_fields(
+        cast(Any, state),
+        component,
+        PrefillContext(fields={}, received={}, sent={}),
+    )
+
+    expected = {
+        "temperature": 288.15,
+        "potential_temperature": 288.15,
+        "density": 1.2,
+        "model_level_height": 50.0,
+    }
+    for field_name, value in expected.items():
+        assert_allclose_compact(
+            cast(Any, result.fields)[field_name],
+            np.full(grid.shape, value),
+        )
+
+
 @pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
 def test_compiled_jcm_surface_cleanup_rejects_infinity(bad_value: float) -> None:
     with pytest.raises(JaxRuntimeError, match="JCM.*surface temperature.*infinity"):
@@ -482,6 +511,85 @@ def test_prepare_surface_temperature_forcing_preserves_fractional_cells() -> Non
     )
 
 
+def _map_uniform_jcm_column(
+    temperature: jax.Array | float,
+    normalized_surface_pressure: jax.Array | float = 0.9,
+) -> dict[str, jax.Array]:
+    """Map the default eight-level JCM column with lowest center sigma 0.95."""
+
+    sigma_levels = jnp.asarray([0.025, 0.095, 0.2, 0.34, 0.51, 0.685, 0.835, 0.95])
+    temperature_profile = jnp.broadcast_to(
+        jnp.asarray(temperature),
+        (sigma_levels.shape[0], 1, 1),
+    )
+    return cast(
+        dict[str, jax.Array],
+        jax_gcm_fields_module.map_jcm_output_fields(
+            2.5e6,
+            1.0e5,
+            sigma_levels,
+            28.966,
+            8314.47,
+            1.0e5,
+            0.286,
+            jnp.zeros((1, 1, 1)),
+            jnp.zeros((1, 1, 1)),
+            jnp.zeros((1, 1)),
+            jnp.zeros((1, 1)),
+            jnp.broadcast_to(jnp.asarray(normalized_surface_pressure), (1, 1)),
+            jnp.zeros_like(temperature_profile),
+            jnp.zeros_like(temperature_profile),
+            temperature_profile,
+            jnp.full_like(temperature_profile, 10.0),
+            dtype=DTypePolicy(),
+        ),
+    )
+
+
+def test_map_jcm_output_fields_anchors_sigma_095_height_at_surface() -> None:
+    mapped_fields = _map_uniform_jcm_column(288.0)
+
+    model_level_height = mapped_fields["model_level_height"]
+
+    assert 300.0 < float(model_level_height[0, 0]) < 500.0
+    assert_allclose_compact(model_level_height, np.asarray([[435.0322]]), atol=0.05)
+
+
+def test_map_jcm_output_fields_sigma_095_height_derivative_uses_surface_layer() -> None:
+    def height(temperature: jax.Array) -> jax.Array:
+        return _map_uniform_jcm_column(temperature)["model_level_height"][0, 0]
+
+    temperature = jnp.asarray(288.0)
+    _, tangent = jax.jvp(height, (temperature,), (jnp.asarray(1.0),))
+    gradient = jax.grad(height)(temperature)
+
+    assert_allclose_compact(tangent, 1.5105285, atol=1e-5)
+    assert_allclose_compact(gradient, 1.5105285, atol=1e-5)
+
+
+def test_map_jcm_output_fields_sigma_height_is_independent_of_surface_pressure() -> (
+    None
+):
+    def height(normalized_surface_pressure: jax.Array) -> jax.Array:
+        return _map_uniform_jcm_column(
+            288.0,
+            normalized_surface_pressure,
+        )[
+            "model_level_height"
+        ][0, 0]
+
+    normalized_surface_pressure = jnp.asarray(0.9)
+    _, tangent = jax.jvp(
+        height,
+        (normalized_surface_pressure,),
+        (jnp.asarray(1.0),),
+    )
+    gradient = jax.grad(height)(normalized_surface_pressure)
+
+    assert float(tangent) == 0.0
+    assert float(gradient) == 0.0
+
+
 def test_map_jcm_output_fields_supports_jit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -497,13 +605,8 @@ def test_map_jcm_output_fields_supports_jit(
     )
     monkeypatch.setattr(
         jax_gcm_fields_module,
-        "get_altitudes_sigma_levels",
-        lambda temperature, pressure, specific_humidity: jnp.asarray(
-            [
-                jnp.full((2, 2), 50.0),
-                jnp.full((2, 2), 150.0),
-            ]
-        ),
+        "_compute_surface_nearest_sigma_level_altitude",
+        lambda temperature, sigma_level, specific_humidity: jnp.full((2, 2), 150.0),
     )
 
     mapped_fields = jax.jit(
@@ -1134,13 +1237,8 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     )
     monkeypatch.setattr(
         jax_gcm_fields_module,
-        "get_altitudes_sigma_levels",
-        lambda temperature, pressure, specific_humidity: jnp.asarray(
-            [
-                np.full((2, 2), 50.0),
-                np.full((2, 2), 150.0),
-            ]
-        ),
+        "_compute_surface_nearest_sigma_level_altitude",
+        lambda temperature, sigma_level, specific_humidity: jnp.full((2, 2), 150.0),
     )
     cast(Any, jax_gcm_fields_module.map_jcm_output_fields).clear_cache()
 
@@ -1690,22 +1788,98 @@ def test_custom_global_four_degree_set_diagnostics_populates_outputs() -> None:
     ]
 
 
-def test_configure_veros_runtime_sets_diskless_mode(
+@pytest.mark.parametrize(
+    ("execution", "expected_backend", "expected_solver"),
+    (("host", "numpy", "best"), ("jax", "jax", "scipy_jax")),
+)
+def test_configure_veros_runtime_selects_execution_backend_and_solver(
     monkeypatch: pytest.MonkeyPatch,
+    execution: Literal["host", "jax"],
+    expected_backend: str,
+    expected_solver: str,
 ) -> None:
     runtime_settings = SimpleNamespace()
     fake_veros = ModuleType("veros")
     setattr(fake_veros, "runtime_settings", runtime_settings)
     monkeypatch.setitem(sys.modules, "veros", fake_veros)
 
-    veros_runtime_settings_module.configure_veros_runtime()
+    veros_runtime_settings_module.configure_veros_runtime(execution)
 
-    assert runtime_settings.backend == "numpy"
-    assert runtime_settings.force_overwrite is True
-    assert getattr(runtime_settings, "diskless_mode") is True
+    assert runtime_settings.backend == expected_backend
+    assert runtime_settings.linear_solver == expected_solver
+    if execution == "host":
+        assert runtime_settings.force_overwrite is True
+        assert getattr(runtime_settings, "diskless_mode") is True
+    else:
+        assert not hasattr(runtime_settings, "force_overwrite")
+        assert not hasattr(runtime_settings, "diskless_mode")
 
 
-def test_veros_copy_state_jitted_path_deep_copies_state(
+def test_veros_jax_capability_check_rejects_stock_veros(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import veros.core.operators as veros_operators
+    import veros.variables as veros_variables
+    from veros.state import VerosState
+
+    monkeypatch.delattr(VerosState, "copy", raising=False)
+    monkeypatch.delattr(veros_operators, "safe_sqrt", raising=False)
+    monkeypatch.setattr(
+        veros_variables,
+        "VARIABLES",
+        {
+            name: metadata
+            for name, metadata in veros_variables.VARIABLES.items()
+            if name not in {"c_k", "c_eps"}
+        },
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="differentiable Veros fork.*7a8c964",
+    ):
+        veros_runtime_settings_module.require_differentiable_veros_capabilities()
+
+
+def test_veros_runtime_conflict_requires_a_separate_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class LockedRuntimeSettings:
+        backend = "numpy"
+        linear_solver = "best"
+
+        def __setattr__(self, name: str, value: Any) -> None:
+            _ = name, value
+            raise RuntimeError("runtime settings are locked")
+
+    fake_veros = ModuleType("veros")
+    setattr(fake_veros, "runtime_settings", LockedRuntimeSettings())
+    monkeypatch.setitem(sys.modules, "veros", fake_veros)
+
+    with pytest.raises(
+        RuntimeError,
+        match="already locked.*backend='numpy'.*requested 'jax'.*separate Python",
+    ):
+        veros_runtime_settings_module.configure_veros_runtime("jax")
+
+
+def test_veros_config_uses_execution_as_the_only_native_mode() -> None:
+    config = VerosConfig(setup="acc", execution="jax")
+
+    assert config.setup == "acc"
+    assert config.execution == "jax"
+    assert not hasattr(config, "jitted")
+
+    with pytest.raises(TypeError, match="jitted"):
+        VerosConfig(jitted=True)  # type: ignore[call-arg]
+
+    with pytest.raises(ValueError, match="setup must be 'global_4deg' or 'acc'"):
+        VerosConfig(setup=cast(Any, "unknown"))
+    with pytest.raises(ValueError, match="execution must be 'host' or 'jax'"):
+        VerosConfig(execution=cast(Any, "unknown"))
+
+
+def test_veros_copy_state_host_deep_copies_the_complete_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(veros_state_module, "VerosState", _ConstructedVerosState)
@@ -1716,39 +1890,54 @@ def test_veros_copy_state_jitted_path_deep_copies_state(
         _plugin_interfaces={"plugins": ["tracer"]},
         _var_meta={"temp": {"units": "K"}},
         _variables={"temp": [1.0, 2.0]},
+        _diagnostics={"averages": {"samples": [1.0]}},
         timers={"step": [1.0]},
         profile_timers={"profile": [2.0]},
+        future_native_attribute={"owned": [3.0]},
     )
 
-    copied = veros_state_module.copy_state(state, jitted=True)
+    copied = veros_state_module.copy_state(state, execution="host")
 
     assert copied is not state
-    assert copied._dimensions == state._dimensions
-    assert copied._dimensions is not state._dimensions
-    assert copied._plugin_interfaces == state._plugin_interfaces
-    assert copied._plugin_interfaces is not state._plugin_interfaces
-    assert copied._var_meta == state._var_meta
-    assert copied._var_meta is not state._var_meta
-    assert copied._variables == state._variables
-    assert copied._variables is not state._variables
-    assert copied.timers == state.timers
-    assert copied.timers is not state.timers
-    assert copied.profile_timers == state.profile_timers
-    assert copied.profile_timers is not state.profile_timers
+    assert vars(copied).keys() == vars(state).keys()
+    for name, value in vars(state).items():
+        copied_value = vars(copied)[name]
+        assert copied_value == value
+        assert copied_value is not value
     assert copied.settings["dt_tracer"] == 600.0
-    assert copied.settings.__metadata__ == state.settings.__metadata__
-    assert copied.settings.__metadata__ is not state.settings.__metadata__
+    assert isinstance(copied.settings.__fields__, tuple)
+    assert not isinstance(state.settings.__fields__, tuple)
 
 
-@pytest.mark.parametrize("jitted", (False, True))
-def test_veros_copy_state_returns_deepcopy_compatible_state(
+def test_veros_copy_state_jax_path_uses_native_pytree_copy() -> None:
+    copied_state = SimpleNamespace(marker="copied")
+
+    class NativeCopyState:
+        def __init__(self) -> None:
+            self.copy_calls = 0
+
+        def copy(self) -> Any:
+            self.copy_calls += 1
+            return copied_state
+
+    state = NativeCopyState()
+
+    result = veros_state_module.copy_state(
+        cast(Any, state),
+        execution="jax",
+    )
+
+    assert result is copied_state
+    assert state.copy_calls == 1
+
+
+def test_veros_copy_state_host_result_remains_deepcopy_compatible(
     monkeypatch: pytest.MonkeyPatch,
-    jitted: bool,
 ) -> None:
     monkeypatch.setattr(veros_state_module, "VerosState", _ConstructedVerosState)
     source = _make_copyable_fake_veros_state()
 
-    copied = veros_state_module.copy_state(source, jitted=jitted)
+    copied = veros_state_module.copy_state(source, execution="host")
     copied_again = deepcopy(copied)
 
     assert isinstance(copied.settings.__fields__, tuple)
@@ -1772,7 +1961,7 @@ def test_veros_pure_reuses_component_solver_for_copied_states(
     monkeypatch.setattr(
         veros_state_module,
         "copy_state",
-        lambda state, jitted=True: next(copied_states),
+        lambda state, *, execution: next(copied_states),
     )
 
     stepped_states: list[Any] = []
@@ -1785,9 +1974,9 @@ def test_veros_pure_reuses_component_solver_for_copied_states(
     results = tuple(
         veros_state_module.pure(
             original_state,
-            jitted=False,
             step=fake_step,
             linear_solver=solver,
+            execution="jax",
         )
         for _ in range(2)
     )
@@ -1817,7 +2006,7 @@ def test_veros_pure_restores_solver_cache_when_step_fails(
     monkeypatch.setattr(
         veros_state_module,
         "copy_state",
-        lambda state, jitted=True: copied_state,
+        lambda state, *, execution: copied_state,
     )
 
     def failing_step(state: Any) -> None:
@@ -1827,9 +2016,9 @@ def test_veros_pure_restores_solver_cache_when_step_fails(
     with pytest.raises(RuntimeError, match="native step failed"):
         veros_state_module.pure(
             original_state,
-            jitted=False,
             step=failing_step,
             linear_solver=component_solver,
+            execution="jax",
         )
 
     assert solver_cache == ({key: prior_solver} if has_prior_entry else {})
@@ -1861,7 +2050,7 @@ def test_veros_component_solvers_are_isolated_and_release_owner_entries(
     monkeypatch.setattr(
         veros_state_module,
         "copy_state",
-        lambda state, jitted=True: copied_states[state],
+        lambda state, *, execution: copied_states[state],
     )
 
     assert veros_state_module.get_component_linear_solver(first_owner) is first_solver
@@ -1884,18 +2073,18 @@ def test_veros_component_solvers_are_isolated_and_release_owner_entries(
     assert (
         veros_state_module.pure(
             first_owner,
-            jitted=False,
             step=first_step,
             linear_solver=first_solver,
+            execution="jax",
         )
         is first_copied_state
     )
     with pytest.raises(RuntimeError, match="second owner failed"):
         veros_state_module.pure(
             second_owner,
-            jitted=False,
             step=failing_second_step,
             linear_solver=second_solver,
+            execution="jax",
         )
 
     assert observed_solvers == [first_solver, second_solver]
@@ -2334,7 +2523,7 @@ def test_veros_output_variables_rejects_setup_local_field() -> None:
         )
 
 
-def test_apply_veros_forcing_fields_copies_once_and_updates_all_fields(
+def test_apply_veros_forcing_fields_updates_owned_host_state_without_copy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     variables = _FakeVariableStore(
@@ -2344,13 +2533,11 @@ def test_apply_veros_forcing_fields_copies_once_and_updates_all_fields(
         }
     )
     state = SimpleNamespace(variables=variables)
-    copy_calls: list[bool] = []
-
-    def recording_copy(value: Any, jitted: bool = True) -> Any:
-        copy_calls.append(jitted)
-        return deepcopy(value)
-
-    monkeypatch.setattr(veros_state_module, "copy_state", recording_copy)
+    monkeypatch.setattr(
+        veros_state_module,
+        "copy_state",
+        lambda *args, **kwargs: pytest.fail("host forcing must reuse the owned copy"),
+    )
     forcing = veros_state_module.VerosForcingFields(
         taux=jnp.ones((4, 4, 1)),
         tauy=jnp.full((4, 4, 1), 2.0),
@@ -2361,12 +2548,11 @@ def test_apply_veros_forcing_fields_copies_once_and_updates_all_fields(
     result = veros_state_module.apply_veros_forcing_fields(
         state,
         forcing,
-        jitted=True,
+        execution="host",
     )
 
-    assert copy_calls == [True]
     assert not hasattr(veros_state_module, "set_variable")
-    assert result is not state
+    assert result is state
     assert result.variables.unlock_calls == 1
     for name, expected in zip(
         ("taux", "tauy", "qnet", "qnec"),
@@ -2383,7 +2569,43 @@ def test_apply_veros_forcing_fields_copies_once_and_updates_all_fields(
         assert np.count_nonzero(result_value[-2:, :, :]) == 0
         assert np.count_nonzero(result_value[:, :2, :]) == 0
         assert np.count_nonzero(result_value[:, -2:, :]) == 0
-        assert np.count_nonzero(getattr(state.variables, name)) == 0
+        assert getattr(state.variables, name) is result_value
+
+
+def test_apply_veros_forcing_fields_preserves_jax_arrays_in_jax_execution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    variables = _FakeVariableStore(
+        **{
+            name: jnp.zeros((8, 8, 1), dtype=jnp.float64)
+            for name in ("taux", "tauy", "qnet", "qnec")
+        }
+    )
+    state = SimpleNamespace(variables=variables)
+    copy_calls: list[str] = []
+
+    def recording_copy(
+        value: Any,
+        *,
+        execution: str,
+    ) -> Any:
+        copy_calls.append(execution)
+        return deepcopy(value)
+
+    monkeypatch.setattr(veros_state_module, "copy_state", recording_copy)
+    forcing = veros_state_module.VerosForcingFields(
+        *(jnp.full((4, 4, 1), value) for value in (1.0, 2.0, 3.0, 4.0))
+    )
+
+    result = veros_state_module.apply_veros_forcing_fields(
+        state,
+        forcing,
+        execution="jax",
+    )
+
+    assert copy_calls == ["jax"]
+    for name in ("taux", "tauy", "qnet", "qnec"):
+        assert isinstance(getattr(result.variables, name), jax.Array)
 
 
 def test_veros_initialize_validates_timestep_multiple() -> None:
@@ -2468,12 +2690,14 @@ def test_veros_constructor_builds_jax_backed_grid(
         veros_setup_module, "CustomGlobalFourDegree", _FakeGlobalFourDegree
     )
     monkeypatch.setattr(
-        veros_state_module, "copy_state", lambda tree, jitted=True: tree
+        veros_state_module,
+        "copy_state",
+        lambda tree, *, execution: tree,
     )
     monkeypatch.setattr(
         veros_runtime_settings_module,
         "configure_veros_runtime",
-        lambda: None,
+        lambda execution: None,
     )
     component_solver = object()
     solver_states: list[Any] = []
@@ -2498,7 +2722,6 @@ def test_veros_constructor_builds_jax_backed_grid(
                     variables=("temp", "surface_taux"),
                 ),
             ),
-            jitted=False,
         ),
     )
 
@@ -2535,7 +2758,7 @@ def test_veros_constructor_builds_jax_backed_grid(
         (True, np.asarray([[[3.0], [5.0]], [[4.0], [6.0]]])),
     ],
 )
-def test_veros_step_sets_forcing_fields_and_refreshes_sst(
+def test_veros_host_runtime_owns_one_complete_copy_before_forcing(
     monkeypatch: pytest.MonkeyPatch,
     restore_to_climatology: bool,
     expected_qnec: np.ndarray,
@@ -2546,7 +2769,6 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
     )
     component.restore_to_climatology = restore_to_climatology
     component.model_substeps = 2
-    component.jitted = False
     initial_native_state = _make_copyable_fake_veros_state(surface_temperature=12.0)
     component._veros_state = initial_native_state
     component.name = "OCN"
@@ -2556,6 +2778,30 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
         latitude=np.arange(4.0),
     )
     component.data = {"sea_surface_temperature": np.zeros((4, 4), dtype=float)}
+    original_copy_state = veros_state_module.copy_state
+    initial_native_state._diagnostics = {
+        "snapshot": SimpleNamespace(variables=initial_native_state.variables)
+    }
+    runtime_payload = original_copy_state(initial_native_state, execution="host")
+    copy_calls: list[str] = []
+
+    def recording_copy_state(value: Any, *, execution: str) -> Any:
+        copy_calls.append(execution)
+        return original_copy_state(value, execution=cast(Any, execution))
+
+    monkeypatch.setattr(veros_state_module, "copy_state", recording_copy_state)
+    original_owned_copy = component_runtime_execution_module._copy_owned_pytree
+    owned_copy_calls: list[Any] = []
+
+    def recording_owned_copy(value: Any) -> Any:
+        owned_copy_calls.append(value)
+        return original_owned_copy(value)
+
+    monkeypatch.setattr(
+        component_runtime_execution_module,
+        "_copy_owned_pytree",
+        recording_owned_copy,
+    )
 
     def fake_step_function(state: Any) -> Any:
         state.variables.temp = np.full((8, 8, 1, 1), 15.0, dtype=float)
@@ -2574,46 +2820,73 @@ def test_veros_step_sets_forcing_fields_and_refreshes_sst(
     component._step_function = fake_step_function
 
     coupler = _make_coupler(dt_seconds=20.0, run_order=["ATM"])
-    component_state = _runtime_component_state("OCN", component.data)
+    runtime_component = CallableComponent(
+        "OCN",
+        component.grid,
+        lambda fields, context, payload: veros_runtime_module.step_veros_runtime(
+            component,
+            fields,
+            context,
+            payload,
+        ),
+        spec=ComponentSpec(
+            outputs=("sea_surface_temperature",),
+            initial_fields=component.data,
+            execution="host",
+        ),
+    )
+    component_state = _runtime_component_state("OCN", component.data).with_payload(
+        runtime_payload
+    )
     step_context = StepContext(
         dt_seconds=20.0,
         time=datetime(2000, 1, 1),
         logger=coupler.logger,
     )
-    result = veros_runtime_module.step_veros_runtime(
-        component,
-        component_state.fields.to_mapping(),
+    result = step_component_runtime_state(
+        runtime_component,
+        component_state,
         step_context,
-        initial_native_state,
+        allow_host_runtime=True,
     )
 
-    assert isinstance(result, StepResult)
+    assert owned_copy_calls == [runtime_payload]
+    assert copy_calls == []
     assert all(
-        np.all(np.isfinite(np.asarray(value))) for value in result.fields.values()
+        np.all(np.isfinite(np.asarray(value)))
+        for value in result.fields.to_mapping().values()
     )
-    assert result.payload is not initial_native_state
+    result_payload = result.payload
+    assert result_payload is not None
+    assert result_payload is not runtime_payload
+    assert result_payload._diagnostics["snapshot"].variables is result_payload.variables
+    assert (
+        runtime_payload._diagnostics["snapshot"].variables is runtime_payload.variables
+    )
     assert component._veros_state is initial_native_state
     assert_allclose_compact(
-        result.payload.variables.taux[2:-2, 2:-2, :],
+        result_payload.variables.taux[2:-2, 2:-2, :],
         np.asarray([[[1.0], [3.0]], [[2.0], [4.0]]]),
     )
     assert_allclose_compact(
-        result.payload.variables.tauy[2:-2, 2:-2, :],
+        result_payload.variables.tauy[2:-2, 2:-2, :],
         np.asarray([[[5.0], [7.0]], [[6.0], [8.0]]]),
     )
     assert_allclose_compact(
-        result.payload.variables.qnet[2:-2, 2:-2, :],
+        result_payload.variables.qnet[2:-2, 2:-2, :],
         np.asarray([[[9.0], [11.0]], [[10.0], [12.0]]]),
     )
-    assert_allclose_compact(result.payload.variables.qnec[2:-2, 2:-2, :], expected_qnec)
+    assert_allclose_compact(result_payload.variables.qnec[2:-2, 2:-2, :], expected_qnec)
     for name in ("taux", "tauy", "qnet", "qnec"):
         assert np.count_nonzero(getattr(initial_native_state.variables, name)) == 0
+        assert np.count_nonzero(getattr(runtime_payload.variables, name)) == 0
     assert_allclose_compact(initial_native_state.variables.temp, 12.0)
+    assert_allclose_compact(runtime_payload.variables.temp, 12.0)
     assert_allclose_compact(
-        result.fields["sea_surface_temperature"],
+        result.fields.get("sea_surface_temperature"),
         np.full((4, 4), 288.15),
     )
-    assert isinstance(result.fields["sea_surface_temperature"], jax.Array)
+    assert isinstance(result.fields.get("sea_surface_temperature"), jax.Array)
 
 
 def test_veros_step_requires_native_runtime_payload() -> None:
@@ -2626,6 +2899,50 @@ def test_veros_step_requires_native_runtime_payload() -> None:
         veros_runtime_module.step_veros_runtime(resources, {}, context, None)
 
 
+def test_veros_acc_jax_step_uses_internal_forcing_without_host_logging(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resources = veros_gcm_state_module.VerosGCMSetupState.__new__(
+        veros_gcm_state_module.VerosGCMSetupState
+    )
+    resources.name = "OCN"
+    resources.execution = "jax"
+    resources.uses_atmosphere_forcing = False
+    resources.restore_to_climatology = False
+    resources.model_substeps = 1
+    stepped_states: list[Any] = []
+
+    def step_function(state: Any) -> Any:
+        stepped_states.append(state)
+        return state
+
+    resources._step_function = step_function
+    native_state = _make_fake_veros_state(surface_temperature=10.0)
+    logger = _RecordingLogger()
+    context = StepContext(
+        dt_seconds=20.0,
+        time=None,
+        logger=cast(Any, logger),
+    )
+
+    monkeypatch.setattr(
+        veros_fluxes_module,
+        "compute_fluxes",
+        lambda *args, **kwargs: pytest.fail("ACC must use native internal forcing"),
+    )
+
+    result = veros_runtime_module.step_veros_runtime(
+        resources,
+        {},
+        context,
+        native_state,
+    )
+
+    assert result.payload is native_state
+    assert stepped_states == [native_state]
+    assert logger.messages == []
+
+
 def test_veros_step_nan_cleans_forcing_fields_before_apply(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2634,8 +2951,7 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
     )
     component.restore_to_climatology = True
     component.model_substeps = 0
-    component.jitted = True
-    component._veros_state = _make_fake_veros_state(surface_temperature=12.0)
+    component._veros_state = _make_copyable_fake_veros_state(surface_temperature=12.0)
     component.name = "OCN"
     component.grid = make_test_grid(
         name="ocn",
@@ -2650,9 +2966,9 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
         state: Any,
         forcing_fields: veros_state_module.VerosForcingFields,
         *,
-        jitted: bool,
+        execution: str,
     ) -> Any:
-        assert jitted is True
+        assert execution == "host"
         assert all(isinstance(value, jax.Array) for value in forcing_fields)
         assert all(np.all(np.isfinite(np.asarray(value))) for value in forcing_fields)
         forcing_calls.append(forcing_fields)

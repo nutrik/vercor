@@ -8,11 +8,13 @@ import jax.numpy as jnp
 from vercor._numerical_safety import replace_missing_nan
 from vercor.dtypes import DTypePolicy, as_jax_real_array
 from vercor.fluxes.vertical_coordinates import (
+    _compute_surface_nearest_sigma_level_altitude,
     compute_sigma_pressure_levels,
-    get_altitudes_sigma_levels,
 )
 
 REFERENCE_SURFACE_TEMPERATURE = 273.15 + 15.0
+REFERENCE_AIR_DENSITY = 1.2
+REFERENCE_MODEL_LEVEL_HEIGHT = 50.0
 COLD_SURFACE_TEMPERATURE_THRESHOLD = 250.0
 JAXGCM_INPUT_GRID_FIELD_NAMES = (
     "land_surface_temperature",
@@ -126,6 +128,9 @@ def map_jcm_output_fields(
         potential_temperature_reference_pressure, dtype
     )
     cappa_array = as_jax_real_array(cappa, dtype)
+    normalized_surface_pressure_array = as_jax_real_array(
+        normalized_surface_pressure, dtype
+    ).T
     temperature_array = as_jax_real_array(temperature, dtype)
     specific_humidity_array = as_jax_real_array(specific_humidity, dtype)
 
@@ -152,7 +157,7 @@ def map_jcm_output_fields(
         reference_pressure_array,
         as_jax_real_array(0.0, dtype),
         sigma_levels_array,
-        as_jax_real_array(normalized_surface_pressure, dtype).T,
+        normalized_surface_pressure_array,
     )
 
     density = mwdair_array / rgas_array * pressure[-1, :, :] / temperature_2m
@@ -162,11 +167,11 @@ def map_jcm_output_fields(
         ** cappa_array
     )
 
-    model_level_height = get_altitudes_sigma_levels(
-        temperature_array.transpose((0, 2, 1))[::-1, :, :],
-        pressure[::-1, :, :],
-        specific_humidity_array.transpose((0, 2, 1))[::-1, :, :] / 1000.0,
-    )[1, :, :]
+    model_level_height = _compute_surface_nearest_sigma_level_altitude(
+        temperature_2m,
+        sigma_levels_array[-1],
+        specific_humidity_2m,
+    )
 
     return {
         "u_velocity": u_velocity,
@@ -189,6 +194,8 @@ __all__ = [
     "JAXGCM_INPUT_GRID_FIELD_NAMES",
     "JAXGCM_OUTPUT_GRID_FIELD_NAMES",
     "JAXGCM_REQUIRED_GRID_FIELD_NAMES",
+    "REFERENCE_AIR_DENSITY",
+    "REFERENCE_MODEL_LEVEL_HEIGHT",
     "REFERENCE_SURFACE_TEMPERATURE",
     "cleanup_surface_temperature_fields",
     "map_jcm_output_fields",

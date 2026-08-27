@@ -273,6 +273,7 @@ vercor.setups._external.veros_output
 vercor.setups._external.veros_runtime
 vercor.setups._external.veros_runtime_settings
 vercor.setups._external.veros_setup
+vercor.setups._external.veros_setup_jax
 vercor.setups._external.veros_state
 vercor.setups.gallery
 vercor.setups.gallery.custom_component_wrapping

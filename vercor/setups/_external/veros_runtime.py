@@ -1,9 +1,9 @@
-"""Veros host-runtime stepping helpers."""
+"""Veros host and differentiable JAX runtime stepping helpers."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from vercor.components import StepContext, StepResult
 from vercor.exceptions import ComponentError
@@ -20,37 +20,41 @@ def step_veros_runtime(
     context: StepContext,
     payload: Any | None,
 ) -> StepResult:
-    """Advance the payload-owned host-backed Veros ocean boundary."""
+    """Advance the payload-owned host or JAX Veros ocean boundary."""
 
     if payload is None:
         raise ComponentError("Veros runtime requires a native runtime payload.")
+    execution = cast(
+        Literal["host", "jax"],
+        getattr(resources, "execution", "host"),
+    )
+    uses_atmosphere_forcing = getattr(resources, "uses_atmosphere_forcing", True)
     native_state = payload
-    if not resources.jitted:
-        native_state = _veros_state.copy_state(native_state, jitted=True)
     time = context.time
-    if time is None:
+    if execution == "host" and time is None:
         return StepResult(payload=native_state)
 
-    taux, tauy, qnet, qnec = _veros_fluxes.compute_fluxes(
-        native_state,
-        fields,
-        context.constants,
-        context.dtype,
-    )
-    forcing_fields = _veros_state.prepare_surface_forcing_fields(
-        taux, tauy, qnet, qnec, resources.restore_to_climatology
-    )
+    if uses_atmosphere_forcing:
+        taux, tauy, qnet, qnec = _veros_fluxes.compute_fluxes(
+            native_state,
+            fields,
+            context.constants,
+            context.dtype,
+        )
+        forcing_fields = _veros_state.prepare_surface_forcing_fields(
+            taux, tauy, qnet, qnec, resources.restore_to_climatology
+        )
 
-    native_state = _veros_state.apply_veros_forcing_fields(
-        native_state,
-        forcing_fields,
-        jitted=resources.jitted,
-    )
+        native_state = _veros_state.apply_veros_forcing_fields(
+            native_state,
+            forcing_fields,
+            execution=execution,
+        )
     native_state = _veros_state.advance_veros_substeps(
         native_state,
         step_function=resources._step_function,
         model_substeps=resources.model_substeps,
-        logger=context.logger,
+        logger=context.logger if execution == "host" else None,
     )
     return StepResult(
         fields={

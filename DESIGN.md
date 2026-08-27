@@ -163,7 +163,11 @@ default `SequentialWorkflow` repeats the constructor run order.
 The private coordinator validates the plan, groups compatible consecutive
 schedules, and splits at output boundaries. Each `ExecutionChunk` retains
 absolute clock indices. Output-free uniform workflows preserve one JIT-wrapped
-`jax.lax.scan`; a run-local executor is reused for repeated schedules.
+`jax.lax.scan`; a run-local executor is reused for repeated schedules. The
+fixed-shape scan step is wrapped in `jax.checkpoint`, so reverse-mode rollouts
+rematerialize per-step intermediates instead of retaining the complete
+trajectory. Scan length, callback order, progress reporting, interrupt checks,
+and carry structure are unchanged.
 
 An `ExecutionBackend.execute(...)` receives state, public context, a core-owned
 chunk, and `RuntimeDriver`. It must consume every plan exactly once and in order
@@ -264,6 +268,55 @@ because it is not implemented. CAMulator forcing alignment is explicitly
 `datetime` clock because no-leap and 360-day CAMulator conversion is not
 implemented.
 
+`VerosConfig` selects `setup="global_4deg"` or `setup="acc"` and an
+`execution="host"` or `execution="jax"` lane. Host is the compatibility
+default and configures stock Veros with the NumPy backend and its best
+available solver. Adapter construction deep-copies the complete native state,
+substituting an immutable tuple for Veros' non-copyable settings `dict_keys`
+view without modifying the source. On every host step, the generic component
+runtime ownership boundary copies that normalized payload exactly once before
+the adapter mutates it through forcing and model substeps. JAX execution
+configures the JAX backend with `scipy_jax`, uses the fork's native PyTree-aware
+`VerosState.copy()` at functional mutation boundaries, and requires runtime
+capabilities supplied by the approved differentiable fork: native state
+copying, differentiable operators, and traced `c_k`/`c_eps` variables.
+`execution` is the sole Veros copy and compilation policy; there is no separate
+`jitted` option. Runtime settings lock on first Veros use, so conflicting
+host/JAX components must run in separate Python processes. The packaged
+optional requirement remains `veros>=1.6.2,<1.7`; fork selection is
+capability-gated rather than globally pinned.
+
+The JAX global adapter consumes external atmospheric forcing, disables
+streamfunction and diagnostics that would change the payload PyTree, and uses
+the fork's finite-derivative calm-stress norm. The JAX ACC adapter retains its
+native internal forcing and topology while leaving variable-owned turbulence
+parameters at their fork defaults. JAXGCM uses one physical default mapping
+everywhere fields are declared, initialized, or prefilled: temperature and
+potential temperature are 288.15 K, density is 1.2 kg/m³, and model-level
+height is 50 m. These defaults prevent a not-yet-stepped atmosphere from
+feeding valid-looking zero divisors and logarithm inputs into the ocean.
+After a JAXGCM step, model-level height is the surface-nearest sigma-center
+altitude above ground. The adapter anchors the pressure ratio at the surface
+and uses the lowest model-level virtual temperature for the unresolved
+surface-to-center layer.
+
+ERA5 and CAMulator instead use the distinct ECMWF hybrid-sigma coordinate.
+Interface pressure is `A + B * ps`; temperature, specific humidity, and
+interfaces enter the height kernel top-to-bottom. The kernel follows the IFS
+half-level hydrostatic discretization, integrates upward from zero surface
+geopotential, and returns full-level geometric heights above ground in
+bottom-to-top order. It therefore uses the bounding interface pressures rather
+than treating an arithmetic full-level pressure as an exact hydrostatic
+location. Any nonzero pressure component makes the effective pressure ratio
+and height depend on local surface pressure. Static layout checks reject
+ambiguous ranks, mismatched thermodynamic fields, and missing interfaces before
+JAX arithmetic can broadcast them silently.
+
+Here, fully differentiable means finite first-order JVP, VJP, and reverse-mode
+gradients for output-free fixed-plan JAX rollouts over physically valid
+continuous inputs. Output I/O, setup-time/static values, stock-host execution,
+and second derivatives are outside this contract.
+
 Every slab and data factory accepts a final keyword-only
 `output: OutputSpec | None` argument. Omission selects `OutputSpec()`; a
 supplied declaration is retained unchanged. Paired JCM construction owns its
@@ -298,6 +351,19 @@ Release gates are Black, strict flake8, mypy, compileall, fast/full pytest,
 90% branch coverage, build, installed wheel and source-distribution probes,
 external-extension smoke and strict mypy, optional base/JCM/Veros lanes, a
 macOS smoke, and `git diff --check`.
+
+CI keeps stock-Veros compatibility separate from differentiable-fork
+acceptance. The ordinary quality job and installed-artifact Veros matrix lane
+resolve the packaged `veros>=1.6.2,<1.7` requirement. A dedicated serial job
+installs the public differentiable fork without dependencies at immutable commit
+`7a8c964cf00b5aa0713c995edd760643a431b3c9`, verifies its PEP 610 commit record
+and required runtime capabilities, and runs the multi-step rollout module.
+Both lanes collect relative-path branch data without applying a partial-suite
+threshold and upload distinct raw artifacts. A downstream job requires both
+artifacts, unions their executed lines and arcs with Coverage.py, enforces the
+90% project threshold, and sends one deterministic XML report to Codecov.
+Release publication depends on that combined gate, so neither stock
+compatibility nor the differentiability contract can be bypassed.
 
 Built-artifact tests run outside the checkout and verify origin, metadata,
 `py.typed`, the six-symbol root, every canonical owner manifest, central

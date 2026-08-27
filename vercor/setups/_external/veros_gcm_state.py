@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from datetime import timedelta
 from functools import partial
-from typing import Any, cast
+from typing import Any, Literal, cast
 
+import jax
 import jax.numpy as jnp
 
 from vercor.components import (
@@ -37,8 +38,32 @@ VEROS_INPUT_FIELD_NAMES = (
 VEROS_FIELD_DEFAULTS = {"sea_surface_temperature": 283.15}
 
 
+def _select_veros_setup_class(
+    setup: Literal["global_4deg", "acc"],
+    execution: Literal["host", "jax"],
+) -> type[Any]:
+    """Return the native setup class for one execution lane."""
+
+    if execution == "jax":
+        from vercor.setups._external.veros_setup_jax import (
+            DifferentiableACCSetup,
+            DifferentiableGlobalFourDegree,
+        )
+
+        return (
+            DifferentiableGlobalFourDegree
+            if setup == "global_4deg"
+            else DifferentiableACCSetup
+        )
+    if setup == "global_4deg":
+        return _veros_setup.CustomGlobalFourDegree
+    from veros.setups.acc import ACCSetup
+
+    return cast(type[Any], ACCSetup)
+
+
 class VerosGCMSetupState:
-    """Mutable setup-time owner for a host-backed Veros ocean adapter."""
+    """Mutable setup-time owner for one host or JAX Veros ocean adapter."""
 
     name: str
     data: dict[str, RuntimeArray]
@@ -51,38 +76,48 @@ class VerosGCMSetupState:
     def __init__(
         self,
         name: str = "OCN",
+        setup: Literal["global_4deg", "acc"] = "global_4deg",
+        execution: Literal["host", "jax"] = "host",
         spinup_time: timedelta = timedelta(days=2),
         custom_parameters: Mapping[str, Any] | None = None,
         restore_to_climatology: bool = False,
         do_spinup: bool = False,
-        jitted: bool = False,
     ) -> None:
         """Build Veros model resources and the VerCOR ocean grid."""
 
         self.name = name
-        override = custom_parameters or {}
+        self.execution = execution
+        self.uses_atmosphere_forcing = setup == "global_4deg"
+        override = dict(custom_parameters or {})
+        if execution == "jax":
+            override["enable_streamfunction"] = False
 
-        self.model = _veros_setup.CustomGlobalFourDegree(override=override)
+        setup_class = _select_veros_setup_class(setup, execution)
+        self.model = setup_class(override=override)
         self.model.setup()
         self._linear_solver = _veros_state.get_component_linear_solver(self.model.state)
         self._veros_state = _veros_state.copy_state(
             self.model.state,
-            jitted=jitted,
+            execution=execution,
         )
-        self._step_function = cast(
+        step_function = cast(
             Callable[[Any], Any],
             partial(
                 _veros_state.pure,
-                jitted=jitted,
                 step=self.model.step,
                 linear_solver=self._linear_solver,
+                execution=execution,
             ),
+        )
+        self._step_function = (
+            cast(Callable[[Any], Any], jax.jit(step_function))
+            if execution == "jax"
+            else step_function
         )
 
         self.do_spinup = do_spinup
         self.spinup_time = spinup_time
         self.restore_to_climatology = restore_to_climatology
-        self.jitted = jitted
 
         self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
         self.spinup_steps = int(self.spinup_time.total_seconds() // self.dt_tracer)

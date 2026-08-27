@@ -82,6 +82,14 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "fast_always: always include this test in --fast mode",
     )
+    config.addinivalue_line(
+        "markers",
+        "slow: integration or rollout test with material compile/runtime cost",
+    )
+    config.addinivalue_line(
+        "markers",
+        "veros_autodiff: requires the exact differentiable Veros fork",
+    )
 
 
 def pytest_collection_modifyitems(

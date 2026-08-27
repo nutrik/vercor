@@ -30,7 +30,7 @@ def make_veros_gcm(
     *,
     config: VerosConfig | None = None,
 ) -> Component:
-    """Return a host-backed Veros GCM component."""
+    """Return a host-backed or differentiable JAX Veros GCM component."""
 
     try:
         import veros  # noqa: F401
@@ -40,11 +40,12 @@ def make_veros_gcm(
             "with `pip install veros`."
         ) from error
 
-    from vercor.setups._external.veros_runtime_settings import (
-        configure_veros_runtime,
-    )
+    from vercor.setups._external import veros_runtime_settings
 
-    configure_veros_runtime()
+    config = VerosConfig() if config is None else config
+    veros_runtime_settings.configure_veros_runtime(config.execution)
+    if config.execution == "jax":
+        veros_runtime_settings.require_differentiable_veros_capabilities()
 
     (
         _veros_gcm_state,
@@ -53,24 +54,28 @@ def make_veros_gcm(
         VerosGCMSetupState,
     ) = _load_veros_implementation()
 
-    config = VerosConfig() if config is None else config
     state = VerosGCMSetupState(
         name=config.name,
+        setup=config.setup,
+        execution=config.execution,
         spinup_time=config.spinup.duration,
         custom_parameters=config.custom_parameters,
         restore_to_climatology=config.restore_to_climatology,
         do_spinup=config.spinup.enabled,
-        jitted=config.jitted,
     )
     component = CallableComponent(
         config.name,
         state.grid,
         partial(_veros_runtime.step_veros_runtime, state),
         spec=ComponentSpec(
-            inputs=_veros_gcm_state.VEROS_INPUT_FIELD_NAMES,
+            inputs=(
+                _veros_gcm_state.VEROS_INPUT_FIELD_NAMES
+                if state.uses_atmosphere_forcing
+                else ()
+            ),
             outputs=("sea_surface_temperature",),
             initial_fields=_veros_gcm_state.veros_default_fields(),
-            execution="host",
+            execution=config.execution,
             lifecycle=LifecycleHooks(setup=state.setup),
             output=OutputSpec(
                 provider=(

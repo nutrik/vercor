@@ -366,26 +366,41 @@ def test_forced_jax_backend_rejects_scheduled_host_component() -> None:
         coupler.run()
 
 
-def test_default_output_free_jax_workflow_uses_one_jit_and_one_scan(
+def test_default_output_free_jax_workflow_uses_one_jit_scan_and_checkpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     jit_calls = 0
     scan_calls = 0
+    checkpoint_calls = 0
+    compiled_jaxprs: list[object] = []
     original_jit = jax.jit
     original_scan = jax.lax.scan
+    original_checkpoint = jax.checkpoint
 
-    def recording_jit(*args: Any, **kwargs: Any) -> Any:
+    def recording_jit(function: Any, *args: Any, **kwargs: Any) -> Any:
         nonlocal jit_calls
         jit_calls += 1
-        return original_jit(*args, **kwargs)
+        compiled = original_jit(function, *args, **kwargs)
+
+        def invoke(*call_args: Any, **call_kwargs: Any) -> Any:
+            compiled_jaxprs.append(compiled.trace(*call_args, **call_kwargs).jaxpr)
+            return compiled(*call_args, **call_kwargs)
+
+        return invoke
 
     def recording_scan(*args: Any, **kwargs: Any) -> Any:
         nonlocal scan_calls
         scan_calls += 1
         return original_scan(*args, **kwargs)
 
+    def recording_checkpoint(*args: Any, **kwargs: Any) -> Any:
+        nonlocal checkpoint_calls
+        checkpoint_calls += 1
+        return original_checkpoint(*args, **kwargs)
+
     monkeypatch.setattr(jax, "jit", recording_jit)
     monkeypatch.setattr(jax.lax, "scan", recording_scan)
+    monkeypatch.setattr(jax, "checkpoint", recording_checkpoint)
     coupler = Coupler(
         _clock(steps=3),
         components=(_component("A"),),
@@ -397,6 +412,9 @@ def test_default_output_free_jax_workflow_uses_one_jit_and_one_scan(
 
     assert jit_calls == 1
     assert scan_calls == 1
+    assert checkpoint_calls == 1
+    assert len(compiled_jaxprs) == 1
+    assert "remat" in str(compiled_jaxprs[0])
     assert_allclose_compact(
         final_state.component("A").field("value"),
         jnp.full((2, 2), 3.0),

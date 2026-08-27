@@ -301,8 +301,8 @@ def test_veros_factory_configures_once_before_implementation_import(
     class ImplementationReached(RuntimeError):
         pass
 
-    def configure() -> None:
-        events.append("configure")
+    def configure(execution: str) -> None:
+        events.append(f"configure:{execution}")
 
     def load_implementation() -> object:
         events.append("implementation")
@@ -318,7 +318,48 @@ def test_veros_factory_configures_once_before_implementation_import(
     with pytest.raises(ImplementationReached):
         setups.make_veros_gcm()
 
-    assert events == ["configure", "implementation"]
+    assert events == ["configure:host", "implementation"]
+
+
+@pytest.mark.fast_always
+def test_veros_jax_factory_checks_capabilities_before_implementation_import(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import vercor.setups as setups
+    import vercor.setups._external.veros_gcm as factory_module
+    import vercor.setups._external.veros_runtime_settings as runtime_settings
+
+    events: list[str] = []
+
+    class ImplementationReached(RuntimeError):
+        pass
+
+    monkeypatch.setattr(
+        runtime_settings,
+        "configure_veros_runtime",
+        lambda execution: events.append(f"configure:{execution}"),
+    )
+    monkeypatch.setattr(
+        runtime_settings,
+        "require_differentiable_veros_capabilities",
+        lambda: events.append("capabilities"),
+        raising=False,
+    )
+
+    def load_implementation() -> object:
+        events.append("implementation")
+        raise ImplementationReached
+
+    monkeypatch.setattr(
+        factory_module,
+        "_load_veros_implementation",
+        load_implementation,
+    )
+
+    with pytest.raises(ImplementationReached):
+        setups.make_veros_gcm(config=setups.VerosConfig(execution="jax"))
+
+    assert events == ["configure:jax", "capabilities", "implementation"]
 
 
 @pytest.mark.fast_always

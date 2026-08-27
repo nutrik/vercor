@@ -28,6 +28,12 @@ if TYPE_CHECKING:
     from vercor.setups._external.jax_gcm_state import JAXGCMSetupState
 
 JCM_REFERENCE_PRESSURE = 1.0e5
+JAXGCM_PHYSICAL_FIELD_DEFAULTS = {
+    "temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
+    "potential_temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
+    "density": _jax_gcm_fields.REFERENCE_AIR_DENSITY,
+    "model_level_height": _jax_gcm_fields.REFERENCE_MODEL_LEVEL_HEIGHT,
+}
 
 
 @jax.tree_util.register_pytree_node_class
@@ -111,15 +117,19 @@ def jax_gcm_default_field_names(
     return fields
 
 
-def jax_gcm_default_fields() -> dict[str, float]:
+def jax_gcm_default_fields(
+    *,
+    include_total_surface_temperature: bool = True,
+) -> dict[str, float]:
     """Return scalar defaults for the JAXGCM runtime output contract."""
 
     defaults = {
         field_name: 0.0
         for field_name in jax_gcm_default_field_names(
-            include_total_surface_temperature=True
+            include_total_surface_temperature=include_total_surface_temperature
         )
     }
+    defaults.update(JAXGCM_PHYSICAL_FIELD_DEFAULTS)
     defaults["sea_surface_temperature"] = _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE
     return defaults
 
@@ -165,14 +175,7 @@ def prefill_jax_gcm_runtime_fields(
     """Pre-seed JAXGCM output fields so scan carry structure is stable."""
 
     data = dict(context.fields)
-    defaults = {
-        name: 0.0
-        for name in jax_gcm_default_field_names(
-            include_total_surface_temperature=True,
-        )
-    }
-    defaults["sea_surface_temperature"] = _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE
-    for name, value in defaults.items():
+    for name, value in jax_gcm_default_fields().items():
         data.setdefault(
             name, jax_full(component.grid.shape, value, state._dtype_policy)
         )
