@@ -187,13 +187,12 @@ def _forbidden_pre_v0_4_labels(relative_path: Path, line: str) -> tuple[str, ...
     changelog_context = bool(
         relative_path == Path("CHANGELOG.md") and re.match(r"^\s*(?:##\s+)?\[", line)
     )
-    external_artifact_context = any(
-        stem in relative_path.as_posix() or stem in line
-        for stem in _EXTERNAL_ARTIFACT_STEMS
-    )
     labels: list[str] = []
     for match in _PRE_V0_4_TOKEN.finditer(line):
         owner = _version_context_owner(line, match.start(), match.end())
+        external_artifact_context = any(
+            line[: match.start()].endswith(stem) for stem in _EXTERNAL_ARTIFACT_STEMS
+        )
         if owner == "external" or external_artifact_context:
             continue
         if owner == "vercor" or metadata_context or changelog_context:
@@ -258,6 +257,21 @@ def test_pre_v0_4_matcher_allows_external_and_numeric_contexts(
     line: str,
 ) -> None:
     assert not _forbidden_pre_v0_4_labels(relative_path, line)
+
+
+@pytest.mark.fast_always
+def test_pre_v0_4_matcher_rejects_vercor_label_beside_external_artifact() -> None:
+    """Keep an external artifact exemption scoped to its own version token."""
+
+    vercor_label = _legacy_version(minor=2, patch=1)
+    external_label = _legacy_version(minor=1)
+    line = (
+        f"Historical VerCOR release {vercor_label}; "
+        "external_extension_test_fixture-"
+        f"{external_label}-py3-none-any.whl"
+    )
+
+    assert _forbidden_pre_v0_4_labels(Path("docs/history.md"), line) == (vercor_label,)
 
 
 @pytest.mark.fast_always
