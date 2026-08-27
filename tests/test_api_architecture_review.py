@@ -632,12 +632,22 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
         assert "RELEASE_STATUS" not in section
         assert pypi_url in section
         assert 'test "$PYPI_STATUS" = "404"' in section
-        capability_index = section.index(capability_probe)
-        enumeration_index = section.index(release_enumeration)
-        absence_index = section.index(
-            "tools/validate_release_state.py github-tag-absent"
-        )
-        assert capability_index < enumeration_index < absence_index
+    prepare_enumeration_index = prepare.index(release_enumeration)
+    prepare_absence_index = prepare.index(
+        "tools/validate_release_state.py github-tag-absent"
+    )
+    prepare_capability_index = prepare.index(capability_probe)
+    assert (
+        prepare_enumeration_index
+        < prepare_absence_index
+        < prepare_capability_index
+    )
+    tag_capability_index = tag.index(capability_probe)
+    tag_enumeration_index = tag.index(release_enumeration)
+    tag_absence_index = tag.index(
+        "tools/validate_release_state.py github-tag-absent"
+    )
+    assert tag_capability_index < tag_enumeration_index < tag_absence_index
 
     assert ancestry_check in prepare
     assert exact_main_check not in prepare
@@ -786,8 +796,8 @@ def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
 
 
 @pytest.mark.fast_always
-def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
-    """Publish and reauthenticate the exact release branch before GitHub queries."""
+def test_release_pr_completes_conflict_preflight_before_push() -> None:
+    """Catch a release-branch push preceding any read-only conflict check."""
 
     guide = RELEASING_PATH.read_text(encoding="utf-8")
     prepare = _section(guide, "## 5. Prepare the required release pull request")
@@ -804,11 +814,16 @@ def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
     )
     remote_check = 'test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"'
     capability = "gh api --method POST repos/nutrik/vercor/releases/generate-notes"
+    local_tag_absence = 'test -z "$(git tag --list v0.4.6)"'
+    remote_tag_query = 'REMOTE_TAG_PRECHECK="$(git ls-remote --tags origin '
+    remote_tag_absence = 'test -z "$REMOTE_TAG_PRECHECK"'
     enumeration = (
         'gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100"'
     )
     absence = "tools/validate_release_state.py github-tag-absent"
     pypi_absence = 'test "$PYPI_STATUS" = "404"'
+    pr_query = 'OPEN_RELEASE_PRS="$(gh pr list --repo nutrik/vercor'
+    pr_absence = 'test "$OPEN_RELEASE_PRS" = "[]"'
     range_whitespace = 'git diff --check "$MAIN_COMMIT" "$RELEASE_COMMIT"'
     draft_pr = (
         'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" '
@@ -821,24 +836,37 @@ def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
         'test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"',
         'git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"',
         range_whitespace,
+        local_tag_absence,
+        remote_tag_query,
+        remote_tag_absence,
+        enumeration,
+        absence,
+        pypi_absence,
+        pr_query,
+        pr_absence,
         push,
         remote_query,
         remote_check,
         capability,
-        enumeration,
-        absence,
-        pypi_absence,
         draft_pr,
     ):
         assert required in prepare
-    assert prepare.index(range_whitespace) < prepare.index(push)
+    conflict_checks = (
+        local_tag_absence,
+        remote_tag_query,
+        remote_tag_absence,
+        enumeration,
+        absence,
+        pypi_absence,
+        pr_query,
+        pr_absence,
+    )
+    assert prepare.index(range_whitespace) < prepare.index(local_tag_absence)
+    assert all(prepare.index(check) < prepare.index(push) for check in conflict_checks)
     assert prepare.index(push) < prepare.index(remote_query)
     assert prepare.index(remote_query) < prepare.index(remote_check)
     assert prepare.index(remote_check) < prepare.index(capability)
-    assert prepare.index(capability) < prepare.index(enumeration)
-    assert prepare.index(enumeration) < prepare.index(absence)
-    assert prepare.index(absence) < prepare.index(pypi_absence)
-    assert prepare.index(pypi_absence) < prepare.index(draft_pr)
+    assert prepare.index(capability) < prepare.index(draft_pr)
     assert prepare.count("git push ") == 1
 
     selection = transcripts[-1]

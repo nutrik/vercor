@@ -178,12 +178,13 @@ publishes the tested artifact bundle.
 The workflow file runs validation on pushes to `main`, pull requests targeting
 `main`, and version tags. Only a version tag can satisfy the deployment job's
 condition. A push to `release/vercor-0.4.6` alone does not run it. Before any
-GitHub preflight or pull-request creation, fetch the protected branch, prove it
-is an ancestor of the reviewed release commit, push that exact commit to the
-release branch, and verify the remote branch SHA. Then prove the same token can
-invoke the non-mutating Release notes-generation endpoint and enumerate every
-release page so an exact-tag draft cannot be mistaken for absence. PyPI 0.4.6
-must also be absent:
+release-branch push or pull-request creation, fetch the protected branch,
+prove it is an ancestor of the reviewed release commit, and complete every
+read-only conflict check: local and remote exact tags, GitHub releases, PyPI,
+and matching open pull requests. Only after those checks prove absence, push
+the exact commit to the release branch and verify the remote branch SHA. Then
+prove the same token can invoke the non-mutating Release notes-generation
+endpoint against the now-reachable commit:
 
 ```text
 set -euo pipefail
@@ -198,24 +199,30 @@ export MAIN_COMMIT
 test -n "${MAIN_COMMIT:-}"
 git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"
 git diff --check "$MAIN_COMMIT" "$RELEASE_COMMIT"
-git push --set-upstream origin "$RELEASE_BRANCH"
-REMOTE_RELEASE_COMMIT="$(git ls-remote origin "refs/heads/${RELEASE_BRANCH}" | awk '{print $1}')"
-export REMOTE_RELEASE_COMMIT
-test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"
+test -z "$(git tag --list v0.4.6)"
+REMOTE_TAG_PRECHECK="$(git ls-remote --tags origin refs/tags/v0.4.6 'refs/tags/v0.4.6^{}')"
+export REMOTE_TAG_PRECHECK
+test -z "$REMOTE_TAG_PRECHECK"
 GH_TOKEN="$(gh auth token)"
 export GH_TOKEN
 test -n "${GH_TOKEN:-}"
 PREFLIGHT_DIR="$(mktemp -d)"
-gh api --method POST repos/nutrik/vercor/releases/generate-notes \
-  -f tag_name=v0.4.6 \
-  -f target_commitish="$RELEASE_COMMIT" \
-  > "$PREFLIGHT_DIR/release-capability.json"
 gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100" > "$PREFLIGHT_DIR/releases.json"
 python tools/validate_release_state.py github-tag-absent --json "$PREFLIGHT_DIR/releases.json" --tag v0.4.6
 PYPI_STATUS="$(curl -sS -L -o "$PREFLIGHT_DIR/pypi.json" -w '%{http_code}' https://pypi.org/pypi/vercor/0.4.6/json)"
 export PYPI_STATUS
 test "$PYPI_STATUS" = "404"
-gh pr list --repo nutrik/vercor --state open --base main --head "$RELEASE_BRANCH" --json number,url,headRefName,baseRefName,headRefOid
+OPEN_RELEASE_PRS="$(gh pr list --repo nutrik/vercor --state open --base main --head "$RELEASE_BRANCH" --json number,url,headRefName,baseRefName,headRefOid)"
+export OPEN_RELEASE_PRS
+test "$OPEN_RELEASE_PRS" = "[]"
+git push --set-upstream origin "$RELEASE_BRANCH"
+REMOTE_RELEASE_COMMIT="$(git ls-remote origin "refs/heads/${RELEASE_BRANCH}" | awk '{print $1}')"
+export REMOTE_RELEASE_COMMIT
+test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"
+gh api --method POST repos/nutrik/vercor/releases/generate-notes \
+  -f tag_name=v0.4.6 \
+  -f target_commitish="$RELEASE_COMMIT" \
+  > "$PREFLIGHT_DIR/release-capability.json"
 ```
 
 If no authorized pull request exists, this is the exact preparation command.
