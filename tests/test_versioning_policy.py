@@ -86,6 +86,23 @@ _VERSION_ASSIGNMENT = re.compile(
     r"(?:^|[\"'])\s*(?:__version__|version)[\"']?\s*[:=]",
     flags=re.IGNORECASE,
 )
+_PRE_V0_4_TOKEN = re.compile(
+    r"(?<![\d.])(?:[vV])?0\.(?:[0-3])" r"(?:\.\d+(?:[A-Za-z][0-9A-Za-z.-]*)?)?(?![\d.])"
+)
+_PRE_V0_4_PATH = re.compile(
+    r"(?:migration|vercor|compat|api|release)[^/]*0\.(?:[0-3])",
+    flags=re.IGNORECASE,
+)
+_EXTERNAL_ARTIFACT_STEMS = (
+    "external_extension_test_fixture-",
+    "vercor_public_plugin-",
+)
+
+
+def _legacy_version(*, minor: int, patch: int = 0, prefix: str = "") -> str:
+    """Construct an unsupported VerCOR label without storing it literally."""
+
+    return prefix + ".".join(str(part) for part in (0, minor, patch))
 
 
 def _tracked_text_paths() -> tuple[Path, ...]:
@@ -154,6 +171,42 @@ def _version_context_owner(line: str, start: int, end: int) -> str | None:
     return None
 
 
+def _forbidden_pre_v0_4_labels(relative_path: Path, line: str) -> tuple[str, ...]:
+    """Return unsupported labels when their path or context belongs to VerCOR."""
+
+    metadata_context = bool(
+        _VERSION_ASSIGNMENT.search(line)
+        and (
+            relative_path == Path("pyproject.toml")
+            or (
+                relative_path.parts[:2] == ("tests", "contracts")
+                and relative_path.name.startswith("vercor-")
+            )
+        )
+    )
+    changelog_context = bool(
+        relative_path == Path("CHANGELOG.md") and re.match(r"^\s*(?:##\s+)?\[", line)
+    )
+    external_artifact_context = any(
+        stem in relative_path.as_posix() or stem in line
+        for stem in _EXTERNAL_ARTIFACT_STEMS
+    )
+    labels: list[str] = []
+    for match in _PRE_V0_4_TOKEN.finditer(line):
+        owner = _version_context_owner(line, match.start(), match.end())
+        if owner == "external" or external_artifact_context:
+            continue
+        if owner == "vercor" or metadata_context or changelog_context:
+            labels.append(match.group())
+    return tuple(labels)
+
+
+def _forbidden_pre_v0_4_path(relative_path: Path) -> bool:
+    """Return whether a path itself identifies an unsupported release series."""
+
+    return bool(_PRE_V0_4_PATH.search(relative_path.as_posix()))
+
+
 def _forbidden_release_shorthand_labels(line: str) -> tuple[str, ...]:
     """Return shorthand spans whose adjacent context belongs to VerCOR."""
 
@@ -162,6 +215,55 @@ def _forbidden_release_shorthand_labels(line: str) -> tuple[str, ...]:
         for match in _RELEASE_SHORTHAND_TOKEN.finditer(line)
         if _version_context_owner(line, match.start(), match.end()) == "vercor"
     )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("minor", range(4))
+@pytest.mark.parametrize("prefix", ("", "v", "V"))
+def test_pre_v0_4_matcher_rejects_vercor_owned_labels(
+    minor: int,
+    prefix: str,
+) -> None:
+    label = _legacy_version(minor=minor, patch=2, prefix=prefix)
+    assert _forbidden_pre_v0_4_labels(
+        Path("docs/history.md"),
+        f"Historical VerCOR release {label}",
+    ) == (label,)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    ("relative_path", "line"),
+    (
+        (
+            Path("docs/external-dependencies.md"),
+            "external dependency version " + _legacy_version(minor=2, patch=1),
+        ),
+        (
+            Path("dist/artifacts.md"),
+            "external_extension_test_fixture-"
+            + _legacy_version(minor=1)
+            + "-py3-none-any.whl",
+        ),
+        (Path("docs/numerics.md"), "one-quarter numerical weights are 0.25"),
+        (Path("docs/development.md"), "Python 3.12 and Python 3.13"),
+        (
+            Path(".readthedocs.yaml"),
+            "https://docs.readthedocs.io/en/stable/config-file/" + "v" + "2.html",
+        ),
+    ),
+)
+def test_pre_v0_4_matcher_allows_external_and_numeric_contexts(
+    relative_path: Path,
+    line: str,
+) -> None:
+    assert not _forbidden_pre_v0_4_labels(relative_path, line)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("minor", range(4))
+def test_pre_v0_4_matcher_rejects_legacy_migration_paths(minor: int) -> None:
+    assert _forbidden_pre_v0_4_path(Path(f"docs/migration-0.{minor}-to-0.4.md"))
 
 
 def _forbidden_api_tokens(relative_path: Path, line: str) -> tuple[str, ...]:

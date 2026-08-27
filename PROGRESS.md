@@ -1,6 +1,7 @@
 # VerCOR Progress
 This is the bounded orientation log for active development. Detailed history is preserved in `docs/progress-archive-2026-04-23-to-2026-05-15.md`, `docs/progress-archive-2026-05-16-to-2026-07-14.md`, and `docs/progress-archive-2026-07-22.md`.
 ## Current Status
+- Semantic pre-v0.4 matcher unit completed (2026-08-27): generated ownership, external-artifact, numerical, Python, Read the Docs, and migration-path cases recorded 21/21 expected RED missing-function failures, then 21/21 focused GREEN and 163/163 complete version-policy GREEN. Live-tree integration is intentionally deferred to the next cleanup task.
 - Hybrid-sigma hypsometric audit completed (2026-08-27): independent `A + B * ps`
   cases reproduce 95,000/85,700 Pa; the IFS half-level height discretization has
   dry/moist literals and surface-pressure JVP/VJP; six RED eager/JIT layouts now
@@ -159,7 +160,6 @@ This is the bounded orientation log for active development. Detailed history is 
   cadence, host transfer, paths, period files, final fields, and snapshots.
   `output=None` performs no I/O and remains differentiable.
 - JCM, Veros, and CAMulator imports remain lazy. CAMulator is not installed or pinned.
-
 ## Release Candidate Handoff
 
 - The executable review validates the exact eight sections, all canonical public manifests, central/root signatures, all 119 non-public modules, runnable README/migration snippets, archive SHA-256, Task 9 absence, and release metadata.
