@@ -494,6 +494,27 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
 
 
 @pytest.mark.fast_always
+def test_release_notes_distinguish_stock_and_fork_state_copy_ownership() -> None:
+    """Describe generic stock-state ownership separately from native fork copying."""
+
+    release_notes = " ".join(
+        (PROJECT_ROOT / "docs" / "release-notes-0.4.6.md")
+        .read_text(encoding="utf-8")
+        .split()
+    )
+    accurate_claim = (
+        "The stock state copy is owned by the generic runtime; the fork retains "
+        "its native PyTree copy path."
+    )
+    inaccurate_claim = (
+        "The state copy path remains native to each supported Veros implementation."
+    )
+
+    assert accurate_claim in release_notes
+    assert inaccurate_claim not in release_notes
+
+
+@pytest.mark.fast_always
 def test_readme_installation_metadata_matches_project_version() -> None:
     """Keep active installation guidance bound to the packaged release version."""
 

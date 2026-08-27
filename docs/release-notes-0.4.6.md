@@ -17,7 +17,8 @@ corrects native-state ownership and atmospheric hybrid-sigma heights.
 - Removed unsupported VerCOR release references from tracked source,
   documentation, tests, and archives.
 
-The state copy path remains native to each supported Veros implementation.
+The stock state copy is owned by the generic runtime; the fork retains its
+native PyTree copy path.
 
 ## Upgrade
 
