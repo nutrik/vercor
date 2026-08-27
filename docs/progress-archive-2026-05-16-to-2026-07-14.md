@@ -156,7 +156,7 @@ historical commands, failure messages, or detailed validation notes.
   `OutputConfig`/`PeriodOutput`, `Coupler.run()`, and
   `Coupler.write_outputs()`; custom backends still remained
   on `RuntimeOptions.execution` plus `ExecutionBackend.run`. Route IDs were
-  outside Task 4; workflow, unified output-provider, and `vercor.compat.v0_3`
+  outside Task 4; workflow, unified output-provider, and legacy compatibility
   APIs were not yet implemented. Final review closed imported-object/module namespace leaks,
   public annotation resolution, eager graph validation, strict run-order
   typing, installed-wheel manifest coverage, and documentation ownership
@@ -1333,7 +1333,7 @@ historical commands, failure messages, or detailed validation notes.
   `vercor.exchanges` `*_FIELDS` recipe names.
 - Updated API-boundary tests to assert the removed names and modules stay
   absent, refreshed runtime-state boundary coverage, and updated
-  `DESIGN.md`/`DEPENDENCIES.md` to describe the 0.2.0-only API.
+  `DESIGN.md`/`DEPENDENCIES.md` to describe the legacy API.
 - Validation run for this change: focused red/green API/runtime-state pytest,
   Black, flake8, mypy, full fast pytest, and full pytest passed using
   `/Users/romannuterman/miniforge3/envs/scipy/bin/python`. Black emitted the

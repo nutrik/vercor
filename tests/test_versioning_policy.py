@@ -59,6 +59,10 @@ _VERCOR_VERSION_PREFIX = re.compile(
     r"plugins?|fixtures?|line|candidate))*[ \t:`\"'=[_-]*$",
     flags=re.IGNORECASE,
 )
+_VERCOR_API_IDENTIFIER_PREFIX = re.compile(
+    r"\bvercor(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.$",
+    flags=re.IGNORECASE,
+)
 _EXTERNAL_VERSION_PREFIX = re.compile(
     r"\b(?:external|independent)"
     rf"(?:[ \t_-]+{_VERSION_QUALIFIER})*"
@@ -78,7 +82,7 @@ _REPOSITORY_VERSION_PREFIX = re.compile(
     flags=re.IGNORECASE,
 )
 _REPOSITORY_VERSION_SUFFIX = re.compile(
-    r"^[ \t`\"'\])}:_-]*(?:releases?|APIs?|history|migrations?|artifacts?|"
+    r"^[ \t`\"'\])}:_-]*(?:only[ \t_-]+)?(?:releases?|APIs?|history|migrations?|artifacts?|"
     r"manifests?|plugins?|fixtures?|lines?)\b",
     flags=re.IGNORECASE,
 )
@@ -87,7 +91,12 @@ _VERSION_ASSIGNMENT = re.compile(
     flags=re.IGNORECASE,
 )
 _PRE_V0_4_TOKEN = re.compile(
-    r"(?<![\d.])(?:[vV])?0\.(?:[0-3])" r"(?:\.\d+(?:[A-Za-z][0-9A-Za-z.-]*)?)?(?![\d.])"
+    r"(?:"
+    r"(?<![\d.])(?:[vV])?0\.(?:[0-3])"
+    r"(?:\.\d+(?:[A-Za-z][0-9A-Za-z.-]*)?)?(?![\d.])"
+    r"|"
+    r"(?<![A-Za-z0-9_])(?:[vV])?0_(?:[0-3])(?:_\d+)?(?![A-Za-z0-9_])"
+    r")"
 )
 _PRE_V0_4_PATH = re.compile(
     r"(?:migration|vercor|compat|api|release)[^/]*0\.(?:[0-3])",
@@ -172,6 +181,7 @@ def _version_context_owner(line: str, start: int, end: int) -> str | None:
         return "external"
     if (
         _VERCOR_VERSION_PREFIX.search(prefix)
+        or _VERCOR_API_IDENTIFIER_PREFIX.search(prefix)
         or _REPOSITORY_VERSION_PREFIX.search(prefix)
         or _REPOSITORY_VERSION_SUFFIX.search(suffix)
     ):
@@ -235,6 +245,28 @@ def test_pre_v0_4_matcher_rejects_vercor_owned_labels(
     assert _forbidden_pre_v0_4_labels(
         Path("docs/history.md"),
         f"Historical VerCOR release {label}",
+    ) == (label,)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("minor", range(4))
+def test_pre_v0_4_matcher_rejects_encoded_vercor_api_identifiers(
+    minor: int,
+) -> None:
+    label = f"v0_{minor}"
+    assert _forbidden_pre_v0_4_labels(
+        Path("docs/history.md"),
+        f"vercor.compat.{label}",
+    ) == (label,)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("minor", range(4))
+def test_pre_v0_4_matcher_rejects_only_api_suffix(minor: int) -> None:
+    label = _legacy_version(minor=minor)
+    assert _forbidden_pre_v0_4_labels(
+        Path("docs/history.md"),
+        f"the {label}-only API",
     ) == (label,)
 
 
