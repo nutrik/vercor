@@ -17,4 +17,5 @@ authoring and released versions.
    release-notes-0.4.3
    release-notes-0.4.4
    release-notes-0.4.5
+   release-notes-0.4.6
    releasing

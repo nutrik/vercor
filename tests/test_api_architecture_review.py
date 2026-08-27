@@ -432,7 +432,7 @@ def test_readme_python_snippets_run_as_one_public_quick_start(
 def test_release_files_and_metadata_describe_the_stable_release() -> None:
     """Bind release documentation to installed project metadata and artifact names."""
 
-    assert EXPECTED_VERSION == "0.4.5"
+    assert EXPECTED_VERSION == "0.4.6"
     expected_release_notes = f"docs/release-notes-{EXPECTED_VERSION}.md"
     project = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -443,7 +443,7 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
 
     changelog = CHANGELOG_PATH.read_text(encoding="utf-8")
     assert re.search(
-        rf"^## \[{re.escape(EXPECTED_VERSION)}\] - 2026-08-24$",
+        rf"^## \[{re.escape(EXPECTED_VERSION)}\] - 2026-08-27$",
         changelog,
         re.MULTILINE,
     )
@@ -452,8 +452,8 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
         in changelog
     )
     assert (
-        f"[{EXPECTED_VERSION}]: https://github.com/nutrik/vercor/compare/v0.4.4...v{EXPECTED_VERSION}"
-        in changelog
+        f"[{EXPECTED_VERSION}]: https://github.com/nutrik/vercor/compare/"
+        f"v0.4.5...v{EXPECTED_VERSION}" in changelog
     )
     assert re.search(r"^## \[0\.4\.2\] - 2026-07-25$", changelog, re.MULTILINE)
     assert re.search(r"^## \[0\.4\.1\] - 2026-07-24$", changelog, re.MULTILINE)
@@ -462,17 +462,17 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
     release_notes = release_notes_path.read_text(encoding="utf-8")
     release_notes_lower = release_notes.lower()
     for required in (
-        "jcm 2.0.1",
-        "fractional surface",
-        "no-nan",
-        "setup gallery",
-        "jaxgcm",
-        "logging",
+        "veros",
+        "differentiable",
+        "execution",
+        "state copy",
+        "sigma",
+        "0.4.6",
     ):
         assert required in release_notes_lower
     releasing = RELEASING_PATH.read_text(encoding="utf-8")
-    assert "release/vercor-0.4.5" in releasing
-    assert "release/vercor-0.4.4" not in releasing
+    assert "release/vercor-0.4.6" in releasing
+    assert "release/vercor-0.4.5" not in releasing
     commands = "\n".join(re.findall(r"```bash\n(.*?)```", releasing, re.DOTALL))
     for command in (
         "python -m build",
@@ -723,9 +723,9 @@ def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
     branch_assignment = f'RELEASE_BRANCH="{expected_branch}"'
     exact_title = f'--title "Release {expected_title}"'
     exact_body = (
-        f'--body "Prepare {expected_title} with the JCM 2.0.1 migration, '
-        "finite-gradient numerical safeguards, setup-gallery runtime fixes, "
-        'and quiet JAXGCM stepping."'
+        f'--body "Prepare {expected_title} with differentiable multi-step Veros '
+        "execution, complete native-state ownership, CI provenance gates, and "
+        'corrected hybrid-sigma heights."'
     )
 
     assert "refactor" not in guide

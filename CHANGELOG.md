@@ -5,18 +5,30 @@ versioning; pre-releases may still refine new contracts.
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-08-27
+
+### Added
+
+- Added capability-gated differentiable JAX execution for the supported
+  Veros fork, including stable multi-step forward- and reverse-mode
+  gradients.
+
 ### Changed
 
 - Made `VerosConfig.execution` the sole Veros execution-policy option and
-  removed the misleading `jitted` flag, which never compiled NumPy-backed
-  host execution and was redundant for differentiable JAX execution.
+  removed the redundant `jitted` flag.
+- Strengthened CI isolation, provenance, dependency installation, and
+  combined coverage for stock and differentiable Veros lanes.
 
 ### Fixed
 
 - Copy complete stock-Veros states without enumerating native attributes,
-  preserving diagnostics and future additions. Each host step now relies on
-  the generic runtime's single ownership copy, while the differentiable fork
-  retains its native PyTree copy path.
+  preserving diagnostics and future additions while retaining the fork's
+  native PyTree copy path.
+- Corrected JCM sigma-level height evaluation and validated hybrid-sigma
+  height calculations.
+- Removed unsupported VerCOR release references from the complete tracked
+  source, documentation, test, and archive tree.
 
 ## [0.4.5] - 2026-08-24
 
@@ -176,7 +188,8 @@ versioning; pre-releases may still refine new contracts.
 This alpha does not ship legacy compatibility adapters. Use the current
 researcher and developer guides for supported workflows.
 
-[Unreleased]: https://github.com/nutrik/vercor/compare/v0.4.5...HEAD
+[Unreleased]: https://github.com/nutrik/vercor/compare/v0.4.6...HEAD
+[0.4.6]: https://github.com/nutrik/vercor/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/nutrik/vercor/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/nutrik/vercor/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/nutrik/vercor/compare/v0.4.2...v0.4.3

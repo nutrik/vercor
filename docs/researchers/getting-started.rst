@@ -39,7 +39,7 @@ If you want to install a specific release version execute:
 
 .. code-block:: console
 
-   python -m pip install "vercor==0.4.5"
+   python -m pip install "vercor==0.4.6"
 
 Using Conda (multi-platform)
 ++++++++++++++++++++++++++++
