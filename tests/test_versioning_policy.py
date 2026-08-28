@@ -468,20 +468,34 @@ def test_integrated_scanner_checks_every_tracked_text_format(
 
 
 @pytest.mark.fast_always
-def test_integrated_scanner_safely_skips_tracked_binary_artifacts(
+def test_integrated_scanner_safely_skips_invalid_utf8_without_nul(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Catch decoding every tracked byte sequence as UTF-8 without classification."""
+    """Catch removing the decode-error fallback while NUL exclusion remains."""
 
     label = _legacy_version(minor=3, patch=2)
     _run_integrated_scanner_for_real_tracked_file(
         monkeypatch,
         tmp_path,
-        relative_path=Path("assets/reference.md"),
-        content=b"\xff\xfe\x00"
-        + f"Historical VerCOR release {label}".encode()
-        + b"\x00",
+        relative_path=Path("assets/invalid-utf8.md"),
+        content=b"\xff\xfe" + f"Historical VerCOR release {label}".encode(),
+    )
+
+
+@pytest.mark.fast_always
+def test_integrated_scanner_safely_skips_nul_containing_utf8(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Catch removing NUL exclusion while the decode-error fallback remains."""
+
+    label = _legacy_version(minor=3, patch=2)
+    _run_integrated_scanner_for_real_tracked_file(
+        monkeypatch,
+        tmp_path,
+        relative_path=Path("assets/nul-containing.md"),
+        content=f"Historical VerCOR release {label}\0".encode(),
     )
 
 
