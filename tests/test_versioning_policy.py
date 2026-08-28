@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -56,7 +57,8 @@ _VERCOR_VERSION_PREFIX = re.compile(
     r"(?:\[[A-Za-z0-9_.-]+(?:,[A-Za-z0-9_.-]+)*\])?"
     rf"(?:[ \t_-]+(?:{_VERSION_QUALIFIER}|version|releases?|APIs?|history|"
     r"migrations?|artifacts?|manifests?|"
-    r"plugins?|fixtures?|line|candidate))*[\t :`\"'=<>!~_\[\]-]*$",
+    r"plugins?|fixtures?|packages?|distributions?|line|candidate))*"
+    r"[\t :`\"'=<>!~_()\[\]-]*$",
     flags=re.IGNORECASE,
 )
 _VERCOR_API_IDENTIFIER_PREFIX = re.compile(
@@ -142,13 +144,16 @@ def _tracked_paths() -> tuple[Path, ...]:
         text=True,
     )
     paths = (Path(name) for name in result.stdout.split("\0") if name)
-    return tuple(path for path in paths if (PROJECT_ROOT / path).is_file())
+    return tuple(path for path in paths if os.path.lexists(PROJECT_ROOT / path))
 
 
 def _read_tracked_text(relative_path: Path) -> str | None:
     """Decode a repository file as UTF-8 text, or return ``None`` for binary."""
 
-    content = (PROJECT_ROOT / relative_path).read_bytes()
+    absolute_path = PROJECT_ROOT / relative_path
+    if absolute_path.is_symlink() or not absolute_path.is_file():
+        return None
+    content = absolute_path.read_bytes()
     if b"\0" in content:
         return None
     try:
@@ -443,6 +448,27 @@ def _run_integrated_scanner_for_real_tracked_file(
     test_tracked_repository_has_no_forbidden_vercor_release_labels()
 
 
+def _run_integrated_scanner_for_real_tracked_symlink(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    relative_path: Path,
+) -> None:
+    """Run the scanner through a real temporary Git tracked symlink."""
+
+    candidate = tmp_path / relative_path
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    candidate.symlink_to("missing-target")
+    subprocess.run(["git", "init", "-q"], check=True, cwd=tmp_path)
+    subprocess.run(
+        ["git", "add", "--", relative_path.as_posix()],
+        check=True,
+        cwd=tmp_path,
+    )
+    monkeypatch.setattr("tests.test_versioning_policy.PROJECT_ROOT", tmp_path)
+    test_tracked_repository_has_no_forbidden_vercor_release_labels()
+
+
 @pytest.mark.fast_always
 @pytest.mark.parametrize(
     "relative_path",
@@ -494,6 +520,37 @@ def test_integrated_scanner_checks_paths_before_content_classification(
             relative_path=relative_path,
             content=content,
         )
+
+
+@pytest.mark.fast_always
+def test_integrated_scanner_checks_forbidden_dangling_symlink_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Catch filtering Git symlink entries through ``Path.is_file``."""
+
+    label = _legacy_version(minor=3, patch=2, prefix="v")
+    relative_path = Path("docs/releases") / f"{label}.md"
+    with pytest.raises(AssertionError, match=re.escape(relative_path.as_posix())):
+        _run_integrated_scanner_for_real_tracked_symlink(
+            monkeypatch,
+            tmp_path,
+            relative_path=relative_path,
+        )
+
+
+@pytest.mark.fast_always
+def test_integrated_scanner_skips_allowed_dangling_symlink_content(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Catch attempting to decode a permitted dangling Git symlink."""
+
+    _run_integrated_scanner_for_real_tracked_symlink(
+        monkeypatch,
+        tmp_path,
+        relative_path=Path("docs/latest.md"),
+    )
 
 
 @pytest.mark.fast_always
@@ -558,6 +615,15 @@ def _legacy_policy_case(case: str) -> tuple[Path, str, str | None]:
     if case == "encoded-version-path":
         label = _legacy_version(minor=3, patch=None, prefix="v").replace(".", "_")
         return Path("docs/compat") / f"{label}.md", "Compatibility", None
+    if case == "package-version":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs/history.txt"), f"VerCOR package version {label}", label
+    if case == "distribution-version":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs/history.txt"), f"VerCOR distribution {label}", label
+    if case == "core-metadata-requires-dist":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("METADATA"), f"Requires-Dist: vercor (>={label})", label
     raise AssertionError(f"unknown policy case: {case}")
 
 
@@ -574,6 +640,9 @@ def _legacy_policy_case(case: str) -> tuple[Path, str, str | None]:
         "owner-directory-version-leaf",
         "version-first-release-filename",
         "encoded-version-path",
+        "package-version",
+        "distribution-version",
+        "core-metadata-requires-dist",
     ),
 )
 def test_pre_v0_4_matchers_reject_common_owned_forms(case: str) -> None:
@@ -599,6 +668,9 @@ def test_pre_v0_4_matchers_reject_common_owned_forms(case: str) -> None:
         "owner-directory-version-leaf",
         "version-first-release-filename",
         "encoded-version-path",
+        "package-version",
+        "distribution-version",
+        "core-metadata-requires-dist",
     ),
 )
 def test_integrated_scanner_rejects_common_owned_forms(
@@ -636,6 +708,18 @@ def test_integrated_scanner_rejects_common_owned_forms(
         (Path("docs/development.txt"), "Python 3.13"),
         (Path("docs/provenance.txt"), "SHA-256 " + "03" * 32),
         (Path("docs/numerics.txt"), "relaxation coefficient 0.3"),
+        (
+            Path("docs/dependencies.txt"),
+            "external package version " + _legacy_version(minor=3, patch=2),
+        ),
+        (
+            Path("docs/distributions.txt"),
+            "independent distribution " + _legacy_version(minor=3, patch=2),
+        ),
+        (
+            Path("METADATA"),
+            "Requires-Dist: numpy (>=" + _legacy_version(minor=3, patch=2) + ")",
+        ),
     ),
 )
 def test_integrated_scanner_allows_unowned_numeric_forms(
