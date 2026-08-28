@@ -181,10 +181,11 @@ condition. A push to `release/vercor-0.4.6` alone does not run it. Before any
 release-branch push or pull-request creation, fetch the protected branch,
 prove it is an ancestor of the reviewed release commit, and complete every
 read-only conflict check: local and remote exact tags, GitHub releases, PyPI,
-and matching open pull requests. Only after those checks prove absence, push
-the exact commit to the release branch and verify the remote branch SHA. Then
-prove the same token can invoke the non-mutating Release notes-generation
-endpoint against the now-reachable commit:
+matching open pull requests, and the target remote release branch. Only after
+those checks prove absence, push the exact commit to the release branch and
+verify the remote branch SHA. Then prove the same token can invoke the
+non-mutating Release notes-generation endpoint against the now-reachable
+commit:
 
 ```text
 set -euo pipefail
@@ -203,6 +204,9 @@ test -z "$(git tag --list v0.4.6)"
 REMOTE_TAG_PRECHECK="$(git ls-remote --tags origin refs/tags/v0.4.6 'refs/tags/v0.4.6^{}')"
 export REMOTE_TAG_PRECHECK
 test -z "$REMOTE_TAG_PRECHECK"
+REMOTE_BRANCH_PRECHECK="$(git ls-remote origin "refs/heads/${RELEASE_BRANCH}" | awk '{print $1}')"
+export REMOTE_BRANCH_PRECHECK
+test -z "$REMOTE_BRANCH_PRECHECK"
 GH_TOKEN="$(gh auth token)"
 export GH_TOKEN
 test -n "${GH_TOKEN:-}"

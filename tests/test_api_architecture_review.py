@@ -873,6 +873,33 @@ def test_release_pr_completes_conflict_preflight_before_push() -> None:
 
 
 @pytest.mark.fast_always
+def test_release_pr_requires_remote_branch_absence_before_hosted_mutation() -> None:
+    """Catch pushing when the target remote release branch already exists."""
+
+    guide = RELEASING_PATH.read_text(encoding="utf-8")
+    prepare = _section(guide, "## 5. Prepare the required release pull request")
+    remote_branch_query = (
+        'REMOTE_BRANCH_PRECHECK="$(git ls-remote origin '
+        '"refs/heads/${RELEASE_BRANCH}" | awk \'{print $1}\')"'
+    )
+    remote_branch_absence = 'test -z "$REMOTE_BRANCH_PRECHECK"'
+    hosted_mutations = (
+        'git push --set-upstream origin "$RELEASE_BRANCH"',
+        'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH"',
+        'gh pr ready "$RELEASE_PR_NUMBER" --repo nutrik/vercor',
+        'gh pr merge "$RELEASE_PR_NUMBER" --repo nutrik/vercor --merge',
+    )
+
+    assert remote_branch_query in prepare
+    assert "export REMOTE_BRANCH_PRECHECK" in prepare
+    assert remote_branch_absence in prepare
+    query_index = prepare.index(remote_branch_query)
+    absence_index = prepare.index(remote_branch_absence)
+    assert query_index < absence_index
+    assert all(absence_index < prepare.index(command) for command in hosted_mutations)
+
+
+@pytest.mark.fast_always
 def test_release_pr_merge_rebinds_main_before_tag_preflight() -> None:
     """Merge the verified PR and detach at the protected-main commit before tagging."""
 
