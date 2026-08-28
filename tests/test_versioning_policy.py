@@ -53,6 +53,7 @@ _VERSION_QUALIFIER = (
 )
 _VERCOR_VERSION_PREFIX = re.compile(
     r"\bvercor(?:['’]s)?"
+    r"(?:\[[A-Za-z0-9_.-]+(?:,[A-Za-z0-9_.-]+)*\])?"
     rf"(?:[ \t_-]+(?:{_VERSION_QUALIFIER}|version|releases?|APIs?|history|"
     r"migrations?|artifacts?|manifests?|"
     r"plugins?|fixtures?|line|candidate))*[\t :`\"'=<>!~_\[\]-]*$",
@@ -81,8 +82,11 @@ _REPOSITORY_VERSION_PREFIX = re.compile(
     flags=re.IGNORECASE,
 )
 _REPOSITORY_VERSION_SUFFIX = re.compile(
-    r"^[ \t`\"'\])}:_-]*(?:only[ \t_-]+)?(?:releases?|APIs?|history|migrations?|artifacts?|"
-    r"manifests?|plugins?|fixtures?|lines?)\b",
+    r"^[ \t`\"'\])}:_-]*(?:"
+    r"(?:only[ \t_-]+)?(?:releases?|APIs?|history|migrations?|artifacts?|"
+    r"manifests?|plugins?|fixtures?|lines?)\b"
+    r"|of[ \t]+vercor\b"
+    r")",
     flags=re.IGNORECASE,
 )
 _VERSION_ASSIGNMENT = re.compile(
@@ -97,10 +101,13 @@ _PRE_V0_4_TOKEN = re.compile(
     r"(?<![A-Za-z0-9_])(?:[vV])?0_(?:[0-3])(?:_\d+)?(?![A-Za-z0-9_])"
     r")"
 )
+_PRE_V0_4_PATH_VERSION = r"(?:[vV])?0[._](?:[0-3])(?!\d)"
 _PRE_V0_4_PATH = re.compile(
     r"(?:"
-    r"(?:migration|vercor|compat|api|release)[^/]*0\.(?:[0-3])"
-    r"|(?:^|/)releases?/[^/]*0\.(?:[0-3])"
+    rf"(?:migration|vercor|compat|api|releases?)[^/]*{_PRE_V0_4_PATH_VERSION}"
+    rf"|(?:^|/)(?:releases?|vercor|compat|api)/[^/]*{_PRE_V0_4_PATH_VERSION}"
+    rf"|(?:^|/){_PRE_V0_4_PATH_VERSION}[^/]*"
+    r"(?:migration|vercor|compat|api|releases?)"
     r")",
     flags=re.IGNORECASE,
 )
@@ -124,8 +131,8 @@ def _legacy_version(
     return prefix + ".".join(str(part) for part in parts) + suffix
 
 
-def _tracked_text_paths() -> tuple[Path, ...]:
-    """Return existing tracked or intended repository text paths."""
+def _tracked_paths() -> tuple[Path, ...]:
+    """Return every existing tracked or intended repository path."""
 
     result = subprocess.run(
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
@@ -135,11 +142,7 @@ def _tracked_text_paths() -> tuple[Path, ...]:
         text=True,
     )
     paths = (Path(name) for name in result.stdout.split("\0") if name)
-    return tuple(
-        path
-        for path in paths
-        if (PROJECT_ROOT / path).is_file() and _read_tracked_text(path) is not None
-    )
+    return tuple(path for path in paths if (PROJECT_ROOT / path).is_file())
 
 
 def _read_tracked_text(relative_path: Path) -> str | None:
@@ -412,7 +415,7 @@ def _run_integrated_scanner_for_line(
     candidate.write_text(line + "\n", encoding="utf-8")
     monkeypatch.setattr("tests.test_versioning_policy.PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(
-        "tests.test_versioning_policy._tracked_text_paths",
+        "tests.test_versioning_policy._tracked_paths",
         lambda: (relative_path,),
     )
     test_tracked_repository_has_no_forbidden_vercor_release_labels()
@@ -468,6 +471,32 @@ def test_integrated_scanner_checks_every_tracked_text_format(
 
 
 @pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "content",
+    (
+        pytest.param(b"harmless\0binary", id="nul"),
+        pytest.param(b"\xff\xfe harmless binary", id="invalid-utf8"),
+    ),
+)
+def test_integrated_scanner_checks_paths_before_content_classification(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    content: bytes,
+) -> None:
+    """Catch filtering tracked paths through binary-content classification."""
+
+    label = _legacy_version(minor=3, patch=2, prefix="v")
+    relative_path = Path("docs/releases") / f"{label}.bin"
+    with pytest.raises(AssertionError, match=re.escape(relative_path.as_posix())):
+        _run_integrated_scanner_for_real_tracked_file(
+            monkeypatch,
+            tmp_path,
+            relative_path=relative_path,
+            content=content,
+        )
+
+
+@pytest.mark.fast_always
 def test_integrated_scanner_safely_skips_invalid_utf8_without_nul(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -514,6 +543,21 @@ def _legacy_policy_case(case: str) -> tuple[Path, str, str | None]:
     if case == "nested-release-path":
         label = _legacy_version(minor=3, patch=2, prefix="v")
         return Path("docs/releases") / f"{label}.md", "Release notes", None
+    if case == "pep508-extras":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("requirements.txt"), f"vercor[veros]>={label}", label
+    if case == "version-of-vercor":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs/history.txt"), f"version {label} of VerCOR", label
+    if case == "owner-directory-version-leaf":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs/vercor") / f"{label}.md", "Release notes", None
+    if case == "version-first-release-filename":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs") / f"{label}-release-notes.md", "Release notes", None
+    if case == "encoded-version-path":
+        label = _legacy_version(minor=3, patch=None, prefix="v").replace(".", "_")
+        return Path("docs/compat") / f"{label}.md", "Compatibility", None
     raise AssertionError(f"unknown policy case: {case}")
 
 
@@ -525,10 +569,15 @@ def _legacy_policy_case(case: str) -> tuple[Path, str, str | None]:
         "compatible-release",
         "release-wildcard",
         "nested-release-path",
+        "pep508-extras",
+        "version-of-vercor",
+        "owner-directory-version-leaf",
+        "version-first-release-filename",
+        "encoded-version-path",
     ),
 )
 def test_pre_v0_4_matchers_reject_common_owned_forms(case: str) -> None:
-    """Catch dropping operators, wildcards, or nested release-path ownership."""
+    """Catch incomplete owned package syntax, reverse ownership, or paths."""
 
     relative_path, line, label = _legacy_policy_case(case)
     if label is None:
@@ -545,6 +594,11 @@ def test_pre_v0_4_matchers_reject_common_owned_forms(case: str) -> None:
         "compatible-release",
         "release-wildcard",
         "nested-release-path",
+        "pep508-extras",
+        "version-of-vercor",
+        "owner-directory-version-leaf",
+        "version-first-release-filename",
+        "encoded-version-path",
     ),
 )
 def test_integrated_scanner_rejects_common_owned_forms(
@@ -562,6 +616,42 @@ def test_integrated_scanner_rejects_common_owned_forms(
             relative_path=relative_path,
             line=line,
         )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    ("relative_path", "line"),
+    (
+        (
+            Path("requirements.txt"),
+            "numpy==" + _legacy_version(minor=3, patch=2),
+        ),
+        (
+            Path("dist/inventory.md"),
+            "vercor_public_plugin-"
+            + _legacy_version(minor=3, patch=2)
+            + "-py3-none-any.whl",
+        ),
+        (Path("docs/history.txt"), "archive date 2026-03-02"),
+        (Path("docs/development.txt"), "Python 3.13"),
+        (Path("docs/provenance.txt"), "SHA-256 " + "03" * 32),
+        (Path("docs/numerics.txt"), "relaxation coefficient 0.3"),
+    ),
+)
+def test_integrated_scanner_allows_unowned_numeric_forms(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    relative_path: Path,
+    line: str,
+) -> None:
+    """Catch broad ownership grammar that captures external or numeric prose."""
+
+    _run_integrated_scanner_for_line(
+        monkeypatch,
+        tmp_path,
+        relative_path=relative_path,
+        line=line,
+    )
 
 
 @pytest.mark.fast_always
@@ -839,7 +929,7 @@ def test_readthedocs_reference_does_not_hide_a_stale_api_token() -> None:
 @pytest.mark.fast_always
 def test_tracked_repository_has_no_forbidden_vercor_release_labels() -> None:
     violations: list[str] = []
-    for relative_path in _tracked_text_paths():
+    for relative_path in _tracked_paths():
         rendered_path = relative_path.as_posix()
         for fragment in FORBIDDEN_PATH_FRAGMENTS:
             if fragment in rendered_path:
