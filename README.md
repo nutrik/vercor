@@ -21,9 +21,9 @@ VerCOR is built on [JAX](https://github.com/jax-ml/jax). Output-free JAX
 workflows remain differentiable end to end, supporting sensitivity analysis,
 automatic differentiation, and gradient-based experiments.
 
-> **Stable release:** Version `0.4.5` is the current release. VerCOR 0.3
-> applications should follow the
-> [Migration guide](https://vercor.readthedocs.io/en/latest/migration-0.3-to-0.4.html).
+> **Stable release:** Version `0.4.6` is the current release. Use the current
+> [researcher](https://vercor.readthedocs.io/en/latest/researchers/) and
+> [developer](https://vercor.readthedocs.io/en/latest/developers/) guides.
 
 ## Key capabilities
 
@@ -45,7 +45,7 @@ by your platform.
 Install the core package:
 
 ```bash
-python -m pip install "vercor==0.4.5"
+python -m pip install "vercor==0.4.6"
 ```
 
 Install an optional extra before using a bundled JCM or Veros setup:
@@ -59,11 +59,11 @@ CAMulator additionally requires NCAR's
 [MILES-CREDIT](https://github.com/NCAR/miles-credit). A compatible CREDIT
 release has not yet been confirmed or pinned.
 
-Version `0.4.5` is the current release. Upgrade an older installation for the
+Version `0.4.6` is the current release. Upgrade an older installation for the
 published stable API:
 
 ```bash
-python -m pip install --upgrade "vercor==0.4.5"
+python -m pip install --upgrade "vercor==0.4.6"
 ```
 
 ## Quick start
@@ -136,7 +136,6 @@ Read the canonical documentation at
 - [Researcher guide](https://vercor.readthedocs.io/en/latest/researchers/)
 - [Developer guide](https://vercor.readthedocs.io/en/latest/developers/)
 - [Python API](https://vercor.readthedocs.io/en/latest/api/)
-- [Migration guide](https://vercor.readthedocs.io/en/latest/migration-0.3-to-0.4.html)
 - [Plugin authoring](https://vercor.readthedocs.io/en/latest/plugin-authoring.html)
 
 Repository resources:

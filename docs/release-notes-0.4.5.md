@@ -24,10 +24,10 @@ python -m pip install --upgrade "vercor==0.4.5"
 
 ## Compatibility and migration
 
-VerCOR requires Python 3.12 or 3.13. Version 0.4 is intentionally
-source-breaking for 0.3 applications; follow
-`docs/migration-0.3-to-0.4.md`. Third-party plugins should depend on
-`vercor>=0.4.0,<0.5` and use the documented stable extension modules.
+VerCOR requires Python 3.12 or 3.13. The 0.4 API does not include legacy
+compatibility adapters; use the current researcher and developer guides.
+Third-party plugins should depend on `vercor>=0.4.0,<0.5` and use the documented
+stable extension modules.
 
 JCM setups require the pinned `dinosaur==1.3.6` and `jcm==2.0.1` optional
 dependencies supplied by `vercor[jcm]`.
@@ -36,4 +36,4 @@ dependencies supplied by `vercor[jcm]`.
 
 CAMulator requires a separately installed compatible MILES-CREDIT
 environment; an exact compatible release is not pinned. CAMulator spinup
-remains unsupported. No legacy 0.3 adapter namespace is included.
+remains unsupported. No legacy compatibility adapter namespace is included.

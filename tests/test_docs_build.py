@@ -42,11 +42,11 @@ TUTORIAL_PAGES = (
 )
 
 PROJECT_RESOURCE_PAGES = (
-    "migration-0.3-to-0.4",
     "plugin-authoring",
     "release-notes-0.4.3",
     "release-notes-0.4.4",
     "release-notes-0.4.5",
+    "release-notes-0.4.6",
     "releasing",
 )
 
@@ -185,7 +185,7 @@ def test_readme_is_a_concise_gateway_to_canonical_documentation() -> None:
     """Keep detailed guidance on Read the Docs instead of in the README."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert 'python -m pip install "vercor==0.4.5"' in readme
+    assert 'python -m pip install "vercor==0.4.6"' in readme
     assert "Development-only" not in readme
     assert "unreleased" not in readme.lower()
     assert "https://vercor.readthedocs.io/" in readme
@@ -193,7 +193,6 @@ def test_readme_is_a_concise_gateway_to_canonical_documentation() -> None:
         "[Researcher guide](https://vercor.readthedocs.io/en/latest/researchers/)",
         "[Developer guide](https://vercor.readthedocs.io/en/latest/developers/)",
         "[Python API](https://vercor.readthedocs.io/en/latest/api/)",
-        "[Migration guide](https://vercor.readthedocs.io/en/latest/migration-0.3-to-0.4.html)",
         "[Plugin authoring](https://vercor.readthedocs.io/en/latest/plugin-authoring.html)",
     ):
         assert canonical_link in readme

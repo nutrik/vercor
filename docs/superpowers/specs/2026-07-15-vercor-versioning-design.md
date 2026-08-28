@@ -17,11 +17,10 @@ runtime behavior.
 
 ## Corrected release sequence
 
-The repository now describes the historical progression as `0.2.0`, `0.2.1`,
-`0.3.0`, `0.3.1`, and `0.3.2`, followed by the current `0.4.0a1` alpha.
-Current-architecture prose uses VerCOR 0.4, and historical fixture evidence uses
-VerCOR 0.3. Neutral fixture-generation markers use descriptive names instead of
-release labels.
+The repository described a supervised sequence of superseded releases followed
+by the current `0.4.0a1` alpha. Current-architecture prose uses VerCOR 0.4, and
+historical fixture evidence uses the pre-redesign baseline. Neutral
+fixture-generation markers use descriptive names instead of release labels.
 
 ## Scope
 
@@ -53,10 +52,10 @@ wheel and source-distribution artifacts, passed the installed-artifact gates,
 and recorded the exact local commands and SHA-256 evidence in `PROGRESS.md`.
 No artifact was uploaded or published, and no tag or hosted release was created.
 
-The historical compatibility fixture is labeled for the 0.3 line, depends on
-`vercor>=0.3,<0.4`, and uses a frozen public API baseline labeled `0.3.2`. The
-pinned source SHA is unchanged; its project version is normalized only in the
-temporary extracted build tree.
+The historical compatibility fixture used an earlier-package dependency range
+and a frozen pre-redesign public API baseline. The pinned source SHA is
+unchanged; its project version is normalized only in the temporary extracted
+build tree.
 
 ## Testing strategy
 

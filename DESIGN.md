@@ -2,8 +2,8 @@
 
 VerCOR is a JAX-first, fully differentiable coupler for composing Earth-system
 components. This document describes the implemented stable `0.4.0` architecture.
-The exact API inventory and migration decisions are in
-`docs/api-architecture-review.md` and `docs/migration-0.3-to-0.4.md`.
+The exact API inventory and compatibility decisions are in
+`docs/api-architecture-review.md`.
 
 ## 1. Goals and constraints
 
@@ -331,9 +331,8 @@ an injected regridder, explicit route, non-empty topology patch, custom
 workflow/backend, immutable state replacement, period output, and snapshot
 output. It imports no private VerCOR module.
 
-No legacy adapter namespace or executable VerCOR 0.3 evidence ships with
-version 0.4.0. VerCOR 0.3-only workflows must migrate directly to the current
-contracts.
+The 0.4 API does not include legacy compatibility adapters or executable
+pre-redesign evidence. Applications use the current contracts directly.
 
 ## 10. Testing and release evidence
 

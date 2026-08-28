@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -9,7 +10,6 @@ import subprocess
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-TEXT_SUFFIXES = {".json", ".md", ".py", ".toml", ".yaml", ".yml"}
 FORBIDDEN_RELEASE_LABELS = (
     ".".join(("1", "0", "0")),
     ".".join(("2", "0", "0")),
@@ -54,9 +54,15 @@ _VERSION_QUALIFIER = (
 )
 _VERCOR_VERSION_PREFIX = re.compile(
     r"\bvercor(?:['’]s)?"
+    r"(?:\[[A-Za-z0-9_.-]+(?:,[A-Za-z0-9_.-]+)*\])?"
     rf"(?:[ \t_-]+(?:{_VERSION_QUALIFIER}|version|releases?|APIs?|history|"
     r"migrations?|artifacts?|manifests?|"
-    r"plugins?|fixtures?|line|candidate))*[ \t:`\"'=[_-]*$",
+    r"plugins?|fixtures?|packages?|distributions?|line|candidate))*"
+    r"[\t :`\"'=<>!~_()\[\]-]*$",
+    flags=re.IGNORECASE,
+)
+_VERCOR_API_IDENTIFIER_PREFIX = re.compile(
+    r"\bvercor(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.$",
     flags=re.IGNORECASE,
 )
 _EXTERNAL_VERSION_PREFIX = re.compile(
@@ -78,18 +84,57 @@ _REPOSITORY_VERSION_PREFIX = re.compile(
     flags=re.IGNORECASE,
 )
 _REPOSITORY_VERSION_SUFFIX = re.compile(
-    r"^[ \t`\"'\])}:_-]*(?:releases?|APIs?|history|migrations?|artifacts?|"
-    r"manifests?|plugins?|fixtures?|lines?)\b",
+    r"^[ \t`\"'\])}:_-]*(?:"
+    r"(?:only[ \t_-]+)?(?:releases?|APIs?|history|migrations?|artifacts?|"
+    r"manifests?|plugins?|fixtures?|lines?)\b"
+    r"|of[ \t]+vercor\b"
+    r")",
     flags=re.IGNORECASE,
 )
 _VERSION_ASSIGNMENT = re.compile(
     r"(?:^|[\"'])\s*(?:__version__|version)[\"']?\s*[:=]",
     flags=re.IGNORECASE,
 )
+_PRE_V0_4_TOKEN = re.compile(
+    r"(?:"
+    r"(?<![\d.])(?:[vV])?0\.(?:[0-3])"
+    r"(?:\.(?:\d+(?:[A-Za-z][0-9A-Za-z.-]*)?|\*))?(?![\d.])"
+    r"|"
+    r"(?<![A-Za-z0-9_])(?:[vV])?0_(?:[0-3])(?:_\d+)?(?![A-Za-z0-9_])"
+    r")"
+)
+_PRE_V0_4_PATH_VERSION = r"(?:[vV])?0[._](?:[0-3])(?!\d)"
+_PRE_V0_4_PATH = re.compile(
+    r"(?:"
+    rf"(?:migration|vercor|compat|api|releases?)[^/]*{_PRE_V0_4_PATH_VERSION}"
+    rf"|(?:^|/)(?:releases?|vercor|compat|api)/[^/]*{_PRE_V0_4_PATH_VERSION}"
+    rf"|(?:^|/){_PRE_V0_4_PATH_VERSION}[^/]*"
+    r"(?:migration|vercor|compat|api|releases?)"
+    r")",
+    flags=re.IGNORECASE,
+)
+_EXTERNAL_ARTIFACT_STEMS = (
+    "external_extension_test_fixture-",
+    "vercor_public_plugin-",
+)
 
 
-def _tracked_text_paths() -> tuple[Path, ...]:
-    """Return existing tracked or intended repository text paths."""
+def _legacy_version(
+    *,
+    minor: int,
+    major: int = 0,
+    patch: int | None = 0,
+    prefix: str = "",
+    suffix: str = "",
+) -> str:
+    """Construct an unsupported VerCOR label without source-hiding fragments."""
+
+    parts = (major, minor) if patch is None else (major, minor, patch)
+    return prefix + ".".join(str(part) for part in parts) + suffix
+
+
+def _tracked_paths() -> tuple[Path, ...]:
+    """Return every existing tracked or intended repository path."""
 
     result = subprocess.run(
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
@@ -98,12 +143,23 @@ def _tracked_text_paths() -> tuple[Path, ...]:
         capture_output=True,
         text=True,
     )
-    paths = (
-        Path(name)
-        for name in result.stdout.split("\0")
-        if name and Path(name).suffix in TEXT_SUFFIXES
-    )
-    return tuple(path for path in paths if (PROJECT_ROOT / path).is_file())
+    paths = (Path(name) for name in result.stdout.split("\0") if name)
+    return tuple(path for path in paths if os.path.lexists(PROJECT_ROOT / path))
+
+
+def _read_tracked_text(relative_path: Path) -> str | None:
+    """Decode a repository file as UTF-8 text, or return ``None`` for binary."""
+
+    absolute_path = PROJECT_ROOT / relative_path
+    if absolute_path.is_symlink() or not absolute_path.is_file():
+        return None
+    content = absolute_path.read_bytes()
+    if b"\0" in content:
+        return None
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
 
 
 def _forbidden_exact_release_labels(
@@ -147,11 +203,47 @@ def _version_context_owner(line: str, start: int, end: int) -> str | None:
         return "external"
     if (
         _VERCOR_VERSION_PREFIX.search(prefix)
+        or _VERCOR_API_IDENTIFIER_PREFIX.search(prefix)
         or _REPOSITORY_VERSION_PREFIX.search(prefix)
         or _REPOSITORY_VERSION_SUFFIX.search(suffix)
     ):
         return "vercor"
     return None
+
+
+def _forbidden_pre_v0_4_labels(relative_path: Path, line: str) -> tuple[str, ...]:
+    """Return unsupported labels when their path or context belongs to VerCOR."""
+
+    metadata_context = bool(
+        _VERSION_ASSIGNMENT.search(line)
+        and (
+            relative_path == Path("pyproject.toml")
+            or (
+                relative_path.parts[:2] == ("tests", "contracts")
+                and relative_path.name.startswith("vercor-")
+            )
+        )
+    )
+    changelog_context = bool(
+        relative_path == Path("CHANGELOG.md") and re.match(r"^\s*(?:##\s+)?\[", line)
+    )
+    labels: list[str] = []
+    for match in _PRE_V0_4_TOKEN.finditer(line):
+        owner = _version_context_owner(line, match.start(), match.end())
+        external_artifact_context = any(
+            line[: match.start()].endswith(stem) for stem in _EXTERNAL_ARTIFACT_STEMS
+        )
+        if owner == "external" or external_artifact_context:
+            continue
+        if owner == "vercor" or metadata_context or changelog_context:
+            labels.append(match.group())
+    return tuple(labels)
+
+
+def _forbidden_pre_v0_4_path(relative_path: Path) -> bool:
+    """Return whether a path itself identifies an unsupported release series."""
+
+    return bool(_PRE_V0_4_PATH.search(relative_path.as_posix()))
 
 
 def _forbidden_release_shorthand_labels(line: str) -> tuple[str, ...]:
@@ -162,6 +254,92 @@ def _forbidden_release_shorthand_labels(line: str) -> tuple[str, ...]:
         for match in _RELEASE_SHORTHAND_TOKEN.finditer(line)
         if _version_context_owner(line, match.start(), match.end()) == "vercor"
     )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("minor", range(4))
+@pytest.mark.parametrize("prefix", ("", "v", "V"))
+def test_pre_v0_4_matcher_rejects_vercor_owned_labels(
+    minor: int,
+    prefix: str,
+) -> None:
+    label = _legacy_version(minor=minor, patch=2, prefix=prefix)
+    assert _forbidden_pre_v0_4_labels(
+        Path("docs/history.md"),
+        f"Historical VerCOR release {label}",
+    ) == (label,)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("minor", range(4))
+def test_pre_v0_4_matcher_rejects_encoded_vercor_api_identifiers(
+    minor: int,
+) -> None:
+    label = f"v0_{minor}"
+    assert _forbidden_pre_v0_4_labels(
+        Path("docs/history.md"),
+        f"vercor.compat.{label}",
+    ) == (label,)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("minor", range(4))
+def test_pre_v0_4_matcher_rejects_only_api_suffix(minor: int) -> None:
+    label = _legacy_version(minor=minor)
+    assert _forbidden_pre_v0_4_labels(
+        Path("docs/history.md"),
+        f"the {label}-only API",
+    ) == (label,)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    ("relative_path", "line"),
+    (
+        (
+            Path("docs/external-dependencies.md"),
+            "external dependency version " + _legacy_version(minor=2, patch=1),
+        ),
+        (
+            Path("dist/artifacts.md"),
+            "external_extension_test_fixture-"
+            + _legacy_version(minor=1)
+            + "-py3-none-any.whl",
+        ),
+        (Path("docs/numerics.md"), "one-quarter numerical weights are 0.25"),
+        (Path("docs/development.md"), "Python 3.12 and Python 3.13"),
+        (
+            Path(".readthedocs.yaml"),
+            "https://docs.readthedocs.io/en/stable/config-file/" + "v" + "2.html",
+        ),
+    ),
+)
+def test_pre_v0_4_matcher_allows_external_and_numeric_contexts(
+    relative_path: Path,
+    line: str,
+) -> None:
+    assert not _forbidden_pre_v0_4_labels(relative_path, line)
+
+
+@pytest.mark.fast_always
+def test_pre_v0_4_matcher_rejects_vercor_label_beside_external_artifact() -> None:
+    """Keep an external artifact exemption scoped to its own version token."""
+
+    vercor_label = _legacy_version(minor=2, patch=1)
+    external_label = _legacy_version(minor=1)
+    line = (
+        f"Historical VerCOR release {vercor_label}; "
+        "external_extension_test_fixture-"
+        f"{external_label}-py3-none-any.whl"
+    )
+
+    assert _forbidden_pre_v0_4_labels(Path("docs/history.md"), line) == (vercor_label,)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("minor", range(4))
+def test_pre_v0_4_matcher_rejects_legacy_migration_paths(minor: int) -> None:
+    assert _forbidden_pre_v0_4_path(Path(f"docs/migration-0.{minor}-to-0.4.md"))
 
 
 def _forbidden_api_tokens(relative_path: Path, line: str) -> tuple[str, ...]:
@@ -193,13 +371,13 @@ def _forbidden_api_tokens(relative_path: Path, line: str) -> tuple[str, ...]:
 @pytest.mark.parametrize(
     "line",
     (
-        "VerCOR " + ".".join(("1", "0")) + " release",
-        "VerCOR " + ".".join(("2", "0")) + " API",
-        "frozen " + ".".join(("3", "0")) + " plugin",
-        "current-" + ".".join(("3", "1")),
+        "VerCOR " + _legacy_version(major=1, minor=0, patch=None) + " release",
+        "VerCOR " + _legacy_version(major=2, minor=0, patch=None) + " API",
+        "frozen " + _legacy_version(major=3, minor=0, patch=None) + " plugin",
+        "current-" + _legacy_version(major=3, minor=1, patch=None),
         "Compatibility within the " + "4" + ".x line",
         "2" + ".x migration",
-        "vercor-release-" + ".".join(("3", "1")) + "-final",
+        "vercor-release-" + _legacy_version(major=3, minor=1, patch=None) + "-final",
     ),
 )
 def test_release_shorthand_matcher_rejects_repository_labels(line: str) -> None:
@@ -218,7 +396,7 @@ def test_release_shorthand_matcher_rejects_repository_labels(line: str) -> None:
         "schema version 1",
         "JCM 1.1.1 and Veros 1.6.2",
         "external_extension_test_fixture-0.1.0-py3-none-any.whl",
-        "dependency release 0.2.1",
+        "dependency release " + _legacy_version(minor=2, patch=1),
         "v" + "3 = eastward_vector_component",
     ),
 )
@@ -242,22 +420,335 @@ def _run_integrated_scanner_for_line(
     candidate.write_text(line + "\n", encoding="utf-8")
     monkeypatch.setattr("tests.test_versioning_policy.PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(
-        "tests.test_versioning_policy._tracked_text_paths",
+        "tests.test_versioning_policy._tracked_paths",
         lambda: (relative_path,),
     )
     test_tracked_repository_has_no_forbidden_vercor_release_labels()
+
+
+def _run_integrated_scanner_for_real_tracked_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    relative_path: Path,
+    content: bytes,
+) -> None:
+    """Run the scanner through a real temporary Git tracked-file boundary."""
+
+    candidate = tmp_path / relative_path
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    candidate.write_bytes(content)
+    subprocess.run(["git", "init", "-q"], check=True, cwd=tmp_path)
+    subprocess.run(
+        ["git", "add", "--", relative_path.as_posix()],
+        check=True,
+        cwd=tmp_path,
+    )
+    monkeypatch.setattr("tests.test_versioning_policy.PROJECT_ROOT", tmp_path)
+    test_tracked_repository_has_no_forbidden_vercor_release_labels()
+
+
+def _run_integrated_scanner_for_real_tracked_symlink(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    relative_path: Path,
+) -> None:
+    """Run the scanner through a real temporary Git tracked symlink."""
+
+    candidate = tmp_path / relative_path
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    candidate.symlink_to("missing-target")
+    subprocess.run(["git", "init", "-q"], check=True, cwd=tmp_path)
+    subprocess.run(
+        ["git", "add", "--", relative_path.as_posix()],
+        check=True,
+        cwd=tmp_path,
+    )
+    monkeypatch.setattr("tests.test_versioning_policy.PROJECT_ROOT", tmp_path)
+    test_tracked_repository_has_no_forbidden_vercor_release_labels()
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        Path("docs/history.rst"),
+        Path("notes/history.txt"),
+        Path("vercor/py.typed"),
+        Path("NOTICE"),
+    ),
+)
+def test_integrated_scanner_checks_every_tracked_text_format(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    relative_path: Path,
+) -> None:
+    """Catch replacing content classification with a text-suffix allowlist."""
+
+    label = _legacy_version(minor=3, patch=2)
+    with pytest.raises(AssertionError, match=re.escape(relative_path.as_posix())):
+        _run_integrated_scanner_for_real_tracked_file(
+            monkeypatch,
+            tmp_path,
+            relative_path=relative_path,
+            content=f"Historical VerCOR release {label}\n".encode(),
+        )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "content",
+    (
+        pytest.param(b"harmless\0binary", id="nul"),
+        pytest.param(b"\xff\xfe harmless binary", id="invalid-utf8"),
+    ),
+)
+def test_integrated_scanner_checks_paths_before_content_classification(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    content: bytes,
+) -> None:
+    """Catch filtering tracked paths through binary-content classification."""
+
+    label = _legacy_version(minor=3, patch=2, prefix="v")
+    relative_path = Path("docs/releases") / f"{label}.bin"
+    with pytest.raises(AssertionError, match=re.escape(relative_path.as_posix())):
+        _run_integrated_scanner_for_real_tracked_file(
+            monkeypatch,
+            tmp_path,
+            relative_path=relative_path,
+            content=content,
+        )
+
+
+@pytest.mark.fast_always
+def test_integrated_scanner_checks_forbidden_dangling_symlink_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Catch filtering Git symlink entries through ``Path.is_file``."""
+
+    label = _legacy_version(minor=3, patch=2, prefix="v")
+    relative_path = Path("docs/releases") / f"{label}.md"
+    with pytest.raises(AssertionError, match=re.escape(relative_path.as_posix())):
+        _run_integrated_scanner_for_real_tracked_symlink(
+            monkeypatch,
+            tmp_path,
+            relative_path=relative_path,
+        )
+
+
+@pytest.mark.fast_always
+def test_integrated_scanner_skips_allowed_dangling_symlink_content(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Catch attempting to decode a permitted dangling Git symlink."""
+
+    _run_integrated_scanner_for_real_tracked_symlink(
+        monkeypatch,
+        tmp_path,
+        relative_path=Path("docs/latest.md"),
+    )
+
+
+@pytest.mark.fast_always
+def test_integrated_scanner_safely_skips_invalid_utf8_without_nul(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Catch removing the decode-error fallback while NUL exclusion remains."""
+
+    label = _legacy_version(minor=3, patch=2)
+    _run_integrated_scanner_for_real_tracked_file(
+        monkeypatch,
+        tmp_path,
+        relative_path=Path("assets/invalid-utf8.md"),
+        content=b"\xff\xfe" + f"Historical VerCOR release {label}".encode(),
+    )
+
+
+@pytest.mark.fast_always
+def test_integrated_scanner_safely_skips_nul_containing_utf8(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Catch removing NUL exclusion while the decode-error fallback remains."""
+
+    label = _legacy_version(minor=3, patch=2)
+    _run_integrated_scanner_for_real_tracked_file(
+        monkeypatch,
+        tmp_path,
+        relative_path=Path("assets/nul-containing.md"),
+        content=f"Historical VerCOR release {label}\0".encode(),
+    )
+
+
+def _legacy_policy_case(case: str) -> tuple[Path, str, str | None]:
+    """Build one unsupported owned form without retaining its legacy literal."""
+
+    if case == "specifier-range":
+        label = _legacy_version(minor=3, patch=None)
+        return Path("requirements.txt"), f"vercor>={label},<0.4", label
+    if case == "compatible-release":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("requirements.txt"), f"vercor~={label}", label
+    if case == "release-wildcard":
+        label = _legacy_version(minor=3, patch=None) + ".*"
+        return Path("docs/history.txt"), f"Historical VerCOR release {label}", label
+    if case == "nested-release-path":
+        label = _legacy_version(minor=3, patch=2, prefix="v")
+        return Path("docs/releases") / f"{label}.md", "Release notes", None
+    if case == "pep508-extras":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("requirements.txt"), f"vercor[veros]>={label}", label
+    if case == "version-of-vercor":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs/history.txt"), f"version {label} of VerCOR", label
+    if case == "owner-directory-version-leaf":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs/vercor") / f"{label}.md", "Release notes", None
+    if case == "version-first-release-filename":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs") / f"{label}-release-notes.md", "Release notes", None
+    if case == "encoded-version-path":
+        label = _legacy_version(minor=3, patch=None, prefix="v").replace(".", "_")
+        return Path("docs/compat") / f"{label}.md", "Compatibility", None
+    if case == "package-version":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs/history.txt"), f"VerCOR package version {label}", label
+    if case == "distribution-version":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("docs/history.txt"), f"VerCOR distribution {label}", label
+    if case == "core-metadata-requires-dist":
+        label = _legacy_version(minor=3, patch=2)
+        return Path("METADATA"), f"Requires-Dist: vercor (>={label})", label
+    raise AssertionError(f"unknown policy case: {case}")
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "case",
+    (
+        "specifier-range",
+        "compatible-release",
+        "release-wildcard",
+        "nested-release-path",
+        "pep508-extras",
+        "version-of-vercor",
+        "owner-directory-version-leaf",
+        "version-first-release-filename",
+        "encoded-version-path",
+        "package-version",
+        "distribution-version",
+        "core-metadata-requires-dist",
+    ),
+)
+def test_pre_v0_4_matchers_reject_common_owned_forms(case: str) -> None:
+    """Catch incomplete owned package syntax, reverse ownership, or paths."""
+
+    relative_path, line, label = _legacy_policy_case(case)
+    if label is None:
+        assert _forbidden_pre_v0_4_path(relative_path)
+    else:
+        assert _forbidden_pre_v0_4_labels(relative_path, line) == (label,)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "case",
+    (
+        "specifier-range",
+        "compatible-release",
+        "release-wildcard",
+        "nested-release-path",
+        "pep508-extras",
+        "version-of-vercor",
+        "owner-directory-version-leaf",
+        "version-first-release-filename",
+        "encoded-version-path",
+        "package-version",
+        "distribution-version",
+        "core-metadata-requires-dist",
+    ),
+)
+def test_integrated_scanner_rejects_common_owned_forms(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    case: str,
+) -> None:
+    """Catch wiring a corrected matcher incompletely into the repository scanner."""
+
+    relative_path, line, _ = _legacy_policy_case(case)
+    with pytest.raises(AssertionError, match=re.escape(relative_path.as_posix())):
+        _run_integrated_scanner_for_line(
+            monkeypatch,
+            tmp_path,
+            relative_path=relative_path,
+            line=line,
+        )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    ("relative_path", "line"),
+    (
+        (
+            Path("requirements.txt"),
+            "numpy==" + _legacy_version(minor=3, patch=2),
+        ),
+        (
+            Path("dist/inventory.md"),
+            "vercor_public_plugin-"
+            + _legacy_version(minor=3, patch=2)
+            + "-py3-none-any.whl",
+        ),
+        (Path("docs/history.txt"), "archive date 2026-03-02"),
+        (Path("docs/development.txt"), "Python 3.13"),
+        (Path("docs/provenance.txt"), "SHA-256 " + "03" * 32),
+        (Path("docs/numerics.txt"), "relaxation coefficient 0.3"),
+        (
+            Path("docs/dependencies.txt"),
+            "external package version " + _legacy_version(minor=3, patch=2),
+        ),
+        (
+            Path("docs/distributions.txt"),
+            "independent distribution " + _legacy_version(minor=3, patch=2),
+        ),
+        (
+            Path("METADATA"),
+            "Requires-Dist: numpy (>=" + _legacy_version(minor=3, patch=2) + ")",
+        ),
+    ),
+)
+def test_integrated_scanner_allows_unowned_numeric_forms(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    relative_path: Path,
+    line: str,
+) -> None:
+    """Catch broad ownership grammar that captures external or numeric prose."""
+
+    _run_integrated_scanner_for_line(
+        monkeypatch,
+        tmp_path,
+        relative_path=relative_path,
+        line=line,
+    )
 
 
 @pytest.mark.fast_always
 @pytest.mark.parametrize(
     "line",
     (
-        "numpy==" + "2" + ".0.0",
-        "independent plugin version " + "3" + ".1.1",
-        "external schema " + "3" + ".0.0",
-        "VerCOR depends on numpy==" + "2" + ".0.0",
-        "VerCOR supports independent plugin version " + "3" + ".1.1",
-        "VerCOR documents external schema " + "3" + ".0.0",
+        "numpy==" + _legacy_version(major=2, minor=0),
+        "independent plugin version " + _legacy_version(major=3, minor=1, patch=1),
+        "external schema " + _legacy_version(major=3, minor=0),
+        "VerCOR depends on numpy==" + _legacy_version(major=2, minor=0),
+        "VerCOR supports independent plugin version "
+        + _legacy_version(major=3, minor=1, patch=1),
+        "VerCOR documents external schema " + _legacy_version(major=3, minor=0),
     ),
 )
 def test_integrated_scanner_allows_external_exact_version_collisions(
@@ -277,13 +768,15 @@ def test_integrated_scanner_allows_external_exact_version_collisions(
 @pytest.mark.parametrize(
     "line",
     (
-        "external artifact version " + "3" + ".0.0",
-        "external release " + "3" + ".1.1",
-        'independent release: "' + "3" + '.1.1"',
-        "independent artifact version " + "2" + ".0.0",
-        "external " + "3" + ".0 artifact",
-        "external " + "2" + ".0 API",
-        "independent " + "3" + ".1 plugin fixture",
+        "external artifact version " + _legacy_version(major=3, minor=0),
+        "external release " + _legacy_version(major=3, minor=1, patch=1),
+        'independent release: "' + _legacy_version(major=3, minor=1, patch=1) + '"',
+        "independent artifact version " + _legacy_version(major=2, minor=0),
+        "external " + _legacy_version(major=3, minor=0, patch=None) + " artifact",
+        "external " + _legacy_version(major=2, minor=0, patch=None) + " API",
+        "independent "
+        + _legacy_version(major=3, minor=1, patch=None)
+        + " plugin fixture",
     ),
 )
 def test_integrated_scanner_allows_explicit_external_version_contexts(
@@ -303,10 +796,10 @@ def test_integrated_scanner_allows_explicit_external_version_contexts(
 @pytest.mark.parametrize(
     "line",
     (
-        "VerCOR version `" + "4" + ".0.0a1`",
-        'VERCOR_VERSION: "' + "4" + '.0.0a1"',
-        "export VERCOR_VERSION='" + "3" + ".1.1'",
-        "VerCOR version " + "4" + ".0",
+        "VerCOR version `" + _legacy_version(major=4, minor=0, suffix="a1") + "`",
+        'VERCOR_VERSION: "' + _legacy_version(major=4, minor=0, suffix="a1") + '"',
+        "export VERCOR_VERSION='" + _legacy_version(major=3, minor=1, patch=1) + "'",
+        "VerCOR version " + _legacy_version(major=4, minor=0, patch=None),
     ),
 )
 def test_integrated_scanner_rejects_quoted_and_env_vercor_versions(
@@ -334,14 +827,18 @@ def _ownership_matrix_line(
 
     fields: tuple[str, ...]
     if shorthand:
-        label = "3" + (".0" if concept == "plugin fixture" else ".1")
+        label = _legacy_version(
+            major=3,
+            minor=0 if concept == "plugin fixture" else 1,
+            patch=None,
+        )
         fields = (owner, qualifier, label, concept)
     else:
         label = {
-            "release": "3" + ".1.1",
-            "API": "3" + ".0.0",
-            "artifact": "3" + ".0.0",
-            "plugin fixture": "2" + ".0.0",
+            "release": _legacy_version(major=3, minor=1, patch=1),
+            "API": _legacy_version(major=3, minor=0),
+            "artifact": _legacy_version(major=3, minor=0),
+            "plugin fixture": _legacy_version(major=2, minor=0),
         }[concept]
         version_word = "version" if concept == "artifact" else ""
         fields = (owner, qualifier, concept, version_word, label)
@@ -400,7 +897,8 @@ def test_integrated_scanner_later_vercor_owner_overrides_external_qualifier(
             monkeypatch,
             tmp_path,
             relative_path=Path("ownership-matrix.md"),
-            line="external current VerCOR release " + "3" + ".1.1",
+            line="external current VerCOR release "
+            + _legacy_version(major=3, minor=1, patch=1),
         )
 
 
@@ -408,22 +906,27 @@ def test_integrated_scanner_later_vercor_owner_overrides_external_qualifier(
 @pytest.mark.parametrize(
     ("relative_path", "line"),
     (
-        (Path("pyproject.toml"), 'version = "' + "4" + '.0.0a1"'),
+        (
+            Path("pyproject.toml"),
+            'version = "' + _legacy_version(major=4, minor=0, suffix="a1") + '"',
+        ),
         (
             Path("docs/releasing.md"),
-            "VerCOR release " + "3" + ".1.1",
+            "VerCOR release " + _legacy_version(major=3, minor=1, patch=1),
         ),
         (
             Path("docs/api-history.md"),
-            "frozen API history " + "3" + ".0.0",
+            "frozen API history " + _legacy_version(major=3, minor=0),
         ),
         (
             Path("tests/fixture-notes.md"),
-            "historical plugin fixture " + "2" + ".0.0",
+            "historical plugin fixture " + _legacy_version(major=2, minor=0),
         ),
         (
             Path(".github/workflows/python-package.yml"),
-            "artifact: vercor-" + "1" + ".0.0-py3-none-any.whl",
+            "artifact: vercor-"
+            + _legacy_version(major=1, minor=0)
+            + "-py3-none-any.whl",
         ),
     ),
 )
@@ -510,24 +1013,36 @@ def test_readthedocs_reference_does_not_hide_a_stale_api_token() -> None:
 @pytest.mark.fast_always
 def test_tracked_repository_has_no_forbidden_vercor_release_labels() -> None:
     violations: list[str] = []
-    for relative_path in _tracked_text_paths():
+    for relative_path in _tracked_paths():
         rendered_path = relative_path.as_posix()
         for fragment in FORBIDDEN_PATH_FRAGMENTS:
             if fragment in rendered_path:
                 violations.append(
                     f"{rendered_path}: forbidden path fragment {fragment!r}"
                 )
+        if _forbidden_pre_v0_4_path(relative_path):
+            violations.append(f"{rendered_path}: forbidden pre-v0.4 path")
 
-        text = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+        text = _read_tracked_text(relative_path)
+        if text is None:
+            continue
         for line_number, line in enumerate(text.splitlines(), start=1):
             labels = _forbidden_exact_release_labels(relative_path, line)
+            pre_v0_4_labels = _forbidden_pre_v0_4_labels(relative_path, line)
             api_tokens = _forbidden_api_tokens(relative_path, line)
             major_names = tuple(FORBIDDEN_VERCOR_MAJOR.findall(line))
             shorthand_labels = _forbidden_release_shorthand_labels(line)
-            if labels or api_tokens or major_names or shorthand_labels:
+            if (
+                labels
+                or pre_v0_4_labels
+                or api_tokens
+                or major_names
+                or shorthand_labels
+            ):
                 violations.append(
                     f"{rendered_path}:{line_number}: "
-                    f"labels={labels}, api_tokens={api_tokens}, "
+                    f"labels={labels}, pre_v0_4_labels={pre_v0_4_labels}, "
+                    f"api_tokens={api_tokens}, "
                     f"major_names={major_names}, shorthand={shorthand_labels}"
                 )
 

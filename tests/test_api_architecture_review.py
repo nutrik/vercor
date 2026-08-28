@@ -11,8 +11,9 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import textwrap
 import tomllib
-from typing import Any, cast, get_type_hints
+from typing import cast, get_type_hints
 
 import numpy as np
 import pytest
@@ -28,9 +29,14 @@ from tests._signature_support import canonicalize_external_typing_aliases
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REVIEW_PATH = PROJECT_ROOT / "docs" / "api-architecture-review.md"
 README_PATH = PROJECT_ROOT / "README.md"
-DESIGN_PATH = PROJECT_ROOT / "DESIGN.md"
-MIGRATION_PATH = PROJECT_ROOT / "docs" / "migration-0.3-to-0.4.md"
 RELEASING_PATH = PROJECT_ROOT / "docs" / "releasing.md"
+RELEASE_PLAN_PATH = (
+    PROJECT_ROOT
+    / "docs"
+    / "superpowers"
+    / "plans"
+    / "2026-08-27-vercor-0.4.6-release.md"
+)
 WORKFLOW_PATH = PROJECT_ROOT / ".github" / "workflows" / "python-package.yml"
 CHECKOUT_ACTION = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
 PYPI_PUBLISH_ACTION = (
@@ -42,12 +48,11 @@ PROGRESS_PATH = PROJECT_ROOT / "PROGRESS.md"
 SIGNATURE_CONTRACT_PATH = (
     PROJECT_ROOT / "tests" / "contracts" / "vercor-0.4.0-public-signatures.json"
 )
-DEPENDENCIES_PATH = PROJECT_ROOT / "DEPENDENCIES.md"
 PROGRESS_ARCHIVE_PATH = (
     PROJECT_ROOT / "docs" / "progress-archive-2026-05-16-to-2026-07-14.md"
 )
 PROGRESS_ARCHIVE_SHA256 = (
-    "77a1d4a3c536901053718e9d7d31474a955922f8c2872f6e53f1c7fdbc70f69e"
+    "aaa3ae3303ff49051544af5ec98d06737c0f74de773b3fecb8f176c802d6f557"
 )
 
 REQUIRED_REVIEW_HEADINGS = (
@@ -432,32 +437,10 @@ def test_readme_python_snippets_run_as_one_public_quick_start(
 
 
 @pytest.mark.fast_always
-def test_migration_v0_4_snippet_runs_without_private_or_compat_imports(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Execute the supported 0.4 migration result and verify its observable state."""
-
-    snippets = _python_fences(MIGRATION_PATH.read_text(encoding="utf-8"))
-    assert len(snippets) == 1
-    source = snippets[0]
-    _assert_public_imports_only(source, owner="docs/migration-0.3-to-0.4.md")
-    assert "vercor.compat" not in source
-    monkeypatch.chdir(tmp_path)
-
-    namespace: dict[str, object] = {}
-    exec(compile(source, str(MIGRATION_PATH), "exec"), namespace)
-
-    migrated_temperature = cast(Any, namespace["migrated_temperature"])
-    assert float(migrated_temperature[0, 0]) == pytest.approx(282.0)
-    assert not tuple(tmp_path.iterdir())
-
-
-@pytest.mark.fast_always
 def test_release_files_and_metadata_describe_the_stable_release() -> None:
     """Bind release documentation to installed project metadata and artifact names."""
 
-    assert EXPECTED_VERSION == "0.4.5"
+    assert EXPECTED_VERSION == "0.4.6"
     expected_release_notes = f"docs/release-notes-{EXPECTED_VERSION}.md"
     project = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -468,7 +451,7 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
 
     changelog = CHANGELOG_PATH.read_text(encoding="utf-8")
     assert re.search(
-        rf"^## \[{re.escape(EXPECTED_VERSION)}\] - 2026-08-24$",
+        rf"^## \[{re.escape(EXPECTED_VERSION)}\] - 2026-08-27$",
         changelog,
         re.MULTILINE,
     )
@@ -477,8 +460,8 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
         in changelog
     )
     assert (
-        f"[{EXPECTED_VERSION}]: https://github.com/nutrik/vercor/compare/v0.4.4...v{EXPECTED_VERSION}"
-        in changelog
+        f"[{EXPECTED_VERSION}]: https://github.com/nutrik/vercor/compare/"
+        f"v0.4.5...v{EXPECTED_VERSION}" in changelog
     )
     assert re.search(r"^## \[0\.4\.2\] - 2026-07-25$", changelog, re.MULTILINE)
     assert re.search(r"^## \[0\.4\.1\] - 2026-07-24$", changelog, re.MULTILINE)
@@ -487,17 +470,17 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
     release_notes = release_notes_path.read_text(encoding="utf-8")
     release_notes_lower = release_notes.lower()
     for required in (
-        "jcm 2.0.1",
-        "fractional surface",
-        "no-nan",
-        "setup gallery",
-        "jaxgcm",
-        "logging",
+        "veros",
+        "differentiable",
+        "execution",
+        "state copy",
+        "sigma",
+        "0.4.6",
     ):
         assert required in release_notes_lower
     releasing = RELEASING_PATH.read_text(encoding="utf-8")
-    assert "release/vercor-0.4.5" in releasing
-    assert "release/vercor-0.4.4" not in releasing
+    assert "release/vercor-0.4.6" in releasing
+    assert "release/vercor-0.4.5" not in releasing
     commands = "\n".join(re.findall(r"```bash\n(.*?)```", releasing, re.DOTALL))
     for command in (
         "python -m build",
@@ -516,6 +499,27 @@ def test_release_files_and_metadata_describe_the_stable_release() -> None:
 
     for artifact in (EXPECTED_WHEEL_NAME, EXPECTED_SDIST_NAME):
         assert artifact in commands
+
+
+@pytest.mark.fast_always
+def test_release_notes_distinguish_stock_and_fork_state_copy_ownership() -> None:
+    """Describe generic stock-state ownership separately from native fork copying."""
+
+    release_notes = " ".join(
+        (PROJECT_ROOT / "docs" / "release-notes-0.4.6.md")
+        .read_text(encoding="utf-8")
+        .split()
+    )
+    accurate_claim = (
+        "The stock state copy is owned by the generic runtime; the fork retains "
+        "its native PyTree copy path."
+    )
+    inaccurate_claim = (
+        "The state copy path remains native to each supported Veros implementation."
+    )
+
+    assert accurate_claim in release_notes
+    assert inaccurate_claim not in release_notes
 
 
 @pytest.mark.fast_always
@@ -636,12 +640,16 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
         assert "RELEASE_STATUS" not in section
         assert pypi_url in section
         assert 'test "$PYPI_STATUS" = "404"' in section
-        capability_index = section.index(capability_probe)
-        enumeration_index = section.index(release_enumeration)
-        absence_index = section.index(
-            "tools/validate_release_state.py github-tag-absent"
-        )
-        assert capability_index < enumeration_index < absence_index
+    prepare_enumeration_index = prepare.index(release_enumeration)
+    prepare_absence_index = prepare.index(
+        "tools/validate_release_state.py github-tag-absent"
+    )
+    prepare_capability_index = prepare.index(capability_probe)
+    assert prepare_enumeration_index < prepare_absence_index < prepare_capability_index
+    tag_capability_index = tag.index(capability_probe)
+    tag_enumeration_index = tag.index(release_enumeration)
+    tag_absence_index = tag.index("tools/validate_release_state.py github-tag-absent")
+    assert tag_capability_index < tag_enumeration_index < tag_absence_index
 
     assert ancestry_check in prepare
     assert exact_main_check not in prepare
@@ -738,8 +746,8 @@ def test_release_publication_preflights_are_authenticated_and_fail_closed() -> N
 
 
 @pytest.mark.fast_always
-def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
-    """Bind the active release PR transcript to the approved branch and copy."""
+def test_release_pr_transcript_creates_ready_evidence_rich_handoff() -> None:
+    """Catch creating a draft PR or omitting literal verified evidence."""
 
     guide = RELEASING_PATH.read_text(encoding="utf-8")
     prepare = _section(guide, "## 5. Prepare the required release pull request")
@@ -747,10 +755,22 @@ def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
     expected_title = f"VerCOR {EXPECTED_VERSION}"
     branch_assignment = f'RELEASE_BRANCH="{expected_branch}"'
     exact_title = f'--title "Release {expected_title}"'
-    exact_body = (
-        f'--body "Prepare {expected_title} with the JCM 2.0.1 migration, '
-        "finite-gradient numerical safeguards, setup-gallery runtime fixes, "
-        'and quiet JAXGCM stepping."'
+    ready_pr = (
+        'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" '
+        f'--title "Release {expected_title}" --body-file "$PR_BODY_FILE"'
+    )
+    required_body_evidence = (
+        "Black: 250 files unchanged; Flake8: 0; mypy: 250 source files.",
+        "Strict Sphinx: 30 sources without warnings.",
+        "Version policy: 215/215; API architecture/documentation: 43/43.",
+        "Fast: 882/882; full: 1,755/1,755.",
+        "Branch coverage: 91.80% across 7,932 statements and 1,706 branches.",
+        "`vercor-0.4.6-py3-none-any.whl` — 239986 B — SHA-256 "
+        "`819d54b995d4ba9e384d6e7d8a05defc9a384123a15f5b354331ab013d0ddcad`",
+        "`vercor-0.4.6.tar.gz` — 169226 B — SHA-256 "
+        "`207d0cf8b909ac81cfc63908b91f37898bc2305be9c0588d3962932c38369b20`",
+        "No tag, merge, PyPI publication, artifact upload, or GitHub Release "
+        "was created.",
     )
 
     assert "refactor" not in guide
@@ -775,12 +795,12 @@ def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
         '--head "$RELEASE_BRANCH" '
         "--json number,url,headRefName,baseRefName,headRefOid"
     ) in prepare
-    assert (
-        'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" '
-        "--draft"
-    ) in prepare
+    assert 'PR_BODY_FILE="$(mktemp)"' in prepare
+    assert ready_pr in prepare
+    assert "--draft" not in prepare
     assert exact_title in prepare
-    assert exact_body in prepare
+    for evidence in required_body_evidence:
+        assert evidence in prepare
     assert (
         "gh pr list --repo nutrik/vercor --state open --base main "
         '--head "$RELEASE_BRANCH" --json number'
@@ -790,8 +810,8 @@ def test_release_pr_transcript_uses_release_branch_and_draft_metadata() -> None:
 
 
 @pytest.mark.fast_always
-def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
-    """Publish and reauthenticate the exact release branch before GitHub queries."""
+def test_release_pr_completes_conflict_preflight_before_push() -> None:
+    """Catch a release-branch push preceding any read-only conflict check."""
 
     guide = RELEASING_PATH.read_text(encoding="utf-8")
     prepare = _section(guide, "## 5. Prepare the required release pull request")
@@ -808,15 +828,20 @@ def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
     )
     remote_check = 'test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"'
     capability = "gh api --method POST repos/nutrik/vercor/releases/generate-notes"
+    local_tag_absence = 'test -z "$(git tag --list v0.4.6)"'
+    remote_tag_query = 'REMOTE_TAG_PRECHECK="$(git ls-remote --tags origin '
+    remote_tag_absence = 'test -z "$REMOTE_TAG_PRECHECK"'
     enumeration = (
         'gh api --paginate --slurp "repos/nutrik/vercor/releases?per_page=100"'
     )
     absence = "tools/validate_release_state.py github-tag-absent"
     pypi_absence = 'test "$PYPI_STATUS" = "404"'
+    pr_query = 'OPEN_RELEASE_PRS="$(gh pr list --repo nutrik/vercor'
+    pr_absence = 'test "$OPEN_RELEASE_PRS" = "[]"'
     range_whitespace = 'git diff --check "$MAIN_COMMIT" "$RELEASE_COMMIT"'
-    draft_pr = (
+    ready_pr = (
         'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" '
-        "--draft"
+        f'--title "Release VerCOR {EXPECTED_VERSION}" --body-file "$PR_BODY_FILE"'
     )
 
     for required in (
@@ -825,24 +850,37 @@ def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
         'test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"',
         'git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"',
         range_whitespace,
+        local_tag_absence,
+        remote_tag_query,
+        remote_tag_absence,
+        enumeration,
+        absence,
+        pypi_absence,
+        pr_query,
+        pr_absence,
         push,
         remote_query,
         remote_check,
         capability,
+        ready_pr,
+    ):
+        assert required in prepare
+    conflict_checks = (
+        local_tag_absence,
+        remote_tag_query,
+        remote_tag_absence,
         enumeration,
         absence,
         pypi_absence,
-        draft_pr,
-    ):
-        assert required in prepare
-    assert prepare.index(range_whitespace) < prepare.index(push)
+        pr_query,
+        pr_absence,
+    )
+    assert prepare.index(range_whitespace) < prepare.index(local_tag_absence)
+    assert all(prepare.index(check) < prepare.index(push) for check in conflict_checks)
     assert prepare.index(push) < prepare.index(remote_query)
     assert prepare.index(remote_query) < prepare.index(remote_check)
     assert prepare.index(remote_check) < prepare.index(capability)
-    assert prepare.index(capability) < prepare.index(enumeration)
-    assert prepare.index(enumeration) < prepare.index(absence)
-    assert prepare.index(absence) < prepare.index(pypi_absence)
-    assert prepare.index(pypi_absence) < prepare.index(draft_pr)
+    assert prepare.index(capability) < prepare.index(ready_pr)
     assert prepare.count("git push ") == 1
 
     selection = transcripts[-1]
@@ -855,17 +893,82 @@ def test_release_pr_pushes_exact_branch_before_github_preflights() -> None:
 
 
 @pytest.mark.fast_always
-def test_release_pr_merge_rebinds_main_before_tag_preflight() -> None:
-    """Merge the verified PR and detach at the protected-main commit before tagging."""
+def test_release_pr_requires_remote_branch_absence_before_hosted_mutation() -> None:
+    """Catch either controlling transcript pushing an existing remote branch."""
+
+    guide = RELEASING_PATH.read_text(encoding="utf-8")
+    prepare = _section(guide, "## 5. Prepare the required release pull request")
+    remote_branch_query = (
+        'REMOTE_BRANCH_PRECHECK="$(git ls-remote origin '
+        '"refs/heads/${RELEASE_BRANCH}" | awk \'{print $1}\')"'
+    )
+    remote_branch_absence = 'test -z "$REMOTE_BRANCH_PRECHECK"'
+    hosted_mutations = (
+        'git push --set-upstream origin "$RELEASE_BRANCH"',
+        'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH"',
+    )
+
+    assert remote_branch_query in prepare
+    assert "export REMOTE_BRANCH_PRECHECK" in prepare
+    assert remote_branch_absence in prepare
+    query_index = prepare.index(remote_branch_query)
+    absence_index = prepare.index(remote_branch_absence)
+    assert query_index < absence_index
+    assert all(absence_index < prepare.index(command) for command in hosted_mutations)
+
+    plan = RELEASE_PLAN_PATH.read_text(encoding="utf-8")
+    task_6 = _section(
+        plan, "### Task 6: Push the Branch and Open the Ready Pull Request"
+    )
+    task_6_bash = tuple(
+        textwrap.dedent(source)
+        for source in re.findall(
+            r"^  ```bash\n(.*?)^  ```$",
+            task_6,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+    )
+    preflight = next(
+        source for source in task_6_bash if "git fetch --no-tags origin main" in source
+    )
+    push_command = "git push --set-upstream origin release/vercor-0.4.6"
+    push_transcript = next(source for source in task_6_bash if push_command in source)
+    assert remote_branch_query in preflight
+    assert "export REMOTE_BRANCH_PRECHECK" in preflight
+    assert remote_branch_absence in preflight
+    assert preflight.index(remote_branch_query) < preflight.index(remote_branch_absence)
+    assert push_command in push_transcript
+    assert task_6.index(remote_branch_absence) < task_6.index(push_command)
+
+
+@pytest.mark.fast_always
+def test_release_pr_handoff_verifies_ready_state_without_merging() -> None:
+    """Catch draft transitions or merge commands entering the authorized handoff."""
 
     guide = RELEASING_PATH.read_text(encoding="utf-8")
     prepare = _section(guide, "## 5. Prepare the required release pull request")
     tag = _section(guide, "## 6. Create and verify the annotated tag")
-    draft_pr = (
+    ready_pr = (
         'gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" '
-        "--draft"
+        f'--title "Release VerCOR {EXPECTED_VERSION}" --body-file "$PR_BODY_FILE"'
     )
-    exact_pr_check = (
+    open_check = (
+        'test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
+        '--json state --jq .state)" = "OPEN"'
+    )
+    ready_check = (
+        'test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
+        '--json isDraft --jq .isDraft)" = "false"'
+    )
+    base_check = (
+        'test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
+        '--json baseRefName --jq .baseRefName)" = "main"'
+    )
+    head_check = (
+        'test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
+        '--json headRefName --jq .headRefName)" = "$RELEASE_BRANCH"'
+    )
+    exact_sha_check = (
         'test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
         '--json headRefOid --jq .headRefOid)" = "$RELEASE_COMMIT"'
     )
@@ -873,53 +976,31 @@ def test_release_pr_merge_rebinds_main_before_tag_preflight() -> None:
         'test "$(gh run view "$RELEASE_RUN_ID" --repo nutrik/vercor '
         '--json conclusion --jq .conclusion)" = "success"'
     )
-    ready = 'gh pr ready "$RELEASE_PR_NUMBER" --repo nutrik/vercor'
-    merge = 'gh pr merge "$RELEASE_PR_NUMBER" --repo nutrik/vercor --merge'
-    merged_state = (
-        'test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
-        '--json state --jq .state)" = "MERGED"'
-    )
-    merge_commit = (
-        'MERGE_COMMIT="$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor '
-        "--json mergeCommit --jq '.mergeCommit.oid // empty')\""
-    )
-    main_binding = 'RELEASE_COMMIT="$(git rev-parse refs/remotes/origin/main)"'
-    merged_main_check = 'test "$MERGE_COMMIT" = "$RELEASE_COMMIT"'
-    detach = 'git switch --detach "$RELEASE_COMMIT"'
-    detached_check = 'test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"'
 
     for required in (
-        draft_pr,
-        exact_pr_check,
+        ready_pr,
+        open_check,
+        ready_check,
+        base_check,
+        head_check,
+        exact_sha_check,
         successful_run,
-        ready,
-        merge,
-        merged_state,
-        merge_commit,
-        "git fetch --no-tags origin main",
-        main_binding,
-        "export RELEASE_COMMIT",
-        merged_main_check,
-        detach,
-        detached_check,
     ):
         assert required in prepare
-    assert prepare.index(draft_pr) < prepare.index(exact_pr_check)
-    assert prepare.index(exact_pr_check) < prepare.index(successful_run)
-    assert prepare.index(successful_run) < prepare.index(ready)
-    assert prepare.index(ready) < prepare.index(merge)
-    assert prepare.index(merge) < prepare.index(merged_state)
-    assert prepare.index(merged_state) < prepare.index(merge_commit)
-    assert prepare.index(merge_commit) < prepare.rindex(
-        "git fetch --no-tags origin main"
+    assert prepare.index(ready_pr) < prepare.index(open_check)
+    assert prepare.index(open_check) < prepare.index(ready_check)
+    assert prepare.index(ready_check) < prepare.index(base_check)
+    assert prepare.index(base_check) < prepare.index(head_check)
+    assert prepare.index(head_check) < prepare.index(exact_sha_check)
+    assert prepare.index(exact_sha_check) < prepare.index(successful_run)
+    assert "gh pr ready " not in prepare
+    assert "gh pr merge " not in prepare
+    assert "MERGE_COMMIT=" not in prepare
+    assert "git switch --detach" not in prepare
+    assert "later human approval" in prepare
+    assert guide.index("later human approval") < guide.index(
+        "## 6. Create and verify the annotated tag"
     )
-    assert prepare.rindex("git fetch --no-tags origin main") < prepare.index(
-        main_binding
-    )
-    assert prepare.index(main_binding) < prepare.index(merged_main_check)
-    assert prepare.index(merged_main_check) < prepare.index(detach)
-    assert prepare.index(detach) < prepare.rindex(detached_check)
-    assert guide.index(ready) < guide.index("## 6. Create and verify the annotated tag")
 
     assert "git fetch --no-tags origin main" in tag
     assert 'MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"' in tag
@@ -1105,8 +1186,3 @@ def test_active_memory_is_current_and_historical_detail_is_archived() -> None:
         == PROGRESS_ARCHIVE_SHA256
     )
     assert "VerCOR 0.4.0 release verification" in progress
-
-    design = DESIGN_PATH.read_text(encoding="utf-8")
-    dependencies = DEPENDENCIES_PATH.read_text(encoding="utf-8")
-    assert "vercor.compat.v0_3" not in design
-    assert "vercor.compat.v0_3" not in dependencies

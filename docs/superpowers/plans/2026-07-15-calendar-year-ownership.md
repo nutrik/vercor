@@ -14,7 +14,7 @@
 - Do not add a second run-level year-type or calendar setting.
 - Do not retain a compatibility alias for `RuntimeOptions.model_year_seconds`.
 - Resolve Gregorian leap status per timestamp because one run may cross calendar years.
-- Keep the historical `tests/contracts/vercor-0.3.2-public-api.json` and archived progress documents unchanged.
+- Keep the historical frozen public API contract and archived progress documents unchanged.
 - Follow red-green-refactor: no production change may precede its failing regression test.
 - Use the direct `scipy` interpreter at `/Users/romannuterman/miniforge3/envs/scipy/bin/python`; the Conda launcher is known to panic in this checkout.
 - Run the complete unit suite before each implementation commit, as required by `AGENTS.md`.
@@ -31,10 +31,10 @@
 - `vercor/runtime/__init__.py`: `RuntimeOptions` after removal of the model-year field and validation.
 - `tests/test_tools_time_and_forcing.py`: calendar API, forcing compatibility, and direct runtime metadata regressions.
 - `tests/test_coupler_runtime.py`: end-to-end monthly forcing and gradient regressions.
-- `tests/test_v0_2_1_api_boundary_redesign.py`, `tests/test_v0_4_workflows.py`, `tests/test_plugin_architecture.py`, `tests/test_final_review_boundaries.py`, `tests/test_v0_4_public_api.py`: corrected ownership and public-boundary assertions.
+- `tests/test_runtime_api_boundaries.py`, `tests/test_v0_4_workflows.py`, `tests/test_plugin_architecture.py`, `tests/test_final_review_boundaries.py`, `tests/test_v0_4_public_api.py`: corrected ownership and public-boundary assertions.
 - `tests/test_api_architecture_review.py`, `tests/test_distribution_boundaries.py`: exclude inherited builtin string methods from VerCOR-owned method inventory.
 - `tests/contracts/vercor-0.4.0a1-public-signatures.json`: exact new calendar callables and corrected `RuntimeOptions` signature.
-- `DESIGN.md`, `DEPENDENCIES.md`, `docs/api-architecture-review.md`, `docs/migration-0.3-to-0.4.md`, `PROGRESS.md`: implemented ownership, dependency, migration, and verification evidence.
+- `DESIGN.md`, `DEPENDENCIES.md`, `docs/api-architecture-review.md`, legacy migration guidance, `PROGRESS.md`: implemented ownership, dependency, migration, and verification evidence.
 
 ---
 
@@ -347,7 +347,7 @@ git commit -m "feat: centralize model-year policy in calendar"
 
 - Modify: `tests/test_tools_time_and_forcing.py`
 - Modify: `tests/test_coupler_runtime.py`
-- Modify: `tests/test_v0_2_1_api_boundary_redesign.py`
+- Modify: `tests/test_runtime_api_boundaries.py`
 - Modify: `tests/test_v0_4_workflows.py`
 - Modify: `tests/test_plugin_architecture.py`
 - Modify: `tests/test_final_review_boundaries.py`
@@ -360,7 +360,7 @@ git commit -m "feat: centralize model-year policy in calendar"
 - Modify: `DESIGN.md`
 - Modify: `DEPENDENCIES.md`
 - Modify: `docs/api-architecture-review.md`
-- Modify: `docs/migration-0.3-to-0.4.md`
+- Modify: legacy migration guidance
 - Modify: `PROGRESS.md`
 
 **Interfaces:**
@@ -624,7 +624,7 @@ the deleted private clock helper.
 
 Make these focused replacements:
 
-- `tests/test_v0_2_1_api_boundary_redesign.py`: assert the attribute and
+- `tests/test_runtime_api_boundaries.py`: assert the attribute and
   constructor parameter are absent.
 - `tests/test_plugin_architecture.py`: construct `RuntimeOptions` with topology
   only and assert the model-year attribute is absent.
@@ -651,7 +651,7 @@ Run:
 /Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest \
   tests/test_tools_time_and_forcing.py \
   tests/test_coupler_runtime.py \
-  tests/test_v0_2_1_api_boundary_redesign.py \
+  tests/test_runtime_api_boundaries.py \
   tests/test_v0_4_workflows.py \
   tests/test_plugin_architecture.py \
   tests/test_final_review_boundaries.py \
@@ -673,7 +673,7 @@ Make these exact semantic updates:
 - `DESIGN.md`: change configuration ownership so `RuntimeOptions` owns dtype,
   backend, workflow, and topology only; add calendar year type/duration to the
   clock/calendar ownership paragraph.
-- `docs/migration-0.3-to-0.4.md`: state that callers delete
+- Legacy migration guidance: state that callers delete
   `RuntimeOptions(model_year_seconds=...)` and select only `Clock.calendar`.
 - `DEPENDENCIES.md`: describe `vercor.calendar` as the year-type/duration owner
   in layer 1 and `_runtime/time.py` as its per-timestamp consumer in layer 3.
@@ -688,7 +688,7 @@ Run:
 ```bash
 rg -n "model_year_seconds|_forcing_year_type_for_calendar" \
   vercor tests examples DESIGN.md DEPENDENCIES.md \
-  docs/api-architecture-review.md docs/migration-0.3-to-0.4.md PROGRESS.md
+  docs/api-architecture-review.md PROGRESS.md
 ```
 
 Expected live matches are limited to the calendar helper, deliberate absence
@@ -724,12 +724,12 @@ above 90%, and no whitespace errors are reported.
 git add vercor/_runtime/time.py vercor/_runtime/backends.py \
   vercor/_runtime/preparation.py vercor/runtime/__init__.py \
   tests/test_tools_time_and_forcing.py tests/test_coupler_runtime.py \
-  tests/test_v0_2_1_api_boundary_redesign.py tests/test_v0_4_workflows.py \
+  tests/test_runtime_api_boundaries.py tests/test_v0_4_workflows.py \
   tests/test_plugin_architecture.py tests/test_final_review_boundaries.py \
   tests/test_v0_4_public_api.py \
   tests/contracts/vercor-0.4.0a1-public-signatures.json \
   DESIGN.md DEPENDENCIES.md docs/api-architecture-review.md \
-  docs/migration-0.3-to-0.4.md PROGRESS.md
+  PROGRESS.md
 git commit -m "refactor: derive model-year duration from calendar"
 ```
 

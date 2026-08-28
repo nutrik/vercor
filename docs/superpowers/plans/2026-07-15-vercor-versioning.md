@@ -28,14 +28,14 @@ runtime behavior.
   repository-label contracts. Its path helper scans cached and intended
   untracked repository text while ignoring deleted paths.
 - Renamed the migration guide, architecture design and plan, current signature
-  contract, frozen `0.3.2` API contract, historical plugin fixture, and current
+  contract, frozen pre-redesign API contract, historical plugin fixture, and current
   test modules to their corrected paths.
 - Set package and current artifact identity to `0.4.0a1`.
 - Renamed CI plugin lanes to `native-v0.4` and
-  `historical-v0.3-artifact` while preserving GitHub Action revisions.
-- Renamed the frozen plugin distribution and package to the 0.3 identity and
-  set its dependency interval to `vercor>=0.3,<0.4`.
-- Normalized the pinned historical wheel build to `0.3.2` after archive
+  `historical-pre-redesign-artifact` while preserving GitHub Action revisions.
+- Renamed the frozen plugin distribution and package to the legacy identity and
+  set its earlier-package dependency interval.
+- Normalized the pinned historical wheel build to the pre-redesign version after archive
   extraction while preserving its SHA, exports, and signatures.
 - Updated source/test identifiers, executable contracts, documentation, release
   commands, historical progress, and every renamed-path cross-reference.

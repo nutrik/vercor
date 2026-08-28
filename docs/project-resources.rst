@@ -1,14 +1,13 @@
 Project resources
 =================
 
-This page collects maintained project records that describe migrations,
-extension authoring, and released versions.
+This page collects maintained project records that describe extension
+authoring and released versions.
 
 .. toctree::
    :maxdepth: 1
-   :caption: Migration and extension
+   :caption: Extension guidance
 
-   migration-0.3-to-0.4
    plugin-authoring
 
 .. toctree::
@@ -18,4 +17,5 @@ extension authoring, and released versions.
    release-notes-0.4.3
    release-notes-0.4.4
    release-notes-0.4.5
+   release-notes-0.4.6
    releasing
