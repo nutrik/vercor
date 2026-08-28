@@ -240,15 +240,35 @@ test -n "${RELEASE_COMMIT:-}"
 test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 test -n "${MAIN_COMMIT:-}"
 git merge-base --is-ancestor "$MAIN_COMMIT" "$RELEASE_COMMIT"
-gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" --draft --title "Release VerCOR 0.4.6" --body "Prepare VerCOR 0.4.6 with differentiable multi-step Veros execution, complete native-state ownership, CI provenance gates, and corrected hybrid-sigma heights."
+PR_BODY_FILE="$(mktemp)"
+cat > "$PR_BODY_FILE" <<'EOF'
+Summary
+
+Prepare VerCOR 0.4.6 with differentiable multi-step Veros execution, complete native-state ownership, CI provenance gates, corrected hybrid-sigma heights, and the complete tracked-tree legacy-reference purge.
+
+Final local evidence
+
+- Black: 250 files unchanged; Flake8: 0; mypy: 250 source files.
+- Strict Sphinx: 30 sources without warnings.
+- Version policy: 215/215; API architecture/documentation: 43/43.
+- Fast: 882/882; full: 1,755/1,755.
+- Branch coverage: 91.80% across 7,932 statements and 1,706 branches.
+- `vercor-0.4.6-py3-none-any.whl` — 239986 B — SHA-256 `819d54b995d4ba9e384d6e7d8a05defc9a384123a15f5b354331ab013d0ddcad`.
+- `vercor-0.4.6.tar.gz` — 169226 B — SHA-256 `207d0cf8b909ac81cfc63908b91f37898bc2305be9c0588d3962932c38369b20`.
+- Supplied-artifact distribution boundary: 30/30.
+
+Non-actions
+
+No tag, merge, PyPI publication, artifact upload, or GitHub Release was created.
+EOF
+gh pr create --repo nutrik/vercor --base main --head "$RELEASE_BRANCH" --title "Release VerCOR 0.4.6" --body-file "$PR_BODY_FILE"
 ```
 
 Confirm exactly one open matching pull request, reverify the remote branch SHA,
 select the `pull_request` run of `python-package.yml` at the exact SHA, watch
-it, and mechanically recheck the PR and run. After those checks pass, mark the
-draft ready, merge through the repository's normal mechanism, bind
-`RELEASE_COMMIT` to the fetched protected `main` merge commit, and detach the
-worktree at that exact commit:
+it, and mechanically recheck the ready PR and run. This authorized handoff
+stops after those checks; merging requires later human approval and remains
+outside this procedure:
 
 ```text
 set -euo pipefail
@@ -270,7 +290,7 @@ RELEASE_PR_NUMBER="$(gh pr list --repo nutrik/vercor --state open --base main --
 export RELEASE_PR_NUMBER
 test -n "${RELEASE_PR_NUMBER:-}"
 test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json state --jq .state)" = "OPEN"
-test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json isDraft --jq .isDraft)" = "true"
+test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json isDraft --jq .isDraft)" = "false"
 test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json baseRefName --jq .baseRefName)" = "main"
 test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json headRefName --jq .headRefName)" = "$RELEASE_BRANCH"
 test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json headRefOid --jq .headRefOid)" = "$RELEASE_COMMIT"
@@ -282,26 +302,14 @@ test "$(gh run view "$RELEASE_RUN_ID" --repo nutrik/vercor --json headSha --jq .
 test "$(gh run view "$RELEASE_RUN_ID" --repo nutrik/vercor --json event --jq .event)" = "pull_request"
 test "$(gh run view "$RELEASE_RUN_ID" --repo nutrik/vercor --json conclusion --jq .conclusion)" = "success"
 (cd dist && shasum -a 256 -c SHA256SUMS)
-gh pr ready "$RELEASE_PR_NUMBER" --repo nutrik/vercor
-gh pr merge "$RELEASE_PR_NUMBER" --repo nutrik/vercor --merge
-test "$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json state --jq .state)" = "MERGED"
-MERGE_COMMIT="$(gh pr view "$RELEASE_PR_NUMBER" --repo nutrik/vercor --json mergeCommit --jq '.mergeCommit.oid // empty')"
-export MERGE_COMMIT
-test -n "${MERGE_COMMIT:-}"
-git fetch --no-tags origin main
-RELEASE_COMMIT="$(git rev-parse refs/remotes/origin/main)"
-export RELEASE_COMMIT
-test -n "${RELEASE_COMMIT:-}"
-test "$MERGE_COMMIT" = "$RELEASE_COMMIT"
-git switch --detach "$RELEASE_COMMIT"
-test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 test -z "$(git status --porcelain --untracked-files=all)"
 ```
 
 If the run has not appeared yet, stop and rerun the selection transcript later.
 Do not select a `push` run, a run for another workflow, or a run at another SHA.
-Do not mark the PR ready or merge until every exact PR and workflow check above
-has passed.
+The ready pull request is the terminal branch handoff. Do not merge it here.
+Only after later human approval, a separately authorized merge, and rebinding
+to the exact protected-`main` commit may the publication procedure below begin.
 
 ## 6. Create and verify the annotated tag
 
