@@ -124,6 +124,15 @@ ipython_savefig_dir = "_generated"
 #
 html_theme = "furo"
 
+# Furo's light/dark logo filenames are relative to a static asset directory.
+html_static_path = ["_images"]
+
+html_theme_options = {
+    "light_logo": "vercor-logo-400px.png",
+    "dark_logo": "vercor-logo-400px.png",
+    "sidebar_hide_name": True,
+}
+
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.

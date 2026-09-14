@@ -1,7 +1,7 @@
-VerCOR documentation
-====================
+Versatile Earth System coupler
+==============================
 
-VerCOR (Versatile Earth System coupler) is a JAX-first coupler for composing
+VerCOR, the Versatile Earth System COupleR, is a JAX-first coupler for composing
 atmosphere, ocean, sea-ice, land, and forcing-data models/components on a shared clock.
 It moves fields between model grids, supports host-side and JAX-native components,
 and keeps output-free JAX workflows differentiable.
