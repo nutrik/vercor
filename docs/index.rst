@@ -6,6 +6,12 @@ atmosphere, ocean, sea-ice, land, and forcing-data models/components on a shared
 It moves fields between model grids, supports host-side and JAX-native components,
 and keeps output-free JAX workflows differentiable.
 
+.. figure:: /_images/sst_anomaly.gif
+   :width: 70%
+   :align: center
+
+   Sea surface temperature anomaly from a coupled ocean-atmosphere model run with VerCOR.
+
 For researchers
 ---------------
 
