@@ -56,7 +56,7 @@ PYPI_PUBLISH_ACTION = (
     "pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247"
 )
 CODECOV_ACTION = "codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac"
-VEROS_AD_COMMIT = "429a67162bd112259e8143cea12735013cf3d757"
+VEROS_AD_COMMIT = "7a8c964cf00b5aa0713c995edd760643a431b3c9"
 VEROS_AD_REPOSITORY = "https://github.com/Etienne-Meunier/veros.git"
 EXPECTED_INSTALLED_ROOT = (
     "Clock",
@@ -174,8 +174,7 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
 
     assert extras["jcm"] == ["dinosaur>=1.3.6", "jcm==2.0.1"]
     assert extras["veros_ad"] == [
-        "veros @ git+https://github.com/Etienne-Meunier/veros.git@"
-        "429a67162bd112259e8143cea12735013cf3d757"
+        f"veros @ git+{VEROS_AD_REPOSITORY}@{VEROS_AD_COMMIT}"
     ]
     assert not any(
         dependency.lower().startswith("pytest") for dependency in runtime_dependencies
