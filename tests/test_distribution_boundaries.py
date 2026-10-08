@@ -173,10 +173,14 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
     extras = project["optional-dependencies"]
 
     assert extras["jcm"] == ["dinosaur>=1.3.6", "jcm==2.0.1"]
+    assert extras["veros_ad"] == [
+        "veros @ git+https://github.com/Etienne-Meunier/veros.git@"
+        "429a67162bd112259e8143cea12735013cf3d757"
+    ]
     assert not any(
         dependency.lower().startswith("pytest") for dependency in runtime_dependencies
     )
-    assert {"jcm", "veros", "test", "dev"}.issubset(extras)
+    assert {"jcm", "veros", "veros_ad", "test", "dev"}.issubset(extras)
     assert any(dependency.lower().startswith("pytest") for dependency in extras["test"])
     assert any(
         dependency.lower().startswith("pytest-cov") for dependency in extras["test"]
