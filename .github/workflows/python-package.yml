@@ -276,7 +276,7 @@ jobs:
   veros-autodiff:
     runs-on: ubuntu-latest
     env:
-      VEROS_AD_COMMIT: 7a8c964cf00b5aa0713c995edd760643a431b3c9
+      VEROS_AD_COMMIT: 429a67162bd112259e8143cea12735013cf3d757
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # checkout major 4
         with:

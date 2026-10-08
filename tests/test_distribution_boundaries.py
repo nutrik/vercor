@@ -56,7 +56,7 @@ PYPI_PUBLISH_ACTION = (
     "pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247"
 )
 CODECOV_ACTION = "codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac"
-VEROS_AD_COMMIT = "7a8c964cf00b5aa0713c995edd760643a431b3c9"
+VEROS_AD_COMMIT = "429a67162bd112259e8143cea12735013cf3d757"
 VEROS_AD_REPOSITORY = "https://github.com/Etienne-Meunier/veros.git"
 EXPECTED_INSTALLED_ROOT = (
     "Clock",
