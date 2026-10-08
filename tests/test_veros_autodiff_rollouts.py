@@ -37,6 +37,35 @@ from vercor.topology import SurfaceMaskPolicy
 pytestmark = [pytest.mark.slow, pytest.mark.veros_autodiff]
 
 
+@pytest.mark.fast_always
+def test_global_setup_keeps_turbulence_parameters_in_native_variables() -> None:
+    """Catch fork revisions that still assign variable-owned TKE settings."""
+
+    from vercor.setups._external.veros_runtime_settings import (
+        configure_veros_runtime,
+        require_differentiable_veros_capabilities,
+    )
+
+    configure_veros_runtime("jax")
+    try:
+        require_differentiable_veros_capabilities()
+    except RuntimeError as error:
+        pytest.skip(str(error))
+    from vercor.setups._external.veros_setup_jax import (
+        DifferentiableGlobalFourDegree,
+    )
+
+    model = DifferentiableGlobalFourDegree()
+    state = model.state
+    with state.settings.unlock():
+        model.set_parameter(state)
+    state.initialize_variables()
+
+    assert state.settings.enable_tke
+    assert float(state.variables.c_k) == pytest.approx(0.1)
+    assert float(state.variables.c_eps) == pytest.approx(0.7)
+
+
 def test_global_zero_surface_stress_forcing_has_finite_derivatives() -> None:
     """The JAX global setup keeps calm-wind TKE forcing differentiable."""
 
