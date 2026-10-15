@@ -145,47 +145,77 @@ def test_datetime_to_seconds_in_year_for_model_datetime_with_arithmetic() -> Non
     assert np.isclose(seconds, 1 * 86400 + 2 * 3600 + 3 * 60 + 4 + 5e-6)
 
 
-def test_get_periodic_interval_wraps_with_time_beyond_cycle() -> None:
+@pytest.mark.fast_always
+@pytest.mark.parametrize("month", range(12))
+def test_get_periodic_interval_monthly_midpoints(month: int) -> None:
+    """Monthly means belong at the middle of each record interval."""
+
+    month_length = 30 * 86_400.0
     (n1, f1), (n2, f2) = get_periodic_interval(
-        current_time=13.25,
-        cycle_length=12.0,
-        rec_spacing=1.0,
-        n_rec=12,
+        (month + 0.5) * month_length, 12 * month_length, month_length, 12
     )
 
     assert isinstance(n1, int)
     assert isinstance(n2, int)
-    assert n1 == 1
-    assert n2 == 2
-    assert np.isclose(f1 + f2, 1.0)
+    assert (n1, n2) == (month, (month + 1) % 12)
+    assert (f1, f2) == (1.0, 0.0)
+    records = np.arange(12, dtype=float)
+    assert f1 * records[n1] + f2 * records[n2] == month
 
 
-def test_get_periodic_interval_exact_last_record_boundary_wraps_to_first() -> None:
-    (n1, f1), (n2, f2) = get_periodic_interval(
-        current_time=11.0,
-        cycle_length=12.0,
-        rec_spacing=1.0,
-        n_rec=12,
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    ("current_day", "expected"),
+    (
+        (-15.0, ((11, 1.0), (0, 0.0))),
+        (0.0, ((11, 0.5), (0, 0.5))),
+        (7.5, ((11, 0.25), (0, 0.75))),
+        (22.5, ((0, 0.75), (1, 0.25))),
+        (30.0, ((0, 0.5), (1, 0.5))),
+        (352.5, ((11, 0.75), (0, 0.25))),
+        (360.0, ((11, 0.5), (0, 0.5))),
+        (375.0, ((0, 1.0), (1, 0.0))),
+    ),
+)
+def test_get_periodic_interval_monthly_weights(
+    current_day: float,
+    expected: tuple[tuple[int, float], tuple[int, float]],
+) -> None:
+    """Interpolate centered records continuously across the cycle boundary."""
+
+    day_length = 86_400.0
+    actual = get_periodic_interval(
+        current_day * day_length, 360 * day_length, 30 * day_length, 12
     )
 
-    assert n1 == 11
-    assert n2 == 0
-    assert np.isclose(f1, 1.0)
-    assert np.isclose(f2, 0.0)
+    for (index, weight), (expected_index, expected_weight) in zip(
+        actual, expected, strict=True
+    ):
+        assert isinstance(index, int)
+        assert index == expected_index
+        assert weight == pytest.approx(expected_weight)
 
 
-def test_get_periodic_interval_exact_cycle_boundary_resets_to_first_record() -> None:
+@pytest.mark.parametrize("cycle", (-2, 0, 2))
+@pytest.mark.parametrize("rec_spacing", (1.0, 6.0))
+def test_get_periodic_interval_arbitrary_record_spacing(
+    cycle: int, rec_spacing: float
+) -> None:
+    """Record centering applies to any spacing and repeated cycle."""
+
     (n1, f1), (n2, f2) = get_periodic_interval(
-        current_time=12.0,
-        cycle_length=12.0,
-        rec_spacing=1.0,
-        n_rec=12,
+        (4 * cycle + 1.25) * rec_spacing, 4 * rec_spacing, rec_spacing, 4
     )
 
-    assert n1 == 0
-    assert n2 == 1
-    assert np.isclose(f1, 1.0)
-    assert np.isclose(f2, 0.0)
+    assert (n1, n2) == (0, 1)
+    assert (f1, f2) == pytest.approx((0.25, 0.75))
+
+
+def test_get_periodic_interval_single_record() -> None:
+    (n1, f1), (n2, f2) = get_periodic_interval(0.0, 10.0, 10.0, 1)
+
+    assert (n1, n2) == (0, 0)
+    assert f1 + f2 == pytest.approx(1.0)
 
 
 @pytest.mark.fast_always

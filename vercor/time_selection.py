@@ -10,9 +10,15 @@ __all__ = ["datetime_to_seconds_in_year", "get_periodic_interval"]
 def get_periodic_interval(
     current_time: float, cycle_length: float, rec_spacing: float, n_rec: int
 ) -> tuple[tuple[int, float], tuple[int, float]]:
-    """Return record indices and weights for periodic linear interpolation."""
+    """Return indices and weights for interpolation of centered periodic records.
 
-    current_time = current_time % cycle_length
+    Record 0 is centered at ``rec_spacing / 2``, with subsequent records
+    spaced by ``rec_spacing`` in the same time units as ``current_time`` and
+    ``cycle_length``. At time zero, the last and first records have equal
+    weight. Indices are host integers for precomputed runtime metadata.
+    """
+
+    current_time = (current_time - 0.5 * rec_spacing) % cycle_length
     t_idx_1 = int(current_time // rec_spacing)
     t_idx_2 = (1 + t_idx_1) % n_rec
     weight_2 = (current_time - rec_spacing * t_idx_1) / rec_spacing

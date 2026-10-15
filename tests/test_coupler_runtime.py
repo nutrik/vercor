@@ -11,7 +11,7 @@ from jax.errors import JaxRuntimeError
 
 from tests._coverage_support import make_test_grid
 from tests.assertions import assert_allclose_compact
-from vercor.calendar import model_year_seconds, year_type_for_calendar
+from vercor.calendar import year_type_for_calendar
 from vercor.clock import Clock
 from vercor.components import (
     CallableComponent,
@@ -57,10 +57,6 @@ from vercor._runtime.preparation import (
 )
 from vercor.state import RunState
 from vercor._runtime.stores import FieldStore
-from vercor.time_selection import (
-    datetime_to_seconds_in_year,
-    get_periodic_interval,
-)
 from tests._runtime_helpers import (
     create_runtime_state_from_coupler,
     replace_runtime_topology_maps,
@@ -1040,10 +1036,12 @@ def test_data_forcing_components_run_inside_runtime() -> None:
     monthly_ocean = monthly_ocean.at[0].set(
         jnp.asarray([[280.0, 281.0], [282.0, 283.0]], dtype=jnp.float64)
     )
+    monthly_ocean = monthly_ocean.at[11].set(monthly_ocean[0] + 12.0)
     monthly_land = jnp.zeros((12, 2, 2), dtype=jnp.float64)
     monthly_land = monthly_land.at[0].set(
         jnp.asarray([[285.0, 286.0], [287.0, 288.0]], dtype=jnp.float64)
     )
+    monthly_land = monthly_land.at[11].set(monthly_land[0] + 12.0)
     ocean = _make_data_component(
         make_era5_ocean,
         name="OCN",
@@ -1116,8 +1114,9 @@ def test_data_forcing_components_run_inside_runtime() -> None:
     atmosphere = final_state._component_state("ATM")
     received_ocean = atmosphere.received.get("sea_surface_temperature")
     received_land = atmosphere.received.get("land_surface_temperature")
-    expected_ocean = np.asarray(monthly_ocean[0])
-    expected_land = np.asarray(monthly_land[0])
+    # January 1 is halfway between the December and January record centers.
+    expected_ocean = np.asarray(monthly_ocean[0] + 6.0)
+    expected_land = np.asarray(monthly_land[0] + 6.0)
 
     assert received_ocean.shape == grid.shape
     assert received_land.shape == grid.shape
@@ -1147,8 +1146,9 @@ def test_data_forcing_components_run_inside_runtime() -> None:
     (reverse_vjp,) = pullback(jnp.ones_like(value))
 
     assert gradient.shape == monthly_ocean.shape
-    assert_allclose_compact(gradient[0], np.ones((2, 2)))
-    assert_allclose_compact(gradient[1:], np.zeros((11, 2, 2)))
+    assert_allclose_compact(gradient[0], np.full((2, 2), 0.5))
+    assert_allclose_compact(gradient[11], np.full((2, 2), 0.5))
+    assert_allclose_compact(gradient[1:11], np.zeros((10, 2, 2)))
     assert np.all(np.isfinite(np.asarray(reverse_vjp)))
     assert_allclose_compact(
         jnp.vdot(tangent_seed, reverse_vjp),
@@ -1169,6 +1169,7 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
         dtype=jnp.float64,
     )
     monthly_ocean = monthly_ocean.at[0].set(first_month)
+    monthly_ocean = monthly_ocean.at[11].set(first_month + 12.0)
     ocean = DataComponent(
         name="OCN",
         grid=grid,
@@ -1207,7 +1208,7 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
     assert ocean_state.sent.get("sea_surface_temperature").shape == grid.shape
     assert_allclose_compact(
         ocean_state.sent.get("sea_surface_temperature"),
-        np.asarray(first_month),
+        np.asarray(first_month + 6.0),
     )
 
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1218,7 +1219,7 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
     )
 
     assert received_sst.shape == grid.shape
-    assert_allclose_compact(received_sst, np.asarray(first_month))
+    assert_allclose_compact(received_sst, np.asarray(first_month + 6.0))
 
 
 def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridder() -> (
@@ -1291,6 +1292,7 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
     )
     monthly_ocean = monthly_ocean.at[0].set(first_month)
     monthly_ocean = monthly_ocean.at[1].set(first_month + 12.0)
+    monthly_ocean = monthly_ocean.at[11].set(first_month + 24.0)
     atmosphere = make_slab_atmosphere(atmosphere_grid)
     ocean = _make_data_component(
         make_erainterim_ocean,
@@ -1339,7 +1341,7 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
     atmosphere_state = final_state._component_state("ATM")
     received_sst = atmosphere_state.received.get("sea_surface_temperature")
     sensible_heat_flux = atmosphere_state.fields.get("sensible_heat_flux")
-    expected_source = np.asarray(first_month)
+    expected_source = np.asarray(first_month + 12.0)
     expected_received = regridder.regrid(expected_source)
 
     assert received_sst.shape == atmosphere_grid.shape
@@ -1370,7 +1372,8 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
 
     assert gradient.shape == monthly_ocean.shape
     assert np.all(np.isfinite(np.asarray(gradient[0])))
-    assert_allclose_compact(gradient[1:], np.zeros((11, 2, 3)))
+    assert_allclose_compact(gradient[0], gradient[11])
+    assert_allclose_compact(gradient[1:11], np.zeros((10, 2, 3)))
     assert np.all(np.isfinite(np.asarray(reverse_vjp)))
     assert_allclose_compact(
         jnp.vdot(tangent_seed, reverse_vjp),
@@ -1714,17 +1717,10 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
         regridders=cast(Any, {key: _IdentityRegridder()}),
         fractional_masks={key: jnp.ones(grid.shape, dtype=jnp.float64)},
     )
-    year_type = year_type_for_calendar(
-        coupler.clock.calendar,
-        coupler.clock.start.year,
-    )
-    year_seconds = model_year_seconds(year_type)
-    (left_index, left_weight), (right_index, right_weight) = get_periodic_interval(
-        current_time=datetime_to_seconds_in_year(coupler.clock.start),
-        cycle_length=year_seconds,
-        rec_spacing=year_seconds / 12.0,
-        n_rec=12,
-    )
+    # Half a day before January 1 in a 365-day year, with 12 centered records.
+    left_index, right_index = 11, 0
+    left_weight = 0.5 + 6.0 / 365.0
+    right_weight = 0.5 - 6.0 / 365.0
 
     initial_state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
