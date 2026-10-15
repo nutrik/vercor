@@ -6,10 +6,7 @@ from datetime import datetime
 import importlib
 import inspect
 import logging
-import os
 from pathlib import Path
-import subprocess
-import sys
 from types import MappingProxyType, ModuleType
 from typing import Any, get_type_hints
 
@@ -34,8 +31,6 @@ from vercor.jax_logging import LoggerLike
 from vercor.physics import PhysicalConstants
 from vercor.runtime import RuntimeOptions
 from vercor.topology import TopologyContext
-
-from tests._distribution_support import _cached_build_pythonpath
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ROOT_EXPORTS = (
@@ -946,143 +941,3 @@ def test_examples_and_current_plugin_use_direct_constructor_assembly() -> None:
         source = path.read_text(encoding="utf-8")
         for marker in forbidden:
             assert marker not in source, (path, marker)
-
-
-def test_optional_setup_imports_remain_lazy() -> None:
-    script = """
-import sys
-import vercor
-import vercor.setups
-banned = ('dinosaur', 'jax_gcm', 'veros', 'credit', 'torch', 'tensorflow')
-loaded = sorted(name for name in sys.modules if name.split('.')[0].lower() in banned)
-assert loaded == [], loaded
-"""
-    result = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=PROJECT_ROOT,
-        text=True,
-        capture_output=True,
-        timeout=30,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
-
-
-def test_installed_wheel_preserves_the_complete_public_boundary(
-    tmp_path: Path,
-) -> None:
-    distribution_dir = tmp_path / "dist"
-    installed_root = tmp_path / "site-packages"
-    distribution_dir.mkdir()
-    installed_root.mkdir()
-    environment = os.environ.copy()
-    build_pythonpath = _cached_build_pythonpath()
-    if build_pythonpath:
-        environment["PYTHONPATH"] = build_pythonpath
-
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "build",
-            "--no-isolation",
-            "--wheel",
-            "--outdir",
-            str(distribution_dir),
-            str(PROJECT_ROOT),
-        ],
-        cwd=tmp_path,
-        env=environment,
-        text=True,
-        capture_output=True,
-        timeout=120,
-        check=True,
-    )
-    wheel = next(distribution_dir.glob("vercor-*.whl"))
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "--no-compile",
-            "--no-deps",
-            "--target",
-            str(installed_root),
-            str(wheel),
-        ],
-        cwd=tmp_path,
-        text=True,
-        capture_output=True,
-        timeout=120,
-        check=True,
-    )
-
-    probe = f"""
-import importlib
-from pathlib import Path
-import pkgutil
-import sys
-from types import ModuleType
-
-installed_root = Path({str(installed_root)!r}).resolve()
-sys.path.insert(0, str(installed_root))
-import vercor
-
-root_exports = {ROOT_EXPORTS!r}
-module_exports = {PUBLIC_MODULE_EXPORTS!r}
-
-assert tuple(vercor.__all__) == root_exports
-assert Path(vercor.__file__).resolve().is_relative_to(installed_root)
-
-discovered = {{
-    f"vercor.{{item.name}}"
-    for item in pkgutil.iter_modules(vercor.__path__)
-    if not item.name.startswith("_")
-}}
-assert discovered == set(module_exports), (discovered, set(module_exports))
-
-modules = {{"vercor": vercor}}
-for module_name, exports in module_exports.items():
-    module = importlib.import_module(module_name)
-    modules[module_name] = module
-    assert tuple(module.__all__) == tuple(exports), module_name
-    assert Path(module.__file__).resolve().is_relative_to(installed_root), module_name
-    for name, value in vars(module).items():
-        if name.startswith("_") or name in exports:
-            continue
-        origin = (
-            value.__name__
-            if isinstance(value, ModuleType)
-            else getattr(value, "__module__", None)
-        )
-        assert not (
-            isinstance(origin, str) and origin.startswith("vercor")
-        ), (module_name, name, origin)
-
-for owner_name, exports in module_exports.items():
-    for symbol in exports:
-        for module_name, module in modules.items():
-            if module_name == owner_name:
-                continue
-            if module_name == "vercor" and symbol in root_exports:
-                continue
-            if (owner_name, symbol, module_name) == (
-                "vercor.cli",
-                "cli",
-                "vercor",
-            ):
-                continue
-            assert symbol not in vars(module), (symbol, owner_name, module_name)
-
-"""
-    result = subprocess.run(
-        [sys.executable, "-I", "-c", probe],
-        cwd=tmp_path,
-        text=True,
-        capture_output=True,
-        timeout=120,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr

@@ -1385,10 +1385,14 @@ def test_distribution_helper_reuses_explicit_artifact_directory_without_building
         pytest.fail("downloaded artifacts must bypass local build tooling")
 
     monkeypatch.setattr(subprocess, "run", unexpected_build)
+    monkeypatch.setattr(
+        distribution_support, "_cached_build_pythonpath", unexpected_build
+    )
 
+    unused_output = tmp_path / "unused-build-output"
     distributions = build_distributions(
         PROJECT_ROOT,
-        tmp_path / "unused-build-output",
+        unused_output,
         artifact_dir=artifact_dir,
     )
 
@@ -1396,6 +1400,12 @@ def test_distribution_helper_reuses_explicit_artifact_directory_without_building
     assert distributions.sdist == sdist
     assert distributions.build_pythonpath == ""
     assert set(artifact_dir.iterdir()) == {wheel, sdist}
+    assert not unused_output.exists()
+
+    monkeypatch.setenv("VERCOR_ARTIFACT_DIR", str(artifact_dir))
+    supplied = build_distributions(PROJECT_ROOT, unused_output)
+    assert supplied == distributions
+    assert not unused_output.exists()
 
 
 def test_distribution_helper_rejects_extra_artifact(
@@ -1662,8 +1672,13 @@ import importlib.metadata
 import inspect
 import json
 import pathlib
+import pkgutil
 import re
+import sys
+from types import ModuleType
 import typing
+
+sys.path.insert(0, {str(target)!r})
 import vercor
 
 external_typing_alias_replacements = {EXTERNAL_TYPING_ALIAS_REPLACEMENTS!r}
@@ -1677,12 +1692,49 @@ external_typing_alias_pattern = re.compile(
 )
 
 owners = {{}}
+modules = {{"vercor": vercor}}
 for module_name in {tuple(EXPECTED_INSTALLED_OWNER_MANIFESTS)!r}:
     module = importlib.import_module(module_name)
+    modules[module_name] = module
     owners[module_name] = {{
         "all": list(module.__all__),
         "file": module.__file__,
     }}
+
+module_exports = {EXPECTED_INSTALLED_OWNER_MANIFESTS!r}
+discovered = {{
+    f"vercor.{{item.name}}"
+    for item in pkgutil.iter_modules(vercor.__path__)
+    if not item.name.startswith("_")
+}}
+assert discovered == set(module_exports), (discovered, set(module_exports))
+
+for module_name, exports in module_exports.items():
+    module = modules[module_name]
+    for name, value in vars(module).items():
+        if name.startswith("_") or name in exports:
+            continue
+        origin = (
+            value.__name__
+            if isinstance(value, ModuleType)
+            else getattr(value, "__module__", None)
+        )
+        assert not (
+            isinstance(origin, str) and origin.startswith("vercor")
+        ), (module_name, name, origin)
+
+for owner_name, exports in module_exports.items():
+    for symbol in exports:
+        for module_name, module in modules.items():
+            if module_name == owner_name:
+                continue
+            if module_name == "vercor" and symbol in {EXPECTED_INSTALLED_ROOT!r}:
+                continue
+            if (owner_name, symbol, module_name) == (
+                "vercor.cli", "cli", "vercor"
+            ):
+                continue
+            assert symbol not in vars(module), (symbol, owner_name, module_name)
 
 removed = {{}}
 for module_name in {REMOVED_PRIMARY_MODULES!r}:
@@ -1792,6 +1844,7 @@ print(json.dumps({{
     probe = subprocess.run(
         [
             sys.executable,
+            "-I",
             "-c",
             probe_source,
         ],
@@ -1802,14 +1855,14 @@ print(json.dumps({{
         text=True,
     )
     installed = json.loads(probe.stdout)
-    assert Path(installed["file"]).is_relative_to(target)
+    assert Path(installed["file"]).resolve().is_relative_to(target.resolve())
     assert installed["version"] == EXPECTED_VERSION
     assert Path(installed["typed"]).is_file()
     assert installed["root"] == list(EXPECTED_INSTALLED_ROOT)
     for module_name, expected_manifest in EXPECTED_INSTALLED_OWNER_MANIFESTS.items():
         owner = installed["owners"][module_name]
         assert owner["all"] == list(expected_manifest)
-        assert Path(owner["file"]).is_relative_to(target)
+        assert Path(owner["file"]).resolve().is_relative_to(target.resolve())
     assert installed["removed"] == {
         module_name: module_name for module_name in REMOVED_PRIMARY_MODULES
     }
@@ -2064,61 +2117,6 @@ print(json.dumps({
     plugin_evidence = json.loads(smoke.stdout.splitlines()[-1])
     assert plugin_evidence["temperature"] == 12.0
     assert plugin_evidence["host_value"] == 17.0
-
-
-def test_supplied_wheels_install_and_run_without_build_environment(
-    built_distributions: BuiltDistributions,
-    external_extension_fixture_wheel: Path,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    assert external_extension_fixture_wheel.is_file()
-    artifact_dir = tmp_path / "supplied-artifacts"
-    artifact_dir.mkdir()
-    for artifact in (
-        built_distributions.wheel,
-        built_distributions.sdist,
-    ):
-        shutil.copyfile(artifact, artifact_dir / artifact.name)
-
-    def unavailable_build_environment() -> str:
-        pytest.fail("supplied wheels must not inspect build/flit_core/Conda fallback")
-
-    monkeypatch.setattr(
-        distribution_support,
-        "_cached_build_pythonpath",
-        unavailable_build_environment,
-    )
-    monkeypatch.setenv("VERCOR_ARTIFACT_DIR", str(artifact_dir))
-
-    supplied = build_distributions(PROJECT_ROOT, tmp_path / "must-not-build")
-    target = tmp_path / "clean-installed-target"
-    install_local_target(
-        wheel=supplied.wheel,
-        extension_fixture_wheel=external_extension_fixture_wheel,
-        target=target,
-    )
-
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = str(target)
-    smoke = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "external_extension_test_fixture.smoke",
-            "--output-dir",
-            str(tmp_path / "clean-external-extension-fixture-output"),
-        ],
-        cwd=tmp_path,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    evidence = json.loads(smoke.stdout.splitlines()[-1])
-    assert evidence["temperature"] == 12.0
-    assert evidence["host_value"] == 17.0
 
 
 @pytest.mark.fast_always

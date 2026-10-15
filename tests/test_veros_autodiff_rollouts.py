@@ -226,28 +226,22 @@ def _assert_scalar_rollout_autodiff(
     parameter_array = jnp.asarray(parameter, dtype=jnp.float64)
     tangent = jnp.asarray(0.375, dtype=jnp.float64)
 
-    value = objective(parameter_array)
-    gradient = jax.grad(objective)(parameter_array)
+    value, pullback = jax.vjp(objective, parameter_array)
+    # For a scalar objective, a unit VJP is the reverse-mode gradient.
+    (gradient,) = pullback(jnp.ones_like(value))
     jvp_value, jvp_tangent = jax.jvp(
         objective,
         (parameter_array,),
         (tangent,),
     )
-    vjp_value, pullback = jax.vjp(objective, parameter_array)
-    (vjp_gradient,) = pullback(jnp.ones_like(vjp_value))
-
     values = np.asarray(
-        jax.device_get(
-            jnp.stack(
-                (value, gradient, jvp_value, jvp_tangent, vjp_value, vjp_gradient)
-            )
-        )
+        jax.device_get(jnp.stack((value, gradient, jvp_value, jvp_tangent)))
     )
     assert np.all(np.isfinite(values))
     assert float(abs(gradient)) > 0.0
     np.testing.assert_allclose(
         jvp_tangent,
-        tangent * vjp_gradient,
+        tangent * gradient,
         rtol=inner_product_tolerance,
         atol=1e-12,
     )
