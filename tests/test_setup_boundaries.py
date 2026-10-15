@@ -14,7 +14,15 @@ from typing import cast
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-OPTIONAL_MODULE_ROOTS = {"credit", "dinosaur", "jcm", "tensorflow", "torch", "veros"}
+OPTIONAL_MODULE_ROOTS = {
+    "credit",
+    "dinosaur",
+    "jax_gcm",
+    "jcm",
+    "tensorflow",
+    "torch",
+    "veros",
+}
 RUNTIME_ENVIRONMENT_KEYS = (
     "TF_CPP_MIN_LOG_LEVEL",
     "OMP_NUM_THREADS",
@@ -44,7 +52,7 @@ print(json.dumps({{
     "vercor_file": getattr(sys.modules.get("vercor"), "__file__", None),
     "optional_modules": sorted(
         name for name in sys.modules
-        if name.partition(".")[0] in {OPTIONAL_MODULE_ROOTS!r}
+        if name.partition(".")[0].lower() in {OPTIONAL_MODULE_ROOTS!r}
     ),
     "runtime_environment": {{
         key: os.environ.get(key) for key in {RUNTIME_ENVIRONMENT_KEYS!r}
@@ -114,7 +122,7 @@ else:
     "statement",
     (
         "import vercor",
-        "import vercor.setups",
+        "import vercor; import vercor.setups",
         "import vercor.setups as setups; dir(setups)",
         (
             "from vercor.setups import (CAMulatorConfig, JAXGCMConfig, "
