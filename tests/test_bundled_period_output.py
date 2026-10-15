@@ -322,7 +322,7 @@ def test_data_period_file_contains_declared_outputs_only(tmp_path: Path) -> None
     component = time_interpolated_data_component(
         name="DATA",
         grid=grid,
-        fields={"temperature": jnp.full(grid.shape, 280.0)},
+        fields={"temperature": jnp.full((12, *grid.shape), 280.0)},
         inputs=("forcing",),
         outputs=("temperature",),
         initial_fields={"forcing": 1.0},
@@ -344,6 +344,7 @@ def test_data_period_file_contains_declared_outputs_only(tmp_path: Path) -> None
     )
 
     with h5netcdf.File(tmp_path / "data.averages.2000-01-01.nc", "r") as dataset:
+        assert dataset.variables["temperature"].shape == (1, *grid.shape)
         np.testing.assert_allclose(dataset.variables["temperature"][0], 280.0)
         assert "forcing" not in dataset.variables
 

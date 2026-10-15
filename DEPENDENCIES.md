@@ -18,6 +18,9 @@ Release-only tooling is outside the runtime graph:
 `tools/validate_release_state.py` is a standard-library-only foundation
 consumed by `docs/releasing.md` and `tests/test_release_state_validator.py`.
 
+`vercor/time_selection.py` owns host-side interpolation of centered periodic
+records; runtime time metadata consumes it without changing the import layers.
+
 The Veros adapter has two capability-gated branches. Layer 1 owns lazy runtime
 configuration plus the stock-compatible global forcing definition; layer 2's
 `veros_setup_jax.py` depends on that definition and contains only inherited JAX
