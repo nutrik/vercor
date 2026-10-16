@@ -2,7 +2,7 @@
 
 Status: approved by the user on 2026-10-16, including CESM `tref` for `ATemp`;
 implementation plan approved; implemented and locally verified on
-`feat/veris-seaice`; remote handoff pending.
+`feat/veris-seaice`; source pushed with GitHub SHA verification.
 
 ## Intent and acceptance criteria
 
