@@ -13,6 +13,8 @@ ATMOSPHERE_TO_VEROS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
     "temperature",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
+    "rain_rate",
+    "snow_rate",
 )
 """Stable atmosphere-to-Veros forcing fields used by coupled setup scripts."""
 

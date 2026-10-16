@@ -53,6 +53,8 @@ EXPECTED_CONSTANTS = {
     "bulk_aerodynamic_resistance": 0.1,
     "reference_height": 10.0,
     "air_temperature_reference_height": 2.0,
+    "freshwater_density": 1000.0,
+    "surface_salinity_reference": 34.7,
 }
 
 

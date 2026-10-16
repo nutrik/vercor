@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from copy import copy
+from typing import Any
+
 from veros.core.operators import numpy as npx, update, at
 from veros.routines import veros_kernel, veros_routine
 from veros.state import KernelOutput
 from veros.setups.global_4deg import GlobalFourDegreeSetup
 from veros.tools import get_periodic_interval
+from veros.variables import Variable
+from veros.core.utilities import enforce_boundaries
 
 
 def _surface_tke_forcing(stress_x, stress_y, density):  # type: ignore[no-untyped-def]
@@ -24,6 +29,49 @@ def _surface_tke_forcing(stress_x, stress_y, density):  # type: ignore[no-untype
 
 class CustomGlobalFourDegree(GlobalFourDegreeSetup):
     """Veros global 4-degree setup with VerCOR-controlled forcing fields."""
+
+    def __init__(
+        self,
+        override: dict[str, Any] | None = None,
+        *,
+        restore_to_climatology: bool = False,
+    ) -> None:
+        """Keep the restoring choice as immutable setup configuration."""
+
+        self.restore_to_climatology = restore_to_climatology
+        super().__init__(override=override)
+
+    @veros_routine
+    def set_parameter(self, state):  # type: ignore[no-untyped-def]
+        """Declare zero-seeded coupled salt flux and the restoring coefficient."""
+
+        super().set_parameter(state)
+        state.var_meta.update(
+            coupled_salt_flux=Variable(
+                "Coupled virtual salt flux",
+                ("xt", "yt"),
+                "m g kg-1 s-1",
+                "VerCOR-computed freshwater contribution to surface salinity flux",
+                initial=0.0,
+            ),
+            salt_restoring=Variable(
+                "Salinity restoring weight",
+                (),
+                "1",
+                "Enable the existing 30-day surface salinity restoring term",
+                initial=float(self.restore_to_climatology),
+                time_dependent=False,
+            ),
+        )
+        salt_metadata = copy(state.var_meta["forc_salt_surface"])
+        salt_metadata.units = "m g kg-1 s-1"
+        state.var_meta["forc_salt_surface"] = salt_metadata
+
+    @veros_routine
+    def set_forcing(self, state):  # type: ignore[no-untyped-def]
+        """Apply the adapter kernel instead of the upstream module's kernel."""
+
+        state.variables.update(self.set_forcing_kernel(state))
 
     @veros_kernel
     def set_forcing_kernel(state):  # type: ignore
@@ -63,12 +111,15 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
         t_rest = 30 * 86400.0
         sss = f1 * vs.sss_clim[:, :, n1] + f2 * vs.sss_clim[:, :, n2]
         vs.forc_salt_surface = (
-            1.0
+            vs.salt_restoring
             / t_rest
             * (sss - vs.salt[:, :, -1, vs.tau])
             * vs.maskT[:, :, -1]
             * vs.dzt[-1]
         )
+        vs.forc_salt_surface = (vs.coupled_salt_flux + vs.forc_salt_surface) * vs.maskT[
+            :, :, -1
+        ]
 
         mask = npx.logical_and(
             vs.temp[:, :, -1, vs.tau] * vs.maskT[:, :, -1] < -1.8,
@@ -76,6 +127,9 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
         )
         vs.forc_temp_surface = npx.where(mask, 0.0, vs.forc_temp_surface)
         vs.forc_salt_surface = npx.where(mask, 0.0, vs.forc_salt_surface)
+        vs.forc_salt_surface = enforce_boundaries(
+            vs.forc_salt_surface, settings.enable_cyclic_x
+        )
 
         return KernelOutput(
             surface_taux=vs.surface_taux,

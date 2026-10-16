@@ -5,6 +5,20 @@ versioning; pre-releases may still refine new contracts.
 
 ## [Unreleased]
 
+### Added
+
+- Transfer ERA5 rain and water-equivalent snow and JCM total precipitation to
+  Veros through zero-seeded `rain_rate` and `snow_rate` exchange fields.
+- Compute virtual salt flux in VerCOR from precipitation minus bulk evaporation,
+  with traced freshwater density and fixed reference salinity.
+
+### Fixed
+
+- Apply the VerCOR global forcing callback in both Veros execution lanes,
+  preserve cyclic salt-flux halos, and report unambiguous salinity-flux units.
+- Make global salinity restoring an optional additive term controlled by
+  `VerosConfig.restore_to_climatology`, disabled by default in the gallery.
+
 ## [0.4.6] - 2026-08-27
 
 ### Added

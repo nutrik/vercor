@@ -341,6 +341,8 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
         "temperature": np.full((4, 4), 16.0),
         "net_shortwave_radiation_flux": np.full((4, 4), 20.0),
         "downward_longwave_radiation_flux": np.full((4, 4), 30.0),
+        "rain_rate": np.full((4, 4), 1e-4),
+        "snow_rate": np.full((4, 4), 2e-5),
     }
 
     def fake_compute_ocean_surface_fluxes(*args: Any) -> tuple[Any, ...]:
@@ -349,7 +351,7 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
             np.full((4, 4), 1.0),
             np.full((4, 4), 2.0),
             np.full((4, 4), 3.0),
-            np.full((4, 4), 4.0),
+            np.full((4, 4), -4e-5),
             np.full((4, 4), 5.0),
             np.full((4, 4), 6.0),
             np.full((4, 4), 7.0),
@@ -374,7 +376,7 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
         fake_compute_ocean_surface_fluxes,
     )
 
-    taux, tauy, qnet, qnec = veros_fluxes_module.compute_fluxes(
+    taux, tauy, qnet, qnec, salt_flux = veros_fluxes_module.compute_fluxes(
         veros_state=veros_state,  # type: ignore[arg-type]
         runtime_fields=runtime_fields,
         constants=PhysicalConstants(),
@@ -384,6 +386,7 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
     assert_allclose_compact(taux, np.full((4, 4), 5.0))
     assert_allclose_compact(tauy, np.full((4, 4), 6.0))
     assert_allclose_compact(qnet, np.full((4, 4), 56.0))
+    assert_allclose_compact(salt_flux, np.full((4, 4), -2.776e-6), rtol=1e-6)
     assert_allclose_compact(
         qnec,
         np.asarray(
@@ -404,6 +407,7 @@ def test_veros_state_helpers_cover_owned_host_mutation_paths() -> None:
             tauy=np.zeros((8, 8, 1), dtype=float),
             qnet=np.zeros((8, 8, 1), dtype=float),
             qnec=np.zeros((8, 8, 1), dtype=float),
+            coupled_salt_flux=np.zeros((8, 8), dtype=float),
         )
     )
 
@@ -428,6 +432,7 @@ def test_veros_state_helpers_cover_owned_host_mutation_paths() -> None:
         tauy=jnp.full((4, 4, 1), 8.0),
         qnet=jnp.full((4, 4, 1), 7.0),
         qnec=jnp.full((4, 4, 1), 6.0),
+        coupled_salt_flux=jnp.full((4, 4), -3.47e-6),
     )
     result_state = veros_state_module.apply_veros_forcing_fields(
         state,

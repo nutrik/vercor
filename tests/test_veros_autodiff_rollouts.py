@@ -101,6 +101,105 @@ def test_global_zero_surface_stress_forcing_has_finite_derivatives() -> None:
     assert bool(jnp.isfinite(gradient))
 
 
+@pytest.mark.fast_always
+def test_coupled_precipitation_reaches_native_salt_with_matching_jvp_vjp() -> None:
+    """Follow precipitation through adapter substeps and native tracer mixing."""
+
+    from types import SimpleNamespace
+
+    from vercor.components import StepContext
+    from vercor.setups._external.veros_runtime_settings import (
+        configure_veros_runtime,
+        require_differentiable_veros_capabilities,
+    )
+
+    configure_veros_runtime("jax")
+    try:
+        require_differentiable_veros_capabilities()
+    except RuntimeError as error:
+        pytest.skip(str(error))
+    from vercor.setups._external.veros_runtime import step_veros_runtime
+    from vercor.setups._external.veros_setup_jax import DifferentiableGlobalFourDegree
+    from veros.core.thermodynamics import vertmix_tempsalt
+
+    model = DifferentiableGlobalFourDegree()
+    state = model.state
+    with state.settings.unlock():
+        model.set_parameter(state)
+        state.settings.nx, state.settings.ny, state.settings.nz = 3, 2, 1
+        state.settings.dt_tracer = 20.0
+    state.initialize_variables()
+    with state.variables.unlock():
+        vs = state.variables
+        vs.maskT = jnp.ones_like(vs.maskT)
+        vs.kbot = jnp.ones_like(vs.kbot)
+        vs.temp = jnp.full_like(vs.temp, 10.0)
+        vs.salt = jnp.full_like(vs.salt, 35.0)
+        vs.dzt = jnp.full_like(vs.dzt, 50.0)
+        vs.dzw = jnp.full_like(vs.dzw, 50.0)
+
+    def native_tracer_step(current: Any) -> Any:
+        next_state = current.copy()
+        model.set_forcing(next_state)
+        with next_state.variables.unlock():
+            next_state.variables.update(vertmix_tempsalt(next_state))
+            vs = next_state.variables
+            vs.salt = vs.salt.at[..., vs.tau].set(vs.salt[..., vs.taup1])
+            vs.time = vs.time + next_state.settings.dt_tracer
+        return next_state
+
+    resources = SimpleNamespace(
+        execution="jax",
+        uses_atmosphere_forcing=True,
+        restore_to_climatology=False,
+        model_substeps=2,
+        _step_function=native_tracer_step,
+    )
+    fields = {
+        name: jnp.full((2, 3), value)
+        for name, value in {
+            "model_level_height": 50.0,
+            "u_velocity": 2.0,
+            "v_velocity": 3.0,
+            "potential_temperature": 283.15,
+            "specific_humidity": 0.005,
+            "density": 1.2,
+            "temperature": 283.15,
+            "net_shortwave_radiation_flux": 0.0,
+            "downward_longwave_radiation_flux": 300.0,
+            "snow_rate": 0.0,
+        }.items()
+    }
+    context = StepContext(
+        dt_seconds=40.0, time=None, dtype=DTypePolicy(enable_x64=True)
+    )
+
+    @jax.jit
+    def objective(rain: jax.Array) -> jax.Array:
+        def couple(current: Any, _: Any) -> tuple[Any, None]:
+            result = step_veros_runtime(
+                cast(Any, resources),
+                {**fields, "rain_rate": jnp.full((2, 3), rain)},
+                context,
+                current,
+            )
+            return result.payload, None
+
+        final, _ = jax.lax.scan(couple, state, xs=None, length=3)
+        return cast(jax.Array, final.variables.salt[2, 2, -1, final.variables.tau])
+
+    # Six 20-second native steps in a 50 m top cell: dS/dR = -0.08328.
+    rain = jnp.asarray(1e-4)
+    value, tangent = jax.jvp(objective, (rain,), (jnp.asarray(1.0),))
+    gradient = jax.grad(objective)(rain)
+    dry = objective(jnp.asarray(0.0))
+    finite_difference = (objective(rain + 1e-5) - objective(rain - 1e-5)) / 2e-5
+    np.testing.assert_allclose(value - dry, -8.328e-6, atol=1e-12)
+    np.testing.assert_allclose(tangent, -0.08328, rtol=1e-10)
+    np.testing.assert_allclose(gradient, -0.08328, rtol=1e-10)
+    np.testing.assert_allclose(gradient, finite_difference, rtol=1e-7)
+
+
 def _clock(steps: int) -> Clock:
     return Clock(
         start=datetime(2000, 1, 3),

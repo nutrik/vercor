@@ -237,17 +237,22 @@ def _required_speedy_diagnostics(
     physics: Mapping[str, Any],
     *,
     component_name: str,
-) -> tuple[Any, Any]:
+) -> tuple[Any, Any, Any, Any]:
     """Return required SPEEDY diagnostics from a JCM 2 mapping."""
 
-    required = ("_surface_flux", "_shortwave_rad")
+    required = ("_surface_flux", "_shortwave_rad", "_condensation", "_convection")
     missing = tuple(name for name in required if name not in physics)
     if missing:
         names = ", ".join(missing)
         raise ComponentError(
             f"JAXGCM component '{component_name}' is missing JCM diagnostics: {names}"
         )
-    return physics["_surface_flux"], physics["_shortwave_rad"]
+    return (
+        physics["_surface_flux"],
+        physics["_shortwave_rad"],
+        physics["_condensation"],
+        physics["_convection"],
+    )
 
 
 def step_jax_gcm_runtime(
@@ -299,9 +304,11 @@ def step_jax_gcm_runtime(
         component_name=state.name,
         stage="step output",
     )
-    surface_flux, shortwave_rad = _required_speedy_diagnostics(
-        jcm_state.physics,
-        component_name=state.name,
+    surface_flux, shortwave_rad, condensation, convection = (
+        _required_speedy_diagnostics(
+            jcm_state.physics,
+            component_name=state.name,
+        )
     )
 
     mapped_fields = _jax_gcm_fields.map_jcm_output_fields(
@@ -321,6 +328,8 @@ def step_jax_gcm_runtime(
         jcm_state.dynamics.v_wind,
         jcm_state.dynamics.temperature,
         jcm_state.dynamics.specific_humidity,
+        large_scale_precipitation=condensation.precls,
+        convective_precipitation=convection.precnv,
         dtype=dtype,
     )
 

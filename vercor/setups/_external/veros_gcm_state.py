@@ -34,6 +34,8 @@ VEROS_INPUT_FIELD_NAMES = (
     "temperature",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
+    "rain_rate",
+    "snow_rate",
 )
 VEROS_FIELD_DEFAULTS = {"sea_surface_temperature": 283.15}
 
@@ -93,7 +95,14 @@ class VerosGCMSetupState:
             override["enable_streamfunction"] = False
 
         setup_class = _select_veros_setup_class(setup, execution)
-        self.model = setup_class(override=override)
+        self.model = (
+            setup_class(
+                override=override,
+                restore_to_climatology=restore_to_climatology,
+            )
+            if self.uses_atmosphere_forcing
+            else setup_class(override=override)
+        )
         self.model.setup()
         self._linear_solver = _veros_state.get_component_linear_solver(self.model.state)
         self._veros_state = _veros_state.copy_state(

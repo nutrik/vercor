@@ -44,7 +44,13 @@ class JAXGCMConfig:
 
 @dataclass(frozen=True)
 class VerosConfig:
-    """Configuration for the bundled Veros ocean setup factory."""
+    """Configuration for the bundled Veros ocean setup factory.
+
+    For ``global_4deg``, ``restore_to_climatology=True`` enables the existing
+    SST correction and adds 30-day SSS restoring to the coupled virtual salt
+    flux. Both corrections are off by default. The ACC setup retains its
+    native internal forcing.
+    """
 
     name: str = "OCN"
     setup: Literal["global_4deg", "acc"] = "global_4deg"

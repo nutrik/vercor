@@ -286,6 +286,23 @@ host/JAX components must run in separate Python processes. The packaged
 optional requirement remains `veros>=1.6.2,<1.7`; fork selection is
 capability-gated rather than globally pinned.
 
+Both global Veros execution lanes receive zero-seeded `rain_rate` and
+`snow_rate` in kg/m²/s. ERA5 aggregates `crr + lsrr` and `csfr + lssfr` before
+monthly interpolation; JCM aggregates `precls + precnv` before remapping and
+converts g/m²/s to kg/m²/s. JCM provides no separate snowfall diagnostic, so
+its total precipitation uses `rain_rate` and `snow_rate` stays zero.
+VerCOR computes the rigid-lid virtual salt flux on the ocean grid as
+`-S_ref * (rain + snow - E) / rho_fw`, with upward-positive evaporation `E`
+from the existing bulk calculation. `PhysicalConstants` owns traced
+`surface_salinity_reference=34.7` g/kg and `freshwater_density=1000.0` kg/m³.
+The native adapter retains the coupled contribution separately so its forcing
+callback can assign `forc_salt_surface` without accumulating restoring across
+substeps. `restore_to_climatology=True` enables the existing SST correction
+and adds 30-day SSS restoring; both are disabled by default. Ocean/ice masks
+and native cyclic halo exchange are applied to the final salt flux. Its
+metadata is `m g kg-1 s-1`; no timestep or top-cell-depth factor is applied
+before Veros's tracer integration.
+
 The JAX global adapter consumes external atmospheric forcing, disables
 streamfunction and diagnostics that would change the payload PyTree, and uses
 the fork's finite-derivative calm-stress norm. The JAX ACC adapter retains its

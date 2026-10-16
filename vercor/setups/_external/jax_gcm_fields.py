@@ -33,6 +33,8 @@ JAXGCM_OUTPUT_GRID_FIELD_NAMES = (
     "density",
     "potential_temperature",
     "model_level_height",
+    "rain_rate",
+    "snow_rate",
 )
 JAXGCM_REQUIRED_GRID_FIELD_NAMES = (
     *JAXGCM_INPUT_GRID_FIELD_NAMES,
@@ -117,8 +119,18 @@ def map_jcm_output_fields(
     temperature: object,
     specific_humidity: object,
     *,
+    large_scale_precipitation: object,
+    convective_precipitation: object,
     dtype: DTypePolicy,
 ) -> dict[str, jax.Array]:
+    """Map native SPEEDY fields to the coupler's (latitude, longitude) grid.
+
+    ``precls`` and ``precnv`` are downward-positive g/m²/s. Sum them before
+    regridding and convert once to kg/m²/s. SPEEDY has no separate snowfall
+    diagnostic, so its complete precipitation is carried as rain and snow
+    remains zero; no temperature-dependent phase split is inferred.
+    """
+
     latvap_array = as_jax_real_array(latvap, dtype)
     reference_pressure_array = as_jax_real_array(reference_pressure, dtype)
     sigma_levels_array = as_jax_real_array(sigma_levels, dtype)
@@ -138,6 +150,10 @@ def map_jcm_output_fields(
     v_velocity = as_jax_real_array(v_wind, dtype)[-1, :, :].T
     temperature_2m = temperature_array[-1, :, :].T
     specific_humidity_2m = specific_humidity_array[-1, :, :].T / 1000.0
+    rain_rate = (
+        as_jax_real_array(large_scale_precipitation, dtype)
+        + as_jax_real_array(convective_precipitation, dtype)
+    ).T / 1000.0
 
     sensible_heat_flux = -jnp.sum(
         as_jax_real_array(surface_sensible_heat_flux, dtype), axis=2
@@ -186,6 +202,8 @@ def map_jcm_output_fields(
         "density": density,
         "potential_temperature": potential_temperature,
         "model_level_height": model_level_height,
+        "rain_rate": rain_rate,
+        "snow_rate": jnp.zeros_like(rain_rate),
     }
 
 

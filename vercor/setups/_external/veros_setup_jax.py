@@ -13,12 +13,6 @@ class DifferentiableGlobalFourDegree(CustomGlobalFourDegree):
     """Externally forced global setup with a fixed runtime PyTree structure."""
 
     @veros_routine
-    def set_forcing(self, state):  # type: ignore[no-untyped-def]
-        """Apply the JAX-safe external-atmosphere forcing kernel."""
-
-        state.variables.update(self.set_forcing_kernel(state))
-
-    @veros_routine
     def set_diagnostics(self, state):  # type: ignore[no-untyped-def]
         """Disable diagnostics whose lazy accumulators change the state PyTree."""
 

@@ -23,7 +23,8 @@ PhysicalValue = float | _RuntimeArray
 class PhysicalConstants(_PyTreeNodeMixin):
     """Immutable JAX-traced physical values shared by coupled components.
 
-    Values use SI units and intentionally carry no dtype policy. The enclosing
+    Values use SI units except the documented native g/kg salinity reference,
+    and intentionally carry no dtype policy. The enclosing
     :class:`vercor.runtime.RuntimeOptions` remains the sole owner of precision.
     Every field is a PyTree child so callers can differentiate physics outputs
     with respect to any configured constant in forward or reverse mode.
@@ -61,6 +62,9 @@ class PhysicalConstants(_PyTreeNodeMixin):
         reference_height: Momentum reference height in m.
         air_temperature_reference_height: Air-temperature and humidity
             reference height in m.
+        freshwater_density: Water-equivalent freshwater density in kg/m^3.
+        surface_salinity_reference: Fixed virtual-salt-flux reference salinity
+            in g/kg, matching the numerical salinity units used by Veros.
     """
 
     pytree_children = (
@@ -89,6 +93,8 @@ class PhysicalConstants(_PyTreeNodeMixin):
         "bulk_aerodynamic_resistance",
         "reference_height",
         "air_temperature_reference_height",
+        "freshwater_density",
+        "surface_salinity_reference",
     )
 
     earth_radius: PhysicalValue = 6.371e6
@@ -116,6 +122,8 @@ class PhysicalConstants(_PyTreeNodeMixin):
     bulk_aerodynamic_resistance: PhysicalValue = 0.1
     reference_height: PhysicalValue = 10.0
     air_temperature_reference_height: PhysicalValue = 2.0
+    freshwater_density: PhysicalValue = 1000.0
+    surface_salinity_reference: PhysicalValue = 34.7
 
     def __post_init__(self) -> None:
         """Defensively normalize physical leaves while retaining JAX tracers."""
