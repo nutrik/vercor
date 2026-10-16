@@ -220,11 +220,11 @@ Update API/dependency documentation and progress.
 - `write_veris_snapshot_output(context: SnapshotContext) -> None` uses the shared frame/snapshot writer outside model execution.
 - Native variable names remain `Area`, `hIceMean`, `hSnowMean`, `TSurf`, `uIce`, `vIce`, and supported diagnostics; the runtime field alias remains `ice_fraction`.
 
-- [ ] **1. Write failing provider tests.** A tagged non-square payload verifies halo removal, dimension order, native registry units and distinct center/face coordinates. Snapshot/period tests check `Area` agrees with current runtime `ice_fraction`, mean thickness is volume-equivalent, and `forc_salt_surface` honestly retains unknown units. Test empty/subset/unknown `PeriodOutput.variables` through the shared coordinator.
-- [ ] **2. Run RED.** Execute `test_veris_output.py -n0 --fast`; verify absent provider/writer and metadata/coordinate assertions fail for the expected reasons.
-- [ ] **3. Implement sampling and snapshot conversion.** Reuse `VARIABLES`/`DIAGNOSTICS` metadata and existing shared output writers. Strip two halo cells, transpose arrays/dimensions consistently, use grid tracer coordinates and matching native face edges, and include only dimensions actually sampled. Do not invent a verified salt-flux conversion or ocean-feedback export.
-- [ ] **4. Run GREEN and no-I/O acceptance.** Output-disabled runs perform no provider call, host conversion, directory creation or writes, and still work under outer JIT/AD. Inspect actual NetCDF variables, dimensions, end-of-step times and final masks after a short native run. Respect a supplied custom provider/snapshot writer.
-- [ ] **5. Update docs/progress, run gates, and commit.** `feat: expose Veris output through shared providers`.
+- [x] **1. Write failing provider tests.** A tagged non-square payload verifies halo removal, dimension order, native registry units and distinct center/face coordinates. Snapshot/period tests check `Area` agrees with current runtime `ice_fraction`, mean thickness is volume-equivalent, and `forc_salt_surface` honestly retains unknown units. Test empty/subset/unknown `PeriodOutput.variables` through the shared coordinator.
+- [x] **2. Run RED.** Execute `test_veris_output.py -n0 --fast`; verify absent provider/writer and metadata/coordinate assertions fail for the expected reasons.
+- [x] **3. Implement sampling and snapshot conversion.** Reuse `VARIABLES`/`DIAGNOSTICS` metadata and existing shared output writers. Strip two halo cells, transpose arrays/dimensions consistently, use grid tracer coordinates and matching native face edges, and include only dimensions actually sampled. Do not invent a verified salt-flux conversion or ocean-feedback export.
+- [x] **4. Run GREEN and no-I/O acceptance.** Output-disabled runs perform no provider call, host conversion, directory creation or writes, and still work under outer JIT/AD. Inspect actual NetCDF variables, dimensions, end-of-step times and final masks after a short native run. Respect a supplied custom provider/snapshot writer.
+- [x] **5. Update docs/progress, run gates, and commit.** `feat: expose Veris output through shared providers`.
 
 ### Task 8: Add the coupled gallery and regression CI coverage
 
