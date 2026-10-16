@@ -15,6 +15,7 @@ from vercor.components import (
 )
 from vercor.fields import _flatten_field_items
 from vercor.grids import RectilinearGrid
+from vercor.output import OutputSpec
 from vercor.recipes import (
     ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
     OCEAN_TO_VERIS_FORCING_FIELDS,
@@ -71,6 +72,10 @@ def make_veris(
         raise ValueError("Veris geometry surface mask must equal the ocean grid mask")
     config = VerisConfig() if config is None else config
     from vercor.setups._external.veris_runtime import VerisSetupState
+    from vercor.setups._external.veris_output import (
+        veris_output_provider,
+        write_veris_snapshot_output,
+    )
 
     owner = VerisSetupState(config, deepcopy(geometry))
     return CallableComponent(
@@ -90,6 +95,18 @@ def make_veris(
             initial_fields={"ice_fraction": 0.0},
             masks=ComponentMaskSpec(fractional_field="ice_fraction"),
             lifecycle=LifecycleHooks(setup=owner.setup),
-            output=config.output,
+            output=OutputSpec(
+                provider=(
+                    veris_output_provider()
+                    if config.output.provider is None
+                    else config.output.provider
+                ),
+                period=config.output.period,
+                snapshot_writer=(
+                    write_veris_snapshot_output
+                    if config.output.snapshot_writer is None
+                    else config.output.snapshot_writer
+                ),
+            ),
         ),
     )

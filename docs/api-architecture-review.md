@@ -271,6 +271,7 @@ vercor.setups._external.jax_gcm_state
 vercor.setups._external.jax_gcm_tools
 vercor.setups._external.veris
 vercor.setups._external.veris_forcing
+vercor.setups._external.veris_output
 vercor.setups._external.veris_runtime
 vercor.setups._external.veros_data
 vercor.setups._external.veros_fluxes
