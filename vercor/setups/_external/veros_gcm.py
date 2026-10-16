@@ -60,7 +60,8 @@ def make_veros_gcm(
         execution=config.execution,
         spinup_time=config.spinup.duration,
         custom_parameters=config.custom_parameters,
-        restore_to_climatology=config.restore_to_climatology,
+        restore_to_climatology_temp=config.restore_to_climatology_temp,
+        restore_to_climatology_salt=config.restore_to_climatology_salt,
         do_spinup=config.spinup.enabled,
     )
     component = CallableComponent(

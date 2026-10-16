@@ -312,8 +312,14 @@ from the existing bulk calculation. `PhysicalConstants` owns traced
 `surface_salinity_reference=34.7` g/kg and `freshwater_density=1000.0` kg/m³.
 The native adapter retains the coupled contribution separately so its forcing
 callback can assign `forc_salt_surface` without accumulating restoring across
-substeps. `restore_to_climatology=True` enables the existing SST correction
-and adds 30-day SSS restoring; both are disabled by default. Ocean/ice masks
+substeps. `restore_to_climatology_temp` independently enables the SST
+correction, while `restore_to_climatology_salt` adds 30-day SSS restoring.
+Both default to `False`. The common host/JAX native callback owns both
+scalar weights, so the controls also apply during spinup before any coupled
+forcing is prepared. Layout preparation preserves the raw `qnec` coefficient;
+the temperature weight gates only its contribution to heat forcing. Coupled
+heat and freshwater contributions remain active with either switch off.
+Ocean/ice masks
 and native cyclic halo exchange are applied to the final salt flux. Its
 metadata is `m g kg-1 s-1`; no timestep or top-cell-depth factor is applied
 before Veros's tracer integration.

@@ -135,10 +135,37 @@ depth. This follows the freshwater term of the
 `rigid-lid conversion in Veros PR 81 <https://github.com/nutrik/veros/pull/81>`_,
 implemented entirely in the VerCOR adapter.
 
-The examples disable climatological restoring by default. Set
-``VerosConfig(restore_to_climatology=True)`` to enable the existing SST
-correction and add 30-day surface salinity restoring to the coupled salt
-flux. The ACC setup retains its native internal forcing.
+The examples disable both climatological restoring terms by default.
+``VerosConfig.restore_to_climatology_temp`` controls the SST correction,
+and ``VerosConfig.restore_to_climatology_salt`` independently controls
+30-day surface salinity restoring. Both default to ``False``.
+
+.. list-table:: Independent global Veros restoring controls
+   :header-rows: 1
+
+   * - ``restore_to_climatology_temp``
+     - ``restore_to_climatology_salt``
+     - Enabled restoring
+   * - ``False``
+     - ``False``
+     - None
+   * - ``True``
+     - ``False``
+     - Temperature only
+   * - ``False``
+     - ``True``
+     - Salinity only
+   * - ``True``
+     - ``True``
+     - Temperature and salinity
+
+These controls apply to the global setup during spinup and coupled stepping
+in both host and JAX execution. The native callback applies the independent
+weights; ``qnec`` remains the raw heat-correction coefficient even when its
+contribution is disabled. Coupled heat and freshwater fluxes remain active.
+Replace uses of the former shared ``restore_to_climatology`` argument with
+the appropriate new argument(s). The ACC setup retains its native internal
+forcing.
 
 JCM
 +++

@@ -34,16 +34,18 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
         self,
         override: dict[str, Any] | None = None,
         *,
-        restore_to_climatology: bool = False,
+        restore_to_climatology_temp: bool = False,
+        restore_to_climatology_salt: bool = False,
     ) -> None:
-        """Keep the restoring choice as immutable setup configuration."""
+        """Keep independent restoring choices as setup configuration."""
 
-        self.restore_to_climatology = restore_to_climatology
+        self.restore_to_climatology_temp = restore_to_climatology_temp
+        self.restore_to_climatology_salt = restore_to_climatology_salt
         super().__init__(override=override)
 
     @veros_routine
     def set_parameter(self, state):  # type: ignore[no-untyped-def]
-        """Declare zero-seeded coupled salt flux and the restoring coefficient."""
+        """Declare coupled salt flux and independent native restoring weights."""
 
         super().set_parameter(state)
         state.var_meta.update(
@@ -54,12 +56,20 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
                 "VerCOR-computed freshwater contribution to surface salinity flux",
                 initial=0.0,
             ),
+            temp_restoring=Variable(
+                "Temperature restoring weight",
+                (),
+                "1",
+                "Enable the surface temperature correction to climatology",
+                initial=float(self.restore_to_climatology_temp),
+                time_dependent=False,
+            ),
             salt_restoring=Variable(
                 "Salinity restoring weight",
                 (),
                 "1",
                 "Enable the existing 30-day surface salinity restoring term",
-                initial=float(self.restore_to_climatology),
+                initial=float(self.restore_to_climatology_salt),
                 time_dependent=False,
             ),
         )
@@ -102,7 +112,7 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
         qnec = f1 * vs.qnec[:, :, n1] + f2 * vs.qnec[:, :, n2]
         qnet = f1 * vs.qnet[:, :, n1] + f2 * vs.qnet[:, :, n2]
         vs.forc_temp_surface = (
-            (qnet + qnec * (sst - vs.temp[:, :, -1, vs.tau]))
+            (qnet + vs.temp_restoring * qnec * (sst - vs.temp[:, :, -1, vs.tau]))
             * vs.maskT[:, :, -1]
             / cp_0
             / settings.rho_0
