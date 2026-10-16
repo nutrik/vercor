@@ -19,6 +19,36 @@ Use exchanges to route declared source fields to declared target fields.
    :members: Exchange
    :show-inheritance:
 
+Dynamic masks and quantities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Routes touching a component with ``ComponentSpec.masks`` must explicitly select
+``Exchange(quantity=...)``. Each route applies one quantity meaning to all of its
+scalar and vector fields; use separate route IDs for quantities with different
+meanings.
+
+Let ``R`` be the fixed remapper, ``a`` the source coverage, ``b`` the target
+binary computational support, and ``c`` its fractional coverage. The modes are:
+
+* ``intensive``: ``b * R(a * field) / R(a)``, with safe zero on empty overlap.
+  Temperature, humidity, pressure and per-area forcing keep their intensive
+  values. A wet ice-free target still receives forcing so ice can form.
+* ``source_flux``: ``b * R(a * field)``, the source-area contribution per target
+  grid-cell area. Choose conservative remapping when integral conservation is
+  required; bilinear interpolation does not provide that guarantee.
+* ``target_flux``: ``c * R(a * field) / R(a)``, the covered-source mean weighted
+  by the target coverage.
+
+Source weighting occurs before scalar/vector remapping, retaining vector
+transformation. Inactive NaNs are neutralized before arithmetic; infinity is
+invalid everywhere. Missing remapped coverage becomes zero, and mask diagnostics
+are bounded to [0, 1] without changing the physical field numerator/denominator.
+Prepared binary topology restrictions intersect these explicit modes. A
+conflicting fractional topology patch is rejected to prevent double weighting.
+
+The default ``quantity="legacy"`` preserves existing static scalar/vector
+behavior for components without a dynamic mask declaration.
+
 Fields
 ------
 

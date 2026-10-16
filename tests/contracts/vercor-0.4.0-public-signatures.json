@@ -50,7 +50,7 @@
     "vercor.exceptions.ExchangeError": "(*args, **kwargs)",
     "vercor.exceptions.GridError": "(*args, **kwargs)",
     "vercor.exceptions.RegridderError": "(*args, **kwargs)",
-    "vercor.exchanges.Exchange": "(source: str, target: str, fields: collections.abc.Sequence[str | vercor.fields.VectorField], *, route_id: str | None = None, regridder_factory: vercor.regridding.RegridderFactory = <function bilinear>) -> None",
+    "vercor.exchanges.Exchange": "(source: str, target: str, fields: collections.abc.Sequence[str | vercor.fields.VectorField], *, route_id: str | None = None, regridder_factory: vercor.regridding.RegridderFactory = <function bilinear>, quantity: Literal['legacy', 'intensive', 'source_flux', 'target_flux'] = 'legacy') -> None",
     "vercor.field_layout.canonical_data_layout_description": "() -> str",
     "vercor.field_layout.canonical_grid_field_shape": "(value: object) -> tuple[int, ...]",
     "vercor.field_layout.canonical_grid_field_shape_error": "(*, field_name: str, shape: tuple[int, ...], grid_shape: tuple[int, int], owner_description: str, owner_name: str) -> str",
