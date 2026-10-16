@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -201,3 +202,17 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         views["ATM"].field("land_surface_temperature", scope="received"),
         np.asarray([[0.0, 282.0], [286.0, 0.0]], dtype=np.float32),
     )
+
+
+@pytest.mark.fast_always
+def test_veris_gallery_uses_public_import_owners() -> None:
+    """Keep the runnable gallery usable as an ordinary copied setup script."""
+    path = Path("vercor/setups/gallery/run_veris_dataveros_era5.py")
+    tree = ast.parse(path.read_text())
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.ImportFrom)
+            and node.module
+            and node.module.startswith("vercor")
+        ):
+            assert not any(part.startswith("_") for part in node.module.split("."))
