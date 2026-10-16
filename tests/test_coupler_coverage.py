@@ -1623,8 +1623,11 @@ def test_coupler_run_happy_path_dispatches_and_steps_in_sequence(
         logger=cast(Any, _RecordingLogger()),
     )
 
-    def fake_dispatch(state: Any, component_name: str, *args: Any) -> Any:
+    def fake_dispatch(
+        state: Any, component_name: str, *args: Any, context: Any = None
+    ) -> Any:
         _ = args
+        assert context is not None
         events.append(f"dispatch:{component_name}")
         return state
 

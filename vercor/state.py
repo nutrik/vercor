@@ -172,6 +172,15 @@ class RunState:
             component_grids=self._component_grids,
         )
 
+    def _with_fractional_masks(self, masks: _FieldStore) -> "RunState":
+        """Return a state with derived route-mask leaves replaced immutably."""
+        return RunState._from_runtime(
+            component_names=self._component_names,
+            component_grids=self._component_grids,
+            components=self._components,
+            fractional_masks=masks,
+        )
+
     def _fractional_mask(
         self,
         route_id: str,

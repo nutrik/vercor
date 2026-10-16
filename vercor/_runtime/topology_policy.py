@@ -109,6 +109,13 @@ def _apply_exchange_topology_patch(
             value,
             "fractional",
         )
+    for exchange in exchanges:
+        key = exchange.route_id
+        if exchange.quantity != "legacy" and key in patch.fractional_masks:
+            if not bool(jnp.all(fractional_masks[key] == binary_masks[key])):
+                raise CouplerError(
+                    f"Exchange '{key}' explicit quantity conflicts with its fractional topology patch."
+                )
     return RuntimeTopologyMaps(
         regridders=topology_maps.regridders,
         binary_masks=binary_masks,

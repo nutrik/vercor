@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from vercor.dtypes import DTypePolicy
 from vercor.exchanges import Exchange
 from vercor.physics import PhysicalConstants
+from vercor.types import RuntimeArray
 from vercor._runtime.contracts import ExchangeContract
 
 if TYPE_CHECKING:
@@ -26,6 +27,13 @@ class RuntimeDispatchContext:
     dt_seconds: float
     constants: PhysicalConstants
     dtype: DTypePolicy
+    topology_binary_masks: Mapping[str, RuntimeArray] = field(default_factory=dict)
+    topology_fractional_masks: Mapping[str, RuntimeArray] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Copy-own the static topology restrictions used by explicit quantities."""
+        for name in ("topology_binary_masks", "topology_fractional_masks"):
+            object.__setattr__(self, name, MappingProxyType(dict(getattr(self, name))))
 
     def destination_exchanges(self, component_name: str) -> tuple[Exchange, ...]:
         """Return exchanges targeting ``component_name``."""
@@ -42,6 +50,8 @@ def build_runtime_dispatch_context(
     dt_seconds: float,
     constants: PhysicalConstants,
     dtype: DTypePolicy,
+    topology_binary_masks: Mapping[str, RuntimeArray] | None = None,
+    topology_fractional_masks: Mapping[str, RuntimeArray] | None = None,
 ) -> RuntimeDispatchContext:
     """Return static runtime dispatch plumbing for a configured coupler."""
 
@@ -63,4 +73,10 @@ def build_runtime_dispatch_context(
         dt_seconds=dt_seconds,
         constants=constants,
         dtype=dtype,
+        topology_binary_masks=(
+            {} if topology_binary_masks is None else topology_binary_masks
+        ),
+        topology_fractional_masks=(
+            {} if topology_fractional_masks is None else topology_fractional_masks
+        ),
     )

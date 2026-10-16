@@ -39,6 +39,13 @@ def build_exchange_topology_maps(
                 f"Duplicate exchange route ID {route_id!r}; route IDs must be unique."
             )
         configured_route_ids.add(route_id)
+        if exchange.quantity == "legacy" and any(
+            components[name].spec.masks is not None
+            for name in (exchange.source, exchange.target)
+        ):
+            raise CouplerError(
+                f"Exchange '{route_id}' touches dynamic component masks; select an explicit quantity."
+            )
         if route_id not in regridders:
             regridder = exchange.regridder_factory(
                 components[exchange.source].grid, components[exchange.target].grid

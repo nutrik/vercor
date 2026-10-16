@@ -33,6 +33,7 @@ def step_runtime_component(
         component_name,
         dispatch_context.destination_exchanges(component_name),
         dispatch_context.regridders,
+        context=dispatch_context,
     )
     component_state = runtime_state._component_state(component_name)
     component = dispatch_context.components[component_name]
