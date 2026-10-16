@@ -258,10 +258,10 @@ native tests, gallery and CI. Corrections belong to their affected modules/tests
 and the original user requirements are the acceptance boundary; a design/plan
 commit or passing mocks alone do not complete the goal.
 
-- [ ] **1. Run comprehensive static/documentation gates.** Black check, strict whole-tree flake8, mypy, compileall, whitespace, and strict Sphinx all pass. Confirm lazy core/config imports in an environment without optional models and complete public manifest/signature/private-inventory alignment.
-- [ ] **2. Run meaningful full tests and coverage.** Stock fast/full plus branch coverage pass with real Veris installed, including the slow two-day global case and native equivalence/AD tests. Run the exact pinned Veros AD tests in a separate process with the approved fork, preserving existing pin/provenance. Do not change its process-wide backend in a running stock process. Keep combined coverage at the repository's >=90% requirement.
-- [ ] **3. Verify built artifacts and the example.** Build a wheel/sdist into a task-specific temporary directory, inspect the Veris extra and packaged gallery, and run existing supplied-artifact/plugin smoke tests. Execute the new short gallery from the installed artifact with native dependencies; inspect resulting NetCDF files and mask bounds. Do not substitute an import-only smoke for this run.
-- [ ] **4. Request an independent whole-branch review.** Cover mask refresh/source weighting, schema safety, physical units/signs, geometry/staggering, CESM reference height, forcing reset, AD and native output. Under native execution this is the single final fresh reviewer; subagent-driven execution additionally retains its per-task reviews. Fix verified findings with failing tests first, rerun affected/full gates after code changes, and record evidence in progress.
+- [x] **1. Run comprehensive static/documentation gates.** Black check, strict whole-tree flake8, mypy, compileall, whitespace, and strict Sphinx all pass. Confirm lazy core/config imports in an environment without optional models and complete public manifest/signature/private-inventory alignment.
+- [x] **2. Run meaningful full tests and coverage.** Stock fast/full plus branch coverage pass with real Veris installed, including the slow two-day global case and native equivalence/AD tests. Run the exact pinned Veros AD tests in a separate process with the approved fork, preserving existing pin/provenance. Do not change its process-wide backend in a running stock process. Keep combined coverage at the repository's >=90% requirement.
+- [x] **3. Verify built artifacts and the example.** Build a wheel/sdist into a task-specific temporary directory, inspect the Veris extra and packaged gallery, and run existing supplied-artifact/plugin smoke tests. Execute the new short gallery from the installed artifact with native dependencies; inspect resulting NetCDF files and mask bounds. Do not substitute an import-only smoke for this run.
+- [x] **4. Request an independent whole-branch review.** Cover mask refresh/source weighting, schema safety, physical units/signs, geometry/staggering, CESM reference height, forcing reset, AD and native output. Under native execution this is the single final fresh reviewer; subagent-driven execution additionally retains its per-task reviews. Fix verified findings with failing tests first, rerun affected/full gates after code changes, and record evidence in progress.
 - [ ] **5. Audit the original objective and finish commits.** Account for both sequential stages, all seven numbered integration requirements, exact gallery artifact/order, preserved progress edits, all quality gates, real runtime evidence, and separate branch. Mark task checkboxes only when their evidence exists; mark the specification implemented only after this audit. Commit remaining corrections/docs after fresh pre-commit tests.
 - [ ] **6. Push the authorized branch and verify GitHub's SHA.** Use `gh repo view --json nameWithOwner,url` to confirm `nutrik/vercor`, inspect existing CLI authentication without printing secrets, then `git push -u origin feat/veris-seaice`. Verify `gh api repos/nutrik/vercor/git/ref/heads/feat/veris-seaice --jq .object.sha` equals `git rev-parse HEAD`, and verify a clean working tree. No merge/release is part of this task.
 - [ ] **7. Report the implementation result.** Include branch/head, actual push verification, concise native/stock/AD/static results and material limitations. Mark the goal complete only after current evidence proves the entire requested integration and remote handoff.
@@ -272,4 +272,22 @@ commit or passing mocks alone do not complete the goal.
 - Mask declaration, arithmetic, refresh/output, source-data geometry, forcing, native lifecycle, output and gallery have separate focused test cycles and explicit interfaces.
 - Zero-concentration growth, inactive NaNs/reactivation, replaced-state cache refresh, substep forcing reset, and reference-height/staggering risks each have named tests above.
 - The plan preserves the root API, existing default exchanges, native numerical equations and dependency lanes; new public signatures are updated with their contract tests.
-- The user approved this plan on 2026-10-16; execution uses the recommended native method with independent final review. Implementation is in progress.
+- The user approved this plan on 2026-10-16; execution uses the recommended native method with independent final review. Implementation is locally verified; final commits and remote handoff are pending.
+
+## Final local acceptance (2026-10-16)
+
+Stages 1 and 2 meet the original seven requirements: native lifecycle/output in
+`setups/_external/`; the requested packaged gallery and exact execution order;
+complete prescribed forcing with CESM `tref/qref`; tested units/signs; reuse of
+shared coupling/bulk/output; one authentic global4deg Veros geometry snapshot.
+Generic callable transfer tests prepare future ice feedback; data feedback is
+absent. The original progress edit remains intact on the separate feature branch.
+Final review found two Important issues and no Critical/Minor; both reproduced
+RED and passed the single correction pass. Stock full 1955, fast 1057 and the
+separate pinned-fork AD lane 10 passed; combined branch coverage is 92.13%.
+Black, strict flake8, mypy (273 files), compileall, whitespace and strict Sphinx
+passed. Wheel/sdist Twine and supplied-artifact/plugin checks passed; the
+installed wheel outside the checkout ran two actual global days with evolving
+ice and valid native NetCDF output. Long-term/nonuniform spherical accuracy,
+native static-parameter/binary-transition AD and ocean feedback are outside
+this acceptance. GitHub handoff will be recorded after verified push.

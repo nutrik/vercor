@@ -15,6 +15,8 @@ their documented optional packages or input data.
 ``make_veris_verosdata`` creates standalone sea ice and a prescribed ocean
 from one setup-only Veros global 4-degree snapshot, sharing its exact wet grid.
 ``make_veris`` accepts custom native ``OceanGeometry`` on the same physical grid.
+Its U/V geometry uses native west/south faces. Canonical incoming ocean currents
+use Veros east/north faces; packing closes coastal faces and shifts them once.
 Install the pinned native model with ``pip install 'vercor[veris]'``; the paired
 factory additionally needs the existing ``veros`` extra. Initialization uses a
 host-compatible Veros process; start a fresh process if its JAX backend was

@@ -30,9 +30,9 @@ def small_ocean() -> tuple[RectilinearGrid, Any]:
     jax.config.update("jax_enable_x64", True)
     mask = np.ones((3, 2))
     mask[0, 0] = 0.0
-    mask_u = mask * np.roll(mask, -1, axis=0)
-    mask_v = mask * np.roll(mask, -1, axis=1)
-    mask_v[:, -1] = 0.0
+    mask_u = mask * np.roll(mask, 1, axis=0)
+    mask_v = mask * np.roll(mask, 1, axis=1)
+    mask_v[:, 0] = 0.0
     grid = RectilinearGrid(
         "small-ocean",
         longitude=np.arange(3.0),

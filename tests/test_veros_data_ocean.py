@@ -52,21 +52,30 @@ def test_snapshot_preserves_geometry_axes_staggering_and_units(native: Any) -> N
     assert snapshot.grid.shape == (2, 3)
     for name in (
         "maskT",
-        "maskU",
-        "maskV",
         "ht",
         "coriolis_t",
         "area_t",
-        "area_u",
-        "area_v",
     ):
         expected = getattr(native.variables, name)[2:-2, 2:-2]
         np.testing.assert_array_equal(
             snapshot.geometry[name], -expected if name == "ht" else expected
         )
-    for name in ("dxt", "dxu", "dyt", "dyu"):
+    # Native Veris owns west/south faces; Veros stores east/north faces.
+    for name in ("maskU", "area_u"):
+        np.testing.assert_array_equal(
+            snapshot.geometry[name], getattr(native.variables, name)[1:-3, 2:-2]
+        )
+    for name in ("maskV", "area_v"):
+        np.testing.assert_array_equal(
+            snapshot.geometry[name], getattr(native.variables, name)[2:-2, 1:-3]
+        )
+    for name in ("dxt", "dyt"):
         np.testing.assert_array_equal(
             snapshot.geometry[name], getattr(native.variables, name)[2:-2]
+        )
+    for name in ("dxu", "dyu"):
+        np.testing.assert_array_equal(
+            snapshot.geometry[name], getattr(native.variables, name)[1:-3]
         )
     np.testing.assert_array_equal(
         snapshot.grid.binary_mask, native.variables.maskT[2:-2, 2:-2, -1].T
@@ -160,12 +169,18 @@ def test_real_global_four_degree_snapshot_in_host_process() -> None:
         pytest.skip("optional Veros dependency is absent")
     code = """
 import json
+import numpy as np
 from vercor.setups._external.veros_data import load_veros_data_snapshot
 s = load_veros_data_snapshot()
 assert s.grid.shape == (40, 90)
 assert s.fields["sea_surface_temperature"].shape == (12, 40, 90)
 assert (s.geometry["ht"] <= 0).all()
 assert (s.geometry["area_t"] > 0).all()
+t = s.geometry["maskT"]
+# Native area/SSH stencils use the tracer and its west/south neighbour.
+np.testing.assert_array_equal(s.geometry["maskU"], np.minimum(t, np.roll(t, 1, axis=0)))
+south = np.concatenate((np.zeros_like(t[:, :1]), t[:, :-1]), axis=1)
+np.testing.assert_array_equal(s.geometry["maskV"], np.minimum(t, south))
 print(json.dumps({"shape": s.grid.shape, "wet": int(s.grid.binary_mask.sum())}))
 """
     result = subprocess.run(

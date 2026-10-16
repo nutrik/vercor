@@ -116,10 +116,35 @@ def test_current_centering_is_periodic_x_and_closed_y(
         captured["u_ocean"], [[4.0, 2.0, 5.0], [8.0, 4.0, 10.0]]
     )
     np.testing.assert_array_equal(
-        captured["v_ocean"], [[5.0, 10.0, 15.0], [25.0, 35.0, 45.0]]
+        captured["v_ocean"], [[5.0, 10.0, 15.0], [5.0, 10.0, 15.0]]
     )
-    np.testing.assert_array_equal(result["uOcean"], f["ocean_u_velocity"].T)
-    np.testing.assert_array_equal(result["vOcean"], f["ocean_v_velocity"].T)
+    # uIce/vIce and uOcean/vOcean share native west/south face indices.
+    np.testing.assert_array_equal(result["uOcean"].T, [[7, 1, 3], [14, 2, 6]])
+    np.testing.assert_array_equal(result["vOcean"].T, [[0, 0, 0], [10, 20, 30]])
+
+
+def test_prescribed_face_currents_cannot_cross_coasts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+
+    captured: dict[str, Any] = {}
+    _fixed_bulk(monkeypatch, captured)
+    f = surface_fields()
+    f["ocean_u_velocity"] = jnp.array([[1.0, 3.0, 7.0], [2.0, 6.0, 14.0]])
+    f["ocean_v_velocity"] = jnp.array([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]])
+    mask = jnp.array([[0.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
+    with jax.disable_jit():
+        result = prepare_veris_forcing(
+            f,
+            ocean_mask=mask,
+            constants=PhysicalConstants(),
+            dtype=DTypePolicy.from_jax_config(),
+        )
+    np.testing.assert_array_equal(result["uOcean"].T, [[0, 0, 3], [14, 2, 6]])
+    np.testing.assert_array_equal(result["vOcean"].T, [[0, 0, 0], [0, 20, 30]])
+    np.testing.assert_array_equal(captured["u_ocean"], [[0, 1.5, 1.5], [8, 4, 10]])
+    np.testing.assert_array_equal(captured["v_ocean"], [[0, 10, 15], [0, 10, 15]])
 
 
 @pytest.mark.parametrize("enable_x64", [False, True])

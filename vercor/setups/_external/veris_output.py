@@ -1,8 +1,8 @@
 """Sample native sea ice through VerCOR's shared host output coordinator.
 
 Native arrays include two halos in (x, y) order. Samples remove halos and
-transpose dimensions together to (y, x). U/V locations use the ocean's east/
-north faces; no interpolation or thickness/Area renormalization is applied.
+transpose dimensions together to (y, x). U/V locations use native west/south
+faces; no interpolation or thickness/Area renormalization is applied.
 hIceMean and hSnowMean remain volume per total grid-cell area (m). Diagnostic
 salt forcing retains upstream 'unknown' units and is not an ocean feedback.
 """
@@ -58,10 +58,10 @@ def _sample(
         "y_center": grid.latitude,
         "x_face": (
             centers_to_edges(grid.longitude, "lon") if x_edges is None else x_edges
-        )[1:],
+        )[:-1],
         "y_face": (
             centers_to_edges(grid.latitude, "lat") if y_edges is None else y_edges
-        )[1:],
+        )[:-1],
     }
     coordinates = {"time": time_coordinate_variable(time)}
     for name in used_dimension_names(variables):

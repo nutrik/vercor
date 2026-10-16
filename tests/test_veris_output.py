@@ -33,8 +33,8 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
 
     grid, _ = small_ocean()
     assert grid.longitude_edges is not None and grid.latitude_edges is not None
-    expected_x = np.asarray(grid.longitude_edges)[1:]
-    expected_y = np.asarray(grid.latitude_edges)[1:]
+    expected_x = np.asarray(grid.longitude_edges)[:-1]
+    expected_y = np.asarray(grid.latitude_edges)[:-1]
     if not with_edges:
         grid = RectilinearGrid(
             "inferred",
