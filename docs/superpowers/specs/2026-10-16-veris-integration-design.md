@@ -1,6 +1,7 @@
 # Dynamic component masks and Veris integration
 
-Status: proposed for review; implementation has not started.
+Status: approved by the user on 2026-10-16, including CESM `tref` for `ATemp`;
+implementation plan approved; implementation in progress.
 
 ## Intent and acceptance criteria
 
@@ -178,7 +179,7 @@ per-area forcing; native Veris applies its own `Area` weighting.
 | `surfPress` | ERA5 surface pressure | Pa |
 | `uWind`, `vWind` | ERA5 `u10`, `v10` | m/s, 10 m |
 | `wSpeed` | derive through native `advance` | m/s |
-| `ATemp` | ERA5 `t2m` | K, 2 m |
+| `ATemp` | CESM diagnosed 2 m air temperature `tref` | K |
 | `aqh` | CESM diagnosed 2 m specific humidity `qref` | kg/kg |
 | `SWdown` | ERA5 `msdwswrf` | W/m2, downward |
 | `LWdown` | ERA5 `msdwlwrf` | W/m2, downward |
@@ -190,17 +191,19 @@ per-area forcing; native Veris applies its own `Area` weighting.
 | `runoff` | prescribed runoff, zero in example | m/s, into ocean |
 
 The actual cached ERA5 surface asset contains `msdwswrf`, `msnswrf`,
-`msdwlwrf`, `u10`, `v10`, `t2m`, and `sp`. Add downward shortwave to the ERA5
-adapter along with 10 m wind and 2 m temperature, retaining existing model-level
-and net-shortwave fields. The asset has no dewpoint or directly measured 2 m
-specific humidity. Use the existing ocean CESM `qref` diagnostic for `aqh`,
-documenting its open-ocean surface-similarity assumption. Its bulk calculation
+`msdwlwrf`, `u10`, `v10`, and `sp`. Add downward shortwave to the ERA5
+adapter along with 10 m wind, retaining existing model-level and net-shortwave
+fields. Use the existing ocean CESM `tref` and `qref` diagnostics for `ATemp`
+and `aqh`, respectively, documenting their shared open-ocean surface-similarity
+assumption. Both are diagnosed at the configured air-temperature reference
+height, which defaults to 2 m. The bulk calculation
 must retain the original colocated model-level wind/temperature/humidity and
-model-level height, rather than mixing those with `u10`/`t2m`. Native ice
+model-level height, rather than mixing those with `u10`. Native ice
 surface thermodynamics consumes the supplied near-surface values directly;
-changing a height setting does not transform model-level humidity. Add
-independent height/conversion tests. Do not relabel diagnosed `qref` as measured
-ERA5 humidity or neutral relative speed squared as observed wind speed.
+changing a height setting does not transform model-level temperature or
+humidity. Add independent height/conversion tests. Do not relabel diagnosed
+`tref`/`qref` as measured ERA5 temperature/humidity or neutral relative speed
+squared as observed wind speed.
 
 Extract only necessary shared array-level bulk/radiative calculations from the
 Veros-specific owner, preserving existing Veros numerical behavior. Do not

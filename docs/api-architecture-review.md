@@ -96,7 +96,7 @@ signatures from installed artifacts.
   "vercor.calendar": ["CalendarDate", "DAYS_PER_MONTH_360", "DAYS_PER_MONTH_GREGORIAN_LEAP", "DAYS_PER_MONTH_GREGORIAN_NO_LEAP", "DateTime360", "DateTime365", "ModelDateTime", "YearType", "day_of_year_from_month_day", "is_leap_year", "model_year_seconds", "month_day_from_day_of_year", "year_type_for_calendar"],
   "vercor.cli": ["cli"],
   "vercor.clock": ["Clock"],
-  "vercor.components": ["CallableComponent", "Component", "ComponentSpec", "DataComponent", "LifecycleHooks", "PrefillContext", "PrefillResult", "SetupContext", "SetupResult", "StepContext", "StepResult", "TransferPolicy", "ValidationContext"],
+  "vercor.components": ["CallableComponent", "Component", "ComponentMaskSpec", "ComponentSpec", "DataComponent", "LifecycleHooks", "PrefillContext", "PrefillResult", "SetupContext", "SetupResult", "StepContext", "StepResult", "TransferPolicy", "ValidationContext"],
   "vercor.coupler": ["Coupler"],
   "vercor.diagnostics": ["ComponentMetric", "combine_surface_temperatures", "component_vector_speed", "plot_component_scalar_vector_comparison", "print_component_field_means_table", "safe_component_nanmean", "total_surface_temperature"],
   "vercor.dtypes": ["DTypePolicy", "PrecisionPolicy", "ShapeLike", "as_jax_index_array", "as_jax_real_array", "dtype_policy", "jax_arange", "jax_full", "jax_index_dtype", "jax_linspace", "jax_ones", "jax_real_dtype", "jax_zeros"],
@@ -186,6 +186,7 @@ vercor._run_order
 vercor._numerical_safety
 vercor._runtime
 vercor._runtime.backends
+vercor._runtime.component_masks
 vercor._runtime.component_state
 vercor._runtime.contracts
 vercor._runtime.coupler_state

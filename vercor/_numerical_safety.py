@@ -67,6 +67,17 @@ def require_active_finite(
     _require_zero(invalid_count, owner, requirement)
 
 
+def require_mask_values(values: Any, *, owner: str, binary: bool) -> None:
+    """Validate finite binary or fractional mask values, including under JIT."""
+    array = jnp.asarray(values)
+    valid = ((array == 0) | (array == 1)) if binary else ((array >= 0) & (array <= 1))
+    _require_zero(
+        jnp.count_nonzero(~jnp.isfinite(array) | ~valid),
+        owner,
+        "finite binary {0, 1} values" if binary else "finite fractional [0, 1] values",
+    )
+
+
 def require_strictly_positive(values: Any, *, owner: str) -> None:
     """Reject non-finite, zero, or negative numerical values."""
 

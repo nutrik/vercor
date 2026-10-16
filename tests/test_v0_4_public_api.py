@@ -63,6 +63,7 @@ PUBLIC_MODULE_EXPORTS = {
     "vercor.components": (
         "CallableComponent",
         "Component",
+        "ComponentMaskSpec",
         "ComponentSpec",
         "DataComponent",
         "LifecycleHooks",

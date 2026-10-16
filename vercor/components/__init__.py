@@ -4,6 +4,7 @@ from vercor.components.base import CallableComponent
 from vercor.components.contexts import SetupContext, StepContext
 from vercor.components.contracts import (
     Component,
+    ComponentMaskSpec,
     ComponentSpec,
     LifecycleHooks,
     PrefillContext,
@@ -18,6 +19,7 @@ from vercor.components.data import DataComponent
 __all__ = [
     "CallableComponent",
     "Component",
+    "ComponentMaskSpec",
     "ComponentSpec",
     "DataComponent",
     "LifecycleHooks",

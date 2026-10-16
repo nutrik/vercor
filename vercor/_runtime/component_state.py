@@ -6,6 +6,7 @@ from vercor.components.setup_validation import validate_component_setup
 from vercor.dtypes import jax_zeros
 from vercor.field_layout import validate_component_data_layout
 from vercor._runtime.contracts import ExchangeContract
+from vercor._runtime.component_masks import resolve_component_masks
 from vercor._runtime.state import ComponentRuntimeState
 from vercor._runtime.stores import FieldStore
 from vercor.types import RuntimeArray
@@ -53,6 +54,7 @@ def create_runtime_component_state(
         grid_shape=component.grid.shape,
         data=data,
     )
+    resolve_component_masks(component, data, component._dtype_policy)
 
     state = ComponentRuntimeState(
         fields=FieldStore.from_mapping(data),
