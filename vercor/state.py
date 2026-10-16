@@ -146,7 +146,13 @@ class RunState:
         component: str,
         fields: Mapping[str, _RuntimeArray],
     ) -> "RunState":
-        """Return a new run state with existing component fields replaced."""
+        """Replace existing fields and matching current outgoing copies.
+
+        Grid-shaped exports stay coherent before the next recipient runs.
+        Record arrays retain their last selected export until the source's
+        next send applies its time-selection policy. Received stores retain
+        their independently owned values and last-dispatch support.
+        """
 
         component_state = self._component_state(component)
         runtime_store = component_state.fields
@@ -155,7 +161,15 @@ class RunState:
             raise KeyError(f"Runtime field {missing[0]!r} not found")
 
         updated_store = runtime_store.replace_many(fields)
-        updated_component = component_state.with_fields(updated_store)
+        current_exports = {
+            name: updated_store.get(name)
+            for name in fields
+            if name in component_state.sent
+            and updated_store.get(name).shape == component_state.sent.get(name).shape
+        }
+        updated_component = component_state.with_fields(updated_store).with_sent(
+            component_state.sent.replace_many(current_exports)
+        )
         return self._with_component_state(component, updated_component)
 
     def _component_index(self, name: str) -> int:

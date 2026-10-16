@@ -15,7 +15,13 @@ import xarray as xr
 from tests._workflow_test_support import StaticWorkflow
 from vercor._runtime.stores import FieldStore
 from vercor import Clock, Coupler, Exchange, RectilinearGrid, RuntimeOptions
-from vercor.components import CallableComponent, ComponentMaskSpec, ComponentSpec
+from vercor.components import (
+    CallableComponent,
+    ComponentMaskSpec,
+    ComponentSpec,
+    DataComponent,
+    TransferPolicy,
+)
 from vercor.dtypes import DTypePolicy
 from vercor.exceptions import CouplerError
 from vercor.output import OutputTarget
@@ -102,6 +108,92 @@ def test_replaced_mask_fields_refresh_supplied_state() -> None:
     final = coupler.run(updated)
     np.testing.assert_allclose(final._fractional_mask("SRC->AFTER"), 0.5)
     np.testing.assert_allclose(initial._fractional_mask("SRC->AFTER"), 0.25)
+
+
+@pytest.mark.parametrize("execution", ["host", "jax"])
+@pytest.mark.parametrize("mask_kind", ["binary_field", "fractional_field"])
+@pytest.mark.parametrize("order", [("SRC", "DST"), ("DST", "SRC"), ("DST",)])
+def test_replaced_current_exports_reactivate_without_stale_sent_values(
+    execution: str,
+    mask_kind: str,
+    order: tuple[str, ...],
+) -> None:
+    grid = RectilinearGrid("wet", longitude=jnp.arange(2.0), latitude=jnp.arange(2.0))
+    source = CallableComponent(
+        "SRC",
+        grid,
+        lambda f: {},
+        spec=ComponentSpec(
+            outputs=("area", "flux"),
+            initial_fields={"area": 0.0, "flux": jnp.nan},
+            masks=ComponentMaskSpec(**{mask_kind: "area"}),
+            execution=cast(Any, execution),
+        ),
+    )
+    target = CallableComponent(
+        "DST",
+        grid,
+        lambda f: {"total": f["flux"]},
+        spec=ComponentSpec(
+            inputs=("area", "flux"),
+            outputs=("total",),
+            initial_fields={"total": 0.0},
+            execution=cast(Any, execution),
+        ),
+    )
+    coupler = Coupler(
+        Clock(datetime(2000, 1, 1), 60.0, 1),
+        components=(source, target),
+        exchanges=(
+            Exchange(
+                "SRC",
+                "DST",
+                ("area", "flux"),
+                quantity="source_flux",
+                regridder_factory=bilinear,
+            ),
+        ),
+        run_order=("SRC", "DST"),
+        runtime=RuntimeOptions(
+            dtype=DTypePolicy(enable_x64=True),
+            workflow=StaticWorkflow((StepPlan(0, order),)),
+        ),
+    )
+    initial = coupler.initial_state()
+    updated = initial.replace_fields(
+        "SRC", {"area": jnp.ones((2, 2)), "flux": jnp.full((2, 2), 2.0)}
+    )
+    final = coupler.run(updated)
+    np.testing.assert_array_equal(final.component("DST").field("total"), 2.0)
+    np.testing.assert_array_equal(final.component("DST").field("area"), 1.0)
+    np.testing.assert_array_equal(initial._component_state("SRC").sent.get("area"), 0.0)
+    assert np.isnan(initial._component_state("SRC").sent.get("flux")).all()
+
+
+def test_replacing_monthly_records_preserves_outgoing_selection_shape() -> None:
+    grid = RectilinearGrid("wet", longitude=jnp.arange(2.0), latitude=jnp.arange(2.0))
+    source = DataComponent(
+        "SRC",
+        grid,
+        {"value": jnp.ones((12, 2, 2))},
+        spec=ComponentSpec(transfer=TransferPolicy(time_selection="linear")),
+    )
+    target = CallableComponent(
+        "DST", grid, lambda f: {}, spec=ComponentSpec(inputs=("value",))
+    )
+    coupler = Coupler(
+        Clock(datetime(2000, 1, 1), 60.0, 1, calendar="noleap"),
+        components=(source, target),
+        run_order=("SRC", "DST"),
+        exchanges=(Exchange("SRC", "DST", ("value",), regridder_factory=bilinear),),
+    )
+    initial = coupler.initial_state()
+    updated = initial.replace_fields("SRC", {"value": jnp.full((12, 2, 2), 3.0)})
+    np.testing.assert_array_equal(
+        updated._component_state("SRC").sent.get("value"), 1.0
+    )
+    final = coupler.run(updated)
+    np.testing.assert_array_equal(final.component("DST").field("value"), 3.0)
 
 
 def test_omitted_source_retains_mask() -> None:
