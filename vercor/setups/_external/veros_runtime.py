@@ -42,7 +42,7 @@ def step_veros_runtime(
             context.dtype,
         )
         forcing_fields = _veros_state.prepare_surface_forcing_fields(
-            taux, tauy, qnet, qnec, salt_flux, resources.restore_to_climatology
+            taux, tauy, qnet, qnec, salt_flux
         )
 
         native_state = _veros_state.apply_veros_forcing_fields(

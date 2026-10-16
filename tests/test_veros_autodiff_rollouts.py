@@ -38,6 +38,86 @@ pytestmark = [pytest.mark.slow, pytest.mark.veros_autodiff]
 
 
 @pytest.mark.fast_always
+@pytest.mark.parametrize("restore_temp", [False, True])
+@pytest.mark.parametrize("restore_salt", [False, True])
+def test_native_restoring_controls_have_independent_values_and_gradients(
+    restore_temp: bool,
+    restore_salt: bool,
+) -> None:
+    """Check both native switches before any coupled forcing is prepared."""
+
+    from vercor.setups._external.veros_runtime_settings import (
+        configure_veros_runtime,
+        require_differentiable_veros_capabilities,
+    )
+
+    configure_veros_runtime("jax")
+    require_differentiable_veros_capabilities()
+    from vercor.setups._external.veros_setup_jax import DifferentiableGlobalFourDegree
+
+    model = DifferentiableGlobalFourDegree(
+        restore_to_climatology_temp=restore_temp,
+        restore_to_climatology_salt=restore_salt,
+    )
+    state = model.state
+    with state.settings.unlock():
+        model.set_parameter(state)
+        state.settings.nx, state.settings.ny, state.settings.nz = 3, 2, 1
+    state.initialize_variables()
+    with state.variables.unlock():
+        vs = state.variables
+        vs.maskT = jnp.ones_like(vs.maskT)
+        vs.sst_clim = jnp.full_like(vs.sst_clim, 12.0)
+        vs.sss_clim = jnp.full_like(vs.sss_clim, 36.0)
+        vs.qnet = jnp.full_like(vs.qnet, 5.0)
+        vs.qnec = jnp.full_like(vs.qnec, 4.0)
+        vs.dzt = jnp.full_like(vs.dzt, 50.0)
+        vs.coupled_salt_flux = jnp.full_like(vs.coupled_salt_flux, -3.47e-6)
+
+    def forcing(values: jax.Array) -> jax.Array:
+        current = state.copy()
+        with current.variables.unlock():
+            current.variables.temp = jnp.full_like(current.variables.temp, values[0])
+            current.variables.salt = jnp.full_like(current.variables.salt, values[1])
+        model.set_forcing(current)
+        return jnp.stack(
+            (
+                current.variables.forc_temp_surface[2, 2],
+                current.variables.forc_salt_surface[2, 2],
+            )
+        )
+
+    values = jnp.asarray([10.0, 35.0])
+    heat_capacity = 3991.86795711963 * state.settings.rho_0
+    expected = jnp.asarray(
+        [
+            (13.0 if restore_temp else 5.0) / heat_capacity,
+            -3.47e-6 + (50.0 / 2592000.0 if restore_salt else 0.0),
+        ]
+    )
+    expected_jacobian = jnp.asarray(
+        [
+            [-4.0 / heat_capacity if restore_temp else 0.0, 0.0],
+            [0.0, -50.0 / 2592000.0 if restore_salt else 0.0],
+        ]
+    )
+    np.testing.assert_allclose(jax.jit(forcing)(values), expected, rtol=1e-12)
+    forward = jax.jacfwd(forcing)(values)
+    reverse = jax.jacrev(forcing)(values)
+    step = 1e-3
+    finite_difference = jnp.stack(
+        [
+            (forcing(values + step * axis) - forcing(values - step * axis)) / (2 * step)
+            for axis in jnp.eye(2)
+        ],
+        axis=1,
+    )
+    np.testing.assert_allclose(forward, expected_jacobian, rtol=1e-12, atol=1e-20)
+    np.testing.assert_allclose(reverse, forward, rtol=1e-12, atol=1e-20)
+    np.testing.assert_allclose(finite_difference, forward, rtol=1e-8, atol=1e-16)
+
+
+@pytest.mark.fast_always
 def test_global_setup_keeps_turbulence_parameters_in_native_variables() -> None:
     """Catch fork revisions that still assign variable-owned TKE settings."""
 
@@ -151,7 +231,6 @@ def test_coupled_precipitation_reaches_native_salt_with_matching_jvp_vjp() -> No
     resources = SimpleNamespace(
         execution="jax",
         uses_atmosphere_forcing=True,
-        restore_to_climatology=False,
         model_substeps=2,
         _step_function=native_tracer_step,
     )

@@ -42,8 +42,9 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     )
     ocn = make_veros_gcm(
         config=VerosConfig(
-            # Set True to add SST and 30-day SSS restoring to coupled forcing.
-            restore_to_climatology=False,
+            # Independently enable SST correction or 30-day SSS restoring.
+            restore_to_climatology_temp=False,
+            restore_to_climatology_salt=False,
             output=OutputSpec(
                 period=PeriodOutput(
                     frequency="month",

@@ -68,8 +68,9 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         config=VerosConfig(
             # JCM splits rain/snow using near-surface t0 before remapping;
             # total precipitation minus bulk evaporation supplies virtual salt flux.
-            # Set True to add SST and 30-day SSS restoring.
-            restore_to_climatology=False,
+            # Independently enable SST correction or 30-day SSS restoring.
+            restore_to_climatology_temp=False,
+            restore_to_climatology_salt=False,
             spinup=Spinup(enabled=True),
             output=OutputSpec(
                 period=PeriodOutput(

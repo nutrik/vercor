@@ -2244,7 +2244,7 @@ def test_veros_extract_surface_temperature_supports_jit_and_gradients() -> None:
     )
 
 
-def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate() -> (
+def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_coefficient() -> (
     None
 ):
     taux = jnp.asarray([[1.0, jnp.nan], [3.0, 4.0]])
@@ -2253,7 +2253,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     qnec = jnp.asarray([[12.0, 13.0], [14.0, 15.0]])
 
     prepared = jax.jit(veros_state_module.prepare_surface_forcing_fields)(
-        taux, tauy, qnet, qnec, qnet, False
+        taux, tauy, qnet, qnec, qnet
     )
     assert isinstance(prepared, veros_state_module.VerosForcingFields)
     assert prepared.taux.shape == (2, 2, 1)
@@ -2269,13 +2269,8 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     assert qnec_out.shape == (2, 2, 1)
     assert_allclose_compact(taux_out, np.asarray([[[1.0], [3.0]], [[0.0], [4.0]]]))
     assert_allclose_compact(qnet_out, np.asarray([[[9.0], [11.0]], [[10.0], [0.0]]]))
-    assert_allclose_compact(qnec_out, np.zeros((2, 2, 1)))
-
-    restored = veros_state_module.prepare_surface_forcing_fields(
-        taux, tauy, qnet, qnec, qnet, True
-    )[3]
     assert_allclose_compact(
-        restored,
+        qnec_out,
         np.asarray([[[12.0], [14.0]], [[13.0], [15.0]]]),
     )
     assert_finite_jvp_vjp(
@@ -2288,7 +2283,6 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
                     forcing[2],
                     forcing[3],
                     forcing[3],
-                    True,
                 )
             ),
             start=jnp.asarray(0.0),
@@ -2316,7 +2310,6 @@ def test_veros_surface_forcing_rejects_infinity() -> None:
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
-            True,
         )
 
 
@@ -2328,7 +2321,6 @@ def test_compiled_veros_surface_forcing_rejects_infinity() -> None:
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
-            True,
         )
         result.taux.block_until_ready()
 
@@ -2757,8 +2749,13 @@ def test_veros_initialize_spinup_follows_enabled_only(
     )
 
 
+@pytest.mark.fast_always
+@pytest.mark.parametrize("restore_temp", [False, True])
+@pytest.mark.parametrize("restore_salt", [False, True])
 def test_veros_constructor_builds_jax_backed_grid(
     monkeypatch: pytest.MonkeyPatch,
+    restore_temp: bool,
+    restore_salt: bool,
 ) -> None:
     mask = np.ones((8, 8, 1), dtype=float)
     mask[2, 3, 0] = 0.0
@@ -2767,11 +2764,19 @@ def test_veros_constructor_builds_jax_backed_grid(
         variables=SimpleNamespace(xt=np.arange(8.0), yt=np.arange(8.0), maskT=mask),
     )
 
+    restoring_options: list[tuple[bool, bool]] = []
+
     class _FakeGlobalFourDegree:
         def __init__(
-            self, override: dict[str, Any], *, restore_to_climatology: bool
+            self,
+            override: dict[str, Any],
+            *,
+            restore_to_climatology_temp: bool,
+            restore_to_climatology_salt: bool,
         ) -> None:
-            self.restore_to_climatology = restore_to_climatology
+            restoring_options.append(
+                (restore_to_climatology_temp, restore_to_climatology_salt)
+            )
             self.override = override
             self.state = state
             self.step = lambda veros_state: None
@@ -2809,6 +2814,8 @@ def test_veros_constructor_builds_jax_backed_grid(
     component = veros_gcm_module.make_veros_gcm(
         config=VerosConfig(
             custom_parameters={"dt_tracer": 600.0},
+            restore_to_climatology_temp=restore_temp,
+            restore_to_climatology_salt=restore_salt,
             output=OutputSpec(
                 period=PeriodOutput(
                     frequency="month",
@@ -2819,6 +2826,7 @@ def test_veros_constructor_builds_jax_backed_grid(
     )
 
     assert solver_states == [state]
+    assert restoring_options == [(restore_temp, restore_salt)]
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component.grid.latitude, jax.Array)
     assert isinstance(component.grid.binary_mask, jax.Array)
@@ -2846,23 +2854,13 @@ def test_veros_constructor_builds_jax_backed_grid(
     assert_allclose_compact(component.grid.binary_mask, expected_mask)
 
 
-@pytest.mark.parametrize(
-    ("restore_to_climatology", "expected_qnec"),
-    [
-        (False, np.zeros((2, 2, 1))),
-        (True, np.asarray([[[3.0], [5.0]], [[4.0], [6.0]]])),
-    ],
-)
 def test_veros_host_runtime_owns_one_complete_copy_before_forcing(
     monkeypatch: pytest.MonkeyPatch,
-    restore_to_climatology: bool,
-    expected_qnec: np.ndarray,
 ) -> None:
     monkeypatch.setattr(veros_state_module, "VerosState", _ConstructedVerosState)
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
-    component.restore_to_climatology = restore_to_climatology
     component.model_substeps = 2
     initial_native_state = _make_copyable_fake_veros_state(surface_temperature=12.0)
     component._veros_state = initial_native_state
@@ -2972,7 +2970,10 @@ def test_veros_host_runtime_owns_one_complete_copy_before_forcing(
         result_payload.variables.qnet[2:-2, 2:-2, :],
         np.asarray([[[9.0], [11.0]], [[10.0], [12.0]]]),
     )
-    assert_allclose_compact(result_payload.variables.qnec[2:-2, 2:-2, :], expected_qnec)
+    assert_allclose_compact(
+        result_payload.variables.qnec[2:-2, 2:-2, :],
+        np.asarray([[[3.0], [5.0]], [[4.0], [6.0]]]),
+    )
     for name in ("taux", "tauy", "qnet", "qnec"):
         assert np.count_nonzero(getattr(initial_native_state.variables, name)) == 0
         assert np.count_nonzero(getattr(runtime_payload.variables, name)) == 0
@@ -3004,7 +3005,6 @@ def test_veros_acc_jax_step_uses_internal_forcing_without_host_logging(
     resources.name = "OCN"
     resources.execution = "jax"
     resources.uses_atmosphere_forcing = False
-    resources.restore_to_climatology = False
     resources.model_substeps = 1
     stepped_states: list[Any] = []
 
@@ -3045,7 +3045,6 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
-    component.restore_to_climatology = True
     component.model_substeps = 0
     component._veros_state = _make_copyable_fake_veros_state(surface_temperature=12.0)
     component.name = "OCN"

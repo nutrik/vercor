@@ -43,16 +43,15 @@ def prepare_surface_forcing_fields(
     qnet: object,
     qnec: object,
     salt_flux: object,
-    restore_to_climatology: object,
 ) -> VerosForcingFields:
     """Clean and transpose surface arrays into native Veros forcing layouts.
 
     Stress and heat have a singleton month axis for broadcast into the native
     climatology arrays. The already-converted salt flux remains a 2D T-grid
     array in m (g/kg)/s; the native tracer owns timestep/depth integration.
+    Restoring weights are applied by the native callback, including spinup;
+    this layout boundary preserves the raw heat-correction coefficient.
     """
-
-    restore_to_climatology_jax = jnp.asarray(restore_to_climatology, dtype=bool)
 
     def _prepare(field: object, owner: str) -> jax.Array:
         field_jax = as_jax_real_array(field)
@@ -62,9 +61,6 @@ def prepare_surface_forcing_fields(
     tauy_prepared = _prepare(tauy, "Veros tauy surface forcing")
     qnet_prepared = _prepare(qnet, "Veros qnet surface forcing")
     qnec_prepared = _prepare(qnec, "Veros qnec surface forcing")
-    qnec_prepared = jnp.where(
-        restore_to_climatology_jax, qnec_prepared, jnp.zeros_like(qnec_prepared)
-    )
 
     return VerosForcingFields(
         taux=taux_prepared,

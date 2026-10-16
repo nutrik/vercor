@@ -22,7 +22,11 @@ versioning; pre-releases may still refine new contracts.
 - Apply the VerCOR global forcing callback in both Veros execution lanes,
   preserve cyclic salt-flux halos, and report unambiguous salinity-flux units.
 - Make global salinity restoring an optional additive term controlled by
-  `VerosConfig.restore_to_climatology`, disabled by default in the gallery.
+  `VerosConfig.restore_to_climatology_salt`, disabled by default in the gallery.
+- Replace the shared Veros restoring argument with independent
+  `restore_to_climatology_temp` and `restore_to_climatology_salt` flags, both
+  disabled by default. Apply the switches in the native global callback so
+  they also control restoring during spinup; preserve raw `qnec` diagnostics.
 
 ## [0.4.6] - 2026-08-27
 

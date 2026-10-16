@@ -110,10 +110,15 @@ def test_virtual_salt_flux_obeys_runtime_precision(enable_x64: bool) -> None:
     assert_allclose_compact(result, np.full((2, 3), -3.47e-6), rtol=1e-6)
 
 
-def _global_forcing_model(*, restore: bool = False) -> Any:
+def _global_forcing_model(
+    *, restore_temp: bool = False, restore_salt: bool = False
+) -> Any:
     """Build a real small native state without downloading global input data."""
 
-    model = CustomGlobalFourDegree(restore_to_climatology=restore)
+    model = CustomGlobalFourDegree(
+        restore_to_climatology_temp=restore_temp,
+        restore_to_climatology_salt=restore_salt,
+    )
     state = model.state
     with state.settings.unlock():
         model.set_parameter(state)
@@ -129,27 +134,34 @@ def _global_forcing_model(*, restore: bool = False) -> Any:
         vs.sss_clim = np.full_like(vs.sss_clim, 36.0)
         vs.dzt = np.full_like(vs.dzt, 50.0)
         vs.dzw = np.full_like(vs.dzw, 50.0)
-        vs.qnet = np.ones_like(vs.qnet)
-        vs.qnec = np.zeros_like(vs.qnec)
+        vs.qnet = np.full_like(vs.qnet, 5.0)
+        vs.qnec = np.full_like(vs.qnec, 4.0)
+        vs.sst_clim = np.full_like(vs.sst_clim, 12.0)
         vs.coupled_salt_flux = np.full_like(vs.coupled_salt_flux, -3.47e-6)
     return model
 
 
 @pytest.mark.fast_always
-@pytest.mark.parametrize("restore", [False, True])
+@pytest.mark.parametrize("restore_temp", [False, True])
+@pytest.mark.parametrize("restore_salt", [False, True])
 def test_native_callback_applies_coupled_flux_without_accumulating_restoring(
-    restore: bool,
+    restore_temp: bool,
+    restore_salt: bool,
 ) -> None:
     """The actual host callback must call VerCOR's kernel on every substep."""
 
-    model = _global_forcing_model(restore=restore)
+    model = _global_forcing_model(restore_temp=restore_temp, restore_salt=restore_salt)
     for _ in range(2):
         model.set_forcing(model.state)
-        expected = -3.47e-6 + (50.0 / 2592000.0 if restore else 0.0)
+        expected = -3.47e-6 + (50.0 / 2592000.0 if restore_salt else 0.0)
         assert_allclose_compact(
             model.state.variables.forc_salt_surface,
             np.full((7, 6), expected),
         )
+        expected_heat = (13.0 if restore_temp else 5.0) / (
+            3991.86795711963 * model.state.settings.rho_0
+        )
+        assert_allclose_compact(model.state.variables.forc_temp_surface, expected_heat)
 
 
 @pytest.mark.fast_always

@@ -82,7 +82,8 @@ class VerosGCMSetupState:
         execution: Literal["host", "jax"] = "host",
         spinup_time: timedelta = timedelta(days=2),
         custom_parameters: Mapping[str, Any] | None = None,
-        restore_to_climatology: bool = False,
+        restore_to_climatology_temp: bool = False,
+        restore_to_climatology_salt: bool = False,
         do_spinup: bool = False,
     ) -> None:
         """Build Veros model resources and the VerCOR ocean grid."""
@@ -98,7 +99,8 @@ class VerosGCMSetupState:
         self.model = (
             setup_class(
                 override=override,
-                restore_to_climatology=restore_to_climatology,
+                restore_to_climatology_temp=restore_to_climatology_temp,
+                restore_to_climatology_salt=restore_to_climatology_salt,
             )
             if self.uses_atmosphere_forcing
             else setup_class(override=override)
@@ -126,7 +128,6 @@ class VerosGCMSetupState:
 
         self.do_spinup = do_spinup
         self.spinup_time = spinup_time
-        self.restore_to_climatology = restore_to_climatology
 
         self.dt_tracer = getattr(self._veros_state.settings, "dt_tracer")
         self.spinup_steps = int(self.spinup_time.total_seconds() // self.dt_tracer)
