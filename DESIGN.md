@@ -289,8 +289,23 @@ capability-gated rather than globally pinned.
 Both global Veros execution lanes receive zero-seeded `rain_rate` and
 `snow_rate` in kg/m²/s. ERA5 aggregates `crr + lsrr` and `csfr + lssfr` before
 monthly interpolation; JCM aggregates `precls + precnv` before remapping and
-converts g/m²/s to kg/m²/s. JCM provides no separate snowfall diagnostic, so
-its total precipitation uses `rain_rate` and `snow_rate` stays zero.
+converts g/m²/s to kg/m²/s. JCM diagnoses phases on its native grid using
+SPEEDY `surface_flux.t0`, locally named `temperature_2m`. This near-surface
+diagnostic has no specified 2 m height; it is distinct from bottom-level air.
+The snow fraction is `sigmoid(4 * (T_mid - t0) / (T_rain - T_snow))`, with
+`T_mid = (T_snow + T_rain) / 2`. The traced `PhysicalConstants` thresholds
+`precipitation_snow_temperature=272.77` K and
+`precipitation_rain_temperature=278.15` K are the calibrated -0.38/5 degrees C
+LT values from Bedard-Therrien et al. (2025), doi:10.5194/hess-29-1135-2025,
+Appendix C. They require a positive span. The sigmoid matches LT's midpoint
+and midpoint slope but retains phase tails, so it is a smooth approximation,
+not a refit or the exact piecewise-linear model. The calibration used boreal
+eastern Canadian land stations, not global ocean or SPEEDY validation.
+Native snow is total precipitation times its fraction; native rain is the
+remainder. Both rates are transposed and then independently interpolated.
+Bottom sigma-center temperature, humidity, winds, density, and potential
+temperature keep their canonical exchange keys and their common
+`model_level_height`; only the phase diagnosis uses t0.
 VerCOR computes the rigid-lid virtual salt flux on the ocean grid as
 `-S_ref * (rain + snow - E) / rho_fw`, with upward-positive evaporation `E`
 from the existing bulk calculation. `PhysicalConstants` owns traced

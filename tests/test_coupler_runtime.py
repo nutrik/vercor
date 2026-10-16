@@ -104,6 +104,7 @@ class _FakeSurfaceFlux(NamedTuple):
     shf: jax.Array
     evap: jax.Array
     rlds: jax.Array
+    t0: jax.Array
 
 
 class _FakeShortwaveRad(NamedTuple):
@@ -202,6 +203,7 @@ def _fake_jcm_step(
                 shf=surface_flux[jnp.newaxis, ...],
                 evap=(surface_flux * 0.1)[jnp.newaxis, ...],
                 rlds=(surface_temperature + 3.0)[jnp.newaxis, ...],
+                t0=surface_temperature[jnp.newaxis, ...],
             ),
             "_shortwave_rad": _FakeShortwaveRad(
                 rsns=(surface_temperature + 4.0)[jnp.newaxis, ...],
@@ -268,6 +270,7 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
                 shf=jnp.zeros((*grid.shape, 2), dtype=jnp.float64),
                 evap=jnp.zeros((*grid.shape, 2), dtype=jnp.float64),
                 rlds=jnp.zeros(grid.shape, dtype=jnp.float64),
+                t0=jnp.full(grid.shape, 288.15, dtype=jnp.float64),
             ),
             "_shortwave_rad": _FakeShortwaveRad(
                 rsns=jnp.zeros(grid.shape, dtype=jnp.float64),

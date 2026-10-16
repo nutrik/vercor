@@ -79,10 +79,44 @@ that supports anything between idealized toy models and realistic, high-resoluti
 The ERA5/Veros and JCM/Veros examples exchange ``rain_rate`` and ``snow_rate``
 in kg/m²/s, positive into the ocean. ERA5 sums ``crr + lsrr`` for rain and
 ``csfr + lssfr`` for water-equivalent snow before interpolation. JCM sums
-``precls + precnv`` and divides by 1000 to convert its g/m²/s diagnostics;
-it provides no separate snowfall rate, so its ``snow_rate`` remains zero.
+``precls + precnv`` and divides by 1000 to convert its g/m²/s diagnostics.
+It diagnoses water-equivalent rain and snow on the native JCM grid before
+interpolating each phase, using SPEEDY's near-surface air temperature ``t0``.
 See the `ECMWF parameter definitions <https://codes.ecmwf.int/grib/param-db/228218>`_
 and `JCM diagnostic units <https://jax-gcm.readthedocs.io/en/latest/speedy_translation.html>`_.
+
+JCM's snow fraction is a sigmoid approximation to the calibrated
+linear-transition (LT) model in
+`Bedard-Therrien et al. (2025), Appendix C <https://doi.org/10.5194/hess-29-1135-2025>`_:
+
+.. math::
+
+   f_{\mathrm{snow}} = \operatorname{sigmoid}\left(
+       \frac{4(T_{\mathrm{mid}} - T_0)}{T_{\mathrm{rain}} - T_{\mathrm{snow}}}
+       \right), \qquad
+   T_{\mathrm{mid}} = \frac{T_{\mathrm{snow}} + T_{\mathrm{rain}}}{2}.
+
+The traced ``PhysicalConstants.precipitation_snow_temperature`` and
+``precipitation_rain_temperature`` default to 272.77 K (-0.38 degrees C)
+and 278.15 K (5 degrees C), respectively, with a required positive span.
+The sigmoid matches LT's 50 percent point (275.46 K) and midpoint slope;
+at the two thresholds its snow fractions are approximately 88.08 percent
+and 11.92 percent. It retains smooth phase tails, rather than LT's hard
+100/0 percent cutoffs. These thresholds were calibrated over boreal eastern
+Canadian land stations; this adaptation has not been calibrated for the
+global ocean or SPEEDY.
+
+With total water-equivalent precipitation ``P``, snow is ``P * f_snow``
+and rain is ``P - snow``. Their sum and hence their contribution to virtual
+salt flux are preserved. The split does not introduce snow storage or
+melting-energy terms.
+
+The wrapper calls ``surface_flux.t0`` ``temperature_2m`` for phase diagnosis;
+SPEEDY documents it as near-surface temperature without specifying a 2 m
+height. Exported ``temperature``, ``specific_humidity``, winds, density, and
+potential temperature still describe the bottom model level at the exported
+``model_level_height``. Their local names use ``*_bottom`` to distinguish
+them from t0; radiative fluxes are surface quantities.
 
 VerCOR combines these rates with bulk evaporation on the ocean grid and
 computes a virtual salt flux using the fixed reference salinity:
