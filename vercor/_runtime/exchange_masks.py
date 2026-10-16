@@ -71,7 +71,10 @@ def refresh_runtime_masks(
     updates = {
         route.route_id: exchange_coverage(state, route, context=context)
         for route in context.exchanges
+        if route.quantity != "legacy"
     }
+    if not updates:
+        return state
     return state._with_fractional_masks(state._fractional_masks.replace_many(updates))
 
 

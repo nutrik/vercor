@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 import jax
 
 from vercor._numerical_safety import require_active_finite
+from vercor._runtime.component_masks import field_active_mask, resolve_component_masks
 from vercor.components._adapter import _copy_owned_pytree
 from vercor.components._runtime_fields import apply_step_result, runtime_fields
 from vercor.components.contracts import StepResult, _KEEP_PAYLOAD
@@ -46,6 +47,9 @@ def step_component_runtime_state(
             "differentiable Component."
         )
 
+    resolve_component_masks(
+        component, component_state.fields.to_mapping(), context.dtype
+    )
     step_payload = (
         _copy_owned_pytree(component_state.payload)
         if allow_host_runtime
@@ -74,10 +78,19 @@ def step_component_runtime_state(
         component_state,
         result,
     )
+    _, fraction = resolve_component_masks(
+        component, updated_state.fields.to_mapping(), context.dtype
+    )
     for field_name in component.spec.outputs:
         require_active_finite(
             updated_state.fields.get(field_name),
-            active_mask=component.grid.binary_mask,
+            active_mask=field_active_mask(
+                component,
+                field_name,
+                default_mask=component.grid.binary_mask,
+                fractional_mask=fraction,
+                produced=True,
+            ),
             owner=f"Component '{component.name}' step output field '{field_name}'",
         )
     return updated_state

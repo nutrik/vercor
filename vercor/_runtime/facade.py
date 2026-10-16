@@ -16,6 +16,7 @@ from vercor._runtime.execution import (
 )
 from vercor._runtime.prepared import PreparedCoupling, prepare_coupling
 from vercor._runtime.run_context import RuntimeRunContext
+from vercor._runtime.exchange_masks import runtime_exchange_masks
 from vercor.state import RunState
 from vercor.output import OutputTarget
 from vercor.output._session import validate_output_run_state_not_traced
@@ -45,15 +46,17 @@ def run(
         plan = build_validated_execution_plan(context)
         final_state = execute_plan(runtime_state, plan=plan, context=context)
         if output is not None and output.enabled:
-            topology_maps = prepared.topology_maps
             if output.write_final_fields:
+                binary_masks, fractional_masks = runtime_exchange_masks(
+                    final_state, context=prepared.dispatch_context
+                )
                 prepared.interrupts.checkpoint("runtime output")
                 _runtime_output.write_coupler_runtime_outputs(
                     final_state=final_state,
                     components=prepared.components,
                     exchanges=prepared.exchanges,
-                    binary_masks=topology_maps.binary_masks,
-                    fractional_masks=topology_maps.fractional_masks,
+                    binary_masks=binary_masks,
+                    fractional_masks=fractional_masks,
                     output_dir=output.directory,
                     logger=logger,
                 )

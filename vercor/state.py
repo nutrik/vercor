@@ -34,6 +34,7 @@ class RunState:
     _component_grids: tuple[_RectilinearGrid | None, ...]
     _components: tuple["_ComponentRuntimeState", ...]
     _fractional_masks: _StateFieldStore
+    _received_fractional_masks: _StateFieldStore
     _component_indices: dict[str, int] = field(
         init=False,
         repr=False,
@@ -56,6 +57,7 @@ class RunState:
         components: tuple["_ComponentRuntimeState", ...],
         fractional_masks: _FieldStore,
         component_grids: tuple[_RectilinearGrid | None, ...] = (),
+        received_fractional_masks: _FieldStore | None = None,
     ) -> "RunState":
         """Create an opaque public run state from private runtime containers."""
 
@@ -65,6 +67,7 @@ class RunState:
             components=components,
             fractional_masks=fractional_masks,
             component_grids=component_grids,
+            received_fractional_masks=received_fractional_masks,
         )
         return state
 
@@ -75,6 +78,7 @@ class RunState:
         components: tuple["_ComponentRuntimeState", ...],
         fractional_masks: _FieldStore,
         component_grids: tuple[_RectilinearGrid | None, ...] = (),
+        received_fractional_masks: _FieldStore | None = None,
     ) -> None:
         """Assign private runtime containers after construction is authorized."""
 
@@ -86,6 +90,15 @@ class RunState:
         )
         object.__setattr__(self, "_components", components)
         object.__setattr__(self, "_fractional_masks", fractional_masks)
+        object.__setattr__(
+            self,
+            "_received_fractional_masks",
+            (
+                fractional_masks
+                if received_fractional_masks is None
+                else received_fractional_masks
+            ),
+        )
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -170,6 +183,7 @@ class RunState:
             components=tuple(components),
             fractional_masks=self._fractional_masks,
             component_grids=self._component_grids,
+            received_fractional_masks=self._received_fractional_masks,
         )
 
     def _with_fractional_masks(self, masks: _FieldStore) -> "RunState":
@@ -179,6 +193,17 @@ class RunState:
             component_grids=self._component_grids,
             components=self._components,
             fractional_masks=masks,
+            received_fractional_masks=self._received_fractional_masks,
+        )
+
+    def _with_received_masks(self, masks: _FieldStore) -> "RunState":
+        """Retain the coverage under which imported values last arrived."""
+        return RunState._from_runtime(
+            component_names=self._component_names,
+            component_grids=self._component_grids,
+            components=self._components,
+            fractional_masks=self._fractional_masks,
+            received_fractional_masks=masks,
         )
 
     def _fractional_mask(
@@ -196,7 +221,12 @@ def _flatten_run_state(
     """Return dynamic runtime leaves and static component-name metadata."""
 
     return (
-        (state._component_grids, state._components, state._fractional_masks),
+        (
+            state._component_grids,
+            state._components,
+            state._fractional_masks,
+            state._received_fractional_masks,
+        ),
         state._component_names,
     )
 
@@ -207,12 +237,13 @@ def _unflatten_run_state(
 ) -> RunState:
     """Rebuild opaque runtime state after a JAX PyTree transformation."""
 
-    component_grids, components, fractional_masks = children
+    component_grids, components, fractional_masks, received_fractional_masks = children
     return RunState._from_runtime(
         component_names=component_names,
         component_grids=component_grids,  # type: ignore[arg-type]
         components=components,  # type: ignore[arg-type]
         fractional_masks=fractional_masks,  # type: ignore[arg-type]
+        received_fractional_masks=received_fractional_masks,  # type: ignore[arg-type]
     )
 
 

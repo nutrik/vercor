@@ -1446,11 +1446,11 @@ def test_coupler_run_writes_enabled_outputs_for_all_components(
     assert captured_runtime["exchanges"] is coupler.exchanges
     assert (
         captured_runtime["binary_masks"]
-        is coupler._ensure_prepared().topology_maps.binary_masks
+        == coupler._ensure_prepared().topology_maps.binary_masks
     )
     assert (
         captured_runtime["fractional_masks"]
-        is coupler._ensure_prepared().topology_maps.fractional_masks
+        == coupler._ensure_prepared().topology_maps.fractional_masks
     )
     assert captured_runtime["output_dir"] == Path("snapshot")
     assert captured_runtime["logger"] is coupler.logger

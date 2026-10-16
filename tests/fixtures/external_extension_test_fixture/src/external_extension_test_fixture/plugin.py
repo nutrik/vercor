@@ -14,6 +14,7 @@ import jax.numpy as jnp
 from vercor import Clock
 from vercor.components import (
     Component,
+    ComponentMaskSpec,
     ComponentSpec,
     DataComponent,
     LifecycleHooks,
@@ -137,8 +138,12 @@ class StructuralJaxComponent:
         )
         self.spec = ComponentSpec(
             inputs=("forcing",),
-            outputs=("temperature",),
-            initial_fields={"temperature": config.initial_temperature},
+            outputs=("temperature", "coverage"),
+            initial_fields={
+                "temperature": config.initial_temperature,
+                "coverage": 0.25,
+            },
+            masks=ComponentMaskSpec(fractional_field="coverage"),
             lifecycle=LifecycleHooks(setup=_setup_original_component),
             output=OutputSpec(
                 period=PeriodOutput(
@@ -171,7 +176,10 @@ class StructuralJaxComponent:
         payload_value = jnp.asarray(payload, dtype=jnp.int32)
         return StepResult(
             fields={
-                "temperature": fields["temperature"] + fields["forcing"] + payload_value
+                "temperature": fields["temperature"]
+                + fields["forcing"]
+                + payload_value,
+                "coverage": fields["coverage"] + 0.125,
             },
             payload=payload_value + 1,
         )
@@ -328,6 +336,7 @@ class PluginFactory:
                     ("forcing",),
                     route_id=self.route_id,
                     regridder_factory=self.regridder_factory,
+                    quantity="intensive",
                 ),
             ),
             run_order=tuple(component.name for component in components),
@@ -403,6 +412,7 @@ def run_smoke(output_dir: Path) -> dict[str, object]:
 
     return {
         "backend_calls": backend.calls,
+        "coverage": float(jnp.mean(final_state.component("JAX").field("coverage"))),
         "config": {
             "forcing": config.forcing,
             "initial_temperature": config.initial_temperature,

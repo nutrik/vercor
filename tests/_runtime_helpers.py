@@ -60,6 +60,8 @@ def replace_runtime_topology_maps(
         dt_seconds=prepared.clock.dt_seconds,
         constants=prepared.constants,
         dtype=prepared.runtime.dtype,
+        topology_binary_masks=topology_maps.binary_masks,
+        topology_fractional_masks=topology_maps.fractional_masks,
     )
     coupler._prepared = replace(
         prepared,

@@ -9,6 +9,7 @@ from vercor.components.runtime_execution import step_component_runtime_state
 from vercor.jax_logging import LoggerLike
 from vercor._runtime.dispatch_context import RuntimeDispatchContext
 from vercor._runtime.exchange_dispatch import dispatch_component_exchanges
+from vercor._runtime.exchange_masks import refresh_runtime_masks
 from vercor._runtime.field_transfer import receive_runtime_fields, send_runtime_fields
 from vercor.state import RunState
 from vercor._runtime.time import RuntimeStepInfo
@@ -56,11 +57,16 @@ def step_runtime_component(
         step_context,
         allow_host_runtime=allow_host_runtime,
     )
+    runtime_state = refresh_runtime_masks(
+        runtime_state._with_component_state(component_name, component_state),
+        context=dispatch_context,
+    )
     component_state = send_runtime_fields(
         component,
         component_state,
         step_info,
         contract=contract,
+        dtype=dispatch_context.dtype,
     )
     return runtime_state._with_component_state(
         component_name,
@@ -84,6 +90,7 @@ def prime_runtime_outgoing(
             component_state,
             step_info,
             contract=dispatch_context.contracts[component_name],
+            dtype=dispatch_context.dtype,
         )
         runtime_state = runtime_state._with_component_state(
             component_name,

@@ -69,3 +69,25 @@ def resolve_component_masks(
     binary_mask = resolve(declaration.binary_field, support, binary=True)
     fraction = resolve(declaration.fractional_field, binary_mask, binary=False)
     return binary_mask, fraction
+
+
+def field_active_mask(
+    component: Component,
+    field_name: str,
+    *,
+    default_mask: RuntimeArray | None,
+    fractional_mask: RuntimeArray,
+    produced: bool,
+) -> RuntimeArray | None:
+    """Select finite-value support, keeping mask fields finite everywhere.
+
+    Produced fields may be missing outside evolving coverage. Inputs retain
+    their computational or incoming-route support even on ice-free cells.
+    Call ``resolve_component_masks`` before using these exemptions.
+    """
+    declaration = component.spec.masks
+    if declaration is None:
+        return default_mask
+    if field_name in (declaration.binary_field, declaration.fractional_field):
+        return None
+    return fractional_mask if produced else default_mask
