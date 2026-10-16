@@ -4,6 +4,7 @@ from vercor._runtime.coupler_state import (
     runtime_state_from_components as _runtime_state_from_components,
 )
 from vercor._runtime.driver import prime_runtime_outgoing
+from vercor._runtime.exchange_masks import refresh_runtime_masks
 from vercor._runtime.prepared import PreparedCoupling
 from vercor._runtime.state_validation import (
     validate_runtime_state as _validate_runtime_state,
@@ -60,6 +61,10 @@ def create_runtime_state(
         prepared=prepared,
         prefill_missing=prefill_missing,
     )
+    runtime_state = refresh_runtime_masks(
+        runtime_state, context=prepared.dispatch_context
+    )
+    runtime_state = runtime_state._with_received_masks(runtime_state._fractional_masks)
     component_names = tuple(prepared.components)
     if prefill_missing and component_names:
         runtime_state = prime_runtime_outgoing(
@@ -98,7 +103,7 @@ def prepare_runtime_state(
             initial_state,
             prepared=prepared,
         )
-    return initial_state
+    return refresh_runtime_masks(initial_state, context=prepared.dispatch_context)
 
 
 __all__ = [

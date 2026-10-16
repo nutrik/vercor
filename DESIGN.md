@@ -22,6 +22,16 @@ The exact API inventory and compatibility decisions are in
   applicable component or route mask; infinity is always invalid.
 - Masked numerical kernels neutralize inactive operands before nonlinear
   arithmetic so output-free JVP and VJP cannot inherit inactive-branch NaNs.
+- ComponentMaskSpec may reference current binary and fractional runtime fields
+  inside immutable grid support. Explicit exchange quantities weight source
+  fields before remapping; intensive values normalize covered overlap and
+  remain available on wet cells with zero target coverage. Route diagnostics
+  refresh at initialization, supplied-state preparation, and every component
+  step, and final output records current coverage. Mask fields remain finite
+  everywhere; inactive exports may contain NaN until their support reactivates.
+  Stored imports retain the coverage of their last dispatch, separately from
+  current route diagnostics, so a source can reactivate before its recipient
+  runs. Imported mask fields are validated before author physics executes.
 
 The stable release does not provide registries, entry-point discovery, Pydantic
 models, fan-in reducers, a public prepared graph, fractional subcycling,

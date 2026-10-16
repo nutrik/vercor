@@ -326,7 +326,7 @@ def test_refresh_replaces_derived_coverage_without_mutating_state(
     state, exchange, context = _scenario(quantity)
     updated = refresh_runtime_masks(state, context=context)
     np.testing.assert_allclose(updated._fractional_mask(exchange.route_id), coverage)
-    np.testing.assert_array_equal(state._fractional_mask(exchange.route_id), 1.0)
+    np.testing.assert_allclose(state._fractional_mask(exchange.route_id), coverage)
     assert cast(
         Any, jax.tree_util.tree_structure(updated)
     ) == jax.tree_util.tree_structure(state)

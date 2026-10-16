@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING
 import jax.numpy as jnp
 
 from vercor._numerical_safety import require_active_finite
+from vercor.dtypes import DTypePolicy
 from vercor._runtime.contracts import ExchangeContract
+from vercor._runtime.component_masks import field_active_mask, resolve_component_masks
 from vercor._runtime.state import ComponentRuntimeState
 from vercor._runtime.time import RuntimeStepInfo
 from vercor.types import RuntimeArray
@@ -60,9 +62,15 @@ def send_runtime_fields(
     step_info: RuntimeStepInfo | None = None,
     *,
     contract: ExchangeContract,
+    dtype: DTypePolicy | None = None,
 ) -> ComponentRuntimeState:
     """Move component fields into sent runtime fields."""
 
+    _, fraction = resolve_component_masks(
+        component,
+        component_state.fields.to_mapping(),
+        DTypePolicy.from_jax_config() if dtype is None else dtype,
+    )
     selected_fields = {
         field_name: select_runtime_field(
             component_state.fields.get(field_name),
@@ -74,7 +82,13 @@ def send_runtime_fields(
     for field_name, value in selected_fields.items():
         require_active_finite(
             value,
-            active_mask=component.grid.binary_mask,
+            active_mask=field_active_mask(
+                component,
+                field_name,
+                default_mask=component.grid.binary_mask,
+                fractional_mask=fraction,
+                produced=True,
+            ),
             owner=f"Component '{component.name}' sent field '{field_name}'",
         )
     return component_state.with_sent(component_state.sent.set_many(selected_fields))

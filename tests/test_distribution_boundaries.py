@@ -1897,6 +1897,7 @@ print(json.dumps({{
     )
     evidence = json.loads(smoke.stdout.splitlines()[-1])
     assert evidence["temperature"] == 12.0
+    assert evidence["coverage"] == 0.625
     assert evidence["host_value"] == 17.0
     assert evidence["exchange_forcing"] == 2.0
     assert evidence["state_replacement"] is True

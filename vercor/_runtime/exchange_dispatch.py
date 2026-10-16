@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Sequence
 import jax.numpy as jnp
 
 from vercor._numerical_safety import require_active_finite, safe_masked_divide
-from vercor._runtime.exchange_masks import exchange_mask_operands
+from vercor._runtime.exchange_masks import exchange_coverage, exchange_mask_operands
 from vercor.exceptions import ExchangeError
 from vercor.exchanges import Exchange
 from vercor.fields import VectorField
@@ -182,4 +182,14 @@ def dispatch_component_exchanges(
 
     destination_received = destination_received.set_many(received_updates)
     destination_component = destination_component.with_received(destination_received)
-    return state._with_component_state(destination_name, destination_component)
+    result = state._with_component_state(destination_name, destination_component)
+    mask_updates = {
+        exchange.route_id: exchange_coverage(state, exchange, context=context)
+        for exchange in exchanges
+        if exchange.quantity != "legacy" and context is not None
+    }
+    if mask_updates:
+        result = result._with_received_masks(
+            result._received_fractional_masks.replace_many(mask_updates)
+        )
+    return result

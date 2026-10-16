@@ -22,3 +22,10 @@ grid wet mask. Fractions contain finite values in [0, 1] and are zero outside
 the binary support. Omitted binary support uses the grid wet mask; omitted
 fractional coverage is one on active support. Fractional values remain traced
 for differentiation; binary membership changes are discrete.
+
+Preparation refreshes route coverage from supplied runtime fields, including
+states changed with ``RunState.replace_fields``. Each component step refreshes
+coverage before its exports are sent, preserving the configured sequential
+order. Final output uses the final coverage. Mask fields must be finite
+everywhere; other exports may contain missing NaNs outside current coverage,
+but must become finite when that support reactivates.
