@@ -105,6 +105,9 @@ def _install_data_driver_factory_fakes(monkeypatch: pytest.MonkeyPatch) -> None:
         "u": np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "v": -np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "msnswrf": np.full((2, 3, 12), 150.0, dtype=float),
+        "msdwswrf": np.full((2, 3, 12), 180.0),
+        "u10": np.full((2, 3, 12), 4.0),
+        "v10": np.full((2, 3, 12), -3.0),
         "msdwlwrf": np.full((2, 3, 12), 75.0, dtype=float),
         "crr": np.full((2, 3, 12), 1e-5),
         "lsrr": np.broadcast_to(np.arange(12) * 1e-6, (2, 3, 12)),
@@ -839,6 +842,9 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         "u": np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "v": -np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "msnswrf": np.full((2, 3, 12), 150.0, dtype=float),
+        "msdwswrf": np.full((2, 3, 12), 180.0),
+        "u10": np.full((2, 3, 12), 4.0),
+        "v10": np.full((2, 3, 12), -3.0),
         "msdwlwrf": np.full((2, 3, 12), 75.0, dtype=float),
         "crr": np.full((2, 3, 12), 1e-5),
         "lsrr": np.broadcast_to(np.arange(12) * 1e-6, (2, 3, 12)),
@@ -882,7 +888,17 @@ def test_era5_atmosphere_constructor_initialize_and_step(
             }
         else:
             assert where == "surface"
-            assert variable in {"msnswrf", "msdwlwrf", "crr", "lsrr", "csfr", "lssfr"}
+            assert variable in {
+                "msnswrf",
+                "msdwswrf",
+                "msdwlwrf",
+                "u10",
+                "v10",
+                "crr",
+                "lsrr",
+                "csfr",
+                "lssfr",
+            }
         _ = flip_y
         return forcing[variable]
 
@@ -996,6 +1012,9 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         "temperature_3d",
         "u_velocity",
         "v_velocity",
+        "u_velocity_10m",
+        "v_velocity_10m",
+        "downward_shortwave_radiation_flux",
         "net_shortwave_radiation_flux",
         "downward_longwave_radiation_flux",
         "specific_humidity",
@@ -1013,6 +1032,9 @@ def test_era5_atmosphere_constructor_initialize_and_step(
     for coefficient_name in ("hyai", "hybi", "hyam", "hybm"):
         assert coefficient_name not in component._data
     assert component._data["surface_pressure"].shape == (12, 3, 2)
+    assert_allclose_compact(component._data["downward_shortwave_radiation_flux"], 180.0)
+    assert_allclose_compact(component._data["u_velocity_10m"], 4.0)
+    assert_allclose_compact(component._data["v_velocity_10m"], -3.0)
     assert component._data["specific_humidity_3d"].shape == (12, 2, 3, 2)
     assert component._data["temperature_3d"].shape == (12, 2, 3, 2)
     assert component._data["u_velocity"].shape == (12, 3, 2)
@@ -1024,6 +1046,9 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         "temperature_3d",
         "u_velocity",
         "v_velocity",
+        "u_velocity_10m",
+        "v_velocity_10m",
+        "downward_shortwave_radiation_flux",
         "net_shortwave_radiation_flux",
         "downward_longwave_radiation_flux",
         "specific_humidity",

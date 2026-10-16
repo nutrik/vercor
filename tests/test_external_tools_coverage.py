@@ -14,6 +14,7 @@ import xarray as xr
 import vercor.setups._external._jax_gcm_pytree as jax_gcm_pytree_module
 import vercor.setups._external.jax_gcm_tools as jax_gcm_tools_module
 import vercor.setups._external.veros_fluxes as veros_fluxes_module
+import vercor.setups._surface_fluxes as surface_fluxes_module
 import vercor.setups._external.veros_state as veros_state_module
 from tests.assertions import assert_allclose_compact
 from vercor.dtypes import DTypePolicy
@@ -371,17 +372,18 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
         )
 
     monkeypatch.setattr(
-        veros_fluxes_module,
+        surface_fluxes_module,
         "compute_ocean_surface_fluxes",
         fake_compute_ocean_surface_fluxes,
     )
 
-    taux, tauy, qnet, qnec, salt_flux = veros_fluxes_module.compute_fluxes(
-        veros_state=veros_state,  # type: ignore[arg-type]
-        runtime_fields=runtime_fields,
-        constants=PhysicalConstants(),
-        dtype=DTypePolicy(),
-    )
+    with jax.disable_jit():
+        taux, tauy, qnet, qnec, salt_flux = veros_fluxes_module.compute_fluxes(
+            veros_state=veros_state,  # type: ignore[arg-type]
+            runtime_fields=runtime_fields,
+            constants=PhysicalConstants(),
+            dtype=DTypePolicy(),
+        )
 
     assert_allclose_compact(taux, np.full((4, 4), 5.0))
     assert_allclose_compact(tauy, np.full((4, 4), 6.0))

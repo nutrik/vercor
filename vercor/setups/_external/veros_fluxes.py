@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 
 from vercor.dtypes import DTypePolicy, as_jax_real_array
-from vercor.fluxes.bulk_formula_cesm import compute_ocean_surface_fluxes
+from vercor.setups._surface_fluxes import compute_surface_fluxes
 from vercor.physics import PhysicalConstants
 from vercor.types import RuntimeArray
 
@@ -77,60 +77,29 @@ def compute_fluxes(
 
     temp = as_jax_real_array(vs.temp[2:-2, 2:-2, -1, vs.tau], dtype).T + 273.15
 
-    (
-        senf,
-        latf,
-        lwup,
-        evap,
-        taux,
-        tauy,
-        tref,
-        qref,
-        duu10n,
-        ustar,
-        tstar,
-        qstar,
-        dqfldt,
-    ) = compute_ocean_surface_fluxes(
-        constants,
-        as_jax_real_array(vs.maskT[2:-2, 2:-2, -1], dtype).T,
-        as_jax_real_array(runtime_fields["model_level_height"], dtype),
-        as_jax_real_array(runtime_fields["u_velocity"], dtype),
-        as_jax_real_array(runtime_fields["v_velocity"], dtype),
-        as_jax_real_array(runtime_fields["potential_temperature"], dtype),
-        as_jax_real_array(runtime_fields["specific_humidity"], dtype),
-        as_jax_real_array(runtime_fields["density"], dtype),
-        as_jax_real_array(runtime_fields["temperature"], dtype),
-        u_tgrid[1:-2, :].T,
-        v_tgrid[:, 1:-2].T,
-        temp,
+    bulk = compute_surface_fluxes(
+        runtime_fields,
+        sea_surface_temperature=temp,
+        u_ocean=u_tgrid[1:-2, :].T,
+        v_ocean=v_tgrid[:, 1:-2].T,
+        ocean_mask=as_jax_real_array(vs.maskT[2:-2, 2:-2, -1], dtype).T,
+        constants=constants,
+        dtype=dtype,
     )
-    _ = tref, qref, duu10n, ustar, tstar, qstar
-
-    qnet = (
-        as_jax_real_array(runtime_fields.get("net_shortwave_radiation_flux"), dtype)
-        + as_jax_real_array(
-            runtime_fields.get("downward_longwave_radiation_flux"), dtype
-        )
-        + lwup
-        + senf
-        + latf
-    )
-    qnec = -jnp.where(dqfldt <= -1e10, 0.0, dqfldt)
     salt_flux = _compute_virtual_salt_flux(
         constants,
         as_jax_real_array(runtime_fields["rain_rate"], dtype),
         as_jax_real_array(runtime_fields["snow_rate"], dtype),
-        as_jax_real_array(evap, dtype),
+        as_jax_real_array(bulk.evap, dtype),
         as_jax_real_array(vs.maskT[2:-2, 2:-2, -1], dtype).T,
         dtype=dtype,
     )
 
     return (
-        as_jax_real_array(taux, dtype),
-        as_jax_real_array(tauy, dtype),
-        as_jax_real_array(qnet, dtype),
-        as_jax_real_array(qnec, dtype),
+        as_jax_real_array(bulk.taux, dtype),
+        as_jax_real_array(bulk.tauy, dtype),
+        as_jax_real_array(bulk.qnet, dtype),
+        as_jax_real_array(bulk.qnec, dtype),
         as_jax_real_array(salt_flux, dtype),
     )
 

@@ -28,6 +28,7 @@ import vercor.setups._external.jax_gcm_output as jax_gcm_output_module
 import vercor.setups._external.jax_gcm_runtime as jax_gcm_runtime_module
 import vercor.setups._external.jax_gcm_state as jax_gcm_state_module
 import vercor.setups._external.veros_fluxes as veros_fluxes_module
+import vercor.setups._surface_fluxes as surface_fluxes_module
 import vercor.setups._external.veros_gcm as veros_gcm_module
 import vercor.setups._external.veros_gcm_state as veros_gcm_state_module
 import vercor.setups._external.veros_output as veros_output_module
@@ -1799,17 +1800,18 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
         )
 
     monkeypatch.setattr(
-        veros_fluxes_module,
+        surface_fluxes_module,
         "compute_ocean_surface_fluxes",
         fake_compute_ocean_surface_fluxes,
     )
 
-    taux, tauy, qnet, qnec, salt_flux = veros_fluxes_module.compute_fluxes(
-        component._veros_state,
-        component.data,
-        PhysicalConstants(),
-        DTypePolicy(),
-    )
+    with jax.disable_jit():
+        taux, tauy, qnet, qnec, salt_flux = veros_fluxes_module.compute_fluxes(
+            component._veros_state,
+            component.data,
+            PhysicalConstants(),
+            DTypePolicy(),
+        )
 
     assert isinstance(taux, jax.Array)
     assert isinstance(tauy, jax.Array)
