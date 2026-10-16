@@ -38,6 +38,9 @@ _ERA5_ATMOSPHERE_FIELD_NAMES = (
     "temperature_3d",
     "u_velocity",
     "v_velocity",
+    "u_velocity_10m",
+    "v_velocity_10m",
+    "downward_shortwave_radiation_flux",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
     "specific_humidity",
@@ -170,6 +173,15 @@ def make_era5_atmosphere(
         "surface_pressure": surface_pressure,
         "specific_humidity_3d": specific_humidity_3d,
         "temperature_3d": temperature_3d,
+        "u_velocity_10m": canonicalize_time_last_surface_field(
+            _read_forcing(data_files, "u10", where="surface", flip_y=True)
+        ),
+        "v_velocity_10m": canonicalize_time_last_surface_field(
+            _read_forcing(data_files, "v10", where="surface", flip_y=True)
+        ),
+        "downward_shortwave_radiation_flux": canonicalize_time_last_surface_field(
+            _read_forcing(data_files, "msdwswrf", where="surface", flip_y=True)
+        ),
         "u_velocity": canonicalize_time_last_surface_field(
             _read_forcing(data_files, "u", where="model_level", flip_y=True)[:, :, 1, :]
         ),

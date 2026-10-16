@@ -187,3 +187,22 @@ CAMulator achieves these results with a 350 times speedup over CAM6, making it a
 CAMulator configuration paths and checkpoint paths are machine-specific.
 Reconfigure those paths, their associated data, and the checkpoint before
 running a CAMulator driver.
+
+Veris forcing conventions
+-------------------------
+
+The Veris adapter reuses the Veros CESM bulk calculation. ``ATemp`` uses
+``tref`` and ``aqh`` uses ``qref`` at
+``PhysicalConstants.air_temperature_reference_height`` (2 m by default).
+The bulk inputs retain colocated model-level temperature, humidity, wind,
+density and height. These diagnostics use open-ocean similarity beneath
+prescribed ice; they are not observed ERA5 near-surface values.
+
+ERA5 separately supplies actual ``u10/v10`` winds, downward shortwave
+``msdwswrf`` and downward longwave ``msdwlwrf``. Net shortwave ``msnswrf``
+remains distinct. Native ``Qnet`` and ``Qsw`` negate VerCOR's downward-positive
+heat fluxes. Separate rain and snow mass rates and signed CESM evaporation
+convert to water-equivalent m/s using the traced freshwater density; runoff
+and the prescribed ocean currents/height anomaly are explicitly zero.
+Forcing is reapplied before each native substep because native thermodynamics
+replaces heat inputs with residual coupling fluxes.

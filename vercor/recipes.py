@@ -19,6 +19,33 @@ ATMOSPHERE_TO_VEROS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
 """Stable atmosphere-to-Veros forcing fields used by coupled setup scripts."""
 
 
+ATMOSPHERE_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
+    _vector("u_velocity", "v_velocity"),
+    _vector("u_velocity_10m", "v_velocity_10m"),
+    "specific_humidity",
+    "model_level_height",
+    "density",
+    "potential_temperature",
+    "temperature",
+    "surface_pressure",
+    "net_shortwave_radiation_flux",
+    "downward_shortwave_radiation_flux",
+    "downward_longwave_radiation_flux",
+    "rain_rate",
+    "snow_rate",
+)
+"""Colocated bulk inputs and separate observed 10 m winds for native Veris."""
+
+
+OCEAN_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
+    "sea_surface_temperature",
+    "sea_surface_salinity",
+    _vector("ocean_u_velocity", "ocean_v_velocity"),
+    "sea_surface_height",
+)
+"""Prescribed tracer surfaces and native face velocities on the shared ocean grid."""
+
+
 ATMOSPHERE_TO_DATA_OCEAN_FIELDS: tuple[_ExchangeField, ...] = (
     _vector("u_velocity", "v_velocity"),
     "specific_humidity",
@@ -144,12 +171,14 @@ __all__ = [
     "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS",
     "ATMOSPHERE_TO_OCEAN_STATE_FIELDS",
     "ATMOSPHERE_TO_VEROS_FORCING_FIELDS",
+    "ATMOSPHERE_TO_VERIS_FORCING_FIELDS",
     "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS",
     "JCM_LAND_TO_ATMOSPHERE_FIELDS",
     "LAND_TO_ATMOSPHERE_SOIL_FIELDS",
     "LAND_TO_ATMOSPHERE_SURFACE_FIELDS",
     "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS",
     "OCEAN_TO_SEAICE_SURFACE_FIELDS",
+    "OCEAN_TO_VERIS_FORCING_FIELDS",
     "SEAICE_TO_OCEAN_FIELDS",
     "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS",
     "SLAB_ATMOSPHERE_TO_OCEAN_FIELDS",
