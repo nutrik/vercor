@@ -254,6 +254,7 @@ def _normalized_signature(value: object) -> str:
         .replace("vercor.components.data.", "vercor.components.")
         .replace("vercor.setups.config.", "vercor.setups.")
         .replace("vercor.setups._jcm.", "vercor.setups.")
+        .replace("vercor.setups._veris.", "vercor.setups.")
         .replace("pathlib._local.Path", "pathlib.Path")
         .replace(" -> NoneType", " -> None")
     )

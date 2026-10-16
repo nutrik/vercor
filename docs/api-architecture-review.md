@@ -116,7 +116,7 @@ signatures from installed artifacts.
   "vercor.recipes": ["ATMOSPHERE_TO_DATA_OCEAN_FIELDS", "ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS", "ATMOSPHERE_TO_LAND_BASIC_FIELDS", "ATMOSPHERE_TO_LAND_RADIATION_FIELDS", "ATMOSPHERE_TO_LAND_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS", "ATMOSPHERE_TO_OCEAN_STATE_FIELDS", "ATMOSPHERE_TO_VEROS_FORCING_FIELDS", "ATMOSPHERE_TO_VERIS_FORCING_FIELDS", "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS", "JCM_LAND_TO_ATMOSPHERE_FIELDS", "LAND_TO_ATMOSPHERE_SOIL_FIELDS", "LAND_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_SEAICE_SURFACE_FIELDS", "OCEAN_TO_VERIS_FORCING_FIELDS", "SEAICE_TO_OCEAN_FIELDS", "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS", "SLAB_ATMOSPHERE_TO_OCEAN_FIELDS", "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS"],
   "vercor.regridding": ["Regridder", "RegridderFactory", "VectorRegridder", "bilinear", "conservative"],
   "vercor.runtime": ["ExecutionBackend", "ExecutionChunk", "ExecutionContext", "ExecutionPlan", "RuntimeDriver", "RuntimeOptions", "SequentialWorkflow", "StepPlan", "Workflow", "WorkflowContext"],
-  "vercor.setups": ["CAMulatorConfig", "JAXGCMConfig", "JCMLandAtmosphereConfig", "JCMLandAtmosphereSetup", "JCMInputs", "Spinup", "VerosConfig", "load_jcm_inputs", "make_slab_atmosphere", "make_slab_land", "make_slab_ocean", "make_slab_seaice", "make_jcm_land_atmosphere", "make_camulator_gcm", "make_camulator_land", "make_era5_atmosphere", "make_era5_land", "make_era5_ocean", "make_erainterim_ocean", "make_jax_gcm", "make_jcm_land", "make_veros_gcm"],
+  "vercor.setups": ["CAMulatorConfig", "JAXGCMConfig", "JCMLandAtmosphereConfig", "JCMLandAtmosphereSetup", "JCMInputs", "Spinup", "VerosConfig", "VerisConfig", "load_jcm_inputs", "make_slab_atmosphere", "make_slab_land", "make_slab_ocean", "make_slab_seaice", "make_jcm_land_atmosphere", "VerisVerosDataSetup", "make_camulator_gcm", "make_camulator_land", "make_era5_atmosphere", "make_era5_land", "make_era5_ocean", "make_erainterim_ocean", "make_jax_gcm", "make_jcm_land", "make_veris", "make_veris_verosdata", "make_veros_gcm"],
   "vercor.state": ["ComponentState", "FieldLookupScope", "FieldScope", "RunState"],
   "vercor.time_selection": ["datetime_to_seconds_in_year", "get_periodic_interval"],
   "vercor.topology": ["ExchangeTopologyPatch", "SurfaceMaskPolicy", "TopologyContext", "TopologyPolicy"],
@@ -269,7 +269,9 @@ vercor.setups._external.jax_gcm_output
 vercor.setups._external.jax_gcm_runtime
 vercor.setups._external.jax_gcm_state
 vercor.setups._external.jax_gcm_tools
+vercor.setups._external.veris
 vercor.setups._external.veris_forcing
+vercor.setups._external.veris_runtime
 vercor.setups._external.veros_data
 vercor.setups._external.veros_fluxes
 vercor.setups._external.veros_gcm
@@ -281,6 +283,7 @@ vercor.setups._external.veros_setup
 vercor.setups._external.veros_setup_jax
 vercor.setups._external.veros_state
 vercor.setups._surface_fluxes
+vercor.setups._veris
 vercor.setups.gallery
 vercor.setups.gallery.custom_component_wrapping
 vercor.setups.gallery.profile_runtime

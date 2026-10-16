@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import timedelta
 from types import MappingProxyType
@@ -79,6 +80,43 @@ class VerosConfig:
 
 
 @dataclass(frozen=True)
+class VerisConfig:
+    """Standalone sea-ice policy; runtime dtype/grid and coupled clock are owned by VerCOR.
+
+    Native initial conditions use physical (x, y) arrays without halos, with
+    hIceMean/hSnowMean in grid-cell volume-equivalent metres and Area in [0, 1].
+    The wrapper binds native numerical configuration/constants statically;
+    evolving state and prescribed forcing remain differentiable payload leaves.
+    """
+
+    name: str = "CICE"
+    model_timestep: timedelta = timedelta(hours=1)
+    custom_parameters: Mapping[str, object] | None = None
+    initial_conditions: Mapping[str, object] | None = None
+    output: OutputSpec = field(default_factory=OutputSpec)
+
+    def __post_init__(self) -> None:
+        """Validate the native clock and copy caller-owned mappings/arrays."""
+        if not isinstance(self.name, str) or not self.name:
+            raise ValueError("name must be a non-empty string")
+        if not isinstance(self.model_timestep, timedelta):
+            raise TypeError("model_timestep must be a timedelta")
+        if self.model_timestep.total_seconds() <= 0:
+            raise ValueError("model_timestep must be positive")
+        if not isinstance(self.output, OutputSpec):
+            raise TypeError("output must be OutputSpec")
+        for name in ("custom_parameters", "initial_conditions"):
+            supplied = getattr(self, name)
+            if supplied is not None:
+                owned = deepcopy(dict(supplied))
+                for value in owned.values():
+                    setflags = getattr(value, "setflags", None)
+                    if callable(setflags):
+                        setflags(write=False)
+                object.__setattr__(self, name, MappingProxyType(owned))
+
+
+@dataclass(frozen=True)
 class CAMulatorConfig:
     """Configuration for the bundled CAMulator atmosphere setup factory."""
 
@@ -130,4 +168,5 @@ __all__ = [
     "JCMLandAtmosphereConfig",
     "Spinup",
     "VerosConfig",
+    "VerisConfig",
 ]
