@@ -78,6 +78,7 @@ def test_public_constructor_signatures_match_the_v0_4_contract() -> None:
         "lifecycle",
         "transfer",
         "output",
+        "masks",
     )
     assert tuple(callable_component.parameters) == (
         "name",

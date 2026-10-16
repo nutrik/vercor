@@ -738,6 +738,7 @@ def test_top_level_exports_public_orchestration_and_component_author_api() -> No
     expected_component_exports = (
         "CallableComponent",
         "Component",
+        "ComponentMaskSpec",
         "ComponentSpec",
         "DataComponent",
         "LifecycleHooks",
@@ -807,6 +808,7 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert components_module.__all__ == [
         "CallableComponent",
         "Component",
+        "ComponentMaskSpec",
         "ComponentSpec",
         "DataComponent",
         "LifecycleHooks",
