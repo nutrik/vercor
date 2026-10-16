@@ -5,6 +5,8 @@ horizontal boundary. Surface forcing is transposed once to VerCOR's
 (month, latitude, longitude) layout. Veros depth is positive downward; Veris
 R_low is sea-floor elevation, so ht changes sign once here. Spacings (m) and
 spherical cell areas (m²) are already native metrics and are not rescaled.
+Veros east/north face samples shift to Veris west/south faces, including
+face masks, areas and spacing vectors; tracer coordinates stay fixed.
 No prognostic ocean step or native owner is retained by the snapshot.
 """
 
@@ -52,21 +54,29 @@ def snapshot_veros_state(state: Any) -> VerosDataSnapshot:
         name: np.asarray(getattr(vs, name))[2:-2, 2:-2]
         for name in (
             "maskT",
-            "maskU",
-            "maskV",
             "ht",
             "coriolis_t",
             "area_t",
-            "area_u",
-            "area_v",
         )
     }
-    geometry["ht"] = -geometry["ht"]
     geometry.update(
         {
-            name: np.asarray(getattr(vs, name))[2:-2]
-            for name in ("dxt", "dxu", "dyt", "dyu")
+            name: np.asarray(getattr(vs, name))[1:-3, 2:-2]
+            for name in ("maskU", "area_u")
         }
+    )
+    geometry.update(
+        {
+            name: np.asarray(getattr(vs, name))[2:-2, 1:-3]
+            for name in ("maskV", "area_v")
+        }
+    )
+    geometry["ht"] = -geometry["ht"]
+    geometry.update(
+        {name: np.asarray(getattr(vs, name))[2:-2] for name in ("dxt", "dyt")}
+    )
+    geometry.update(
+        {name: np.asarray(getattr(vs, name))[1:-3] for name in ("dxu", "dyu")}
     )
     grid = RectilinearGrid(
         "veros-global-4deg",

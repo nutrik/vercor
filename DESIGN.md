@@ -63,6 +63,10 @@ The public state surface is intentionally opaque. `RunState.component(...)`,
 `RunState.components(...)`, and `RunState.replace_fields(...)` provide reads and
 immutable replacement. Runtime stores, topology maps, alignment metadata, and
 prepared bindings remain private.
+Replacing a current exported field also replaces its matching outgoing copy,
+so a supplied state is coherent before any recipient runs. Record arrays keep
+their prior selected export until the source's next time-selected send;
+received values and their last-dispatch support retain independent ownership.
 
 ## 3. Configuration ownership
 
@@ -270,13 +274,23 @@ and an integer is the process status. CLI choices are lowercase ``trace``,
 those choices to the Coupler log level and ``DTypePolicy``/``RuntimeOptions``
 dtype policy.
 
-Bundled slab, data, JCM, Veros, and CAMulator factories return the same
+Bundled slab, data, JCM, Veros, Veris, and CAMulator factories return the same
 structural components used by external plugins. JAXGCM/Veros spinup is
 controlled only by `Spinup.enabled`. CAMulator enabled spinup is rejected
 because it is not implemented. CAMulator forcing alignment is explicitly
 `strict` or `forcing_start`; both policies require a standard-library
 `datetime` clock because no-leap and 360-day CAMulator conversion is not
 implemented.
+
+Standalone Veris uses native `initialize_experiment` and pure `advance` with
+immutable state/diagnostics in the component payload. Native configuration and
+constants are frozen setup resources; each substep receives fresh prescribed
+forcing. `make_veris_verosdata` snapshots one setup-only Veros global4deg ocean,
+sharing its exact tracer grid/wet domain with the data ocean. The snapshot
+converts Veros east/north face geometry to native west/south indices. CESM bulk
+`tref/qref` supply ice air temperature/humidity; native `Area` supplies evolving
+fractional coverage while ice-free wet cells retain forcing. Output reuses
+the shared coordinator; the gallery sends no feedback to prescribed data.
 
 `VerosConfig` selects `setup="global_4deg"` or `setup="acc"` and an
 `execution="host"` or `execution="jax"` lane. Host is the compatibility

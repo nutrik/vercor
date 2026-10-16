@@ -53,7 +53,9 @@ def make_veris(
 ) -> Component:
     """Wrap native sea ice on the ocean's identical physical grid and binary mask.
 
-    Geometry uses native physical (x, y[, z]) arrays without halos. The factory
+    Geometry uses native west/south faces and physical (x, y[, z]) arrays
+    without halos. Incoming canonical currents use Veros east/north faces.
+    The factory
     copies geometry; setup alone initializes native state and static resources.
     Runtime ice_fraction is native Area, independent of wet-cell forcing support.
     """

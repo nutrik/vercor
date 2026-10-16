@@ -1,7 +1,8 @@
 # Dynamic component masks and Veris integration
 
 Status: approved by the user on 2026-10-16, including CESM `tref` for `ATemp`;
-implementation plan approved; implementation in progress.
+implementation plan approved; implemented and locally verified on
+`feat/veris-seaice`; remote handoff pending.
 
 ## Intent and acceptance criteria
 
@@ -109,8 +110,11 @@ masks, and then send. A later recipient sees the new mask; an earlier recipient
 uses the prior state. An omitted component retains its current mask.
 
 Rebuild derived masks from authoritative component fields for supplied states,
-including states updated through `RunState.replace_fields`. Keep route order,
-leaf shapes/dtypes, and carry schemas fixed. Check binary values in `{0, 1}`,
+including states updated through `RunState.replace_fields`. Synchronize
+replaced current exports with their outgoing copies; record
+arrays retain time selection at the next source send. Preserve received values
+and their last-dispatch support independently. Keep route order, leaf
+shapes/dtypes, and carry schemas fixed. Check binary values in `{0, 1}`,
 fractions in `[0, 1]`, finiteness, shape, dtype, and static-domain containment
 with transform-safe checks. Newly active exported fields must be finite.
 
@@ -156,7 +160,9 @@ Supply physical-interior `maskT/U/V`, `ht`, `coriolis_t`, `dxt/dxu/dyt/dyu`, and
 `area_t/u/v` through `OceanGeometry`. Strip the native two-cell halos once;
 Veris builds its own. Veros setup spacings are already in meters and areas
 already include spherical factors. Pass negative native depth as the Veris
-bottom-elevation convention. Preserve staggering and coordinate order.
+bottom-elevation convention. Convert Veros east/north face masks, areas and
+spacing samples to native west/south indices; tracer coordinates stay fixed.
+Native face output coordinates use the lower edge of each tracer cell.
 
 The data ocean uses existing linear monthly interpolation of `sst_clim` and
 `sss_clim`, converting SST from Celsius to Kelvin. Veros's initial currents
@@ -174,7 +180,7 @@ per-area forcing; native Veris applies its own `Area` weighting.
 | --- | --- | --- |
 | `theta` | ocean SST | K |
 | `ocSalt` | ocean SSS | g/kg |
-| `uOcean`, `vOcean` | prescribed staggered ocean currents | m/s |
+| `uOcean`, `vOcean` | prescribed Veros east/north currents, coastal faces closed, shifted to native west/south | m/s |
 | `ssh_an` | prescribed SSH, zero in example | m |
 | `surfPress` | ERA5 surface pressure | Pa |
 | `uWind`, `vWind` | ERA5 `u10`, `v10` | m/s, 10 m |

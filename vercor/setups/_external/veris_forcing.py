@@ -51,10 +51,14 @@ def prepare_veris_forcing(
         clean[name] = jnp.where(wet, value, as_jax_real_array(fallback, dtype))
 
     u, v = clean["ocean_u_velocity"], clean["ocean_v_velocity"]
-    # Native U/V values sit on east/north faces. Longitude is periodic; the
-    # southern boundary face is closed rather than rolled from the north.
-    u_center = 0.5 * (u + jnp.roll(u, 1, axis=1))
+    # Canonical ocean currents use Veros east/north faces. Close coastal and
+    # exterior faces before centering or converting to native west/south faces.
+    north_wet = jnp.concatenate((wet[1:], jnp.zeros_like(wet[:1])), axis=0)
+    u = jnp.where(wet & jnp.roll(wet, -1, axis=1), u, 0.0)
+    v = jnp.where(wet & north_wet, v, 0.0)
+    west = jnp.roll(u, 1, axis=1)
     south = jnp.concatenate((jnp.zeros_like(v[:1]), v[:-1]), axis=0)
+    u_center = 0.5 * (u + west)
     v_center = 0.5 * (v + south)
     bulk = compute_surface_fluxes(
         clean,
@@ -74,8 +78,8 @@ def prepare_veris_forcing(
     return {
         "theta": native(clean["sea_surface_temperature"], 273.15),
         "ocSalt": native(clean["sea_surface_salinity"]),
-        "uOcean": native(u),
-        "vOcean": native(v),
+        "uOcean": native(west),
+        "vOcean": native(south),
         "ssh_an": native(clean.get("sea_surface_height", zero)),
         "surfPress": native(clean["surface_pressure"], constants.reference_pressure),
         "uWind": native(clean["u_velocity_10m"]),
