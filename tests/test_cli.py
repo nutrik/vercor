@@ -29,6 +29,7 @@ from vercor.cli import cli
         "run_jcm_with_verosdata",
         "run_slab_driver",
         "run_veros_with_era5data",
+        "run_veris_dataveros_era5",
     ),
 )
 def test_every_bundled_setup_exposes_keyword_only_run_contract(

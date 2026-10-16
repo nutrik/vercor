@@ -1197,7 +1197,7 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
         "-q -n0 -m veros_autodiff --tb=short "
         "--cov=vercor --cov-branch --cov-report= --cov-fail-under=0"
     )
-    assert 'python -m pip install ".[dev,jcm,veros]"' in quality_commands
+    assert 'python -m pip install ".[dev,jcm,veros,veris]"' in quality_commands
     for stock_step in (stock_full, stock_coverage):
         assert '-m "not veros_autodiff"' in stock_step["run"]
     assert "combined-coverage" in jobs["publish-release"]["needs"]
@@ -1355,7 +1355,7 @@ def test_ci_quality_job_enforces_static_gates_and_collects_stock_coverage() -> N
 
     assert checkout.get("with", {}).get("fetch-depth") == 0
     assert setup["with"]["python-version"] == "3.12"
-    assert 'pip install ".[dev,jcm,veros]"' in commands
+    assert 'pip install ".[dev,jcm,veros,veris]"' in commands
     assert "black --check vercor tests" in commands
     assert "flake8 ." in commands
     assert "--exit-zero" not in commands
@@ -1475,6 +1475,7 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
         "vercor/setups/gallery/run_jcm_with_verosdata.py",
         "vercor/setups/gallery/run_slab_driver.py",
         "vercor/setups/gallery/run_veros_with_era5data.py",
+        "vercor/setups/gallery/run_veris_dataveros_era5.py",
     }
     runner_name = "vercor/_setup_runner.py"
 

@@ -35,6 +35,13 @@ to install VerCOR with the optional
 `JCM <https://jax-gcm.readthedocs.io/en/latest/>`_ and
 `Veros <https://veros.readthedocs.io/en/latest/>`_ components.
 
+For standalone Veris with prescribed Veros ocean data, install a source checkout
+containing the integration with ``python -m pip install ".[veris,veros]"``.
+The ``veris`` extra pins the maintained standalone native model; ``veros``
+provides the setup-only global ocean geometry and climatology. The gallery
+``run_veris_dataveros_era5`` supplies ERA5 forcing and uses the standard
+``vercor copy-setup`` and ``vercor run`` commands (see :doc:`../setup-gallery`).
+
 If you want to install a specific release version execute:
 
 .. code-block:: console

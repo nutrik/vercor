@@ -57,6 +57,10 @@ Example:
      - Couple Veros to ERA5 atmosphere and land data.
      - Veros
      - Yes
+   * - ``run_veris_dataveros_era5``
+     - Run Veris with prescribed Veros ocean and ERA5 data.
+     - Veris, Veros
+     - Yes
    * - ``run_camulator_with_veros``
      - Couple CAMulator atmosphere/land to Veros.
      - CAMulator, Veros
@@ -206,3 +210,35 @@ convert to water-equivalent m/s using the traced freshwater density; runoff
 and the prescribed ocean currents/height anomaly are explicitly zero.
 Forcing is reapplied before each native substep because native thermodynamics
 replaces heat inputs with residual coupling fluxes.
+
+Veris with prescribed ocean
+---------------------------
+
+The standalone `Veris sea-ice model <https://github.com/team-ocean/veris>`_
+uses the existing global 4-degree Veros ocean grid and its binary wet mask.
+The example schedules ``LND -> CICE -> OCN -> ATM`` each day. Both incoming
+ice routes are intensive, so wet cells with zero concentration still receive
+forcing and can form ice. Concentration ``Area`` evolves as ``ice_fraction``
+without rebuilding ocean geometry or remappers.
+
+From a source checkout containing this integration, install and copy the setup:
+
+.. code-block:: console
+
+   python -m pip install ".[veris,veros]"
+   vercor copy-setup run_veris_dataveros_era5 --to ~/vercor-setups/run_veris_dataveros_era5
+   vercor run ~/vercor-setups/run_veris_dataveros_era5/run_veris_dataveros_era5.py --loglevel info --float-type float64
+
+The native revision is pinned by the ``veris`` extra. Native integration uses
+one-hour coupled dynamics/thermodynamics steps inside daily coupling intervals.
+The default experiment starts with native zero ice and writes monthly native
+ice variables plus final runtime/snapshot files. ``VerisConfig.initial_conditions``
+accepts native physical (x, y) arrays, and ``VerisConfig.output`` selects period
+variables/cadence. Thickness outputs remain volume per total grid-cell area.
+
+The ocean provides monthly Veros SST/SSS climatology with explicitly zero
+currents and height anomaly. Runoff is also prescribed zero. Land and atmosphere
+are ERA5 data components; CICE sends no feedback to these prescribed components.
+CESM reference-air diagnostics and heat/freshwater conventions are described
+above. The short native tests verify operation and local derivatives; they do
+not establish long-term climate or spherical-dynamics accuracy.
