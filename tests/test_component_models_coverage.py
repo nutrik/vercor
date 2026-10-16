@@ -106,6 +106,10 @@ def _install_data_driver_factory_fakes(monkeypatch: pytest.MonkeyPatch) -> None:
         "v": -np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "msnswrf": np.full((2, 3, 12), 150.0, dtype=float),
         "msdwlwrf": np.full((2, 3, 12), 75.0, dtype=float),
+        "crr": np.full((2, 3, 12), 1e-5),
+        "lsrr": np.broadcast_to(np.arange(12) * 1e-6, (2, 3, 12)),
+        "csfr": np.full((2, 3, 12), 2e-6),
+        "lssfr": np.arange(72, dtype=float).reshape(2, 3, 12) * 1e-8,
     }
     land_forcing: dict[str, NDArray] = {
         "lon": np.asarray([0.0, 180.0], dtype=float),
@@ -836,6 +840,10 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         "v": -np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "msnswrf": np.full((2, 3, 12), 150.0, dtype=float),
         "msdwlwrf": np.full((2, 3, 12), 75.0, dtype=float),
+        "crr": np.full((2, 3, 12), 1e-5),
+        "lsrr": np.broadcast_to(np.arange(12) * 1e-6, (2, 3, 12)),
+        "csfr": np.full((2, 3, 12), 2e-6),
+        "lssfr": np.arange(72, dtype=float).reshape(2, 3, 12) * 1e-8,
     }
 
     physics_calls: dict[str, list[Any]] = {
@@ -874,7 +882,7 @@ def test_era5_atmosphere_constructor_initialize_and_step(
             }
         else:
             assert where == "surface"
-            assert variable in {"msnswrf", "msdwlwrf"}
+            assert variable in {"msnswrf", "msdwlwrf", "crr", "lsrr", "csfr", "lssfr"}
         _ = flip_y
         return forcing[variable]
 
@@ -995,6 +1003,8 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         "model_level_height",
         "density",
         "potential_temperature",
+        "rain_rate",
+        "snow_rate",
     )
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component._data["surface_pressure"], jax.Array)
@@ -1021,6 +1031,8 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         "model_level_height",
         "density",
         "potential_temperature",
+        "rain_rate",
+        "snow_rate",
     )
     assert len(physics_calls["pressure"]) == 24
     assert len(physics_calls["height"]) == 12
@@ -1037,6 +1049,56 @@ def test_era5_atmosphere_constructor_initialize_and_step(
     assert component._data["potential_temperature"].shape == (12, 3, 2)
     assert np.all(component._data["model_level_height"] > 0.0)
     assert "total_surface_temperature" not in component._data
+
+
+@pytest.mark.fast_always
+def test_era5_precipitation_is_zero_seeded_and_summed_before_monthly_exchange(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Catch omitted rain/snow components, transposition, and time-axis mistakes."""
+
+    from vercor import Clock, Coupler
+
+    _install_data_driver_factory_fakes(monkeypatch)
+    atmosphere = make_era5_atmosphere()
+    for name in ("rain_rate", "snow_rate"):
+        assert_allclose_compact(
+            atmosphere.spec.initial_fields[name], np.zeros((12, 3, 2))
+        )
+    ocean = DataComponent(
+        "OCN",
+        atmosphere.grid,
+        fields={"rain_rate": 0.0, "snow_rate": 0.0},
+        spec=ComponentSpec(inputs=("rain_rate", "snow_rate")),
+    )
+    coupler = Coupler(
+        clock=Clock(
+            start=datetime(2000, 1, 1),
+            dt_seconds=86400.0,
+            steps=1,
+            calendar="noleap",
+        ),
+        components=(atmosphere, ocean),
+        exchanges=(Exchange("ATM", "OCN", fields=("rain_rate", "snow_rate")),),
+        run_order=("ATM", "OCN"),
+    )
+    initial = coupler.initial_state()
+    rain = initial.component("ATM").field("rain_rate")
+    snow = initial.component("ATM").field("snow_rate")
+    assert_allclose_compact(rain[0], np.full((3, 2), 1e-5))
+    assert_allclose_compact(rain[11], np.full((3, 2), 2.1e-5))
+    assert_allclose_compact(
+        snow[0],
+        np.asarray([[2e-6, 2.36e-6], [2.12e-6, 2.48e-6], [2.24e-6, 2.60e-6]]),
+    )
+    final = coupler.run(initial)
+    assert_allclose_compact(
+        final.component("OCN").field("rain_rate"), np.full((3, 2), 1.55e-5)
+    )
+    assert_allclose_compact(
+        final.component("OCN").field("snow_rate"),
+        np.asarray([[2.055e-6, 2.415e-6], [2.175e-6, 2.535e-6], [2.295e-6, 2.655e-6]]),
+    )
 
 
 def test_jcm_land_constructor_converts_coords_and_preserves_data(

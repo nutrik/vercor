@@ -45,6 +45,8 @@ _ERA5_ATMOSPHERE_FIELD_NAMES = (
     "model_level_height",
     "density",
     "potential_temperature",
+    "rain_rate",
+    "snow_rate",
 )
 
 
@@ -151,6 +153,19 @@ def make_era5_atmosphere(
         _read_forcing(data_files, "t", where="model_level", flip_y=True)[..., 1:, :]
     )
 
+    # ECMWF rates are already water-equivalent kg/m²/s. Aggregate on the
+    # source grid before the runtime selects months or regrids either phase.
+    precipitation_fields = {
+        output_name: canonicalize_time_last_surface_field(
+            _read_forcing(data_files, first, where="surface", flip_y=True)
+            + _read_forcing(data_files, second, where="surface", flip_y=True)
+        )
+        for output_name, first, second in (
+            ("rain_rate", "crr", "lsrr"),
+            ("snow_rate", "csfr", "lssfr"),
+        )
+    }
+
     fields = {
         "surface_pressure": surface_pressure,
         "specific_humidity_3d": specific_humidity_3d,
@@ -169,6 +184,8 @@ def make_era5_atmosphere(
         ),
         "specific_humidity": specific_humidity_3d[:, 0, :, :],
         "temperature": temperature_3d[:, 0, :, :],
+        "rain_rate": jnp.zeros_like(surface_pressure),
+        "snow_rate": jnp.zeros_like(surface_pressure),
     }
 
     def setup(component: Component, context: SetupContext) -> SetupResult:
@@ -190,6 +207,7 @@ def make_era5_atmosphere(
         ]
         return SetupResult(
             fields={
+                **precipitation_fields,
                 "model_level_height": jnp.stack(
                     [item[0] for item in diagnostics],
                     axis=0,

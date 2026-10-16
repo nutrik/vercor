@@ -23,6 +23,7 @@ class VerosForcingFields(NamedTuple):
     tauy: jax.Array
     qnet: jax.Array
     qnec: jax.Array
+    coupled_salt_flux: jax.Array
 
 
 @jax.jit
@@ -41,8 +42,16 @@ def prepare_surface_forcing_fields(
     tauy: object,
     qnet: object,
     qnec: object,
+    salt_flux: object,
     restore_to_climatology: object,
 ) -> VerosForcingFields:
+    """Clean and transpose surface arrays into native Veros forcing layouts.
+
+    Stress and heat have a singleton month axis for broadcast into the native
+    climatology arrays. The already-converted salt flux remains a 2D T-grid
+    array in m (g/kg)/s; the native tracer owns timestep/depth integration.
+    """
+
     restore_to_climatology_jax = jnp.asarray(restore_to_climatology, dtype=bool)
 
     def _prepare(field: object, owner: str) -> jax.Array:
@@ -62,6 +71,9 @@ def prepare_surface_forcing_fields(
         tauy=tauy_prepared,
         qnet=qnet_prepared,
         qnec=qnec_prepared,
+        coupled_salt_flux=replace_missing_nan(
+            as_jax_real_array(salt_flux), owner="Veros virtual salt surface forcing"
+        ).T,
     )
 
 
@@ -186,7 +198,7 @@ def apply_veros_forcing_fields(
     variables = updated_state.variables
     with variables.unlock():
         for variable_name, variable_value in zip(
-            ("taux", "tauy", "qnet", "qnec"),
+            VerosForcingFields._fields,
             forcing_fields,
             strict=True,
         ):

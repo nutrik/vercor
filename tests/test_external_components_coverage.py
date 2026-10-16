@@ -276,6 +276,7 @@ def _make_copyable_fake_veros_state(surface_temperature: float = 10.0) -> Any:
     state._variables = _FakeVariableStore(
         temp=np.full((8, 8, 1, 1), surface_temperature, dtype=float),
         tau=0,
+        coupled_salt_flux=np.zeros((6, 6), dtype=float),
         **{
             name: np.zeros((6, 6, 1), dtype=float)
             for name in ("taux", "tauy", "qnet", "qnec")
@@ -326,10 +327,7 @@ def _make_veros_output_state(offset: float = 0.0) -> Any:
         ),
         variables=variables,
         var_meta={
-            name: SimpleNamespace(
-                active=True,
-                dims=veros_output_module.veros_variables.VARIABLES[name].dims,
-            )
+            name: deepcopy(veros_output_module.veros_variables.VARIABLES[name])
             for name in manifest_variables
         },
     )
@@ -541,6 +539,8 @@ def _map_uniform_jcm_column(
             jnp.zeros_like(temperature_profile),
             temperature_profile,
             jnp.full_like(temperature_profile, 10.0),
+            large_scale_precipitation=jnp.zeros((1, 1)),
+            convective_precipitation=jnp.zeros((1, 1)),
             dtype=DTypePolicy(),
         ),
     )
@@ -553,6 +553,51 @@ def test_map_jcm_output_fields_anchors_sigma_095_height_at_surface() -> None:
 
     assert 300.0 < float(model_level_height[0, 0]) < 500.0
     assert_allclose_compact(model_level_height, np.asarray([[435.0322]]), atol=0.05)
+
+
+@pytest.mark.fast_always
+def test_jcm_precipitation_sums_both_diagnostics_and_converts_grams_before_exchange() -> (
+    None
+):
+    """Catch a missing process, a factor of 1000, or a native-grid transpose."""
+
+    def rain_output(precls: jax.Array) -> jax.Array:
+        fields = jax_gcm_fields_module.map_jcm_output_fields(
+            2.5e6,
+            1e5,
+            jnp.asarray([0.2, 0.95]),
+            28.966,
+            8314.47,
+            1e5,
+            0.286,
+            jnp.zeros((3, 2, 2)),
+            jnp.zeros((3, 2, 2)),
+            jnp.zeros((3, 2)),
+            jnp.zeros((3, 2)),
+            jnp.ones((3, 2)),
+            jnp.zeros((2, 3, 2)),
+            jnp.zeros((2, 3, 2)),
+            jnp.full((2, 3, 2), 280.0),
+            jnp.full((2, 3, 2), 10.0),
+            large_scale_precipitation=precls,
+            convective_precipitation=jnp.asarray([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),
+            dtype=DTypePolicy(),
+        )
+        assert fields["snow_rate"].shape == (2, 3)
+        return jnp.stack((fields["rain_rate"], fields["snow_rate"]))
+
+    precls = jnp.asarray([[10.0, 20.0], [30.0, 40.0], [50.0, 60.0]])
+    value, tangent = jax.jvp(rain_output, (precls,), (jnp.ones_like(precls),))
+    assert_allclose_compact(
+        value[0], np.asarray([[0.011, 0.033, 0.055], [0.022, 0.044, 0.066]])
+    )
+    assert_allclose_compact(value[1], np.zeros((2, 3)))
+    assert_allclose_compact(tangent[0], np.full((2, 3), 0.001))
+    assert_allclose_compact(tangent[1], np.zeros((2, 3)))
+    assert_allclose_compact(
+        jax.grad(lambda values: jnp.sum(rain_output(values)))(precls),
+        np.full((3, 2), 0.001),
+    )
 
 
 def test_map_jcm_output_fields_sigma_095_height_derivative_uses_surface_layer() -> None:
@@ -612,6 +657,8 @@ def test_map_jcm_output_fields_supports_jit(
     mapped_fields = jax.jit(
         lambda *args: jax_gcm_fields_module.map_jcm_output_fields(
             *args,
+            large_scale_precipitation=jnp.zeros((2, 2)),
+            convective_precipitation=jnp.zeros((2, 2)),
             dtype=DTypePolicy(),
         )
     )(
@@ -718,6 +765,8 @@ def test_map_jcm_output_fields_supports_jit(
             jnp.full((2, 2, 2), 2.0),
             temperature_values,
             jnp.full((2, 2, 2), 20.0),
+            large_scale_precipitation=jnp.zeros((2, 2)),
+            convective_precipitation=jnp.zeros((2, 2)),
             dtype=DTypePolicy(),
         )
         return sum(
@@ -1183,6 +1232,8 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
             rlds=np.full((2, 2), 40.0, dtype=float),
         ),
         "_shortwave_rad": SimpleNamespace(rsns=np.full((2, 2), 30.0, dtype=float)),
+        "_condensation": SimpleNamespace(precls=np.full((2, 2), 20.0)),
+        "_convection": SimpleNamespace(precnv=np.full((2, 2), 5.0)),
     }
     d = SimpleNamespace(
         u_wind=np.asarray(
@@ -1673,6 +1724,8 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
         "temperature": np.full((2, 2), 281.0),
         "net_shortwave_radiation_flux": np.full((2, 2), 10.0),
         "downward_longwave_radiation_flux": np.full((2, 2), 20.0),
+        "rain_rate": np.full((2, 2), 1e-4),
+        "snow_rate": np.full((2, 2), 2e-5),
     }
 
     captured: dict[str, np.ndarray] = {}
@@ -1709,7 +1762,7 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
             np.full((2, 2), -1.0),
             np.full((2, 2), -2.0),
             np.full((2, 2), -3.0),
-            np.full((2, 2), 4.0),
+            np.full((2, 2), -4e-5),
             np.full((2, 2), 5.0),
             np.full((2, 2), 6.0),
             np.full((2, 2), 7.0),
@@ -1727,7 +1780,7 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
         fake_compute_ocean_surface_fluxes,
     )
 
-    taux, tauy, qnet, qnec = veros_fluxes_module.compute_fluxes(
+    taux, tauy, qnet, qnec, salt_flux = veros_fluxes_module.compute_fluxes(
         component._veros_state,
         component.data,
         PhysicalConstants(),
@@ -1745,6 +1798,7 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
     assert_allclose_compact(taux, np.full((2, 2), 5.0))
     assert_allclose_compact(tauy, np.full((2, 2), 6.0))
     assert_allclose_compact(qnet, np.full((2, 2), 24.0))
+    assert_allclose_compact(salt_flux, np.full((2, 2), -2.776e-6), rtol=1e-6)
     assert_allclose_compact(qnec, np.asarray([[0.0, 0.0], [-0.5, 2.0]]))
 
 
@@ -2175,14 +2229,15 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     qnec = jnp.asarray([[12.0, 13.0], [14.0, 15.0]])
 
     prepared = jax.jit(veros_state_module.prepare_surface_forcing_fields)(
-        taux, tauy, qnet, qnec, False
+        taux, tauy, qnet, qnec, qnet, False
     )
     assert isinstance(prepared, veros_state_module.VerosForcingFields)
     assert prepared.taux.shape == (2, 2, 1)
     assert prepared.tauy.shape == (2, 2, 1)
     assert prepared.qnet.shape == (2, 2, 1)
     assert prepared.qnec.shape == (2, 2, 1)
-    taux_out, tauy_out, qnet_out, qnec_out = prepared
+    taux_out, tauy_out, qnet_out, qnec_out, salt_out = prepared
+    assert_allclose_compact(salt_out, np.asarray([[9.0, 11.0], [10.0, 0.0]]))
 
     assert taux_out.shape == (2, 2, 1)
     assert tauy_out.shape == (2, 2, 1)
@@ -2193,7 +2248,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
     assert_allclose_compact(qnec_out, np.zeros((2, 2, 1)))
 
     restored = veros_state_module.prepare_surface_forcing_fields(
-        taux, tauy, qnet, qnec, True
+        taux, tauy, qnet, qnec, qnet, True
     )[3]
     assert_allclose_compact(
         restored,
@@ -2207,6 +2262,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_qnec_gate()
                     forcing[0],
                     forcing[1],
                     forcing[2],
+                    forcing[3],
                     forcing[3],
                     True,
                 )
@@ -2235,6 +2291,7 @@ def test_veros_surface_forcing_rejects_infinity() -> None:
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
+            jnp.zeros((1, 1)),
             True,
         )
 
@@ -2243,6 +2300,7 @@ def test_compiled_veros_surface_forcing_rejects_infinity() -> None:
     with pytest.raises(JaxRuntimeError, match="Veros.*surface forcing.*infinity"):
         result = jax.jit(veros_state_module.prepare_surface_forcing_fields)(
             jnp.asarray([[jnp.inf]]),
+            jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
@@ -2301,12 +2359,13 @@ def test_veros_output_provider_exposes_active_native_variable_universe() -> None
         dims=("isle", "isle"),
     )
     state.variables.Ai_ez = np.ones((6, 7, 2, 2, 2), dtype=float)
-    state.var_meta["Ai_ez"] = SimpleNamespace(
-        active=True,
-        dims=("xt", "yt", "zt", "tensor1", "tensor2"),
+    state.var_meta["Ai_ez"] = deepcopy(
+        veros_output_module.veros_variables.VARIABLES["Ai_ez"]
     )
     state.variables.time = np.asarray(259_200.0, dtype=np.float32)
-    state.var_meta["time"] = SimpleNamespace(active=True, dims=None)
+    state.var_meta["time"] = deepcopy(
+        veros_output_module.veros_variables.VARIABLES["time"]
+    )
     local_dimension_resolutions = 0
 
     def local_dimensions(settings: Any) -> tuple[str, ...]:
@@ -2527,10 +2586,11 @@ def test_apply_veros_forcing_fields_updates_owned_host_state_without_copy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     variables = _FakeVariableStore(
+        coupled_salt_flux=np.zeros((8, 8)),
         **{
             name: np.zeros((8, 8, 1), dtype=float)
             for name in ("taux", "tauy", "qnet", "qnec")
-        }
+        },
     )
     state = SimpleNamespace(variables=variables)
     monkeypatch.setattr(
@@ -2543,6 +2603,7 @@ def test_apply_veros_forcing_fields_updates_owned_host_state_without_copy(
         tauy=jnp.full((4, 4, 1), 2.0),
         qnet=jnp.full((4, 4, 1), 3.0),
         qnec=jnp.full((4, 4, 1), 4.0),
+        coupled_salt_flux=jnp.full((4, 4), -3.47e-6),
     )
 
     result = veros_state_module.apply_veros_forcing_fields(
@@ -2576,10 +2637,11 @@ def test_apply_veros_forcing_fields_preserves_jax_arrays_in_jax_execution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     variables = _FakeVariableStore(
+        coupled_salt_flux=np.zeros((8, 8)),
         **{
             name: jnp.zeros((8, 8, 1), dtype=jnp.float64)
             for name in ("taux", "tauy", "qnet", "qnec")
-        }
+        },
     )
     state = SimpleNamespace(variables=variables)
     copy_calls: list[str] = []
@@ -2594,7 +2656,11 @@ def test_apply_veros_forcing_fields_preserves_jax_arrays_in_jax_execution(
 
     monkeypatch.setattr(veros_state_module, "copy_state", recording_copy)
     forcing = veros_state_module.VerosForcingFields(
-        *(jnp.full((4, 4, 1), value) for value in (1.0, 2.0, 3.0, 4.0))
+        taux=jnp.full((4, 4, 1), 1.0),
+        tauy=jnp.full((4, 4, 1), 2.0),
+        qnet=jnp.full((4, 4, 1), 3.0),
+        qnec=jnp.full((4, 4, 1), 4.0),
+        coupled_salt_flux=jnp.full((4, 4), -3.47e-6),
     )
 
     result = veros_state_module.apply_veros_forcing_fields(
@@ -2678,7 +2744,10 @@ def test_veros_constructor_builds_jax_backed_grid(
     )
 
     class _FakeGlobalFourDegree:
-        def __init__(self, override: dict[str, Any]) -> None:
+        def __init__(
+            self, override: dict[str, Any], *, restore_to_climatology: bool
+        ) -> None:
+            self.restore_to_climatology = restore_to_climatology
             self.override = override
             self.state = state
             self.step = lambda veros_state: None
@@ -2739,6 +2808,8 @@ def test_veros_constructor_builds_jax_backed_grid(
         "temperature",
         "net_shortwave_radiation_flux",
         "downward_longwave_radiation_flux",
+        "rain_rate",
+        "snow_rate",
     )
     assert component.spec.outputs == ("sea_surface_temperature",)
     assert component.grid.binary_mask.shape == (4, 4)
@@ -2815,6 +2886,7 @@ def test_veros_host_runtime_owns_one_complete_copy_before_forcing(
             np.asarray([[5.0, 6.0], [7.0, 8.0]]),
             np.asarray([[9.0, 10.0], [11.0, 12.0]]),
             np.asarray([[3.0, 4.0], [5.0, 6.0]]),
+            np.full((2, 2), -3.47e-6),
         ),
     )
     component._step_function = fake_step_function
@@ -2982,6 +3054,7 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
             np.asarray([[5.0, 6.0], [np.nan, 8.0]]),
             np.asarray([[9.0, 10.0], [11.0, np.nan]]),
             np.asarray([[12.0, 13.0], [14.0, np.nan]]),
+            np.asarray([[-3.47e-6, np.nan], [-6.94e-6, 0.0]]),
         ),
     )
     monkeypatch.setattr(

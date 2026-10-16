@@ -76,6 +76,36 @@ Veros
 `Veros <https://veros.readthedocs.io/en/latest/>`__, the versatile ocean simulator, is a full-fledged primitive equation ocean model
 that supports anything between idealized toy models and realistic, high-resolution, global ocean simulations.
 
+The ERA5/Veros and JCM/Veros examples exchange ``rain_rate`` and ``snow_rate``
+in kg/m²/s, positive into the ocean. ERA5 sums ``crr + lsrr`` for rain and
+``csfr + lssfr`` for water-equivalent snow before interpolation. JCM sums
+``precls + precnv`` and divides by 1000 to convert its g/m²/s diagnostics;
+it provides no separate snowfall rate, so its ``snow_rate`` remains zero.
+See the `ECMWF parameter definitions <https://codes.ecmwf.int/grib/param-db/228218>`_
+and `JCM diagnostic units <https://jax-gcm.readthedocs.io/en/latest/speedy_translation.html>`_.
+
+VerCOR combines these rates with bulk evaporation on the ocean grid and
+computes a virtual salt flux using the fixed reference salinity:
+
+.. math::
+
+   F_{S} = -\frac{S_{\mathrm{ref}}}{\rho_{\mathrm{fw}}}
+       (R + S_{\mathrm{snow}} - E).
+
+Here ``E`` is positive for water leaving the ocean. The traced
+``PhysicalConstants.surface_salinity_reference`` defaults to 34.7 g/kg and
+``PhysicalConstants.freshwater_density`` to 1000 kg/m³. The resulting
+``forc_salt_surface`` has units m (g/kg)/s: precipitation lowers salinity and
+evaporation raises it. Veros applies its own tracer timestep and top-cell
+depth. This follows the freshwater term of the
+`rigid-lid conversion in Veros PR 81 <https://github.com/nutrik/veros/pull/81>`_,
+implemented entirely in the VerCOR adapter.
+
+The examples disable climatological restoring by default. Set
+``VerosConfig(restore_to_climatology=True)`` to enable the existing SST
+correction and add 30-day surface salinity restoring to the coupled salt
+flux. The ACC setup retains its native internal forcing.
+
 JCM
 +++
 

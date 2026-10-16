@@ -34,13 +34,16 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
                     "temperature",
                     "net_shortwave_radiation_flux",
                     "downward_longwave_radiation_flux",
+                    "rain_rate",
+                    "snow_rate",
                 ),
             ),
         )
     )
     ocn = make_veros_gcm(
         config=VerosConfig(
-            restore_to_climatology=True,
+            # Set True to add SST and 30-day SSS restoring to coupled forcing.
+            restore_to_climatology=False,
             output=OutputSpec(
                 period=PeriodOutput(
                     frequency="month",
@@ -52,6 +55,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
                         "w",
                         "surface_taux",
                         "surface_tauy",
+                        "forc_salt_surface",
                         "psi",
                     ),
                 ),

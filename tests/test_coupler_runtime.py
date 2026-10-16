@@ -110,6 +110,14 @@ class _FakeShortwaveRad(NamedTuple):
     rsns: jax.Array
 
 
+class _FakeCondensation(NamedTuple):
+    precls: jax.Array
+
+
+class _FakeConvection(NamedTuple):
+    precnv: jax.Array
+
+
 class _FakeDynamicsPrediction(NamedTuple):
     normalized_surface_pressure: jax.Array
     u_wind: jax.Array
@@ -184,6 +192,12 @@ def _fake_jcm_step(
     )
     prediction = _FakePrediction(
         physics={
+            "_condensation": _FakeCondensation(
+                jnp.ones_like(surface_temperature)[jnp.newaxis, ...]
+            ),
+            "_convection": _FakeConvection(
+                jnp.full_like(surface_temperature, 2.0)[jnp.newaxis, ...]
+            ),
             "_surface_flux": _FakeSurfaceFlux(
                 shf=surface_flux[jnp.newaxis, ...],
                 evap=(surface_flux * 0.1)[jnp.newaxis, ...],
@@ -248,6 +262,8 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
             specific_humidity=jnp.zeros((2, *grid.shape), dtype=jnp.float64),
         ),
         physics={
+            "_condensation": _FakeCondensation(jnp.zeros(grid.shape)),
+            "_convection": _FakeConvection(jnp.zeros(grid.shape)),
             "_surface_flux": _FakeSurfaceFlux(
                 shf=jnp.zeros((*grid.shape, 2), dtype=jnp.float64),
                 evap=jnp.zeros((*grid.shape, 2), dtype=jnp.float64),

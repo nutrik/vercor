@@ -66,6 +66,9 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
 
     ocn = make_veros_gcm(
         config=VerosConfig(
+            # JCM precipitation minus bulk evaporation supplies virtual salt flux.
+            # Set True to add SST and 30-day SSS restoring.
+            restore_to_climatology=False,
             spinup=Spinup(enabled=True),
             output=OutputSpec(
                 period=PeriodOutput(
@@ -78,6 +81,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
                         "w",
                         "surface_taux",
                         "surface_tauy",
+                        "forc_salt_surface",
                         "psi",
                     ),
                 ),

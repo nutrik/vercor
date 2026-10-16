@@ -52,6 +52,8 @@ COMMON_FIELD_NAMES: tuple[str, ...] = (
     "latent_heat_flux",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
+    "rain_rate",
+    "snow_rate",
 )
 
 

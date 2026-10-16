@@ -137,7 +137,9 @@ def _remove_ghost_cells(
 
 def _extract_variable(veros_state: Any, name: str) -> OutputVariable:
     vs = veros_state.variables
-    variable = _variable_definition(name)
+    variable = getattr(veros_state, "var_meta", {}).get(name)
+    if variable is None:
+        variable = _variable_definition(name)
     dims = _resolved_dims(variable, veros_state.settings, name)
     values = as_jax_real_array(getattr(vs, name))
     values, dims = _drop_timestep_dim(values, dims, vs)

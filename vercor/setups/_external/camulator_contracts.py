@@ -19,6 +19,10 @@ CAMULATOR_RUNTIME_FIELD_NAMES = (
     "total_surface_temperature",
     "temperature_3d",
     "specific_humidity_3d",
+    # This adapter supplies no precipitation diagnostics; keep the shared
+    # atmosphere-to-Veros route valid with zero precipitation defaults.
+    "rain_rate",
+    "snow_rate",
 )
 
 
