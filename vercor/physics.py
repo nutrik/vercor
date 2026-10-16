@@ -65,6 +65,14 @@ class PhysicalConstants(_PyTreeNodeMixin):
         freshwater_density: Water-equivalent freshwater density in kg/m^3.
         surface_salinity_reference: Fixed virtual-salt-flux reference salinity
             in g/kg, matching the numerical salinity units used by Veros.
+        precipitation_snow_temperature: Lower precipitation-phase threshold
+            in K (272.77 K, or -0.38 degrees C).
+        precipitation_rain_temperature: Upper precipitation-phase threshold
+            in K (278.15 K, or 5 degrees C), greater than the snow threshold.
+            Both thresholds come from the calibrated linear-transition model
+            in Bedard-Therrien et al. (2025), doi:10.5194/hess-29-1135-2025.
+            JCM phase diagnosis uses a sigmoid with the same midpoint and
+            midpoint slope, so these are not hard rain/snow cutoffs.
     """
 
     pytree_children = (
@@ -95,6 +103,8 @@ class PhysicalConstants(_PyTreeNodeMixin):
         "air_temperature_reference_height",
         "freshwater_density",
         "surface_salinity_reference",
+        "precipitation_snow_temperature",
+        "precipitation_rain_temperature",
     )
 
     earth_radius: PhysicalValue = 6.371e6
@@ -124,6 +134,8 @@ class PhysicalConstants(_PyTreeNodeMixin):
     air_temperature_reference_height: PhysicalValue = 2.0
     freshwater_density: PhysicalValue = 1000.0
     surface_salinity_reference: PhysicalValue = 34.7
+    precipitation_snow_temperature: PhysicalValue = 272.77
+    precipitation_rain_temperature: PhysicalValue = 278.15
 
     def __post_init__(self) -> None:
         """Defensively normalize physical leaves while retaining JAX tracers."""

@@ -330,6 +330,9 @@ def step_jax_gcm_runtime(
         jcm_state.dynamics.specific_humidity,
         large_scale_precipitation=condensation.precls,
         convective_precipitation=convection.precnv,
+        temperature_2m=surface_flux.t0,
+        snow_temperature=constants.precipitation_snow_temperature,
+        rain_temperature=constants.precipitation_rain_temperature,
         dtype=dtype,
     )
 

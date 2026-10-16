@@ -11,9 +11,14 @@ versioning; pre-releases may still refine new contracts.
   Veros through zero-seeded `rain_rate` and `snow_rate` exchange fields.
 - Compute virtual salt flux in VerCOR from precipitation minus bulk evaporation,
   with traced freshwater density and fixed reference salinity.
+- Diagnose JCM rain and water-equivalent snow from native-grid SPEEDY ``t0``
+  before remapping, using a sigmoid matched to the calibrated LT midpoint and
+  slope, with traced phase-temperature thresholds.
 
 ### Fixed
 
+- Distinguish JCM bottom-level air variables from near-surface temperature and
+  surface radiation in local adapter names, preserving bulk-flux field meanings.
 - Apply the VerCOR global forcing callback in both Veros execution lanes,
   preserve cyclic salt-flux halos, and report unambiguous salinity-flux units.
 - Make global salinity restoring an optional additive term controlled by

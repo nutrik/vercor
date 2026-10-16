@@ -541,6 +541,9 @@ def _map_uniform_jcm_column(
             jnp.full_like(temperature_profile, 10.0),
             large_scale_precipitation=jnp.zeros((1, 1)),
             convective_precipitation=jnp.zeros((1, 1)),
+            temperature_2m=jnp.full((1, 1), 275.46),
+            snow_temperature=272.77,
+            rain_temperature=278.15,
             dtype=DTypePolicy(),
         ),
     )
@@ -581,6 +584,9 @@ def test_jcm_precipitation_sums_both_diagnostics_and_converts_grams_before_excha
             jnp.full((2, 3, 2), 10.0),
             large_scale_precipitation=precls,
             convective_precipitation=jnp.asarray([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),
+            temperature_2m=jnp.full((3, 2), 275.46),
+            snow_temperature=272.77,
+            rain_temperature=278.15,
             dtype=DTypePolicy(),
         )
         assert fields["snow_rate"].shape == (2, 3)
@@ -589,11 +595,11 @@ def test_jcm_precipitation_sums_both_diagnostics_and_converts_grams_before_excha
     precls = jnp.asarray([[10.0, 20.0], [30.0, 40.0], [50.0, 60.0]])
     value, tangent = jax.jvp(rain_output, (precls,), (jnp.ones_like(precls),))
     assert_allclose_compact(
-        value[0], np.asarray([[0.011, 0.033, 0.055], [0.022, 0.044, 0.066]])
+        value[0], np.asarray([[0.0055, 0.0165, 0.0275], [0.011, 0.022, 0.033]])
     )
-    assert_allclose_compact(value[1], np.zeros((2, 3)))
-    assert_allclose_compact(tangent[0], np.full((2, 3), 0.001))
-    assert_allclose_compact(tangent[1], np.zeros((2, 3)))
+    assert_allclose_compact(value[1], value[0])
+    assert_allclose_compact(tangent[0], np.full((2, 3), 0.0005))
+    assert_allclose_compact(tangent[1], np.full((2, 3), 0.0005))
     assert_allclose_compact(
         jax.grad(lambda values: jnp.sum(rain_output(values)))(precls),
         np.full((3, 2), 0.001),
@@ -659,6 +665,9 @@ def test_map_jcm_output_fields_supports_jit(
             *args,
             large_scale_precipitation=jnp.zeros((2, 2)),
             convective_precipitation=jnp.zeros((2, 2)),
+            temperature_2m=jnp.full((2, 2), 275.46),
+            snow_temperature=272.77,
+            rain_temperature=278.15,
             dtype=DTypePolicy(),
         )
     )(
@@ -767,6 +776,9 @@ def test_map_jcm_output_fields_supports_jit(
             jnp.full((2, 2, 2), 20.0),
             large_scale_precipitation=jnp.zeros((2, 2)),
             convective_precipitation=jnp.zeros((2, 2)),
+            temperature_2m=jnp.full((2, 2), 275.46),
+            snow_temperature=272.77,
+            rain_temperature=278.15,
             dtype=DTypePolicy(),
         )
         return sum(
@@ -1230,6 +1242,7 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
             shf=np.full((2, 2, 2), 5.0, dtype=float),
             evap=np.full((2, 2, 2), 2.0, dtype=float),
             rlds=np.full((2, 2), 40.0, dtype=float),
+            t0=np.asarray([[270.0, 275.0], [280.0, 275.0]]),
         ),
         "_shortwave_rad": SimpleNamespace(rsns=np.full((2, 2), 30.0, dtype=float)),
         "_condensation": SimpleNamespace(precls=np.full((2, 2), 20.0)),
@@ -1324,6 +1337,10 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         dt_seconds=timedelta(days=1).total_seconds(),
         time=datetime(2000, 1, 2),
         logger=cast(Any, step_logger),
+        constants=PhysicalConstants(
+            precipitation_snow_temperature=270.0,
+            precipitation_rain_temperature=280.0,
+        ),
     )
     step_result = jax_gcm_runtime_module.step_jax_gcm_component(
         component,
@@ -1394,6 +1411,13 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         ** coupler.constants.dry_air_kappa,
     )
     assert_allclose_compact(data.get("model_level_height"), np.full((2, 2), 150.0))
+    assert_allclose_compact(
+        data.get("snow_rate"),
+        np.asarray([[0.02201992694944706, 0.0029800730505529388], [0.0125, 0.0125]]),
+    )
+    assert_allclose_compact(
+        data.get("rain_rate") + data.get("snow_rate"), np.full((2, 2), 0.025)
+    )
     assert float(step_result.payload.jcm_state.dycore_state["marker"]) == 1.0
     assert float(step_result.payload.jcm_state.physics_carry["marker"]) == 12.0
     assert component._state is step_result.payload.jcm_state

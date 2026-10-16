@@ -1,3 +1,5 @@
+"""Map native SPEEDY model-level air, surface fluxes, and diagnosed phases."""
+
 from __future__ import annotations
 
 from functools import partial
@@ -121,14 +123,28 @@ def map_jcm_output_fields(
     *,
     large_scale_precipitation: object,
     convective_precipitation: object,
+    temperature_2m: object,
+    snow_temperature: object,
+    rain_temperature: object,
     dtype: DTypePolicy,
 ) -> dict[str, jax.Array]:
     """Map native SPEEDY fields to the coupler's (latitude, longitude) grid.
 
     ``precls`` and ``precnv`` are downward-positive g/m²/s. Sum them before
-    regridding and convert once to kg/m²/s. SPEEDY has no separate snowfall
-    diagnostic, so its complete precipitation is carried as rain and snow
-    remains zero; no temperature-dependent phase split is inferred.
+    regridding and convert once to kg/m²/s. On the native (longitude,
+    latitude) grid, partition the sum using near-surface ``surface_flux.t0``
+    (``temperature_2m``, K), then transpose both phases for exchange. The
+    snow fraction is sigmoid(4 * (midpoint - T) / threshold_span), matching
+    the midpoint and midpoint slope of the calibrated linear-transition
+    model in Bedard-Therrien et al. (2025), doi:10.5194/hess-29-1135-2025,
+    Appendix C. The ordered thresholds are in K with a positive span.
+    The sigmoid retains phase tails outside that interval; it is a smooth
+    approximation, not the paper's piecewise-linear model or a new fit.
+
+    SPEEDY's t0 is a near-surface diagnostic without a specified 2 m height.
+    All exported air fields retain the bottom sigma-center meaning required
+    by the bulk fluxes and ``model_level_height``; t0 is used only for phase
+    diagnosis. Radiation and turbulent heat fluxes are surface quantities.
     """
 
     latvap_array = as_jax_real_array(latvap, dtype)
@@ -146,14 +162,24 @@ def map_jcm_output_fields(
     temperature_array = as_jax_real_array(temperature, dtype)
     specific_humidity_array = as_jax_real_array(specific_humidity, dtype)
 
-    u_velocity = as_jax_real_array(u_wind, dtype)[-1, :, :].T
-    v_velocity = as_jax_real_array(v_wind, dtype)[-1, :, :].T
-    temperature_2m = temperature_array[-1, :, :].T
-    specific_humidity_2m = specific_humidity_array[-1, :, :].T / 1000.0
-    rain_rate = (
+    u_velocity_bottom = as_jax_real_array(u_wind, dtype)[-1, :, :].T
+    v_velocity_bottom = as_jax_real_array(v_wind, dtype)[-1, :, :].T
+    temperature_bottom = temperature_array[-1, :, :].T
+    specific_humidity_bottom = specific_humidity_array[-1, :, :].T / 1000.0
+    temperature_2m = as_jax_real_array(temperature_2m, dtype)
+    snow_temperature_array = as_jax_real_array(snow_temperature, dtype)
+    rain_temperature_array = as_jax_real_array(rain_temperature, dtype)
+    total_precipitation = (
         as_jax_real_array(large_scale_precipitation, dtype)
         + as_jax_real_array(convective_precipitation, dtype)
-    ).T / 1000.0
+    ) / 1000.0
+    threshold_span = rain_temperature_array - snow_temperature_array
+    midpoint = 0.5 * (rain_temperature_array + snow_temperature_array)
+    # A logistic has midpoint derivative -k/4; LT has derivative -1/span.
+    snow_fraction = jax.nn.sigmoid(4.0 * (midpoint - temperature_2m) / threshold_span)
+    snow_precipitation = total_precipitation * snow_fraction
+    rain_rate = (total_precipitation - snow_precipitation).T
+    snow_rate = snow_precipitation.T
 
     sensible_heat_flux = -jnp.sum(
         as_jax_real_array(surface_sensible_heat_flux, dtype), axis=2
@@ -162,10 +188,10 @@ def map_jcm_output_fields(
         as_jax_real_array(surface_evaporation, dtype) / 1e3 * latvap_array,
         axis=2,
     ).T
-    net_shortwave_radiation_flux_2m = as_jax_real_array(
+    net_shortwave_radiation_flux_surface = as_jax_real_array(
         net_shortwave_radiation_flux, dtype
     ).T
-    downward_longwave_radiation_flux_2m = as_jax_real_array(
+    downward_longwave_radiation_flux_surface = as_jax_real_array(
         downward_longwave_radiation_flux, dtype
     ).T
 
@@ -176,34 +202,35 @@ def map_jcm_output_fields(
         normalized_surface_pressure_array,
     )
 
-    density = mwdair_array / rgas_array * pressure[-1, :, :] / temperature_2m
-    potential_temperature = (
-        temperature_2m
-        * (potential_temperature_reference_pressure_array / pressure[-1, :, :])
+    pressure_bottom = pressure[-1, :, :]
+    density_bottom = mwdair_array / rgas_array * pressure_bottom / temperature_bottom
+    potential_temperature_bottom = (
+        temperature_bottom
+        * (potential_temperature_reference_pressure_array / pressure_bottom)
         ** cappa_array
     )
 
     model_level_height = _compute_surface_nearest_sigma_level_altitude(
-        temperature_2m,
+        temperature_bottom,
         sigma_levels_array[-1],
-        specific_humidity_2m,
+        specific_humidity_bottom,
     )
 
     return {
-        "u_velocity": u_velocity,
-        "v_velocity": v_velocity,
-        "temperature": temperature_2m,
-        "specific_humidity": specific_humidity_2m,
+        "u_velocity": u_velocity_bottom,
+        "v_velocity": v_velocity_bottom,
+        "temperature": temperature_bottom,
+        "specific_humidity": specific_humidity_bottom,
         "sensible_heat_flux": sensible_heat_flux,
         "latent_heat_flux": latent_heat_flux,
-        "net_shortwave_radiation_flux": net_shortwave_radiation_flux_2m,
-        "downward_longwave_radiation_flux": downward_longwave_radiation_flux_2m,
+        "net_shortwave_radiation_flux": net_shortwave_radiation_flux_surface,
+        "downward_longwave_radiation_flux": downward_longwave_radiation_flux_surface,
         "pressure": pressure,
-        "density": density,
-        "potential_temperature": potential_temperature,
+        "density": density_bottom,
+        "potential_temperature": potential_temperature_bottom,
         "model_level_height": model_level_height,
         "rain_rate": rain_rate,
-        "snow_rate": jnp.zeros_like(rain_rate),
+        "snow_rate": snow_rate,
     }
 
 

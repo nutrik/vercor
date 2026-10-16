@@ -55,6 +55,8 @@ EXPECTED_CONSTANTS = {
     "air_temperature_reference_height": 2.0,
     "freshwater_density": 1000.0,
     "surface_salinity_reference": 34.7,
+    "precipitation_snow_temperature": 272.77,
+    "precipitation_rain_temperature": 278.15,
 }
 
 
