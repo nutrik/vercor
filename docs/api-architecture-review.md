@@ -245,6 +245,7 @@ vercor.setups._data.era5_land
 vercor.setups._data.era5_ocean
 vercor.setups._data.erainterim_ocean
 vercor.setups._data.jcm_land
+vercor.setups._data.veros_ocean
 vercor.setups._external
 vercor.setups._external._camulator_wind_filtering
 vercor.setups._external._jax_gcm_pytree
@@ -268,6 +269,7 @@ vercor.setups._external.jax_gcm_output
 vercor.setups._external.jax_gcm_runtime
 vercor.setups._external.jax_gcm_state
 vercor.setups._external.jax_gcm_tools
+vercor.setups._external.veros_data
 vercor.setups._external.veros_fluxes
 vercor.setups._external.veros_gcm
 vercor.setups._external.veros_gcm_state

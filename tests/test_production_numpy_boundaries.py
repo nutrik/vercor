@@ -12,6 +12,7 @@ ALLOWED_NUMPY_BOUNDARIES = {
     "vercor/forcing_data.py",
     "vercor/_host_arrays.py",
     "vercor/setups/_external/camulator_output.py",
+    "vercor/setups/_external/veros_data.py",
     "vercor/types.py",
 }
 
