@@ -134,7 +134,7 @@ def test_native_ci_installs_and_verifies_pinned_veris() -> None:
     quality = workflow["jobs"]["quality"]
     commands = "\n".join(step.get("run", "") for step in quality["steps"])
     assert ".[dev,jcm,veros,veris]" in commands
-    assert quality["env"]["VERIS_COMMIT"] == "ee9614eb51726509c2b7f037a2a20b25c8d117e5"
+    assert quality["env"]["VERIS_COMMIT"] == "4551fc86181c660ceb0010160ec7f569d97e52c6"
     assert 'distribution("veris")' in commands and "VERIS_COMMIT" in commands
     assert "not veros_autodiff" in commands
     assert (

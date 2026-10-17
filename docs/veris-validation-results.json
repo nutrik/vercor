@@ -1,0 +1,1803 @@
+{
+  "scope": "Numerical validation at explicitly recorded parameter/precision settings; no observed climate skill claim.",
+  "final_native_pin": "4551fc86181c660ceb0010160ec7f569d97e52c6",
+  "historical_extended_run_native_pin": "ee9614eb51726509c2b7f037a2a20b25c8d117e5",
+  "provenance_note": "Old trajectories retain their actual ee9614e provenance. Corrective commits change host scheduled-output validation, nonzero-angle terms and an unused free-drift branch. The validated 30-day sweep and installed corrections use final 4551fc8.",
+  "vercor_base_commit": "72a05cdabdaa915ce23150b148de7d5f7021ea01",
+  "vercor_worktree_dirty": true,
+  "tested_source_sha256": {
+    "benchmarks/validate_veris.py": "65219c8a61184a8be6827fbc00fdb7acc497107c688cba213b070e4ad568bf9d",
+    "vercor/__init__.py": "647216ade1586fd9d4c2489feed4cb748e92be44e13835d90ce7d3a8524dc94e",
+    "vercor/_field_names.py": "02a698aa124ab2cd443088b3351c7ddbcb24aa76599c61750dd525efe7c6cfdb",
+    "vercor/_host_arrays.py": "88c027c05da9932d9b36ed5f66e20d17e8fe5a34ec218185cfd03b6b86fb7c50",
+    "vercor/_interpolators/__init__.py": "1fcc5b838ddb6582ab04a0b7bf1b516a7bac0043d15c3a48b20da1e169d39356",
+    "vercor/_interpolators/_bilinear_extrapolation.py": "f1445c98045c81e2d7085ba2cee8995e6c5f8af3c84d1965dd851bb0520ebc9b",
+    "vercor/_interpolators/_bilinear_geometry.py": "199a298641a50b6c3140265cc103a381da7ba9130574cc8b9299674ac13e2a46",
+    "vercor/_interpolators/_bilinear_weights.py": "9821c3956f905aa98feaf700c45745ea343610bf7fabab6730ac95fb5a641224",
+    "vercor/_interpolators/bilinear_rectilinear.py": "124a4546f3010f2c812b930623749d86c6021a0fbcfecac8647f5a27bf027332",
+    "vercor/_interpolators/conservative_remap_rectilinear.py": "54961db8453762f1beb8e5b9458acddd728631fafdbf8cd37555c456d36cabed",
+    "vercor/_logging/__init__.py": "f00e69ac50a677daaa8642f2bdf1d8897e64d8c5182638879faa8cbc408a015c",
+    "vercor/_logging/callback.py": "e84f09e2074879df67e967f6a07ddf3eb37eb738aa44594088e726c4d54979ed",
+    "vercor/_logging/config.py": "679b49647f0242bccd24d4264fc59ab31065a946138281506ca4679583a546e7",
+    "vercor/_logging/host.py": "8996a4188647e02c2a2775ee09d8da4f11b83cf3afe066322a69bd2efa6ddf65",
+    "vercor/_logging/protocols.py": "0a11e6b231062c77a08f309114e1c80880ebe28353c2dcf205d78c03bfdc2a8f",
+    "vercor/_numerical_safety.py": "67a31389a270e6d4d0e815c48946539d2745b0c35e07d9206d8e204521554d40",
+    "vercor/_pytree.py": "1167427194b44ff3408bc405502d46dfda94f0516ea64b1b477d9923bcc020bd",
+    "vercor/_regridders/__init__.py": "afa3372d908375793ed7d1431b6d8cb873d70fbe2f8043800ba5d187594634b0",
+    "vercor/_regridders/base.py": "7e09fb5d077c6f1169e33776a7bb75fa82b985bc26ee04719706952d1aebc58e",
+    "vercor/_regridders/bilinear.py": "32f6a87d53eb4a8c61c1ea434cd09b9edacd4d28ba50218a668de074f2165c8e",
+    "vercor/_regridders/conservative.py": "135cc31a888ea2a8f8bf14b4801659e42aad9eec56f80d751314a4d8ccae420c",
+    "vercor/_run_order.py": "32e24f594b77b742de93582d08338893871870a63f2ee9f92ae0aa28fa34f489",
+    "vercor/_runtime/__init__.py": "2deb94e83779e6f48d83784de02ba9fae8bfef460608fbc5efe1efef53bc457c",
+    "vercor/_runtime/backends.py": "a59724edbcbf2f9ae7835105837cbe6f5c300574743fa76cd3b8e215bc2bf28c",
+    "vercor/_runtime/component_masks.py": "4d5ae57d1d375deaf85b3b59c8cc49819868acb57024c1e77b61cb167552aee8",
+    "vercor/_runtime/component_state.py": "ba02b6136680cc37aede997d5348899ff9f25e6f91916ad697819c657ec9b2b1",
+    "vercor/_runtime/contracts.py": "2887ca7c36fad45e8058b9ff078871c31b2a9c461f51a00502cc1ec473b68da7",
+    "vercor/_runtime/coupler_state.py": "3beda5bfe90dbac14d1cf184183d3b6f3d8b0c3a13f8d5890ba5d90f25d93c75",
+    "vercor/_runtime/dispatch_context.py": "c4d2843568abf6345b71aab950111aabb8eb30488d62033c8528b4250396ce77",
+    "vercor/_runtime/driver.py": "0872b7a0afc753d5c0e226d3726516eaf9d52a026d354694b949e6525be0b3de",
+    "vercor/_runtime/exchange_dispatch.py": "25f268bba0b579a27a6438224b9a8b093abc9e5035739096d2eb490c0390e7b6",
+    "vercor/_runtime/exchange_masks.py": "3f667231896f5ab1a55ad3305c878800164ea574ce83ab70eced267fedd770c9",
+    "vercor/_runtime/exchange_topology.py": "e8d1c44608e945bfd0234f180fff6999a1f4b6892d615cd573caf7afebb73d5d",
+    "vercor/_runtime/execution.py": "08cd2f49ffc83b69b892adb10bf4b4dab09704897aab34dd5421aec223600c42",
+    "vercor/_runtime/facade.py": "33b282e006306eea70de9d6f35bee437f6d8ce94dad6e1bfdd0ee9b07e16b331",
+    "vercor/_runtime/field_transfer.py": "9698280f883fe81716b73e7883427fbbea2780b1cd907efd0cc6f19f4eb4946f",
+    "vercor/_runtime/initialization.py": "9cf9f72380ebec3b711b061001e09f3a86fc6b8a10f87c673dee4cd091768e91",
+    "vercor/_runtime/interrupts.py": "ace15a864dbf151f28b9a002b96b99157a98d99abce9018d54f3ac25cebdb50c",
+    "vercor/_runtime/preparation.py": "86720f537b5a26095ccc0d18da550cbee407115fb2178f1327bce03278080320",
+    "vercor/_runtime/prepared.py": "3f67cb47594f5e1e7f1480ec5c681f0589a4645428bbe6a0da59107dce1202b2",
+    "vercor/_runtime/progress.py": "7e3caf2a31dee9365c9e0b541e37518b91ce039f20800d40abd49ba99f21bdf0",
+    "vercor/_runtime/run_context.py": "900c98b61f61d00c8f7a81edc1c6e8d7e83b958263cb670507d12b042661ad33",
+    "vercor/_runtime/state.py": "f63aa6cef0ad958bfc2d607296bd2bc0214afc190343f674a32368608c1e5465",
+    "vercor/_runtime/state_validation.py": "c255afcc548fc94ad86f7ba10cbef10b3cb921e008e2a0c888873f0f06570bb6",
+    "vercor/_runtime/stores.py": "bf2074c834c0a900600ece79cd22a7880a77175bc6565ce0864e34c4cdb7396d",
+    "vercor/_runtime/surface_masks.py": "0515fba3e10b9e5352146c40a09e00824eb20a6afad55908b2634ef8379f1eef",
+    "vercor/_runtime/time.py": "988d27013a048dc90b07cb994cb2df525bcb836ff835d405e3847ea30a3b3c60",
+    "vercor/_runtime/topology.py": "f941315f9d3ae4fd2f5632318b89f91c98a60f6916aa9fa4cd44a58efd0077c7",
+    "vercor/_runtime/topology_policy.py": "fe46051746208c212b9c9b4e40b9b2e976d4b55913ee20c1232d675561a85a65",
+    "vercor/_runtime/topology_state.py": "31526aa3d1e41249005eedbc8616a531cfc93cc9da08f187d9e20f5b7c2ecfc9",
+    "vercor/_runtime/validation.py": "930389e45bfc4a78b55f73ac0e8e9fa27f6a752e9a72b973db974d56322f6dfc",
+    "vercor/_setup_runner.py": "c0fd21cee88048b216c85295c66ebf7db6a7f806f0d3914b7dec446dcb1d3cc1",
+    "vercor/assets.py": "36ad0c89503c577d10d867dfcff5b83e1a82920642c8b84bd49bcc46742c3724",
+    "vercor/calendar.py": "9a5dc377e1999425df6d7d09cc433a2f98fe0a53b5f1853d45e53d120b4e9cd3",
+    "vercor/cli.py": "e6bb97d00539776715758ea69270af749776a2d7b296bae743fcef2e86ada9aa",
+    "vercor/clock.py": "7a19c1f156f738b0f77ce29eac9f116b48fcb0626d8dfa46619cd85bbee5ce15",
+    "vercor/components/__init__.py": "6e45a67f40680807d2a0fcc5ffaf05d3e7744f14ce604b8badfc805f93354fa5",
+    "vercor/components/_adapter.py": "7ca83c3869d528ca5b850c02500f0e69d1677abfb116e68cb221d6dc137e14a6",
+    "vercor/components/_callable_wrappers.py": "4a3c4df3380890b2a79945a1c7aad052d253a378617340d19ea168d4f2c8d1eb",
+    "vercor/components/_contracts.py": "91e9c6a5188d40ec6e85292b1c5fe840a7b18d5fd18efe08dde0cddbd623e30b",
+    "vercor/components/_protocol.py": "219227e101a8b23f9284e34940b0367ab9e2e1ab5e8156fddb4daeac95cc1266",
+    "vercor/components/_runtime_fields.py": "78cb76aeff769463cf5e85fed54024fd08fc1582151f1b5db78cd54438bda1f0",
+    "vercor/components/base.py": "3960cf776398ec6a7499c33d6769a900a6adb8ec03ca180ad596015bd66e5d90",
+    "vercor/components/contexts.py": "b888819b64c31f13d8f2a2dff5cfbf18ec6322f6c3cb147647d2bde2bfd9b862",
+    "vercor/components/contracts.py": "bea551df731628209dc91bce4d2a59164f769449e76fa47ccca3395d7afc083c",
+    "vercor/components/data.py": "6e3760d1af13a238842048241900b1bf31b6658495cb4ca93f8e7d849d89a086",
+    "vercor/components/runtime_execution.py": "caf22fbf06f1254c9f702dcc83f766ef872a47c7246ce60f7ba862d918e056fc",
+    "vercor/components/setup_validation.py": "44e6a293af8b6bc07cc04654c07a32db180a6a99d4f4e9f203cffa3d42c9dfb3",
+    "vercor/coupler.py": "84202d7999de51c547236e05762d90dd7f573c5e3809b9713de12c999731d5c3",
+    "vercor/diagnostics/__init__.py": "9307007cbb1e82cae2d3b26e312193a594ffc476e667b232df9db157bc62173c",
+    "vercor/diagnostics/fields.py": "f36d0725883640f236680c30e33b676ef5c887a3cfa24c3ac864ed6198ce5725",
+    "vercor/diagnostics/plotting.py": "aeb23a3d984ee938c28868788db46f5fdaea5034f50f31a71a5ff62f69e2ef1f",
+    "vercor/diagnostics/tables.py": "76b45bca095249b7ea2950ce7ffe5bfd58ed2a2a47ab5914fe2b6f2e3d9a94dd",
+    "vercor/dtypes.py": "fe539b79dda7aba84d95f86721c2e69fb1ecb07cd8b94f53eef085bb43fcdd94",
+    "vercor/exceptions.py": "567dd3245c59349424e3f3a8a47b41b9f18913bd1f34d10b967181cb659ada6e",
+    "vercor/exchanges.py": "bc2a86ae2d97bd8e3b4e9893ff2898182bb4210c9dc6be81e9c97eb06c0ac64b",
+    "vercor/field_layout.py": "2f51d73cce26e60074296fb055b10b0ae1b1dd06265c2ab7d98a658f89fe3c36",
+    "vercor/fields.py": "0aba0a378f4004fbaaf4aa89ac3849cb76076681640a00a45da9a6d985c28d12",
+    "vercor/fluxes/__init__.py": "566a3ac96469b9e870d5d0ed65826e34b275ad28fd96889ab6bf2b056c67a57a",
+    "vercor/fluxes/bulk_formula_cesm.py": "3c709d35784d4c73e939571de6dc3674538ccd3de4ac1c5d7280ea4996a8d7ba",
+    "vercor/fluxes/utilities.py": "97864ec05dc5feed3d58efea24187d02f16624cbde733729818abfc5fa093326",
+    "vercor/fluxes/vertical_coordinates.py": "84ba15a7ad6207c519a133577904edd06d9b439af0754c926f685e94c58ce12f",
+    "vercor/forcing_data.py": "fca57e78e874eae5bde39e482a10aef53a46319762106c18db23f25f2ee41826",
+    "vercor/forcing_index.py": "6097bfd02bc11cf7a37658b2ce9ff2cd06f3a7dbcca41549b3ce805de9f64e88",
+    "vercor/grid_geometry.py": "094b24dd4c2b46fe8063facd37afa6ac649c5a83dc30080de9775302459d00a1",
+    "vercor/grid_masks.py": "a33da260b4df39ecf14a02c0a3149179eddc17c3fcf54a8f8a0353292150b8e9",
+    "vercor/grids.py": "1c04db891080fe378094e2b26eec7e60d1c34b6bdf13079b26e881dc6835bb46",
+    "vercor/jax_logging.py": "c0fc36a0d9687816c36ec1382309af7426be6b1d5d6c09eb79a1c2595f43961d",
+    "vercor/output/__init__.py": "cd0734abc02c31d772f315d9ba3433b84f0cbe37a0b9e7f7ed5771ff321a0a8f",
+    "vercor/output/_dataset.py": "8bc6161d68bd9704fbe394fc6702cb7f7338bca44d53b933295d4215ae85cc1d",
+    "vercor/output/_netcdf.py": "81b23aff67ca459040f1fef11cff712d0577b660a7c2a0421e89612bc36e7f1a",
+    "vercor/output/_period.py": "e04697b47f4a2ed0076de85c36631384062c6387e3ccf266243a8905ce06d159",
+    "vercor/output/_runtime.py": "3e7ff1431f45172cc618dd43d00bdca967e41eda7420546744a51ea0058abcca",
+    "vercor/output/_session.py": "12955638ca6bc46a3c55e1d2040e86b86dbbee1c55dba8598e983f8025a36fe2",
+    "vercor/physics.py": "ae166b40a26e3e5058a6bd1342848f65f10b70bcd16ad569b1ab24b10b4de88d",
+    "vercor/recipes.py": "2959ca2c358472825a53c1960cd66576bdd2d896dacb59f654a31f74f2480c85",
+    "vercor/regridding.py": "2ef79dd42937bcff991d1b60c23655deb138e503ffd78009aff85299cb344041",
+    "vercor/runtime/__init__.py": "cfeb0525c6517904f967cf350b334106c8a767db861560fc0420fcc0ac48ea8c",
+    "vercor/setups/__init__.py": "3f00cf317d65c33564d6a40050ed9b9107fad7b252645f613f6d25ffa49c4cf0",
+    "vercor/setups/_data/__init__.py": "43c2040f85ebd89de7c15f40b5f9ebe73792e13ec97a51f6d939ba92882b71e2",
+    "vercor/setups/_data/_component_helpers.py": "45aa5e6d3499f8ca05cc443a330874073d4c7c35cb1fd31a76970a079c2a61d1",
+    "vercor/setups/_data/_field_helpers.py": "594881cb9294c7a95576e3f16597c0fbf732525e769bbcb317661fd64e82c829",
+    "vercor/setups/_data/assets.py": "013c603436ff5d6e87da37ae71ec9089df304b0e59d0be548ac8b38c5c90fcb8",
+    "vercor/setups/_data/era5_atmosphere.py": "2cd94518175e09de794cc38663c93ffbca508b3ce126e60dc79121d2bedd82dd",
+    "vercor/setups/_data/era5_land.py": "be030a5ad1dd608ae4398fcd20efdd64692911fc919ce748a9bc37792b63cb16",
+    "vercor/setups/_data/era5_ocean.py": "1ef0906b9e5c7ace131ffff925d66c6fa4a2b74c49b5cd53e4f9dae4860db2a4",
+    "vercor/setups/_data/erainterim_ocean.py": "f592e090b7e5a00a0968222e7c793e927ceb898ffdbdf82ee7ca47c604e32c8c",
+    "vercor/setups/_data/jcm_land.py": "9aac306ed1a4e3d1847fb7231c1f293a9a9cc3af82a69f286ef7d616422c3841",
+    "vercor/setups/_data/veros_ocean.py": "364d244da7aa1d4a4d71065a5794143431c6b11b7bb8bfdb1a88d280ef014e37",
+    "vercor/setups/_external/__init__.py": "5e66907071a4bd96aa21cc113f6f2bf65152af294734f2471da1637f06d142a4",
+    "vercor/setups/_external/_camulator_wind_filtering.py": "8ceb4f8403a975eddfb306e0bbf6612174972aac9003aec12cad4fd67ee57738",
+    "vercor/setups/_external/_jax_gcm_pytree.py": "6754bf76350297b91a81be2cf9fffeb3d8b272437510c72000c89a45873439ca",
+    "vercor/setups/_external/camulator.py": "01907e7daf0f5de71f357388062093704ac164e84b16727f7d2b4c7481744154",
+    "vercor/setups/_external/camulator_contracts.py": "a8b1dd91db27598cbdf8c4db75334314434f2d08236dbe111616e60b0842acee",
+    "vercor/setups/_external/camulator_fields.py": "599509816abef21d1966701a0eb64ab8a3899ceaea565a5681c27e989b38127b",
+    "vercor/setups/_external/camulator_forcing.py": "586153bb08864043a367dea08fccc6983f27cdea5600c407e0d204f83bfdaba9",
+    "vercor/setups/_external/camulator_gcm_state.py": "09a9c7b2361a28e00c42072d2040dbe7778cd89c26e097ea5469b0467901b566",
+    "vercor/setups/_external/camulator_imports.py": "a51a4bf56878d3707b1f3b72b0338c91ae72a92c9a6338e4f4ecdf038a75ef11",
+    "vercor/setups/_external/camulator_init.py": "2a059308a9a59c26375357f93184a2ec38231c8b164e1c0ae20b82cb89142c1b",
+    "vercor/setups/_external/camulator_land.py": "f77e2d989ee2d2188e3c5e8d9f5e387c1a9bae78f3d81d6f3d9424ecb189de9c",
+    "vercor/setups/_external/camulator_output.py": "9d156d7fe5e3758c4ffbfdb3300948544348983db0a317a4c36a53be646f23cb",
+    "vercor/setups/_external/camulator_runtime.py": "38350a05d3e6b3d9c7c0b8adb049cebaf585a078639e70b4c485ed90338e20af",
+    "vercor/setups/_external/camulator_runtime_settings.py": "70d521ec0fd42e44404a5bcc6c4cd1346a04d5e3803870c5d33f56228d825565",
+    "vercor/setups/_external/camulator_stepper.py": "f515d58cfd4dac63539842b6cd69306df255b5c516fbf18c1376ffcef1c014ee",
+    "vercor/setups/_external/camulator_tensors.py": "ee4704a00965f2f9b6093d5b56b1dd549efecf5aad6c5d1c763dc63f043fe3c9",
+    "vercor/setups/_external/camulator_wind_filter.py": "0f9f575ac7249f33f2c6f89d3ce0ecd6cf2b849803370df6bd6fd956c7a809eb",
+    "vercor/setups/_external/jax_gcm.py": "6f5bea754b57af7cff5ac61d9e601b917344d7095f044179b473f0a04de5309c",
+    "vercor/setups/_external/jax_gcm_fields.py": "655936c5dbed60e413d14a02096222588704acc70960e2fdd8e2ca66857a16eb",
+    "vercor/setups/_external/jax_gcm_output.py": "3b07b2a5967f7f151c69d7d00cc6ac9bf07eb5831f1eebdf76b1ee2f5168303b",
+    "vercor/setups/_external/jax_gcm_runtime.py": "5cc8dabd36227b1b3f583bfde1fd05fbd1b489e2684cb346f19c7b4ea7fa1d54",
+    "vercor/setups/_external/jax_gcm_state.py": "4156b398a0936179aa393ae70f84c880784e60b45567549718f75bd8f8edc9ee",
+    "vercor/setups/_external/jax_gcm_tools.py": "ce95d01cb66fd155059d4168762d1437bb081b37483f397b735b3ee40c534f18",
+    "vercor/setups/_external/veris.py": "804d89dfc0ece93e2c286e171c1276c88b56f3386456df486d77e729c774e5e6",
+    "vercor/setups/_external/veris_fluxes.py": "bc1c40ad7bd8210cfc8c9acac5ddd505719e9a3fe19205fe1225406551717ce6",
+    "vercor/setups/_external/veris_forcing.py": "9a73ea504a2f5308afa30336589f33c21a47d39192da5f5032699ccc1b0d3d34",
+    "vercor/setups/_external/veris_output.py": "11e7f56a11682271b37e9f7ee21c951eb584be69ae8070689e7f8e38fd767dc6",
+    "vercor/setups/_external/veris_parameters.py": "c6c87c6a7ccea35680a5114b5997f9dfb5477b92ca9954eea1a88e6e9a452dda",
+    "vercor/setups/_external/veris_runtime.py": "10cb625e00e6ca49a48eb06f433846927017f9eb2169b189415f0537e5d0b69a",
+    "vercor/setups/_external/veros_data.py": "83c7978f546fdefa6b468d06c9ee9e06af7a05cba922bc1600fec4160097a6aa",
+    "vercor/setups/_external/veros_fluxes.py": "5ca848f5c5de4159d1ca7ed600939f21a356d11b260fc544ffbcecbdda9db4c4",
+    "vercor/setups/_external/veros_gcm.py": "293f158fc3147c86239a68a92906a97619d8ad1c38fae4c3343e1b0d3f8687a5",
+    "vercor/setups/_external/veros_gcm_state.py": "038b86daa6eb234251fdffcb554a9854da9722662d7409014bd3f7dad9a5fbe9",
+    "vercor/setups/_external/veros_output.py": "3bd2c98ea6a7864e9b63fa161873bf62e3698e7791a1bce51fb2044de3ed7298",
+    "vercor/setups/_external/veros_runtime.py": "4cbbe247769038d9c38a8f6fca1c69aa747f9a12964b663d75d0036ad2396cab",
+    "vercor/setups/_external/veros_runtime_settings.py": "f4adbff52c5ab195ca833b14cd0b3288f485352c06353c931f3c79e80d31fb91",
+    "vercor/setups/_external/veros_setup.py": "ccf4cdf4d0360acef0136f25c557adf8b0ac8dac30653cb5eb5340d28cda7ff2",
+    "vercor/setups/_external/veros_setup_jax.py": "9f3b64dde6388771ecdbc72784028cd3a04d5cb0798e469fa63f51bda18b7971",
+    "vercor/setups/_external/veros_state.py": "cd28bd0f9e3ede4545e5c9326f77cbbbb12ed1d8d63e6f1515b6a310e1b99f06",
+    "vercor/setups/_jcm.py": "2dbcc803fcec4a21e6b6924c3bb4b4fc4558e578c9cca07f89048cf67d51903c",
+    "vercor/setups/_lazy_imports.py": "861dbddbd13331a476380ed018c9a2c5eda8867c346bb80c3848ebb287d6f014",
+    "vercor/setups/_output.py": "6975278e874fda31fb3c5e6dd41a882080a8ee5919242a3c0ae78e7934f1c411",
+    "vercor/setups/_slab/__init__.py": "008326af1f4f632c1dcae5490960716fa7ceabc625fa25a24f178030d5478aa0",
+    "vercor/setups/_slab/atmosphere.py": "8bf58acbf60647b2705ba9b5e4d8b47d90215c1716df9705fbeb0204051423c7",
+    "vercor/setups/_slab/land.py": "034b36f09eb9261627369268f371e5e91451e73c54d82c510c93df594600122e",
+    "vercor/setups/_slab/ocean.py": "ff83606dea9d9eeb512cc8564424a017ea2727dcafd5fb619d4ab397413cee78",
+    "vercor/setups/_slab/seaice.py": "8172e9e773aecad8cd1f0c34e1f82819f5f10610fa1938c11a5cb6382c66aefa",
+    "vercor/setups/_surface_fluxes.py": "348038859b1599d0752e1c776e719c7919ff7658db096dfef4102dd13f5c2487",
+    "vercor/setups/_time_helpers.py": "0cfa70c2eb48c1d20e00934bba7c4537c2855a5ad7b2451e0242a8bc896e14e9",
+    "vercor/setups/_veris.py": "f26e495f5f2cbd08029762b86bca436b649dd8512365f2d8b887ab0e0df59b25",
+    "vercor/setups/config.py": "4b82cbffe2179bf5099bcbbed5587256f49636b4664124b1a65f18814f441828",
+    "vercor/setups/gallery/__init__.py": "69655e0f2b4b39975c1f382937e645796885f3d0ed54e1d24c599504ecb55b67",
+    "vercor/setups/gallery/custom_component_wrapping.py": "9b3729facfc7971290a9626e7c3fad8dc5c874cc62a09725855ae4a02c9f502b",
+    "vercor/setups/gallery/profile_runtime.py": "b4c653db5bc37c58867f78cb09a6db6194914f63c73f8a6ec05a3b1a5ffbeb26",
+    "vercor/setups/gallery/run_camulator_with_veros.py": "6b56f96cfcf607727897f4add219fd71ca8a3420f04889a9ead8025b0941ea91",
+    "vercor/setups/gallery/run_data_driver.py": "b511856dda128df967b12bfbe20f3ea9550473565d4ac0e477860aaaaf95591e",
+    "vercor/setups/gallery/run_jcm_with_era5data.py": "e1d46ae96a84b9f2352083c82c65f35b07289694b6b664a3ef04ca656ce6b866",
+    "vercor/setups/gallery/run_jcm_with_slab.py": "f73e1ebbbe2acadc40ff57a1b40416d921729f81efde6042a9f1ce6788b29139",
+    "vercor/setups/gallery/run_jcm_with_veros.py": "4ce6cb3d3c982e2cc62d517d76939b4ccb0075a9339b4852486951e26c67552c",
+    "vercor/setups/gallery/run_jcm_with_verosdata.py": "ce32d1d87ce4e601a07231196a6c4746a08b9a6ca7aaea26430ce90514ddbb38",
+    "vercor/setups/gallery/run_slab_driver.py": "8286fb1ee0bc1a77de7bd3842b2ad61a1a17729ad63cb94364f1ee1ea1aaec05",
+    "vercor/setups/gallery/run_veris_calibration.py": "5cc241837c6474ae8c2600ba80e2e530b3854f9f1aef4f0ffb7f79c99b8feabd",
+    "vercor/setups/gallery/run_veris_dataveros_era5.py": "4e0559eeb292450f45fd318bad57d9fc49f9fd2f3866a5077c9daf5b13c21708",
+    "vercor/setups/gallery/run_veris_veros_era5.py": "faddeab780d62fab8c2eee69fb15b71acbdff02a7753e5e10ad36c4b0e92e0e0",
+    "vercor/setups/gallery/run_veros_with_era5data.py": "8b6f009ab7cdd360371e4f472794a15a5919ecc6a31f668b89efbac14349e8fa",
+    "vercor/state.py": "de4e7ff506097a2f8f40e4422c3bc8c853dda13ecdbaab0d93c2aae1bab3e1d3",
+    "vercor/time_selection.py": "83b76ee932d8412d512f4c7dec19c3960f4fcd4836a2b3ec93c2540ef2333c75",
+    "vercor/topology.py": "57afb7ee3fa5ddd42c56737571e2e20f137bdb6bdd1086bff43aa200a38d518b",
+    "vercor/types.py": "69d0c76777a520292499527c64d5fe630386f97afc03f8b778ec595a5d798f26"
+  },
+  "validated_configuration": {
+    "dtype": "float64",
+    "useAdaptiveEVP": true,
+    "nEVPsteps": 400,
+    "hIce_min_m": 1e-09,
+    "saltIce_ref_g_kg": 4.0,
+    "native_seconds": [
+      3600,
+      1800,
+      900
+    ]
+  },
+  "validated_30_day": {
+    "3600": {
+      "checked_native_steps": 720,
+      "expected_native_steps": 720,
+      "all_native_steps_valid": true,
+      "native_guard": "every native input/output leaf finite; hIce/hSnow>=0; Area in [0,1]; zero dry storage; physics_status==0",
+      "dtype": "float64",
+      "native_seconds": 3600.0,
+      "native_configuration": {
+        "dtype": "float64",
+        "enable_cyclic_y": false,
+        "spherical_geometry": true,
+        "deltatTherm": 3600.0,
+        "recip_deltatTherm": 0.0002777777777777778,
+        "deltatDyn": 3600.0,
+        "recip_deltatDyn": 0.0002777777777777778,
+        "nITC": 5,
+        "recip_nITC": 0.2,
+        "noSlip": true,
+        "useRelativeWind": true,
+        "secondOrderBC": false,
+        "extensiveFld": true,
+        "useRealFreshWaterFlux": false,
+        "useFreedrift": false,
+        "useEVP": true,
+        "evpAlpha": 500.0,
+        "evpBeta": 500.0,
+        "useAdaptiveEVP": true,
+        "aEVPalphaMin": 5.0,
+        "aEvpCoeff": 0.5,
+        "explicitDrag": true,
+        "nEVPsteps": 400,
+        "computeEvpResidual": false,
+        "printEvpResidual": false,
+        "geometrySurfaceTemperature": 273.0,
+        "use_coastline": false,
+        "use_sharding": false,
+        "CrMax": 1000000.0,
+        "eps2": 1e-20,
+        "surfaceTemperatureIterations": 6,
+        "aEVPmassMin": 0.0001,
+        "aEVPcStar": 4.0,
+        "lanlBulkIterations": 5,
+        "nx": 90,
+        "ny": 40
+      },
+      "physical_parameters": {
+        "hIce_min": 1e-09,
+        "saltIce_ref": 4.0,
+        "rhoFresh": 1000.0,
+        "rhoIce": 900.0,
+        "rhoSnow": 330.0,
+        "lhFusion": 334000.0
+      },
+      "coupling_seconds": 86400.0,
+      "coupling_steps": 30,
+      "elapsed_seconds": 52.820689790998586,
+      "initial_inventory": {
+        "ice_volume": 7396455147772.277,
+        "snow_volume": 0.0,
+        "mass": 6656809632995050.0,
+        "salt": 26627238531980.2,
+        "enthalpy": -2.2233744174203467e+21
+      },
+      "final_inventory": {
+        "ice_volume": 176439323377.3042,
+        "snow_volume": 6297844031.072157,
+        "mass": 160873679569827.6,
+        "salt": 635181564158.2952,
+        "enthalpy": -5.373180897632241e+19
+      },
+      "integrated_fluxes": {
+        "ocean_mass": 1.3914018912595974e+16,
+        "ocean_salt": 25992056967821.875,
+        "ocean_heat": 4.49220388886248e+22,
+        "external_mass": 7418082959170764.0,
+        "external_heat": 4.709168149706882e+22
+      },
+      "budget_residuals": {
+        "mass": 8.624395349309705e-16,
+        "actual_salt": 1.0520040808563744e-15,
+        "enthalpy": 0.0
+      },
+      "wet_area_m2": 345921121852945.9,
+      "area_sha256": "ffdf38ec143dc404f6a2a7c1d91bbbf9e7cf63f4bee4b4affdd5dd615f9960d0",
+      "boundary_extrema": {
+        "Area": [
+          0.0,
+          0.9882099929395706
+        ],
+        "hIceMean": [
+          0.0,
+          0.8715860747421401
+        ],
+        "hSnowMean": [
+          0.0,
+          0.053815783684716414
+        ]
+      },
+      "comparison_vector": {
+        "ice_volume": 176439323377.3042,
+        "snow_volume": 6297844031.072157,
+        "ocean_mass": 1.3914018912595974e+16,
+        "ocean_salt": 25992056967821.875,
+        "ocean_heat": 4.49220388886248e+22,
+        "external_mass": 7418082959170764.0,
+        "external_heat": 4.709168149706882e+22
+      },
+      "segmented_equivalence": {
+        "segments": 3,
+        "maximum_scaled_state_difference": 0.0,
+        "checked_native_steps": 720,
+        "segment_budget_residuals": [
+          {
+            "mass": 8.208923757318956e-16,
+            "actual_salt": 1.1792358652328336e-15,
+            "enthalpy": 0.0
+          },
+          {
+            "mass": 9.000955371135428e-17,
+            "actual_salt": 1.840185175837934e-16,
+            "enthalpy": 1.462295034880396e-17
+          },
+          {
+            "mass": 8.834079962647331e-17,
+            "actual_salt": 3.458567597164736e-16,
+            "enthalpy": 1.429547455322666e-16
+          }
+        ]
+      },
+      "vercor_commit": "72a05cdabdaa915ce23150b148de7d5f7021ea01",
+      "vercor_dirty": true,
+      "native_provenance": {
+        "url": "https://github.com/team-ocean/veris.git",
+        "vcs_info": {
+          "commit_id": "4551fc86181c660ceb0010160ec7f569d97e52c6",
+          "requested_revision": "4551fc86181c660ceb0010160ec7f569d97e52c6",
+          "vcs": "git"
+        }
+      },
+      "harness_sha256": "65219c8a61184a8be6827fbc00fdb7acc497107c688cba213b070e4ad568bf9d",
+      "platform": "macOS-26.7.1-arm64-arm-64bit",
+      "devices": [
+        "cpu:0"
+      ],
+      "forcing_files": {
+        "era5_model_levels": {
+          "filename": "era5_198x_ml_4x4deg_monthly_mean.nc",
+          "size_bytes": 1609698,
+          "sha256": "a8c29082e65a708668945949febf1280bbbd9cd0f6c666407fa0b502eddcab69"
+        },
+        "era5_surface": {
+          "filename": "era5_198x_sfc_4x4deg_monthly_mean.nc",
+          "size_bytes": 3428412,
+          "sha256": "ec3b3d74fdc60c78248edaa2f6950bb3274cfb3acdbb0f58e996ddc28650ef4e"
+        },
+        "era5_land_masked": {
+          "filename": "era5_lnd_skt_masked_1980.nc",
+          "size_bytes": 245232,
+          "sha256": "419e663584bc815ef97cd72d8d77f8175e4be272df4318dd0cca49e5450bb285"
+        },
+        "veros_forcing": {
+          "filename": "forcing_4deg_global_open_itf.nc",
+          "size_bytes": 843269,
+          "sha256": "b2ec1401f084056dc57ea5b27d4dd02e168d321df400842725dae40307a56d2d"
+        },
+        "veros_ecmwf": {
+          "filename": "ecmwf_4deg_monthly_nc4.nc",
+          "size_bytes": 903426,
+          "sha256": "3a7cb036d822244abdc715adbb6ef7d953649ef1ded9f1493e2896c42d277a29"
+        }
+      },
+      "initial_polar_ice": {
+        "minimum_absolute_latitude_degrees": 60,
+        "Area": 0.5,
+        "hIceMean_m": 0.25,
+        "TSurf_K": 260,
+        "saltIce_ref_g_kg": 4.0
+      },
+      "forcing": "real ERA5 monthly climatology and prescribed native Veros monthly SST/SSS; daily noleap coupling",
+      "geometry": {
+        "shape": [
+          40,
+          90
+        ],
+        "radius_m": 6370000.0,
+        "area_convention": "authoritative native stored area; no remapping quadrature substitution"
+      },
+      "limitations": "No observed climate skill claim; actual salt inventory and fixed-reference Boussinesq virtual salt are distinct."
+    },
+    "1800": {
+      "checked_native_steps": 1440,
+      "expected_native_steps": 1440,
+      "all_native_steps_valid": true,
+      "native_guard": "every native input/output leaf finite; hIce/hSnow>=0; Area in [0,1]; zero dry storage; physics_status==0",
+      "dtype": "float64",
+      "native_seconds": 1800.0,
+      "native_configuration": {
+        "dtype": "float64",
+        "enable_cyclic_y": false,
+        "spherical_geometry": true,
+        "deltatTherm": 1800.0,
+        "recip_deltatTherm": 0.0005555555555555556,
+        "deltatDyn": 1800.0,
+        "recip_deltatDyn": 0.0005555555555555556,
+        "nITC": 5,
+        "recip_nITC": 0.2,
+        "noSlip": true,
+        "useRelativeWind": true,
+        "secondOrderBC": false,
+        "extensiveFld": true,
+        "useRealFreshWaterFlux": false,
+        "useFreedrift": false,
+        "useEVP": true,
+        "evpAlpha": 500.0,
+        "evpBeta": 500.0,
+        "useAdaptiveEVP": true,
+        "aEVPalphaMin": 5.0,
+        "aEvpCoeff": 0.5,
+        "explicitDrag": true,
+        "nEVPsteps": 400,
+        "computeEvpResidual": false,
+        "printEvpResidual": false,
+        "geometrySurfaceTemperature": 273.0,
+        "use_coastline": false,
+        "use_sharding": false,
+        "CrMax": 1000000.0,
+        "eps2": 1e-20,
+        "surfaceTemperatureIterations": 6,
+        "aEVPmassMin": 0.0001,
+        "aEVPcStar": 4.0,
+        "lanlBulkIterations": 5,
+        "nx": 90,
+        "ny": 40
+      },
+      "physical_parameters": {
+        "hIce_min": 1e-09,
+        "saltIce_ref": 4.0,
+        "rhoFresh": 1000.0,
+        "rhoIce": 900.0,
+        "rhoSnow": 330.0,
+        "lhFusion": 334000.0
+      },
+      "coupling_seconds": 86400.0,
+      "coupling_steps": 30,
+      "elapsed_seconds": 102.48073279199889,
+      "initial_inventory": {
+        "ice_volume": 7396455147772.277,
+        "snow_volume": 0.0,
+        "mass": 6656809632995050.0,
+        "salt": 26627238531980.2,
+        "enthalpy": -2.2233744174203467e+21
+      },
+      "final_inventory": {
+        "ice_volume": 176415768615.92474,
+        "snow_volume": 6298379874.437788,
+        "mass": 160852657112896.75,
+        "salt": 635096767017.3291,
+        "enthalpy": -5.372478747570751e+19
+      },
+      "integrated_fluxes": {
+        "ocean_mass": 1.3913899793194222e+16,
+        "ocean_salt": 25992141764962.844,
+        "ocean_heat": 4.492287804493577e+22,
+        "external_mass": 7417942817312071.0,
+        "external_heat": 4.709252767488041e+22
+      },
+      "budget_residuals": {
+        "mass": 1.4374115307185627e-16,
+        "actual_salt": 1.052000648782975e-15,
+        "enthalpy": 2.2266292589754534e-17
+      },
+      "wet_area_m2": 345921121852945.9,
+      "area_sha256": "ffdf38ec143dc404f6a2a7c1d91bbbf9e7cf63f4bee4b4affdd5dd615f9960d0",
+      "boundary_extrema": {
+        "Area": [
+          0.0,
+          0.9881688569473972
+        ],
+        "hIceMean": [
+          0.0,
+          0.8715584035532672
+        ],
+        "hSnowMean": [
+          0.0,
+          0.05381816992762024
+        ]
+      },
+      "comparison_vector": {
+        "ice_volume": 176415768615.92474,
+        "snow_volume": 6298379874.437788,
+        "ocean_mass": 1.3913899793194222e+16,
+        "ocean_salt": 25992141764962.844,
+        "ocean_heat": 4.492287804493577e+22,
+        "external_mass": 7417942817312071.0,
+        "external_heat": 4.709252767488041e+22
+      },
+      "vercor_commit": "72a05cdabdaa915ce23150b148de7d5f7021ea01",
+      "vercor_dirty": true,
+      "native_provenance": {
+        "url": "https://github.com/team-ocean/veris.git",
+        "vcs_info": {
+          "commit_id": "4551fc86181c660ceb0010160ec7f569d97e52c6",
+          "requested_revision": "4551fc86181c660ceb0010160ec7f569d97e52c6",
+          "vcs": "git"
+        }
+      },
+      "harness_sha256": "65219c8a61184a8be6827fbc00fdb7acc497107c688cba213b070e4ad568bf9d",
+      "platform": "macOS-26.7.1-arm64-arm-64bit",
+      "devices": [
+        "cpu:0"
+      ],
+      "forcing_files": {
+        "era5_model_levels": {
+          "filename": "era5_198x_ml_4x4deg_monthly_mean.nc",
+          "size_bytes": 1609698,
+          "sha256": "a8c29082e65a708668945949febf1280bbbd9cd0f6c666407fa0b502eddcab69"
+        },
+        "era5_surface": {
+          "filename": "era5_198x_sfc_4x4deg_monthly_mean.nc",
+          "size_bytes": 3428412,
+          "sha256": "ec3b3d74fdc60c78248edaa2f6950bb3274cfb3acdbb0f58e996ddc28650ef4e"
+        },
+        "era5_land_masked": {
+          "filename": "era5_lnd_skt_masked_1980.nc",
+          "size_bytes": 245232,
+          "sha256": "419e663584bc815ef97cd72d8d77f8175e4be272df4318dd0cca49e5450bb285"
+        },
+        "veros_forcing": {
+          "filename": "forcing_4deg_global_open_itf.nc",
+          "size_bytes": 843269,
+          "sha256": "b2ec1401f084056dc57ea5b27d4dd02e168d321df400842725dae40307a56d2d"
+        },
+        "veros_ecmwf": {
+          "filename": "ecmwf_4deg_monthly_nc4.nc",
+          "size_bytes": 903426,
+          "sha256": "3a7cb036d822244abdc715adbb6ef7d953649ef1ded9f1493e2896c42d277a29"
+        }
+      },
+      "initial_polar_ice": {
+        "minimum_absolute_latitude_degrees": 60,
+        "Area": 0.5,
+        "hIceMean_m": 0.25,
+        "TSurf_K": 260,
+        "saltIce_ref_g_kg": 4.0
+      },
+      "forcing": "real ERA5 monthly climatology and prescribed native Veros monthly SST/SSS; daily noleap coupling",
+      "geometry": {
+        "shape": [
+          40,
+          90
+        ],
+        "radius_m": 6370000.0,
+        "area_convention": "authoritative native stored area; no remapping quadrature substitution"
+      },
+      "limitations": "No observed climate skill claim; actual salt inventory and fixed-reference Boussinesq virtual salt are distinct."
+    },
+    "900": {
+      "checked_native_steps": 2880,
+      "expected_native_steps": 2880,
+      "all_native_steps_valid": true,
+      "native_guard": "every native input/output leaf finite; hIce/hSnow>=0; Area in [0,1]; zero dry storage; physics_status==0",
+      "dtype": "float64",
+      "native_seconds": 900.0,
+      "native_configuration": {
+        "dtype": "float64",
+        "enable_cyclic_y": false,
+        "spherical_geometry": true,
+        "deltatTherm": 900.0,
+        "recip_deltatTherm": 0.0011111111111111111,
+        "deltatDyn": 900.0,
+        "recip_deltatDyn": 0.0011111111111111111,
+        "nITC": 5,
+        "recip_nITC": 0.2,
+        "noSlip": true,
+        "useRelativeWind": true,
+        "secondOrderBC": false,
+        "extensiveFld": true,
+        "useRealFreshWaterFlux": false,
+        "useFreedrift": false,
+        "useEVP": true,
+        "evpAlpha": 500.0,
+        "evpBeta": 500.0,
+        "useAdaptiveEVP": true,
+        "aEVPalphaMin": 5.0,
+        "aEvpCoeff": 0.5,
+        "explicitDrag": true,
+        "nEVPsteps": 400,
+        "computeEvpResidual": false,
+        "printEvpResidual": false,
+        "geometrySurfaceTemperature": 273.0,
+        "use_coastline": false,
+        "use_sharding": false,
+        "CrMax": 1000000.0,
+        "eps2": 1e-20,
+        "surfaceTemperatureIterations": 6,
+        "aEVPmassMin": 0.0001,
+        "aEVPcStar": 4.0,
+        "lanlBulkIterations": 5,
+        "nx": 90,
+        "ny": 40
+      },
+      "physical_parameters": {
+        "hIce_min": 1e-09,
+        "saltIce_ref": 4.0,
+        "rhoFresh": 1000.0,
+        "rhoIce": 900.0,
+        "rhoSnow": 330.0,
+        "lhFusion": 334000.0
+      },
+      "coupling_seconds": 86400.0,
+      "coupling_steps": 30,
+      "elapsed_seconds": 180.73754279199056,
+      "initial_inventory": {
+        "ice_volume": 7396455147772.277,
+        "snow_volume": 0.0,
+        "mass": 6656809632995050.0,
+        "salt": 26627238531980.2,
+        "enthalpy": -2.2233744174203467e+21
+      },
+      "final_inventory": {
+        "ice_volume": 176403813294.567,
+        "snow_volume": 6298653338.137738,
+        "mass": 160841987566695.75,
+        "salt": 635053727860.4412,
+        "enthalpy": -5.372122384727638e+19
+      },
+      "integrated_fluxes": {
+        "ocean_mass": 1.3913835584584862e+16,
+        "ocean_salt": 25992184804119.74,
+        "ocean_heat": 4.492323779902896e+22,
+        "external_mass": 7417867939156506.0,
+        "external_heat": 4.709289099260203e+22
+      },
+      "budget_residuals": {
+        "mass": 1.4374181639862123e-16,
+        "actual_salt": 7.514277905912819e-16,
+        "enthalpy": 1.113306040358325e-16
+      },
+      "wet_area_m2": 345921121852945.9,
+      "area_sha256": "ffdf38ec143dc404f6a2a7c1d91bbbf9e7cf63f4bee4b4affdd5dd615f9960d0",
+      "boundary_extrema": {
+        "Area": [
+          0.0,
+          0.9881480524682261
+        ],
+        "hIceMean": [
+          0.0,
+          0.8715425171890375
+        ],
+        "hSnowMean": [
+          0.0,
+          0.053819138235847185
+        ]
+      },
+      "comparison_vector": {
+        "ice_volume": 176403813294.567,
+        "snow_volume": 6298653338.137738,
+        "ocean_mass": 1.3913835584584862e+16,
+        "ocean_salt": 25992184804119.74,
+        "ocean_heat": 4.492323779902896e+22,
+        "external_mass": 7417867939156506.0,
+        "external_heat": 4.709289099260203e+22
+      },
+      "vercor_commit": "72a05cdabdaa915ce23150b148de7d5f7021ea01",
+      "vercor_dirty": true,
+      "native_provenance": {
+        "url": "https://github.com/team-ocean/veris.git",
+        "vcs_info": {
+          "commit_id": "4551fc86181c660ceb0010160ec7f569d97e52c6",
+          "requested_revision": "4551fc86181c660ceb0010160ec7f569d97e52c6",
+          "vcs": "git"
+        }
+      },
+      "harness_sha256": "65219c8a61184a8be6827fbc00fdb7acc497107c688cba213b070e4ad568bf9d",
+      "platform": "macOS-26.7.1-arm64-arm-64bit",
+      "devices": [
+        "cpu:0"
+      ],
+      "forcing_files": {
+        "era5_model_levels": {
+          "filename": "era5_198x_ml_4x4deg_monthly_mean.nc",
+          "size_bytes": 1609698,
+          "sha256": "a8c29082e65a708668945949febf1280bbbd9cd0f6c666407fa0b502eddcab69"
+        },
+        "era5_surface": {
+          "filename": "era5_198x_sfc_4x4deg_monthly_mean.nc",
+          "size_bytes": 3428412,
+          "sha256": "ec3b3d74fdc60c78248edaa2f6950bb3274cfb3acdbb0f58e996ddc28650ef4e"
+        },
+        "era5_land_masked": {
+          "filename": "era5_lnd_skt_masked_1980.nc",
+          "size_bytes": 245232,
+          "sha256": "419e663584bc815ef97cd72d8d77f8175e4be272df4318dd0cca49e5450bb285"
+        },
+        "veros_forcing": {
+          "filename": "forcing_4deg_global_open_itf.nc",
+          "size_bytes": 843269,
+          "sha256": "b2ec1401f084056dc57ea5b27d4dd02e168d321df400842725dae40307a56d2d"
+        },
+        "veros_ecmwf": {
+          "filename": "ecmwf_4deg_monthly_nc4.nc",
+          "size_bytes": 903426,
+          "sha256": "3a7cb036d822244abdc715adbb6ef7d953649ef1ded9f1493e2896c42d277a29"
+        }
+      },
+      "initial_polar_ice": {
+        "minimum_absolute_latitude_degrees": 60,
+        "Area": 0.5,
+        "hIceMean_m": 0.25,
+        "TSurf_K": 260,
+        "saltIce_ref_g_kg": 4.0
+      },
+      "forcing": "real ERA5 monthly climatology and prescribed native Veros monthly SST/SSS; daily noleap coupling",
+      "geometry": {
+        "shape": [
+          40,
+          90
+        ],
+        "radius_m": 6370000.0,
+        "area_convention": "authoritative native stored area; no remapping quadrature substitution"
+      },
+      "limitations": "No observed climate skill claim; actual salt inventory and fixed-reference Boussinesq virtual salt are distinct."
+    }
+  },
+  "validated_refinement": {
+    "resolved": true,
+    "quantities": {
+      "ice_volume": {
+        "coarse_medium": 23554761.379455566,
+        "medium_fine": 11955321.357757568,
+        "roundoff_floor": 7.221178340822634,
+        "resolved": true
+      },
+      "snow_volume": {
+        "coarse_medium": 535843.3656311035,
+        "medium_fine": 273463.6999502182,
+        "roundoff_floor": 0.25778663277032887,
+        "resolved": true
+      },
+      "ocean_mass": {
+        "coarse_medium": 119119401752.0,
+        "medium_fine": 64208609360.0,
+        "roundoff_floor": 569462.6916618461,
+        "resolved": true
+      },
+      "ocean_salt": {
+        "coarse_medium": 84797140.96875,
+        "medium_fine": 43039156.89453125,
+        "roundoff_floor": 1063.7889465082374,
+        "resolved": true
+      },
+      "ocean_heat": {
+        "coarse_medium": 8.39156310971777e+17,
+        "medium_fine": 3.597540931886121e+17,
+        "roundoff_floor": 1838585104411.5981,
+        "resolved": true
+      },
+      "external_mass": {
+        "coarse_medium": 140141858693.0,
+        "medium_fine": 74878155565.0,
+        "roundoff_floor": 303601.82169050345,
+        "resolved": true
+      },
+      "external_heat": {
+        "coarse_medium": 8.461778115876618e+17,
+        "medium_fine": 3.633177216239534e+17,
+        "roundoff_floor": 1927383068202.3723,
+        "resolved": true
+      }
+    }
+  },
+  "original_default_cleanup_refinement": {
+    "resolved": false,
+    "quantities": {
+      "ice_volume": {
+        "coarse_medium": 24258992.79397583,
+        "medium_fine": 42610975.813323975,
+        "roundoff_floor": 7.2209066578096595,
+        "resolved": false
+      },
+      "snow_volume": {
+        "coarse_medium": 480321.4968776703,
+        "medium_fine": 463592.5890226364,
+        "roundoff_floor": 0.25776522052520573,
+        "resolved": true
+      },
+      "ocean_mass": {
+        "coarse_medium": 118414700204.0,
+        "medium_fine": 36521648498.0,
+        "roundoff_floor": 569462.937571956,
+        "resolved": true
+      },
+      "ocean_salt": {
+        "coarse_medium": 87332374.05859375,
+        "medium_fine": 153399512.9296875,
+        "roundoff_floor": 1063.7945450743919,
+        "resolved": false
+      },
+      "ocean_heat": {
+        "coarse_medium": 8.378709474520596e+17,
+        "medium_fine": 3.526307217617715e+17,
+        "roundoff_floor": 1838584672586.785,
+        "resolved": true
+      },
+      "external_mass": {
+        "coarse_medium": 140089287624.0,
+        "medium_fine": 75024512287.0,
+        "roundoff_floor": 303601.82046313817,
+        "resolved": true
+      },
+      "external_heat": {
+        "coarse_medium": 8.451102596671734e+17,
+        "medium_fine": 3.6549067827000115e+17,
+        "roundoff_floor": 1927383108309.1584,
+        "resolved": true
+      }
+    }
+  },
+  "original_default_cleanup_finer_refinement": {
+    "resolved": false,
+    "quantities": {
+      "ice_volume": {
+        "coarse_medium": 42610975.813323975,
+        "medium_fine": 373245532.37020874,
+        "roundoff_floor": 14.439827607331837,
+        "resolved": false
+      },
+      "snow_volume": {
+        "coarse_medium": 463592.5890226364,
+        "medium_fine": 6340202.771176338,
+        "roundoff_floor": 0.5155304410504115,
+        "resolved": false
+      },
+      "ocean_mass": {
+        "coarse_medium": 36521648498.0,
+        "medium_fine": 299003498416.0,
+        "roundoff_floor": 1138937.6676917546,
+        "resolved": false
+      },
+      "ocean_salt": {
+        "coarse_medium": 153399512.9296875,
+        "medium_fine": 1343683916.5234375,
+        "roundoff_floor": 2127.699076755048,
+        "resolved": false
+      },
+      "ocean_heat": {
+        "coarse_medium": 3.526307217617715e+17,
+        "medium_fine": 6.351417972149453e+16,
+        "roundoff_floor": 3677174544096.465,
+        "resolved": true
+      },
+      "external_mass": {
+        "coarse_medium": 75024512287.0,
+        "medium_fine": 39009747625.0,
+        "roundoff_floor": 607192.1739844381,
+        "resolved": true
+      },
+      "external_heat": {
+        "coarse_medium": 3.6549067827000115e+17,
+        "medium_fine": 1.7641060388202086e+17,
+        "roundoff_floor": 3854780656624.178,
+        "resolved": true
+      }
+    }
+  },
+  "annual_default_numerical_configuration": {
+    "3600": {
+      "checked_native_steps": 8760,
+      "expected_native_steps": 8760,
+      "all_native_steps_valid": true,
+      "native_guard": "every native input/output leaf finite; hIce/hSnow>=0; Area in [0,1]; zero dry storage; physics_status==0",
+      "dtype": "float64",
+      "native_seconds": 3600.0,
+      "coupling_seconds": 86400.0,
+      "coupling_steps": 365,
+      "elapsed_seconds": 534.1912552500144,
+      "initial_inventory": {
+        "ice_volume": 7396455147772.277,
+        "snow_volume": 0.0,
+        "mass": 6656809632995050.0,
+        "salt": 26627238531980.2,
+        "enthalpy": -2.2233744174203467e+21
+      },
+      "final_inventory": {
+        "ice_volume": 302070542677.7056,
+        "snow_volume": 70277717644.35802,
+        "mass": 295055135232573.2,
+        "salt": 1087453953639.7402,
+        "enthalpy": -9.854841516767945e+19
+      },
+      "integrated_fluxes": {
+        "ocean_mass": 9.368279193423802e+16,
+        "ocean_salt": 25539784578340.414,
+        "ocean_heat": 3.2701790083791494e+23,
+        "external_mass": 8.732103743647557e+16,
+        "external_heat": 3.291427268401676e+23
+      },
+      "budget_residuals": {
+        "mass": 3.095552491684595e-16,
+        "actual_salt": 1.83537178460594e-15,
+        "enthalpy": 2.0707563753367514e-17
+      },
+      "wet_area_m2": 345921121852945.9,
+      "area_sha256": "ffdf38ec143dc404f6a2a7c1d91bbbf9e7cf63f4bee4b4affdd5dd615f9960d0",
+      "boundary_extrema": {
+        "Area": [
+          0.0,
+          0.9274229817865508
+        ],
+        "hIceMean": [
+          0.0,
+          0.7950847371327141
+        ],
+        "hSnowMean": [
+          0.0,
+          0.25274651446551294
+        ]
+      },
+      "comparison_vector": {
+        "ice_volume": 302070542677.7056,
+        "snow_volume": 70277717644.35802,
+        "ocean_mass": 9.368279193423802e+16,
+        "ocean_salt": 25539784578340.414,
+        "ocean_heat": 3.2701790083791494e+23,
+        "external_mass": 8.732103743647557e+16,
+        "external_heat": 3.291427268401676e+23
+      },
+      "segmented_equivalence": {
+        "segments": 5,
+        "maximum_scaled_state_difference": 0.0,
+        "checked_native_steps": 8760,
+        "segment_budget_residuals": [
+          {
+            "mass": 6.506116960549388e-16,
+            "actual_salt": 1.0340428210577572e-15,
+            "enthalpy": 2.9633588624410854e-16
+          },
+          {
+            "mass": 1.219096180328054e-16,
+            "actual_salt": 1.2366215922110354e-16,
+            "enthalpy": 8.674822676444118e-16
+          },
+          {
+            "mass": 3.903573189386748e-16,
+            "actual_salt": 1.018976357934279e-15,
+            "enthalpy": 2.856587956732947e-18
+          },
+          {
+            "mass": 1.1778205137794618e-16,
+            "actual_salt": 8.083402369801338e-16,
+            "enthalpy": 1.1823541590778882e-16
+          },
+          {
+            "mass": 9.11089440647264e-17,
+            "actual_salt": 1.0847203989090392e-15,
+            "enthalpy": 5.942059169208665e-17
+          }
+        ]
+      },
+      "vercor_commit": "72a05cdabdaa915ce23150b148de7d5f7021ea01",
+      "vercor_dirty": true,
+      "native_provenance": {
+        "url": "https://github.com/team-ocean/veris.git",
+        "vcs_info": {
+          "commit_id": "ee9614eb51726509c2b7f037a2a20b25c8d117e5",
+          "requested_revision": "ee9614eb51726509c2b7f037a2a20b25c8d117e5",
+          "vcs": "git"
+        }
+      },
+      "harness_sha256": "208e6984267ef06d341968dd8ec9466fb7c4ae97ec8a8fe5be9c8ad4af0540cb",
+      "platform": "macOS-26.7.1-arm64-arm-64bit",
+      "devices": [
+        "cpu:0"
+      ],
+      "forcing_files": {
+        "era5_model_levels": {
+          "filename": "era5_198x_ml_4x4deg_monthly_mean.nc",
+          "size_bytes": 1609698,
+          "sha256": "a8c29082e65a708668945949febf1280bbbd9cd0f6c666407fa0b502eddcab69"
+        },
+        "era5_surface": {
+          "filename": "era5_198x_sfc_4x4deg_monthly_mean.nc",
+          "size_bytes": 3428412,
+          "sha256": "ec3b3d74fdc60c78248edaa2f6950bb3274cfb3acdbb0f58e996ddc28650ef4e"
+        },
+        "era5_land_masked": {
+          "filename": "era5_lnd_skt_masked_1980.nc",
+          "size_bytes": 245232,
+          "sha256": "419e663584bc815ef97cd72d8d77f8175e4be272df4318dd0cca49e5450bb285"
+        },
+        "veros_forcing": {
+          "filename": "forcing_4deg_global_open_itf.nc",
+          "size_bytes": 843269,
+          "sha256": "b2ec1401f084056dc57ea5b27d4dd02e168d321df400842725dae40307a56d2d"
+        },
+        "veros_ecmwf": {
+          "filename": "ecmwf_4deg_monthly_nc4.nc",
+          "size_bytes": 903426,
+          "sha256": "3a7cb036d822244abdc715adbb6ef7d953649ef1ded9f1493e2896c42d277a29"
+        }
+      },
+      "initial_polar_ice": {
+        "minimum_absolute_latitude_degrees": 60,
+        "Area": 0.5,
+        "hIceMean_m": 0.25,
+        "TSurf_K": 260,
+        "saltIce_ref_g_kg": 4.0
+      },
+      "forcing": "real ERA5 monthly climatology and prescribed native Veros monthly SST/SSS; daily noleap coupling",
+      "geometry": {
+        "shape": [
+          40,
+          90
+        ],
+        "radius_m": 6370000.0,
+        "area_convention": "authoritative native stored area; no remapping quadrature substitution"
+      },
+      "limitations": "No observed climate skill claim; actual salt inventory and fixed-reference Boussinesq virtual salt are distinct."
+    },
+    "1800": {
+      "checked_native_steps": 17520,
+      "expected_native_steps": 17520,
+      "all_native_steps_valid": true,
+      "native_guard": "every native input/output leaf finite; hIce/hSnow>=0; Area in [0,1]; zero dry storage; physics_status==0",
+      "dtype": "float64",
+      "native_seconds": 1800.0,
+      "native_configuration": {
+        "dtype": "float64",
+        "enable_cyclic_y": false,
+        "spherical_geometry": true,
+        "deltatTherm": 1800.0,
+        "recip_deltatTherm": 0.0005555555555555556,
+        "deltatDyn": 1800.0,
+        "recip_deltatDyn": 0.0005555555555555556,
+        "nITC": 5,
+        "recip_nITC": 0.2,
+        "noSlip": true,
+        "useRelativeWind": true,
+        "secondOrderBC": false,
+        "extensiveFld": true,
+        "useRealFreshWaterFlux": false,
+        "useFreedrift": false,
+        "useEVP": true,
+        "evpAlpha": 500.0,
+        "evpBeta": 500.0,
+        "useAdaptiveEVP": false,
+        "aEVPalphaMin": 5.0,
+        "aEvpCoeff": 0.5,
+        "explicitDrag": true,
+        "nEVPsteps": 400,
+        "computeEvpResidual": false,
+        "printEvpResidual": false,
+        "geometrySurfaceTemperature": 273.0,
+        "use_coastline": false,
+        "use_sharding": false,
+        "CrMax": 1000000.0,
+        "eps2": 1e-20,
+        "surfaceTemperatureIterations": 6,
+        "aEVPmassMin": 0.0001,
+        "aEVPcStar": 4.0,
+        "lanlBulkIterations": 5,
+        "nx": 90,
+        "ny": 40
+      },
+      "coupling_seconds": 86400.0,
+      "coupling_steps": 365,
+      "elapsed_seconds": 1239.1774062500335,
+      "initial_inventory": {
+        "ice_volume": 7396455147772.277,
+        "snow_volume": 0.0,
+        "mass": 6656809632995050.0,
+        "salt": 26627238531980.2,
+        "enthalpy": -2.2233744174203467e+21
+      },
+      "final_inventory": {
+        "ice_volume": 301905905006.5692,
+        "snow_volume": 70266771728.22792,
+        "mass": 294903349176227.5,
+        "salt": 1086861258023.6492,
+        "enthalpy": -9.849771862485998e+19
+      },
+      "integrated_fluxes": {
+        "ocean_mass": 9.368266960530955e+16,
+        "ocean_salt": 25540377273956.56,
+        "ocean_heat": 3.270173447415056e+23,
+        "external_mass": 8.73207633214908e+16,
+        "external_heat": 3.2914222144030105e+23
+      },
+      "budget_residuals": {
+        "mass": 7.472033012606708e-16,
+        "actual_salt": 3.058881987607278e-16,
+        "enthalpy": 8.601616613058886e-17
+      },
+      "wet_area_m2": 345921121852945.9,
+      "area_sha256": "ffdf38ec143dc404f6a2a7c1d91bbbf9e7cf63f4bee4b4affdd5dd615f9960d0",
+      "boundary_extrema": {
+        "Area": [
+          0.0,
+          0.9273133355449302
+        ],
+        "hIceMean": [
+          0.0,
+          0.7941935729708371
+        ],
+        "hSnowMean": [
+          0.0,
+          0.2526880265474464
+        ]
+      },
+      "comparison_vector": {
+        "ice_volume": 301905905006.5692,
+        "snow_volume": 70266771728.22792,
+        "ocean_mass": 9.368266960530955e+16,
+        "ocean_salt": 25540377273956.56,
+        "ocean_heat": 3.270173447415056e+23,
+        "external_mass": 8.73207633214908e+16,
+        "external_heat": 3.2914222144030105e+23
+      },
+      "vercor_commit": "72a05cdabdaa915ce23150b148de7d5f7021ea01",
+      "vercor_dirty": true,
+      "native_provenance": {
+        "url": "https://github.com/team-ocean/veris.git",
+        "vcs_info": {
+          "commit_id": "ee9614eb51726509c2b7f037a2a20b25c8d117e5",
+          "requested_revision": "ee9614eb51726509c2b7f037a2a20b25c8d117e5",
+          "vcs": "git"
+        }
+      },
+      "harness_sha256": "cf960367e7134bc019e5c0a6eb1a931e8e561f2b6bdb93c6df2b9ad0ce8e52c8",
+      "platform": "macOS-26.7.1-arm64-arm-64bit",
+      "devices": [
+        "cpu:0"
+      ],
+      "forcing_files": {
+        "era5_model_levels": {
+          "filename": "era5_198x_ml_4x4deg_monthly_mean.nc",
+          "size_bytes": 1609698,
+          "sha256": "a8c29082e65a708668945949febf1280bbbd9cd0f6c666407fa0b502eddcab69"
+        },
+        "era5_surface": {
+          "filename": "era5_198x_sfc_4x4deg_monthly_mean.nc",
+          "size_bytes": 3428412,
+          "sha256": "ec3b3d74fdc60c78248edaa2f6950bb3274cfb3acdbb0f58e996ddc28650ef4e"
+        },
+        "era5_land_masked": {
+          "filename": "era5_lnd_skt_masked_1980.nc",
+          "size_bytes": 245232,
+          "sha256": "419e663584bc815ef97cd72d8d77f8175e4be272df4318dd0cca49e5450bb285"
+        },
+        "veros_forcing": {
+          "filename": "forcing_4deg_global_open_itf.nc",
+          "size_bytes": 843269,
+          "sha256": "b2ec1401f084056dc57ea5b27d4dd02e168d321df400842725dae40307a56d2d"
+        },
+        "veros_ecmwf": {
+          "filename": "ecmwf_4deg_monthly_nc4.nc",
+          "size_bytes": 903426,
+          "sha256": "3a7cb036d822244abdc715adbb6ef7d953649ef1ded9f1493e2896c42d277a29"
+        }
+      },
+      "initial_polar_ice": {
+        "minimum_absolute_latitude_degrees": 60,
+        "Area": 0.5,
+        "hIceMean_m": 0.25,
+        "TSurf_K": 260,
+        "saltIce_ref_g_kg": 4.0
+      },
+      "forcing": "real ERA5 monthly climatology and prescribed native Veros monthly SST/SSS; daily noleap coupling",
+      "geometry": {
+        "shape": [
+          40,
+          90
+        ],
+        "radius_m": 6370000.0,
+        "area_convention": "authoritative native stored area; no remapping quadrature substitution"
+      },
+      "limitations": "No observed climate skill claim; actual salt inventory and fixed-reference Boussinesq virtual salt are distinct."
+    }
+  },
+  "annual_sensitivity": {
+    "ice_volume": {
+      "absolute_difference": 164637671.13641357,
+      "relative_difference": 0.0005453277607565549
+    },
+    "snow_volume": {
+      "absolute_difference": 10945916.130096436,
+      "relative_difference": 0.00015577656210580095
+    },
+    "ocean_mass": {
+      "absolute_difference": 122328928464.0,
+      "relative_difference": 1.3057797026854463e-06
+    },
+    "ocean_salt": {
+      "absolute_difference": 592695616.1445312,
+      "relative_difference": 2.3206220087786294e-05
+    },
+    "ocean_heat": {
+      "absolute_difference": 5.5609640934703104e+17,
+      "relative_difference": 1.700510441691108e-06
+    },
+    "external_mass": {
+      "absolute_difference": 274114984768.0,
+      "relative_difference": 3.139173025306533e-06
+    },
+    "external_heat": {
+      "absolute_difference": 5.0539986656270746e+17,
+      "relative_difference": 1.535506032471667e-06
+    }
+  },
+  "controls": {
+    "thermodynamics_only": {
+      "3600_1800_900": {
+        "resolved": true,
+        "quantities": {
+          "ice_volume": {
+            "coarse_medium": 20655973.506622314,
+            "medium_fine": 10372165.796295166,
+            "roundoff_floor": 7.20693755234471,
+            "resolved": true
+          },
+          "snow_volume": {
+            "coarse_medium": 830350.1246767044,
+            "medium_fine": 432881.96417427063,
+            "roundoff_floor": 0.25706047890315203,
+            "resolved": true
+          },
+          "ocean_mass": {
+            "coarse_medium": 122860679686.0,
+            "medium_fine": 67496066098.0,
+            "roundoff_floor": 569475.7306147094,
+            "resolved": true
+          },
+          "ocean_salt": {
+            "coarse_medium": 74361504.62109375,
+            "medium_fine": 37339796.88671875,
+            "roundoff_floor": 1063.8395529855425,
+            "resolved": true
+          },
+          "ocean_heat": {
+            "coarse_medium": 8.391960760187617e+17,
+            "medium_fine": 3.592538282493215e+17,
+            "roundoff_floor": 1838586078890.1675,
+            "resolved": true
+          },
+          "external_mass": {
+            "coarse_medium": 141177040311.0,
+            "medium_fine": 76688164263.0,
+            "roundoff_floor": 303601.79817225074,
+            "resolved": true
+          },
+          "external_heat": {
+            "coarse_medium": 8.453137404537078e+17,
+            "medium_fine": 3.623239890428232e+17,
+            "roundoff_floor": 1927388348358.4753,
+            "resolved": true
+          }
+        }
+      },
+      "1800_900_450": {
+        "resolved": true,
+        "quantities": {
+          "ice_volume": {
+            "coarse_medium": 10372165.796295166,
+            "medium_fine": 5194805.037384033,
+            "roundoff_floor": 14.41218431982764,
+            "resolved": true
+          },
+          "snow_volume": {
+            "coarse_medium": 432881.96417427063,
+            "medium_fine": 221072.53695583344,
+            "roundoff_floor": 0.5141390535934003,
+            "resolved": true
+          },
+          "ocean_mass": {
+            "coarse_medium": 67496066098.0,
+            "medium_fine": 34921874368.0,
+            "roundoff_floor": 1138941.4045270681,
+            "resolved": true
+          },
+          "ocean_salt": {
+            "coarse_medium": 37339796.88671875,
+            "medium_fine": 18701298.12109375,
+            "roundoff_floor": 2127.6806367569247,
+            "resolved": true
+          },
+          "ocean_heat": {
+            "coarse_medium": 3.592538282493215e+17,
+            "medium_fine": 1.6607378510184448e+17,
+            "roundoff_floor": 3677185751670.824,
+            "resolved": true
+          },
+          "external_mass": {
+            "coarse_medium": 76688164263.0,
+            "medium_fine": 39524244966.0,
+            "roundoff_floor": 607192.0403651857,
+            "resolved": true
+          },
+          "external_heat": {
+            "coarse_medium": 3.623239890428232e+17,
+            "medium_fine": 1.676109768902574e+17,
+            "roundoff_floor": 3854790416433.5405,
+            "resolved": true
+          }
+        }
+      }
+    },
+    "fixed_evp_1600": {
+      "resolved": false,
+      "quantities": {
+        "ice_volume": {
+          "coarse_medium": 23450016.497192383,
+          "medium_fine": 42058785.43106079,
+          "roundoff_floor": 7.220915949481494,
+          "resolved": false
+        },
+        "snow_volume": {
+          "coarse_medium": 536852.6606845856,
+          "medium_fine": 425758.4262084961,
+          "roundoff_floor": 0.2577671710994911,
+          "resolved": true
+        },
+        "ocean_mass": {
+          "coarse_medium": 119211637846.0,
+          "medium_fine": 36856372564.0,
+          "roundoff_floor": 569462.9290635491,
+          "resolved": true
+        },
+        "ocean_salt": {
+          "coarse_medium": 84420059.38671875,
+          "medium_fine": 151411627.55078125,
+          "roundoff_floor": 1063.794311072604,
+          "resolved": false
+        },
+        "ocean_heat": {
+          "coarse_medium": 8.391029348714414e+17,
+          "medium_fine": 3.508839103028265e+17,
+          "roundoff_floor": 1838584660005.291,
+          "resolved": true
+        },
+        "external_mass": {
+          "coarse_medium": 140139491325.0,
+          "medium_fine": 74849779733.0,
+          "roundoff_floor": 303601.82019741624,
+          "resolved": true
+        },
+        "external_heat": {
+          "coarse_medium": 8.460928379246346e+17,
+          "medium_fine": 3.6357370831857254e+17,
+          "roundoff_floor": 1927383075802.853,
+          "resolved": true
+        }
+      }
+    },
+    "adaptive_evp_400": {
+      "resolved": false,
+      "quantities": {
+        "ice_volume": {
+          "coarse_medium": 23437091.997192383,
+          "medium_fine": 42033416.300842285,
+          "roundoff_floor": 7.2209151842663655,
+          "resolved": false
+        },
+        "snow_volume": {
+          "coarse_medium": 538012.611287117,
+          "medium_fine": 423948.8856334686,
+          "roundoff_floor": 0.25776711754599846,
+          "resolved": true
+        },
+        "ocean_mass": {
+          "coarse_medium": 119223954438.0,
+          "medium_fine": 36880820994.0,
+          "roundoff_floor": 569462.9298364843,
+          "resolved": true
+        },
+        "ocean_salt": {
+          "coarse_medium": 84373531.19140625,
+          "medium_fine": 151320298.68359375,
+          "roundoff_floor": 1063.794308185266,
+          "resolved": false
+        },
+        "ocean_heat": {
+          "coarse_medium": 8.39108208789291e+17,
+          "medium_fine": 3.508874161118249e+17,
+          "roundoff_floor": 1838584660644.6406,
+          "resolved": true
+        },
+        "external_mass": {
+          "coarse_medium": 140139793072.0,
+          "medium_fine": 74850798803.0,
+          "roundoff_floor": 303601.8202483186,
+          "resolved": true
+        },
+        "external_heat": {
+          "coarse_medium": 8.460940989001892e+17,
+          "medium_fine": 3.6356938870554624e+17,
+          "roundoff_floor": 1927383076198.849,
+          "resolved": true
+        }
+      }
+    },
+    "adaptive_evp_finer": {
+      "resolved": false,
+      "quantities": {
+        "ice_volume": {
+          "coarse_medium": 42033416.300842285,
+          "medium_fine": 372918603.7192383,
+          "roundoff_floor": 14.439911936543053,
+          "resolved": false
+        },
+        "snow_volume": {
+          "coarse_medium": 423948.8856334686,
+          "medium_fine": 6319299.901643753,
+          "roundoff_floor": 0.5155342350919969,
+          "resolved": false
+        },
+        "ocean_mass": {
+          "coarse_medium": 36880820994.0,
+          "medium_fine": 298460665886.0,
+          "roundoff_floor": 1138937.5121465006,
+          "resolved": false
+        },
+        "ocean_salt": {
+          "coarse_medium": 151320298.68359375,
+          "medium_fine": 1342506973.3984375,
+          "roundoff_floor": 2127.698506638678,
+          "resolved": false
+        },
+        "ocean_heat": {
+          "coarse_medium": 3.508874161118249e+17,
+          "medium_fine": 6.409878728238694e+16,
+          "roundoff_floor": 3677174568064.949,
+          "resolved": true
+        },
+        "external_mass": {
+          "coarse_medium": 74850798803.0,
+          "medium_fine": 39251446422.0,
+          "roundoff_floor": 607192.1694206996,
+          "resolved": true
+        },
+        "external_heat": {
+          "coarse_medium": 3.6356938870554624e+17,
+          "medium_fine": 1.768946327795794e+17,
+          "roundoff_floor": 3854780632023.5137,
+          "resolved": true
+        }
+      }
+    },
+    "adaptive_iteration_400_800": {
+      "ice_volume": {
+        "400_800_difference": 0.0,
+        "relative_difference": 0.0,
+        "ratio_to_1800_900_difference": 0.0,
+        "roundoff_floor": 7.21823565564749,
+        "within_roundoff_floor": true
+      },
+      "snow_volume": {
+        "400_800_difference": 9.5367431640625e-07,
+        "relative_difference": 1.5143089649568769e-16,
+        "ratio_to_1800_900_difference": 2.249503062099716e-12,
+        "roundoff_floor": 0.25774976647905967,
+        "within_roundoff_floor": true
+      },
+      "ocean_mass": {
+        "400_800_difference": 0.0,
+        "relative_difference": 0.0,
+        "ratio_to_1800_900_difference": 0.0,
+        "roundoff_floor": 569456.5408955063,
+        "within_roundoff_floor": true
+      },
+      "ocean_salt": {
+        "400_800_difference": 0.0,
+        "relative_difference": 0.0,
+        "ratio_to_1800_900_difference": 0.0,
+        "roundoff_floor": 1063.794308185266,
+        "within_roundoff_floor": true
+      },
+      "ocean_heat": {
+        "400_800_difference": 0.0,
+        "relative_difference": 0.0,
+        "ratio_to_1800_900_difference": 0.0,
+        "roundoff_floor": 1838584660644.6406,
+        "within_roundoff_floor": true
+      },
+      "external_mass": {
+        "400_800_difference": 0.0,
+        "relative_difference": 0.0,
+        "ratio_to_1800_900_difference": 0.0,
+        "roundoff_floor": 303593.02127212775,
+        "within_roundoff_floor": true
+      },
+      "external_heat": {
+        "400_800_difference": 0.0,
+        "relative_difference": 0.0,
+        "ratio_to_1800_900_difference": 0.0,
+        "roundoff_floor": 1927383076198.849,
+        "within_roundoff_floor": true
+      }
+    },
+    "cutoff_1e9_1e11_sensitivity": {
+      "ice_volume": {
+        "difference": 0.0,
+        "relative_difference": 0.0
+      },
+      "snow_volume": {
+        "difference": 0.0,
+        "relative_difference": 0.0
+      },
+      "ocean_mass": {
+        "difference": 752980.0,
+        "relative_difference": 5.411735645591691e-11
+      },
+      "ocean_salt": {
+        "difference": 0.0,
+        "relative_difference": 0.0
+      },
+      "ocean_heat": {
+        "difference": 666307133440.0,
+        "relative_difference": 1.4832126224312413e-11
+      },
+      "external_mass": {
+        "difference": 752986.0,
+        "relative_difference": 1.0150976077981012e-10
+      },
+      "external_heat": {
+        "difference": 666323910656.0,
+        "relative_difference": 1.4149140063638795e-11
+      }
+    },
+    "spatial_diagnosis": {
+      "signed_volume_difference": -372918603.7192801,
+      "absolute_volume_difference": 377263909.25389993,
+      "largest_cells": [
+        {
+          "latitude": -74.0,
+          "longitude": 242.0,
+          "volume_difference_m3": -243201967.65757295,
+          "ice_900_m": 0.004470132952857415,
+          "ice_450_m": 8.68915172208413e-06,
+          "area_900": 0.008934645825659657,
+          "area_450": 1.737830344416826e-05
+        },
+        {
+          "latitude": -74.0,
+          "longitude": 246.0,
+          "volume_difference_m3": -125575882.36082609,
+          "ice_900_m": 0.012896368648287025,
+          "ice_450_m": 0.010592728808005651,
+          "area_900": 0.025738972210534963,
+          "area_450": 0.021154163989103886
+        },
+        {
+          "latitude": 74.0,
+          "longitude": 294.0,
+          "volume_difference_m3": -2669078.4918942577,
+          "ice_900_m": 0.5112326836751838,
+          "ice_450_m": 0.5111837204870686,
+          "area_900": 0.8116093036877569,
+          "area_450": 0.811532003385157
+        },
+        {
+          "latitude": 70.0,
+          "longitude": 294.0,
+          "volume_difference_m3": -2456410.5477511403,
+          "ice_900_m": 0.5443028899943766,
+          "ice_450_m": 0.5442665741884612,
+          "area_900": 0.8620697989619749,
+          "area_450": 0.861993049417451
+        },
+        {
+          "latitude": -74.0,
+          "longitude": 250.0,
+          "volume_difference_m3": 1852709.6439427563,
+          "ice_900_m": 0.015029747751847443,
+          "ice_450_m": 0.015063734976687294,
+          "area_900": 0.02999607486183778,
+          "area_450": 0.030063496274346586
+        },
+        {
+          "latitude": 74.0,
+          "longitude": 298.0,
+          "volume_difference_m3": -678342.3837886925,
+          "ice_900_m": 0.6302702327589182,
+          "ice_450_m": 0.6302577888364765,
+          "area_900": 0.8942747706576448,
+          "area_450": 0.8942362620303762
+        },
+        {
+          "latitude": 74.0,
+          "longitude": 302.0,
+          "volume_difference_m3": -451740.2846159377,
+          "ice_900_m": 0.8715425171636035,
+          "ice_450_m": 0.8715342301669483,
+          "area_900": 0.988148052440429,
+          "area_450": 0.9881377630454926
+        },
+        {
+          "latitude": 70.0,
+          "longitude": 290.0,
+          "volume_difference_m3": 319943.1233671235,
+          "ice_900_m": 0.4074929209380961,
+          "ice_450_m": 0.4074976510074987,
+          "area_900": 0.7925967685630443,
+          "area_450": 0.7925764040888554
+        }
+      ],
+      "cells_different_by_more_than_1mm": 2
+    }
+  },
+  "native_transport_1000_steps": {
+    "steps": 1000,
+    "dtype": "float64",
+    "geometry": {
+      "nx": 32,
+      "ny": 8,
+      "radius_m": 6370000.0,
+      "latitude_degrees": [
+        48.0,
+        52.0,
+        56.0,
+        60.0,
+        64.0,
+        68.0,
+        72.0,
+        76.0
+      ],
+      "area_convention": "supplied midpoint areas"
+    },
+    "maximum_relative_volume_drift": 2.114965734625469e-15,
+    "minimum": 0.9330869393641141,
+    "maximum": 1.0669130606358859,
+    "initial_minimum": 0.9330869393641141,
+    "initial_maximum": 1.0669130606358859,
+    "all_transport_steps_finite": true,
+    "spherical_tendency_relative_error": 5.025120546856513e-13,
+    "tensor_refinement_orders": [
+      1.9997363160158648,
+      1.9999340793950793
+    ],
+    "rigid_rotation_maximum_strain": 2.227299254817537e-22,
+    "rms_rotation_error": 0.0011800617297052565,
+    "status": {
+      "first_invalid_status": 2,
+      "valid_control_status": 0,
+      "intermediate_failure_rejected": true,
+      "accepted_steps_after_failure": 0
+    },
+    "commit": "ee9614eb51726509c2b7f037a2a20b25c8d117e5",
+    "dirty": false,
+    "harness_sha256": "dd2155c50aac34cabb39316aea614f24a4b5ecf606e42e92ed382d9d22540f10",
+    "jax": "0.11.2",
+    "backend": "cpu",
+    "devices": [
+      "cpu:0"
+    ],
+    "platform": "macOS-26.7.1-arm64-arm-64bit"
+  },
+  "native_final_correctness": {
+    "passed": 1729,
+    "hardware_platform_skipped": 5,
+    "first_party_statement_percent": 95.19895385764991,
+    "full_seconds": 1586.53
+  },
+  "review": {
+    "critical": 0,
+    "source_important_fixed": [
+      "Validate sticky physics before scheduled output commits",
+      "Correct nonzero-angle face interpolation and EVP cross velocities; reject unsupported free-drift angle"
+    ],
+    "accuracy_disposition": "Original 1e-5 m cleanup threshold fails temporal refinement; the explicitly authored and sensitivity-checked 1e-9 m configuration passes. No model default or acceptance tolerance was changed."
+  },
+  "rulings": [
+    "Ruling: Normalize N/C task headings to Task <number> while retaining their N/C identifiers \u2014 required by skill task extraction without changing approved scope \u2014 cost if wrong: documentation-only heading adjustment.",
+    "Ruling: Native ledger and task scripts run in the isolated native repository with the absolute VerCOR plan path \u2014 native BASE/commits must describe native code, while preserving the approved plan owner \u2014 cost if wrong: regenerate task briefs only.",
+    "Task 1: Ruling: Add a geometry-owned static spherical_geometry configuration flag, derived automatically from OceanGeometry \u2014 selects paired operators and preserves immutable face metrics at closed-wall halos without data-dependent global reductions or changes to planar arithmetic \u2014 cost if wrong: remove one numerical metadata flag and migrate saved definitions.",
+    "Task 1: Ruling: Compare tensor refinement at shared physical latitudes 48/52/56/60/64/68 degrees \u2014 fixed-domain refinement separates truncation order from shifting high-latitude amplification \u2014 cost if wrong: add a fixed-domain norm, with the required order unchanged.",
+    "Task 1: Ruling: Use the maintained native CI scopes for strict Ruff/format/annotation/type acceptance, with the Linux type target for Linux-only affinity tests \u2014 unrestricted checks include pre-existing vendored Sphinx/Versioneer code and platform-inapplicable declarations \u2014 cost if wrong: third-party generated sources remain outside first-party lint/type coverage. Logs retain unrestricted failures.",
+    "Task 1: Ruling: Derive spherical corner dual areas from actual corner lengths and wet quadrants, retaining supplied tracer/face areas \u2014 RED wall traction was 1.9265 times its physical line integral with legacy full corner areas; a wall owns half a dual cell \u2014 cost if wrong: revisit spherical coast quadrature; planar references remain unchanged.",
+    "Task 1: Ruling: Spherical geometry owns closed-latitude defaults and rejects explicit cyclic latitude \u2014 monotone nonsingular latitude is not a periodic coordinate, while the inherited planar default silently joins the two walls \u2014 cost if wrong: users intentionally modeling an unphysical periodic latitude band need a separately designed geometry.",
+    "Original-source control: git archive a9d6c0a imported from /private/tmp/veris-science-cache-base/veris/__init__.py (asserted/printed before probe) reproduces identical RunId1524182906 four-CPU participant-count abort with the same warmed cache. Thus this cache/backend failure predates N1. Ruling: Retain maintained fresh per-run compilation caches for correctness gates, abandoning the attempted cross-run cache optimization \u2014 warm serialized CPU collective run IDs reproduce an original-source abort \u2014 cost if wrong: extra compilation time; no source tests/physics are weakened.",
+    "Task 1: Ruling: Use the completed full correctness run as task evidence and task-done's whitespace gate without rerunning the same suite \u2014 developer verification rules prohibit redundant repeats after passing checks; only journal/docstrings follow the run \u2014 cost if wrong: final branch gates still rerun all sources before publication.",
+    "Task 2: Ruling: Extract the existing physical validation/dependency laws into one focused helper, keeping PHYSICALCONSTANTS as the only registry \u2014 adding tree reconstruction/status in the existing800-line file would exceed the source-size guide \u2014 cost if wrong: inline helper functions without changing public APIs.",
+    "Task 2: Ruling: Include selected-precision spherical host validation in the host/runtime boundary unit \u2014 raw valid coordinates can round to90 degrees under float32, and the RED proves this reaches device selection \u2014 cost if wrong: earlier rejection of a numerically collapsed grid.",
+    "Task3 Ruling: Keep public Growth at its approved15 arrays and return formation status from one private shared kernel \u2014 advance needs gross-formation validity without duplicating physics or adding an unapproved public tuple value \u2014 cost if wrong: adjust one private call boundary.",
+    "Task3 Ruling: Preserve os_* field names but define them as signed prepared-minus-raw cleanup, cleared after thermodynamic consumption \u2014 existing fields can represent both negative clipping and thin positive removal without another state registry \u2014 cost if wrong: consumers relying on positive-only overshoot semantics must migrate to the documented signed convention.",
+    "Task3 Ruling: Add versioned second archive correction deltas generated from independently archived a9 source with declared phase/dry hooks and NumPy boundary accounting, preserving all original archive files/assertions/tolerances \u2014 intended sublimation/snow/heat corrections change trajectories, so the defective old output cannot remain the corrected physics oracle \u2014 cost if wrong: a shared conceptual error in correction equations requires revisiting the explicit deltas; independent analytic budgets and final review constrain it.",
+    "Task3 Ruling: Accept the complete frozen-source test matrix as1689 full-run passes plus the exact18 socket-blocked cases rerun with access, with appended coverage and source hashes \u2014 repeating already passing1689 is redundant when the only changed condition is loopback permission \u2014 cost if wrong: rerun the complete matrix in one unrestricted invocation; no test/assertion is skipped.",
+    "Task1 Ruling: Apply VerCOR-owned rhoFresh after native host initialization and at every transition \u2014 pinned native ocean initial state has no rhoFresh-dependent fields (source verified), and passing a traced owner into host definition validation would break outer-JIT setup \u2014 cost if wrong: future rhoFresh-dependent initial fields must be recomputed through a traced initializer. Matching authored density is checked with the shared transform-safe guard.",
+    "Task1 Ruling: Make the new VerisConfig physical_constants field keyword-only \u2014 a RED legacy positional constructor otherwise shifted initial_conditions/output into wrong slots \u2014 cost if wrong: callers must use the new parameter by name; all existing positions are preserved.",
+    "Task4 Ruling: New VerosConfig.surface_forcing is keyword-only \u2014 preserve every legacy positional parameter, as verified by constructor regression \u2014 cost if wrong: new mode must be passed by name.",
+    "Task5 Ruling: Split outgoing VERIS_TO_OCEAN_FLUX_FIELDS across distinct scalar/stress route IDs \u2014 existing conservative is scalar-only; use conservative for heat/M/J and existing vector-capable bilinear shared-grid identity for stress, both binary source_flux. This retains the complete recipe and exact native quadrature without adding unvalidated general conservative vector remapping \u2014 cost if wrong: the conservation claim remains limited to the factory-enforced exact shared grid; different-grid staggered stresses require separate validation.",
+    "Task6 Ruling: add private checked_native_steps index-dtype carry, increment only inside actual guarded native advances \u2014 measured execution count is required and physics leaves retain selected float precision \u2014 cost if wrong: private payload constructors must provide an index counter; no public physics semantics change.",
+    "Task6 Ruling: author4g/kg bulk ice salinity in the extended benchmark, leaving model defaults unchanged \u2014 nonzero actual-salt closure must be exercised, not vacuously checked at zero inventory \u2014 cost if wrong: these benchmark trajectories require the documented formation domain ocean salinity>=4g/kg and represent only that fixed bulk-salt model.",
+    "Final Ruling: Start the single read-only whole-branch review on frozen implementation plus C6 working-tree files while long acceptance jobs finish, before C6 commit \u2014 C6 explicitly requires review before its commit, whereas the generic skill places review after task completion; the approved task controls ordering \u2014 cost if wrong: reviewer must be given the final acceptance/report evidence before closing review, and any later substantive implementation change requires its own reproducing test and full gate. No per-task or second review is dispatched.",
+    "Final Ruling: retain the existing zero-angle free-drift equations and explicitly reject nonzero turning angle there, at host construction and in compiled status \u2014 deriving a new free-drift solver is beyond the approved corrections, while silent parameter ignoring is unacceptable \u2014 cost if wrong: nonzero-angle users must select EVP.",
+    "Final Ruling: retain actual ee9614e provenance for the expensive default-angle trajectories after native review corrections \u2014 those fixes affect scheduled host output, terms multiplied by zero default turning angle, and an unused free-drift branch, while fresh final-pin target/installed checks cover the corrected paths \u2014 cost if wrong: a later nonzero-angle/free-drift claim requires new trajectories; no older run is relabeled as the new source revision.",
+    "Final Ruling: certify the explicitly authored float64/adaptive400/hIce_min=1e-9m regime, preserving the failed native-default1e-5m results \u2014 controlled threshold reduction resolves the required refinement and a further100fold reduction leaves stocks unchanged; changing default native phase physics to force a pass would violate the preservation scope \u2014 cost if wrong: accuracy remains conditional on these parameters/resolutions and original native defaults are not certified.",
+    "Final Ruling: Observed climate skill and observational parameter identifiability \u2014 user approved synthetic recovery rather than an observational target \u2014 cost if wrong: observations and a new inference study are required for climate/identifiability claims.",
+    "Final Ruling: Long prognostic ocean stability beyond short real coupled tests \u2014 the approved annual cases use prescribed ocean climatology; actual ocean feedback is checked by native budgets/gradients \u2014 cost if wrong: long coupled climate stability remains uncertified.",
+    "Final Ruling: Different-grid staggered stress conservation \u2014 the factory enforces an exact shared native grid and only that identity transfer is proved \u2014 cost if wrong: different grids need a separately validated vector transport.",
+    "Final Ruling: Global derivatives across hard phase/cleanup transitions \u2014 AD is local to smooth executed branches and the design preserves native binary transitions \u2014 cost if wrong: gradient-based inference must avoid or separately model switching surfaces.",
+    "Final Ruling: GPU/additional distributed hardware \u2014 CPU serial, two/four-device and two-process evidence is available, with five hardware/platform skips recorded \u2014 cost if wrong: untested accelerators and other hardware configurations are not certified.",
+    "Final Ruling: Exhaustive empirical parameter domains and unmodified specialized boundaries \u2014 tests cover declared domains and the named spherical/coast/angle cases, not every physical scenario \u2014 cost if wrong: other parameter/boundary regimes need their own scientific checks."
+  ],
+  "limitations": [
+    "Original native-default thin-ice cutoff is not temporally certified in this experiment.",
+    "Annual prescribed-ocean runs establish stability/sensitivity rather than prognostic-ocean or climate skill.",
+    "Actual salt inventory differs from fixed-reference rigid-lid virtual salinity.",
+    "Shared-grid stress and smooth-branch parameter derivatives only.",
+    "GPU and exhaustive parameter/boundary domains are unvalidated."
+  ],
+  "native_artifacts": {
+    "veris-0.2.0+6.g4551fc8-py3-none-any.whl": {
+      "size_bytes": 184433,
+      "sha256": "0c5643764cacc5f30203a3647eb3fcc043b8b19a16dc5d736d807fc3cde599b7"
+    },
+    "veris-0.2.0+6.g4551fc8.tar.gz": {
+      "size_bytes": 941145,
+      "sha256": "862855ea61d3eae51d08ec19953c7526a488f28d831142c19263e39f119bd8f7"
+    }
+  },
+  "installed_native_corrections": {
+    "passed": 10,
+    "outside_checkout": true,
+    "native_commit": "4551fc86181c660ceb0010160ec7f569d97e52c6"
+  },
+  "calibration": {
+    "target": "synthetic concentration; h0 only; fixed wet weights",
+    "float64_truth_start_cases": 6,
+    "truths_m": [
+      0.35,
+      0.43,
+      0.65
+    ],
+    "starts_m": [
+      0.3,
+      0.7
+    ],
+    "recovery_absolute_tolerance_m": 1e-05,
+    "holdout_maximum_absolute_tolerance": 1e-07,
+    "float64_cli": {
+      "truth_m": 0.43,
+      "recovered_m": 0.43,
+      "loss": 4.6e-25,
+      "gradient": 5.84e-12,
+      "iterations": 8,
+      "evaluations": 10,
+      "holdout_maximum_absolute_error": 1.89e-15
+    },
+    "float32_cli": {
+      "recovered_m": 0.430003107,
+      "holdout_maximum_absolute_error": 1.19e-07
+    },
+    "provenance": "CLI values recorded in C5; recovery and coupled gradient regressions rerun on the final native pin."
+  },
+  "vercor_coverage": {
+    "combined_statement_branch_percent": 92.27427276161693,
+    "statement_percent": 94.45594662985967,
+    "branch_percent": 82.259767687434
+  },
+  "installed_final_prognostic_smoke": {
+    "outside_checkout": true,
+    "real_native_global_ocean": true,
+    "shape": [
+      40,
+      90
+    ],
+    "coupling_intervals": 1,
+    "checked_seaice_steps": 24,
+    "native_commit": "4551fc86181c660ceb0010160ec7f569d97e52c6",
+    "parameter_replacement_immutable": true
+  },
+  "verification": {
+    "native_passed": 1729,
+    "native_hardware_platform_skipped": 5,
+    "vercor_final_pin_ad_passed": 13,
+    "vercor_verifier_passed": 21,
+    "strict_mypy_source_files": 287,
+    "format_lint_compile_whitespace": "passed",
+    "strict_sphinx": "passed",
+    "native_wheel_correction_regressions_passed": 10,
+    "vercor_full": {
+      "tests": 2094,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "vercor_fast": {
+      "tests": 1177,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "environment": {
+    "python": "3.12.15",
+    "jax": "0.11.2",
+    "jaxlib": "0.11.2",
+    "numpy": "2.4.2",
+    "scipy": "1.17.1",
+    "veros": "1.6.2",
+    "veros_autodiff_commit": "7a8c964cf00b5aa0713c995edd760643a431b3c9"
+  }
+}

@@ -21,6 +21,7 @@ from vercor.setups import (
     make_era5_atmosphere,
     make_era5_land,
     make_veris_verosdata,
+    VerisVerosDataSetup,
 )
 
 
@@ -30,6 +31,7 @@ def _make_coupler(
     float_type: str,
     steps: int = 365,
     veris_config: VerisConfig | None = None,
+    pair: VerisVerosDataSetup | None = None,
 ) -> Coupler:
     """Assemble the same experiment for CLI runs and short native verification."""
     if float_type not in {"float32", "float64"}:
@@ -50,7 +52,7 @@ def _make_coupler(
                 )
             )
         )
-    pair = make_veris_verosdata(config=veris_config)
+    pair = make_veris_verosdata(config=veris_config) if pair is None else pair
     ice, ocean = pair.seaice, pair.ocean
     atmosphere = make_era5_atmosphere()
     land = make_era5_land()

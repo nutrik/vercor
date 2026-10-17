@@ -118,10 +118,20 @@ def test_parameter_leaves_follow_runtime_precision(enable_x64: bool) -> None:
     np.testing.assert_allclose(
         native_payload(candidate).physical_constants.recip_h0, 1 / 0.6, rtol=1e-6
     )
+    final = native_payload(coupler.run(candidate))
     assert all(
         x.dtype == expected
-        for x in jax.tree.leaves(native_payload(coupler.run(candidate)))
+        for x in jax.tree.leaves(
+            (
+                final.state,
+                final.diagnostics,
+                final.physical_constants,
+                final.interval_budget,
+            )
+        )
     )
+    assert final.checked_native_steps.dtype == jnp.int32
+    assert int(final.checked_native_steps) == 4
 
 
 @pytest.mark.fast_always

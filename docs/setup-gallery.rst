@@ -248,8 +248,9 @@ The ocean provides monthly Veros SST/SSS climatology with explicitly zero
 currents and height anomaly. Runoff is also prescribed zero. Land and atmosphere
 are ERA5 data components; CICE sends no feedback to these prescribed components.
 CESM reference-air diagnostics and heat/freshwater conventions are described
-above. The short native tests verify operation and local derivatives; they do
-not establish long-term climate or spherical-dynamics accuracy.
+above. Numerical conservation, spherical operators, extended trajectories and local
+derivatives are measured in :doc:`veris-validation`; these checks do not
+establish observed climate skill.
 
 Prognostic sea ice and ocean
 ----------------------------

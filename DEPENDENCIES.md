@@ -72,3 +72,8 @@ The prognostic pair in layer 17 reuses layer-16 Veros owner/component assembly
 and geometry-only extraction, then binds sea ice on the same grid. The two
 packaged Veris galleries depend on this setup facade, recipes and public state
 replacement; the calibration objective accesses no private payload owner.
+
+27. `benchmarks/validate_veris.py`, `tests/test_veris_validation.py`, and
+    `docs/veris-validation.rst` consume layers 16–23 for host-only scientific
+    acceptance: native-area scalar inventories, guarded transition counts,
+    shared period output, model-calendar segmentation and timestep comparisons.
