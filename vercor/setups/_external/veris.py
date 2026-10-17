@@ -19,6 +19,7 @@ from vercor.output import OutputSpec
 from vercor.recipes import (
     ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
     OCEAN_TO_VERIS_FORCING_FIELDS,
+    VERIS_TO_OCEAN_FLUX_FIELDS,
 )
 from vercor.setups.config import VerisConfig
 
@@ -117,8 +118,14 @@ def make_veris(
                     )
                 )
             ),
-            outputs=("ice_fraction",),
-            initial_fields={"ice_fraction": 0.0},
+            outputs=("ice_fraction", *_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS)),
+            initial_fields={
+                name: 0.0
+                for name in (
+                    "ice_fraction",
+                    *_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS),
+                )
+            },
             masks=ComponentMaskSpec(fractional_field="ice_fraction"),
             lifecycle=LifecycleHooks(setup=owner.setup),
             output=OutputSpec(

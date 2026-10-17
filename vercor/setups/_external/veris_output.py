@@ -12,6 +12,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from collections.abc import Mapping
+
+from vercor.types import RuntimeArray
 
 import jax.numpy as jnp
 
@@ -33,7 +36,10 @@ _STATE_VARIABLES = ("Area", "hIceMean", "hSnowMean", "TSurf", "uIce", "vIce")
 
 
 def _sample(
-    payload: Any, grid: RectilinearGrid, time: datetime | ModelDateTime
+    payload: Any,
+    grid: RectilinearGrid,
+    time: datetime | ModelDateTime,
+    canonical_fields: Mapping[str, RuntimeArray],
 ) -> OutputFrame:
     """Build one frame from current payload arrays and native registry metadata."""
     if payload is None:
@@ -52,6 +58,43 @@ def _sample(
             jnp.asarray(getattr(native, name))[2:-2, 2:-2].T,
             definition.netcdf_attributes(),
         )
+    for name, dims, units, description in (
+        (
+            "sea_surface_heat_flux",
+            ("y_center", "x_center"),
+            "W m-2",
+            "Downward total ocean heat input",
+        ),
+        (
+            "sea_surface_mass_flux",
+            ("y_center", "x_center"),
+            "kg m-2 s-1",
+            "Downward total ocean mass input",
+        ),
+        (
+            "sea_surface_salt_mass_flux",
+            ("y_center", "x_center"),
+            "kg m-2 s-1",
+            "Downward actual ocean salt mass input",
+        ),
+        (
+            "ocean_u_stress",
+            ("y_center", "x_east_face"),
+            "N m-2",
+            "Eastward total ocean surface stress",
+        ),
+        (
+            "ocean_v_stress",
+            ("y_north_face", "x_center"),
+            "N m-2",
+            "Northward total ocean surface stress",
+        ),
+    ):
+        variables[name] = OutputVariable(
+            dims,
+            canonical_fields[name],
+            {"units": units, "long_name": description, "cell_methods": "time: mean"},
+        )
     x_edges = grid.longitude_edges
     y_edges = grid.latitude_edges
     values = {
@@ -63,6 +106,12 @@ def _sample(
         "y_face": (
             centers_to_edges(grid.latitude, "lat") if y_edges is None else y_edges
         )[:-1],
+        "x_east_face": (
+            centers_to_edges(grid.longitude, "lon") if x_edges is None else x_edges
+        )[1:],
+        "y_north_face": (
+            centers_to_edges(grid.latitude, "lat") if y_edges is None else y_edges
+        )[1:],
     }
     coordinates = {"time": time_coordinate_variable(time)}
     for name in used_dimension_names(variables):
@@ -88,7 +137,7 @@ class _VerisOutputProvider:
             if context.state.grid is not None
             else context.component.grid
         )
-        return _sample(context.payload, grid, context.time)
+        return _sample(context.payload, grid, context.time, context.state.fields())
 
 
 def veris_output_provider() -> OutputProvider:
@@ -101,7 +150,7 @@ def write_veris_snapshot_output(context: SnapshotContext) -> None:
     grid = (
         context.state.grid if context.state.grid is not None else context.component.grid
     )
-    frame = _sample(context.payload, grid, context.time)
+    frame = _sample(context.payload, grid, context.time, context.state.fields())
     write_netcdf_dataset(
         output=str(context.output_path),
         coordinate_variables=frame.coordinates,

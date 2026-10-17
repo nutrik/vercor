@@ -71,3 +71,15 @@ meaning. VerCOR's traced ``freshwater_density`` owns native rhoFresh and its
 derived ratios at setup and every step; direct helper overrides are rejected.
 
 .. autofunction:: vercor.setups.replace_veris_parameters
+
+Veris ocean feedback
+--------------------
+
+``VERIS_TO_OCEAN_FLUX_FIELDS`` contains downward heat (W/m2), total bulk mass
+(kg/m2/s), actual salt mass (kg salt/m2/s), and east/north total stress (Pa).
+These are interval means over all native substeps on the ocean's shared grid.
+Ice traction uses the momentum-time face concentration and complementary
+open-water traction from one shared bulk calculation. Export these total-area
+fields with ``quantity="source_flux", source_coverage="binary"`` so complete
+melt does not suppress ocean input or apply ice concentration twice. The final
+instantaneous native diagnostics remain separate from the canonical means.

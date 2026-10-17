@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, fields as dataclass_fields, replace
-from typing import Any
+from typing import Any, TypeAlias, cast
 
 import jax
 import jax.numpy as jnp
@@ -28,7 +28,12 @@ from vercor.exceptions import ComponentError
 from vercor._numerical_safety import _require_zero
 from vercor.setups.config import VerisConfig
 from vercor.setups._time_helpers import align_model_timestep
-from vercor.setups._external.veris_forcing import prepare_veris_forcing
+from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
+from vercor.setups._external.veris_fluxes import (
+    VerisSurfaceFluxes,
+    VerisIntervalBudget,
+    veris_surface_fluxes,
+)
 from vercor.types import RuntimeArray
 
 
@@ -40,6 +45,12 @@ class VerisPayload:
     state: Any
     diagnostics: Any
     physical_constants: Any
+    interval_budget: VerisIntervalBudget
+
+
+_VerisCarry: TypeAlias = tuple[
+    VerisPayload, VerisSurfaceFluxes, VerisIntervalBudget, jax.Array
+]
 
 
 @dataclass(frozen=True)
@@ -58,44 +69,133 @@ def _runtime_veris_constants(constants: Any) -> Any:
     )
 
 
+@jax.jit
+def _finite_leaves(value: Any) -> jax.Array:
+    """Reduce finiteness without issuing per-leaf host callbacks."""
+    valid = jnp.asarray(True)
+    for leaf in jax.tree_util.tree_leaves(value):
+        valid = valid & jnp.all(jnp.isfinite(leaf))
+    return valid
+
+
+@jax.jit
+def _valid_native_payload(payload: VerisPayload) -> jax.Array:
+    """Reduce all owned numeric leaves, native bounds and status to one flag."""
+    valid = _finite_leaves(payload)
+    state = payload.state
+    return cast(
+        jax.Array,
+        (
+            valid
+            & jnp.all(state.hIceMean >= 0)
+            & jnp.all(state.hSnowMean >= 0)
+            & jnp.all((state.Area >= 0) & (state.Area <= 1))
+            & jnp.all(payload.diagnostics.physics_status == 0)
+        ),
+    )
+
+
 def step_veris_runtime(
     resources: VerisRuntimeResources,
     fields: Mapping[str, RuntimeArray],
     context: StepContext,
     payload: VerisPayload,
 ) -> StepResult:
-    """Advance coupled dynamics/thermodynamics with freshly prescribed forcing."""
+    """Integrate complete boundary rates and reject invalid intermediate physics.
+
+    All native inputs and outputs are checked each substep. A failed carry
+    skips later physics; one aggregate guard at the coupling boundary prevents
+    accepting it, including under outer JIT. Final diagnostics stay instantaneous
+    while the five ordinary exported fields and external budget are interval means.
+    """
     if not isinstance(payload, VerisPayload):
         raise ComponentError("Veris requires its initialized native runtime payload")
     from veris import advance
 
-    forcing = prepare_veris_forcing(
+    forcing = prepare_veris_forcing_pack(
         fields,
         ocean_mask=payload.state.iceMask[2:-2, 2:-2].T,
         constants=context.constants,
         dtype=context.dtype,
     )
-
     resolved = _runtime_veris_constants(
         payload.physical_constants.with_overrides(
             rhoFresh=context.constants.freshwater_density
         )
     )
     payload = replace(payload, physical_constants=resolved)
+    zero = jnp.zeros_like(payload.state.Area[2:-2, 2:-2].T)
+    totals = VerisSurfaceFluxes(zero, zero, zero, zero, zero)
+    external = VerisIntervalBudget(zero, zero)
+    dt = jnp.asarray(resources.configuration.deltatTherm, dtype=context.dtype.jax_real)
 
-    def substep(_: int, current: VerisPayload) -> VerisPayload:
-        state, diagnostics = advance(
-            current.state,
-            resources.configuration,
-            current.physical_constants,
-            forcing,
-            physics="coupled",
+    def substep(
+        _: int,
+        carry: _VerisCarry,
+    ) -> _VerisCarry:
+        current, total, boundary, valid = carry
+        valid = valid & _valid_native_payload(current)
+
+        def advance_valid(
+            _: None,
+        ) -> _VerisCarry:
+            state, diagnostics = advance(
+                current.state,
+                resources.configuration,
+                current.physical_constants,
+                forcing.native_forcing,
+                physics="coupled",
+            )
+            updated = replace(current, state=state, diagnostics=diagnostics)
+            fluxes = veris_surface_fluxes(
+                state, diagnostics, forcing, dtype=context.dtype
+            )
+            wet = state.iceMask[2:-2, 2:-2].T > 0
+            inputs = VerisIntervalBudget(
+                jnp.where(wet, diagnostics.external_mass_flux[2:-2, 2:-2].T, 0.0),
+                jnp.where(wet, diagnostics.external_heat_flux[2:-2, 2:-2].T, 0.0),
+            )
+            return (
+                updated,
+                jax.tree.map(
+                    lambda accumulated, flux: accumulated + dt * flux, total, fluxes
+                ),
+                jax.tree.map(
+                    lambda accumulated, flux: accumulated + dt * flux, boundary, inputs
+                ),
+                _valid_native_payload(updated),
+            )
+
+        return cast(
+            _VerisCarry,
+            jax.lax.cond(
+                valid,
+                advance_valid,
+                lambda _: (current, total, boundary, valid),
+                None,
+            ),
         )
-        return replace(current, state=state, diagnostics=diagnostics)
 
-    updated = jax.lax.fori_loop(0, resources.model_substeps, substep, payload)
+    updated, totals, external, valid = jax.lax.fori_loop(
+        0,
+        resources.model_substeps,
+        substep,
+        (payload, totals, external, jnp.asarray(True)),
+    )
+    duration = jnp.asarray(context.dt_seconds, dtype=context.dtype.jax_real)
+    means = jax.tree.map(lambda value: value / duration, totals)
+    updated = replace(
+        updated, interval_budget=jax.tree.map(lambda value: value / duration, external)
+    )
+    valid = valid & _finite_leaves((means, updated.interval_budget))
+    _require_zero(
+        jnp.count_nonzero(~valid),
+        "Veris",
+        "valid native substeps, interval means and physical status",
+    )
     return StepResult(
-        fields={"ice_fraction": updated.state.Area[2:-2, 2:-2].T}, payload=updated
+        fields={"ice_fraction": updated.state.Area[2:-2, 2:-2].T, **means.to_fields()},
+        payload=updated,
     )
 
 
@@ -182,9 +282,13 @@ class VerisSetupState:
         diagnostics = Diagnostics(
             **{field.name: zeros for field in dataclass_fields(Diagnostics)}
         )
+        zero = zeros[2:-2, 2:-2].T
+        fluxes = VerisSurfaceFluxes(zero, zero, zero, zero, zero)
         return SetupResult(
-            fields={"ice_fraction": state.Area[2:-2, 2:-2].T},
-            payload=VerisPayload(state, diagnostics, constants),
+            fields={"ice_fraction": state.Area[2:-2, 2:-2].T, **fluxes.to_fields()},
+            payload=VerisPayload(
+                state, diagnostics, constants, VerisIntervalBudget(zero, zero)
+            ),
         )
 
     def step(
