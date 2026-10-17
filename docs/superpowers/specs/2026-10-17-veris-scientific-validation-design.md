@@ -1,9 +1,9 @@
 # Veris scientific validation, calibration and ocean feedback
 
-Status: draft for written-spec review. On 2026-10-17 the user approved synthetic
-parameter recovery with a reusable calibration workflow, native Veris fixes on
-a dedicated branch, and an immutable VerCOR dependency update. Production
-implementation awaits review of this specification and its implementation plan.
+Status: written specification approved by the user on 2026-10-17, including
+synthetic parameter recovery with a reusable calibration workflow, native
+Veris fixes on a dedicated branch, and an immutable VerCOR dependency update.
+Production implementation awaits plan review and execution-method selection.
 
 ## Intent and scope
 
@@ -290,7 +290,7 @@ After independent corrected operators and budgets pass, run:
   inactive, checking stored-area volume conservation, boundedness and refinement.
 - A 30-day prescribed global integration with finite native states, nonnegative
   volume, bounded concentration, zero dry-cell storage, scalar budget summaries,
-interval flux accounting and split-run equivalence.
+  interval flux accounting and split-run equivalence.
 - An explicit annual prescribed-forcing benchmark and timestep-refinement
   comparison, recording forcing provenance, native/coupling timesteps, radius,
   dtype, initial state, native commit and maximum budget/refinement errors.
