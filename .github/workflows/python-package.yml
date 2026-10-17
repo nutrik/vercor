@@ -227,7 +227,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERCOR_ARTIFACT_DIR: ${{ github.workspace }}/dist
-      VERIS_COMMIT: a9d6c0ade52fbae4c0d1da694878943d6dbf7e6e
+      VERIS_COMMIT: ee9614eb51726509c2b7f037a2a20b25c8d117e5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # checkout major 4
         with:

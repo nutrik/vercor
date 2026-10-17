@@ -134,7 +134,7 @@ def test_native_ci_installs_and_verifies_pinned_veris() -> None:
     quality = workflow["jobs"]["quality"]
     commands = "\n".join(step.get("run", "") for step in quality["steps"])
     assert ".[dev,jcm,veros,veris]" in commands
-    assert quality["env"]["VERIS_COMMIT"] == "a9d6c0ade52fbae4c0d1da694878943d6dbf7e6e"
+    assert quality["env"]["VERIS_COMMIT"] == "ee9614eb51726509c2b7f037a2a20b25c8d117e5"
     assert 'distribution("veris")' in commands and "VERIS_COMMIT" in commands
     assert "not veros_autodiff" in commands
     assert (
@@ -194,7 +194,7 @@ else:
     assert not tuple(output.glob('cice.averages.*.nc'))  # no monthly boundary after one day
 with xr.open_dataset(output / 'cice.snapshot.nc') as ds:
     np.testing.assert_allclose(ds.Area[0], area)
-    assert ds.forc_salt_surface.attrs['units'] == 'unknown'
+    assert ds.forc_salt_surface.attrs['units'] == 'g kg-1 m s-1'
 assert (output / 'cice.runtime_fields.nc').is_file()
 print(json.dumps({
     'wet': int(wet.sum()), 'ice_cells': int((area > 0).sum()),

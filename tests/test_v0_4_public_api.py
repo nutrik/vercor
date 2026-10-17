@@ -255,6 +255,7 @@ PUBLIC_MODULE_EXPORTS = {
         "make_veris",
         "make_veris_verosdata",
         "make_veros_gcm",
+        "replace_veris_parameters",
     ),
     "vercor.state": (
         "ComponentState",

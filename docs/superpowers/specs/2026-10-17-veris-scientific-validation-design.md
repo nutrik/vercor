@@ -3,7 +3,7 @@
 Status: written specification approved by the user on 2026-10-17, including
 synthetic parameter recovery with a reusable calibration workflow, native
 Veris fixes on a dedicated branch, and an immutable VerCOR dependency update.
-Production implementation awaits plan review and execution-method selection.
+Both implementation plans and native execution were approved on 2026-10-17.
 
 ## Intent and scope
 

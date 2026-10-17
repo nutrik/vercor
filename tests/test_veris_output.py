@@ -60,10 +60,15 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
                 "OceanStressV",
                 "EmPmR",
                 "forc_salt_surface",
+                "ocean_mass_flux",
+                "ocean_salt_mass_flux",
+                "external_mass_flux",
+                "external_heat_flux",
             )
         }
     )
-    payload = VerisPayload(state, diagnostics)
+    diagnostics.physics_status = jnp.zeros_like(tagged)
+    payload = VerisPayload(state, diagnostics, physical_constants=None)
     component = CallableComponent("CICE", grid, lambda f: {}, spec=ComponentSpec())
     context = OutputContext(
         component,
@@ -91,7 +96,7 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
         "uIce": "m s-1",
         "OceanStressU": "N m-2",
         "EmPmR": "kg m-2 s-1",
-        "forc_salt_surface": "unknown",
+        "forc_salt_surface": "g kg-1 m s-1",
     }.items():
         assert frame.variables[name].attrs["units"] == units
     np.testing.assert_array_equal(frame.coordinates["x_center"].values, grid.longitude)
@@ -155,7 +160,7 @@ def test_shared_period_selection_and_snapshot_metadata(
         assert (
             set(ds.data_vars) == set(variables)
             if variables
-            else len(ds.data_vars) == 11
+            else len(ds.data_vars) == 16
         )
         np.testing.assert_allclose(
             ds["Area"][0], final.component("CICE").field("ice_fraction")
@@ -174,7 +179,7 @@ def test_shared_period_selection_and_snapshot_metadata(
         np.testing.assert_allclose(
             ds["Area"][0], final.component("CICE").field("ice_fraction")
         )
-        assert ds["forc_salt_surface"].attrs["units"] == "unknown"
+        assert ds["forc_salt_surface"].attrs["units"] == "g kg-1 m s-1"
         assert ds["OceanStressV"].dims == ("time", "y_face", "x_center")
     with xr.open_dataset(tmp_path / "cice.runtime_fields.nc") as ds:
         np.testing.assert_allclose(ds["fmask_FORCING_CICE"], component.grid.binary_mask)

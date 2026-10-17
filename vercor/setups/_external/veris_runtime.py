@@ -1,6 +1,6 @@
 """Native Veris initialization and pure coupled substeps with payload-owned state.
 
-Host setup binds immutable native configuration/constants and an aligned integer
+Host setup binds immutable native numerical configuration and an aligned integer
 substep count. The traced payload holds all evolving native State/Diagnostics
 arrays, including halos. Forcing is packed once per coupling interval and
 reapplied before EVERY native substep because Growth replaces Qnet/Qsw with
@@ -10,7 +10,7 @@ residuals. No native Simulation, clock, output writer or mutable model is steppe
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, fields as dataclass_fields
+from dataclasses import dataclass, fields as dataclass_fields, replace
 from typing import Any
 
 import jax
@@ -25,6 +25,7 @@ from vercor.components import (
 )
 from vercor.dtypes import DTypePolicy
 from vercor.exceptions import ComponentError
+from vercor._numerical_safety import _require_zero
 from vercor.setups.config import VerisConfig
 from vercor.setups._time_helpers import align_model_timestep
 from vercor.setups._external.veris_forcing import prepare_veris_forcing
@@ -38,16 +39,23 @@ class VerisPayload:
 
     state: Any
     diagnostics: Any
+    physical_constants: Any
 
 
 @dataclass(frozen=True)
 class VerisRuntimeResources:
-    """Static native physics/configuration and coupling alignment, with no state."""
+    """Static numerical configuration and coupling alignment, with no physical values."""
 
     configuration: Any
-    constants: Any
     model_substeps: int
     dtype: DTypePolicy
+
+
+def _runtime_veris_constants(constants: Any) -> Any:
+    """Normalize independent leaves to the native runtime precision schema."""
+    return jax.tree.map(
+        lambda value: jnp.asarray(value, dtype=constants.dtype), constants
+    )
 
 
 def step_veris_runtime(
@@ -68,15 +76,22 @@ def step_veris_runtime(
         dtype=context.dtype,
     )
 
+    resolved = _runtime_veris_constants(
+        payload.physical_constants.with_overrides(
+            rhoFresh=context.constants.freshwater_density
+        )
+    )
+    payload = replace(payload, physical_constants=resolved)
+
     def substep(_: int, current: VerisPayload) -> VerisPayload:
         state, diagnostics = advance(
             current.state,
             resources.configuration,
-            resources.constants,
+            current.physical_constants,
             forcing,
             physics="coupled",
         )
-        return VerisPayload(state, diagnostics)
+        return replace(current, state=state, diagnostics=diagnostics)
 
     updated = jax.lax.fori_loop(0, resources.model_substeps, substep, payload)
     return StepResult(
@@ -138,6 +153,7 @@ class VerisSetupState:
             geometry=self.geometry,
             settings=settings,
             initial_conditions=self.config.initial_conditions or {},
+            constants=self.config.physical_constants or {},
             execution=native.Execution(),
             output=None,
             physics="coupled",
@@ -145,15 +161,30 @@ class VerisSetupState:
         state, configuration, constants = native.initialize_experiment(experiment)
         if previous is None:
             self.resources = VerisRuntimeResources(
-                configuration, constants, alignment.model_substeps, context.dtype
+                configuration, alignment.model_substeps, context.dtype
             )
+        if "rhoFresh" in (self.config.physical_constants or {}):
+            _require_zero(
+                jnp.count_nonzero(
+                    jnp.asarray(constants.rhoFresh, dtype=context.dtype.jax_real)
+                    != context.constants.freshwater_density
+                ),
+                "Veris rhoFresh",
+                "ownership by VerCOR freshwater_density",
+            )
+        # Native ocean initialization has no rhoFresh-dependent state fields.
+        # Apply the traced owner after host definition/initialization, preserving
+        # device-free definitions and outer-JIT setup with traced constants.
+        constants = _runtime_veris_constants(
+            constants.with_overrides(rhoFresh=context.constants.freshwater_density)
+        )
         zeros = jnp.zeros_like(state.Area)
         diagnostics = Diagnostics(
             **{field.name: zeros for field in dataclass_fields(Diagnostics)}
         )
         return SetupResult(
             fields={"ice_fraction": state.Area[2:-2, 2:-2].T},
-            payload=VerisPayload(state, diagnostics),
+            payload=VerisPayload(state, diagnostics, constants),
         )
 
     def step(
