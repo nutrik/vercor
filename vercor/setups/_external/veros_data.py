@@ -86,6 +86,11 @@ def snapshot_veros_state(state: Any) -> VerosDataSnapshot:
         latitude_edges=np.asarray(vs.yu)[1:-2],
         binary_mask=geometry["maskT"][:, :, -1].T.astype(float),
     )
+    geometry.update(
+        latitude=np.asarray(vs.yt)[2:-2],
+        latitude_edges=np.asarray(vs.yu)[1:-2],
+        radius=np.asarray(state.settings.radius),
+    )
     sst = np.asarray(vs.sst_clim)[2:-2, 2:-2].transpose(2, 1, 0) + 273.15
     surface_fields = {
         "sea_surface_temperature": sst,

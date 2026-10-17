@@ -42,7 +42,9 @@ def native() -> Any:
         np.arange(12, dtype=float), (*shape, 12)
     ).copy()
     values["sss_clim"] = values["sst_clim"] + 30.0
-    return SimpleNamespace(variables=SimpleNamespace(**values))
+    return SimpleNamespace(
+        variables=SimpleNamespace(**values), settings=SimpleNamespace(radius=6.370e6)
+    )
 
 
 def test_snapshot_preserves_geometry_axes_staggering_and_units(native: Any) -> None:
@@ -189,3 +191,33 @@ print(json.dumps({"shape": s.grid.shape, "wet": int(s.grid.binary_mask.sum())}))
     evidence = json.loads(result.stdout.splitlines()[-1])
     assert evidence["shape"] == [40, 90]
     assert evidence["wet"] > 0
+
+
+def test_snapshot_carries_authoritative_spherical_coordinates(native: Any) -> None:
+    from vercor.setups._external.veros_data import snapshot_veros_state
+
+    native.variables.yt = np.array([48.0, 52.0, 56.0, 60.0, 64.0, 68.0])
+    native.variables.yu = np.array([48.0, 54.0, 58.0, 62.0, 66.0, 70.0])
+    snapshot = snapshot_veros_state(native)
+    np.testing.assert_array_equal(snapshot.geometry["latitude"], [56.0, 60.0])
+    np.testing.assert_array_equal(
+        snapshot.geometry["latitude_edges"], [54.0, 58.0, 62.0]
+    )
+    assert np.asarray(snapshot.geometry["radius"]).shape == ()
+    assert float(snapshot.geometry["radius"]) == native.settings.radius
+    assert not np.asarray(snapshot.geometry["radius"]).flags.writeable
+    veris = pytest.importorskip("veris")
+    import jax
+
+    jax.config.update("jax_enable_x64", True)
+    state, _, _ = veris.initialize_experiment(
+        veris.Experiment(
+            grid=veris.Grid(3, 2),
+            geometry=veris.OceanGeometry(**snapshot.geometry),
+            settings={"dtype": "float64", "deltatDyn": 300.0, "deltatTherm": 300.0},
+            output=None,
+        )
+    )
+    np.testing.assert_allclose(
+        1 / state.recip_dxC[3, 3], snapshot.geometry["dxu"][1] * 0.5, rtol=1e-12
+    )

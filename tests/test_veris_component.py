@@ -291,7 +291,7 @@ def test_optional_dependency_is_immutable_and_preserves_veros_extras() -> None:
     metadata = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
     extras = metadata["project"]["optional-dependencies"]
     assert extras["veris"] == [
-        "veris @ git+https://github.com/team-ocean/veris.git@a9d6c0ade52fbae4c0d1da694878943d6dbf7e6e"
+        "veris @ git+https://github.com/team-ocean/veris.git@ee9614eb51726509c2b7f037a2a20b25c8d117e5"
     ]
     assert extras["veros"] == ["veros>=1.6.2,<1.7"]
 

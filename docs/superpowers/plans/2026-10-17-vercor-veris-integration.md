@@ -43,7 +43,7 @@
 
 For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-length=120 --statistics` (no exit-zero for acceptance), `mypy vercor tests`, compileall, whitespace, full stock `pytest tests/ -q -m 'not veros_autodiff' --tb=short`, then the required fast gate. Run isolated exact-fork AD for units changing native/coupled execution, masks, payloads or fluxes. Native and stock checks stay separate; record exact commands/counts and known third-party warnings. Update active API signature/manifests and private-module inventory in the same unit as an intentional API/file change. Never rewrite historical specifications or audit SHA citations during repinning.
 
-### C1: Spherical snapshot, physical payload and public parameter replacement
+### Task 1: C1 — Spherical snapshot, physical payload and public parameter replacement
 
 **Files:**
 - Create: `vercor/setups/_external/veris_parameters.py`, `tests/test_veris_parameters.py`.
@@ -59,7 +59,7 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
 - Produces lazy public `replace_veris_parameters(state: RunState, parameters: Mapping[str, object], *, component: str="CICE") -> RunState` in `veris_parameters.py`. It replaces only payload physical values, using native `with_overrides`; the caller's native state, stores and component owner remain unchanged.
 - Snapshot geometry adds authoritative native `latitude`, `latitude_edges`, `radius`; native face conversions stay west/south. `load_standalone_veris` capability-checks the corrected parameter/geometry/status interface.
 
-- [ ] **Write RED contracts.** Define `test_public_parameter_replacement_differentiates_without_mutation`. Assert immutable mapping/array ownership, lazy import without Veris/Veros installed, correct scalar shapes/dtypes, and a tracer-safe public path:
+- [x] **Write RED contracts.** Define `test_public_parameter_replacement_differentiates_without_mutation`. Assert immutable mapping/array ownership, lazy import without Veris/Veros installed, correct scalar shapes/dtypes, and a tracer-safe public path:
 
   ```python
   candidate = replace_veris_parameters(initial, {"h0": jnp.asarray(0.43)})
@@ -69,12 +69,12 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
   ```
 
   Define `concentration_loss` in this test through only the public replacement helper, public fields and Coupler.run. Check nonzero derivative and unchanged original result after repeated .4/.6 candidates. Reject unknown/derived/numerical/dtype keys, absent/wrong component, nonscalar/complex values and direct rhoFresh overrides (owned by VerCOR). Test conflicting authored rhoFresh versus matching setup values. Verify density 997 and 1030 kg/m3 round-trip atmospheric SI mass into native physics. Check snapshot coordinates/radius against Veros settings, plus tagged face geometry and latitude-dependent native length at 60 degrees.
-- [ ] **Run RED.** `pytest tests/test_veris_parameters.py tests/test_veros_data_ocean.py -q --tb=short`; expect missing public helper/config/coordinates or the current static-parameter failure. Verify native imports are the N4 source first.
-- [ ] **Implement the thin bridge.** Forward native constants during setup; retain parameters in payload. Derive native rhoFresh from StepContext constants for each transition. Use `state._with_component_state(...with_payload(...))` internally, preserving the opaque public boundary. Normalize physical scalar leaves to runtime dtype, validate names/shape/domain with native rules, and keep cached numerical resources free of evolving parameters. Capture actual snapshot radius and edges without rescaling stored areas.
-- [ ] **Verify GREEN and compatibility.** Run named tests, native direct-advance equivalence, public/lazy contracts, both dtypes, parameter JVP/VJP/finite differences and shared gates. Update tests which intentionally expected static resources or a single exported native contract; preserve their ownership/assertions.
-- [ ] **Commit.** Include actual pin/CI/API changes and progress; commit as `feat: expose traced Veris physics on spherical ocean geometry`.
+- [x] **Run RED.** `pytest tests/test_veris_parameters.py tests/test_veros_data_ocean.py -q --tb=short`; expect missing public helper/config/coordinates or the current static-parameter failure. Verify native imports are the N4 source first.
+- [x] **Implement the thin bridge.** Forward native constants during setup; retain parameters in payload. Derive native rhoFresh from StepContext constants for each transition. Use `state._with_component_state(...with_payload(...))` internally, preserving the opaque public boundary. Normalize physical scalar leaves to runtime dtype, validate names/shape/domain with native rules, and keep cached numerical resources free of evolving parameters. Capture actual snapshot radius and edges without rescaling stored areas.
+- [x] **Verify GREEN and compatibility.** Run named tests, native direct-advance equivalence, public/lazy contracts, both dtypes, parameter JVP/VJP/finite differences and shared gates. Update tests which intentionally expected static resources or a single exported native contract; preserve their ownership/assertions.
+- [x] **Commit.** Include actual pin/CI/API changes and progress; commit as `feat: expose traced Veris physics on spherical ocean geometry`.
 
-### C2: Binary source coverage for already integrated fluxes
+### Task 2: C2 — Binary source coverage for already integrated fluxes
 
 **Files:**
 - Modify: `vercor/exchanges.py`, `_runtime/contracts.py`, `component_masks.py`, `exchange_masks.py`, `exchange_dispatch.py`, `field_transfer.py`, `state_validation.py`.
@@ -102,7 +102,7 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
 - [ ] **Verify GREEN.** Assert source weighting before remapping, conservative scalar totals, vector transformation, distinct finite east/north/coast/exterior values, topology restrictions, current versus stored masks, and old default behavior. Use JVP/VJP/finite differences through continuous fields/fractions; binary membership stays discrete. Run shared gates and exact-fork AD.
 - [ ] **Commit.** Commit as `feat: support binary source coverage for total-area fluxes` with signatures/docs/progress.
 
-### C3: Interval-mean Veris ocean fluxes and correct face stresses
+### Task 3: C3 — Interval-mean Veris ocean fluxes and correct face stresses
 
 **Files:**
 - Create: `vercor/setups/_external/veris_fluxes.py`, `tests/test_veris_feedback.py`.
@@ -123,7 +123,7 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
 - [ ] **Verify GREEN with real native physics/output.** Test A=0/.5/1, complete melt with nonzero residual flux, freshwater/latent budgets, rho changes and smooth parameter gradients. Keep real direct-advance/forcing-reset controls. Output native instantaneous diagnostics with registry units, plus canonical mean fields; give east/north stress coordinates their actual upper-edge positions, distinct from native west/south velocity coordinates. Check tagged dimensions, period selection, snapshot units and output-free outer JIT. Run shared gates and AD.
 - [ ] **Commit.** Commit as `feat: export interval-mean Veris ocean boundary fluxes` with public recipe and metadata updates.
 
-### C4: Explicit total-feedback mode and prognostic ocean surfaces
+### Task 4: C4 — Explicit total-feedback mode and prognostic ocean surfaces
 
 **Files:**
 - Create: `tests/test_veros_ice_feedback.py`, `tests/_veros_surface_support.py` for an actual small native column/grid fixture.
@@ -152,7 +152,7 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
 - [ ] **Verify GREEN and compatibility.** Check spinup before activation, first activation, repeated substeps, all restoring combinations, boundary halos, canonical faces and both dtypes. Test invalid mode/ACC/conflicting streamfunction settings early. Use JVP/VJP/directional finite differences for total heat/mass/salt and native output surfaces. Run old atmosphere-only tests, shared gates and AD.
 - [ ] **Commit.** Commit as `feat: couple Veros to total sea-ice surface forcing` with config/signature/docs/progress.
 
-### C5: Shared prognostic setup and reusable synthetic calibration
+### Task 5: C5 — Shared prognostic setup and reusable synthetic calibration
 
 **Files:**
 - Modify: `vercor/setups/_veris.py`, `_external/veros_gcm.py`, `veros_data.py` geometry extraction, `vercor/setups/__init__.py`.
@@ -170,7 +170,7 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
 - [ ] **Verify GREEN with native models.** Exercise CLI list/copy/run and optional-import behavior. Run a short actual host and exact-fork JAX prognostic coupling with evolving ice/ocean, finite state and declared mass/virtual-salt/heat increments; test coupled h0 gradients in a smooth regime. Test fitted h0 against a distinct smooth cold forcing, zero source ice coverage, both dtypes and no hidden owner mutation. Run shared gates and AD.
 - [ ] **Commit.** Commit setup/gallery/calibration work as `feat: add prognostic Veris coupling and synthetic calibration` with manifests/docs/progress.
 
-### C6: Extended scientific report, installed artifacts and authorized pushes
+### Task 6: C6 — Extended scientific report, installed artifacts and authorized pushes
 
 **Files:**
 - Create: `benchmarks/__init__.py`, `benchmarks/validate_veris.py`, `tests/test_veris_validation.py`, `docs/veris-validation.rst`.

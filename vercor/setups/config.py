@@ -85,13 +85,14 @@ class VerisConfig:
 
     Native initial conditions use physical (x, y) arrays without halos, with
     hIceMean/hSnowMean in grid-cell volume-equivalent metres and Area in [0, 1].
-    The wrapper binds native numerical configuration/constants statically;
-    evolving state and prescribed forcing remain differentiable payload leaves.
+    Numerical configuration is static. Native physical constants, evolving state
+    and prescribed forcing are differentiable runtime payload inputs.
     """
 
     name: str = "CICE"
     model_timestep: timedelta = timedelta(hours=1)
     custom_parameters: Mapping[str, object] | None = None
+    physical_constants: Mapping[str, object] | None = field(default=None, kw_only=True)
     initial_conditions: Mapping[str, object] | None = None
     output: OutputSpec = field(default_factory=OutputSpec)
 
@@ -105,7 +106,7 @@ class VerisConfig:
             raise ValueError("model_timestep must be positive")
         if not isinstance(self.output, OutputSpec):
             raise TypeError("output must be OutputSpec")
-        for name in ("custom_parameters", "initial_conditions"):
+        for name in ("custom_parameters", "physical_constants", "initial_conditions"):
             supplied = getattr(self, name)
             if supplied is not None:
                 owned = deepcopy(dict(supplied))

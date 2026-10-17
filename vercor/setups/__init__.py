@@ -49,6 +49,9 @@ _LAZY_EXPORTS = {
     "make_jcm_land": _LazyExport("_data.jcm_land", "make_jcm_land"),
     "make_veros_gcm": _LazyExport("_external.veros_gcm", "make_veros_gcm"),
     "make_veris": _LazyExport("_external.veris", "make_veris"),
+    "replace_veris_parameters": _LazyExport(
+        "_external.veris_parameters", "replace_veris_parameters"
+    ),
     "make_veris_verosdata": _LazyExport("_veris", "make_veris_verosdata"),
     "VerisVerosDataSetup": _LazyExport("_veris", "VerisVerosDataSetup"),
 }

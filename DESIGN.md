@@ -283,11 +283,18 @@ because it is not implemented. CAMulator forcing alignment is explicitly
 implemented.
 
 Standalone Veris uses native `initialize_experiment` and pure `advance` with
-immutable state/diagnostics in the component payload. Native configuration and
-constants are frozen setup resources; each substep receives fresh prescribed
-forcing. `make_veris_verosdata` snapshots one setup-only Veros global4deg ocean,
+immutable state/diagnostics and traced physical constants in the component
+payload. Frozen setup resources retain numerical configuration, precision and
+substep alignment. The lazy `replace_veris_parameters` helper replaces only
+independent scalar physical leaves, using native validation/dependent laws,
+while preserving fields and native state. VerCOR owns native rhoFresh through
+its traced freshwater_density at setup and every transition. Native ocean
+initial fields do not depend on rhoFresh, so that owner is applied after host
+initialization to preserve outer-JIT setup. Each substep receives fresh forcing. `make_veris_verosdata` snapshots one setup-only Veros global4deg ocean,
 sharing its exact tracer grid/wet domain with the data ocean. The snapshot
-converts Veros east/north face geometry to native west/south indices. CESM bulk
+converts Veros east/north face geometry to native west/south indices and retains
+authoritative latitude/edge coordinates and native radius for spherical metrics;
+supplied native areas retain their quadrature without rescaling. CESM bulk
 `tref/qref` supply ice air temperature/humidity; native `Area` supplies evolving
 fractional coverage while ice-free wet cells retain forcing. Output reuses
 the shared coordinator; the gallery sends no feedback to prescribed data.

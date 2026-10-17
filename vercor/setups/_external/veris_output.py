@@ -4,7 +4,8 @@ Native arrays include two halos in (x, y) order. Samples remove halos and
 transpose dimensions together to (y, x). U/V locations use native west/south
 faces; no interpolation or thickness/Area renormalization is applied.
 hIceMean and hSnowMean remain volume per total grid-cell area (m). Diagnostic
-salt forcing retains upstream 'unknown' units and is not an ocean feedback.
+salt forcing has local virtual units (g/kg)*m/s; actual ocean mass/salt inputs
+are separate downward-positive SI rates in the native diagnostic registry.
 """
 
 from __future__ import annotations

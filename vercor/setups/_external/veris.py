@@ -26,7 +26,8 @@ from vercor.setups.config import VerisConfig
 def load_standalone_veris() -> Any:
     """Require maintained standalone entry points rather than the legacy plugin."""
     message = (
-        "Standalone Veris requires initialize_experiment/advance and OceanGeometry; "
+        "Standalone Veris requires initialize_experiment/advance, spherical OceanGeometry, "
+        "physical-parameter AD and corrected ocean budgets; "
         "install the approved model with `pip install 'vercor[veris]'`."
     )
     try:
@@ -44,6 +45,29 @@ def load_standalone_veris() -> Any:
             "advance",
         )
     ):
+        raise ImportError(message)
+    try:
+        from veris.model.physical_constants import PhysicalConstants
+        from veris.model.diagnostics import DIAGNOSTICS
+        from dataclasses import fields
+
+        supported = (
+            callable(getattr(PhysicalConstants, "with_overrides", None))
+            and callable(getattr(PhysicalConstants, "base_parameter_names", None))
+            and {"latitude", "latitude_edges", "radius"}
+            <= {field.name for field in fields(veris.OceanGeometry)}
+            and {
+                "physics_status",
+                "ocean_mass_flux",
+                "ocean_salt_mass_flux",
+                "external_mass_flux",
+                "external_heat_flux",
+            }
+            <= DIAGNOSTICS.keys()
+        )
+    except (ImportError, TypeError) as error:
+        raise ImportError(message) from error
+    if not supported:
         raise ImportError(message)
     return veris
 

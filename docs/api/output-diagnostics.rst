@@ -25,7 +25,10 @@ Native Veris output uses the shared provider/coordinator path. Its supported
 variables are ``Area``, ``hIceMean``, ``hSnowMean``, ``TSurf``, ``uIce``,
 ``vIce`` and native coupling diagnostics. Arrays omit halos and preserve native
 tracer/face locations. ``hIceMean`` and ``hSnowMean`` remain volume per total
-grid-cell area in metres. ``forc_salt_surface`` retains upstream unknown units.
+grid-cell area in metres. ``forc_salt_surface`` uses local virtual-salinity units (g/kg)*m/s.
+Native ``ocean_mass_flux`` and ``ocean_salt_mass_flux`` are actual downward
+bulk/salt mass inputs in kg/m2/s; independent external mass and enthalpy inputs
+are also available from the native diagnostic registry.
 The runtime alias ``ice_fraction`` is the same final concentration as native
 ``Area``. Empty period selections include all supported native variables;
 subsets and unknown names follow the existing output coordinator's contract.

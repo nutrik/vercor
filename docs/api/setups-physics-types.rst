@@ -26,7 +26,7 @@ already locked by another model.
 coupling interval. Runtime dtype and grid size remain coupler-owned. Native
 initial conditions use unhaloed (x, y) arrays; ``hIceMean`` and ``hSnowMean``
 are grid-cell volume-equivalent metres. Native numerical configuration and
-physical constants are static; native state, forcing and ice fractions retain
+physical constants are traced payload leaves; native state, forcing and ice fractions retain
 JAX differentiation. No CICE feedback is sent to the prescribed ocean or ERA5.
 
 Physics
@@ -57,3 +57,17 @@ public runtime boundary.
 .. automodule:: vercor.types
    :members: RuntimeArray
    :show-inheritance:
+
+Veris parameter updates
+-----------------------
+
+``VerisConfig.physical_constants`` supplies independent native physical values
+separately from numerical ``custom_parameters``. It is keyword-only and owns
+copies of caller mappings/arrays. Start calibration candidates from one fixed
+initial state with ``replace_veris_parameters(initial, {"h0": value})``, then
+call ``coupler.run(candidate)``. The helper is immutable and supports JIT, JVP
+and VJP. Geometry, precision and hard binary transitions retain their native
+meaning. VerCOR's traced ``freshwater_density`` owns native rhoFresh and its
+derived ratios at setup and every step; direct helper overrides are rejected.
+
+.. autofunction:: vercor.setups.replace_veris_parameters
