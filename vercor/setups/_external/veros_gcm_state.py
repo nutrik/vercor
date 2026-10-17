@@ -85,14 +85,18 @@ class VerosGCMSetupState:
         restore_to_climatology_temp: bool = False,
         restore_to_climatology_salt: bool = False,
         do_spinup: bool = False,
+        surface_forcing: Literal["atmosphere", "coupled"] = "atmosphere",
     ) -> None:
         """Build Veros model resources and the VerCOR ocean grid."""
 
         self.name = name
         self.execution = execution
-        self.uses_atmosphere_forcing = setup == "global_4deg"
+        self.surface_forcing = surface_forcing
+        self.uses_atmosphere_forcing = (
+            setup == "global_4deg" and surface_forcing == "atmosphere"
+        )
         override = dict(custom_parameters or {})
-        if execution == "jax":
+        if execution == "jax" or surface_forcing == "coupled":
             override["enable_streamfunction"] = False
 
         setup_class = _select_veros_setup_class(setup, execution)
@@ -102,7 +106,7 @@ class VerosGCMSetupState:
                 restore_to_climatology_temp=restore_to_climatology_temp,
                 restore_to_climatology_salt=restore_to_climatology_salt,
             )
-            if self.uses_atmosphere_forcing
+            if setup == "global_4deg"
             else setup_class(override=override)
         )
         self.model.setup()
@@ -177,21 +181,24 @@ class VerosGCMSetupState:
 
         _ = component
         return SetupResult(
-            fields={
-                "sea_surface_temperature": _veros_state.extract_veros_runtime_sst(
-                    self._veros_state
-                )
-            },
+            fields=_veros_state.extract_veros_runtime_surface_fields(
+                self._veros_state, coupled=self.surface_forcing == "coupled"
+            ),
             payload=self._veros_state,
         )
 
 
-def veros_default_fields() -> dict[str, float]:
+def veros_default_fields(*, coupled: bool = False) -> dict[str, float]:
     """Return scalar defaults for the Veros runtime output contract."""
 
+    names: tuple[str, ...] = ("sea_surface_temperature",)
+    if coupled:
+        from vercor.fields import _flatten_field_items
+        from vercor.recipes import OCEAN_TO_VERIS_FORCING_FIELDS
+
+        names = tuple(_flatten_field_items(OCEAN_TO_VERIS_FORCING_FIELDS))
     return {
-        field_name: VEROS_FIELD_DEFAULTS.get(field_name, 0.0)
-        for field_name in ("sea_surface_temperature",)
+        field_name: VEROS_FIELD_DEFAULTS.get(field_name, 0.0) for field_name in names
     }
 
 

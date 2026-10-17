@@ -583,3 +583,149 @@ def test_five_step_fully_coupled_global_adjoint() -> None:
         finite_difference_step=None,
         relative_tolerance=1e-2,
     )
+
+
+@pytest.mark.fast_always
+def test_total_seaice_feedback_native_surface_jacobians() -> None:
+    """Actual source integration preserves total heat/mass/salt JVP and VJP."""
+    from vercor.setups._external.veros_runtime_settings import configure_veros_runtime
+
+    configure_veros_runtime("jax")
+    from tests._veros_surface_support import surface_model, feedback_fields
+    from vercor.physics import PhysicalConstants
+    from vercor.setups._external.veros_fluxes import compute_coupled_fluxes
+    from vercor.setups._external.veros_state import (
+        prepare_surface_forcing_fields,
+        apply_veros_forcing_fields,
+        extract_veros_runtime_surface_fields,
+    )
+
+    model = surface_model(execution="jax")
+    from veros.core import thermodynamics
+
+    state = model.state
+    wet = jnp.asarray(state.variables.maskT[2:-2, 2:-2, -1]).T
+
+    def response(values: jax.Array) -> jax.Array:
+        current = state.copy()
+        fields = feedback_fields()
+        fields["sea_surface_heat_flux"] = jnp.full((4, 4), 20 * values[0])
+        fields["sea_surface_mass_flux"] = jnp.full((4, 4), 1e-4 * values[1])
+        fields["sea_surface_salt_mass_flux"] = jnp.full((4, 4), 1e-7 * values[2])
+        taux, tauy, heat, salt = compute_coupled_fluxes(
+            fields, PhysicalConstants(), DTypePolicy(enable_x64=True)
+        )
+        prepared = prepare_surface_forcing_fields(taux, tauy, heat, None, salt)
+        current = apply_veros_forcing_fields(
+            current, prepared, execution="jax", activate_coupled_feedback=True
+        )
+        model.set_forcing(current)
+        thermodynamics.thermodynamics(current)
+        with current.variables.unlock():
+            current.variables.tau = current.variables.taup1
+        surfaces = extract_veros_runtime_surface_fields(current, coupled=True)
+        return jnp.stack(
+            tuple(
+                jnp.sum(surfaces[name] * wet) / jnp.sum(wet)
+                for name in ("sea_surface_temperature", "sea_surface_salinity")
+            )
+        )
+
+    values = jnp.asarray([-1.0, 1.0, 0.5])
+    capacity = 3991.86795711963 * state.settings.rho_0
+    expected = jnp.asarray(
+        [
+            [600 * 20 / (10 * capacity), 0.0, 0.0],
+            [0.0, -600 * 3.47e-6 / 10, 600 * 1e-7 / 10],
+        ]
+    )
+    forward = jax.jacfwd(response)(values)
+    reverse = jax.jacrev(response)(values)
+    finite_difference = jnp.stack(
+        [
+            (response(values + 1e-3 * axis) - response(values - 1e-3 * axis)) / 2e-3
+            for axis in jnp.eye(3)
+        ],
+        axis=1,
+    )
+    np.testing.assert_allclose(forward, expected, rtol=1e-10, atol=1e-15)
+    np.testing.assert_allclose(reverse, forward, rtol=1e-10, atol=1e-15)
+    np.testing.assert_allclose(finite_difference, forward, rtol=2e-6, atol=1e-9)
+
+
+@pytest.mark.fast_always
+def test_total_feedback_native_velocity_and_ssh_derivatives(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Wind traction differentiates through native momentum and free surface."""
+    from vercor.setups._external.veros_runtime_settings import configure_veros_runtime
+
+    configure_veros_runtime("jax")
+    from tests._veros_surface_support import surface_setup_class, feedback_fields
+    from vercor.components import DataComponent
+    from vercor.recipes import VERIS_TO_OCEAN_FLUX_FIELDS
+    from vercor.setups._external import veros_gcm_state
+
+    setup = surface_setup_class(execution="jax")
+    monkeypatch.setattr(
+        veros_gcm_state, "_select_veros_setup_class", lambda *args: setup
+    )
+    ocean = make_veros_gcm(
+        config=VerosConfig(execution="jax", surface_forcing="coupled")
+    )
+    wet = jnp.asarray(ocean.grid.binary_mask)
+    east = wet * jnp.roll(wet, -1, axis=1)
+    north = wet * jnp.concatenate((wet[1:], jnp.zeros_like(wet[:1])), axis=0)
+    x = jnp.arange(4.0)[None, :]
+    y = jnp.arange(4.0)[:, None]
+    tag_u = jnp.sin((x + 0.25) * jnp.pi / 2) * east
+    tag_v = jnp.cos((y + 0.25) * jnp.pi / 2) * north
+    tag_h = jnp.sin((x + y + 0.25) * jnp.pi / 2) * wet
+    source = DataComponent("CICE", ocean.grid, feedback_fields(heat=0.0, mass=0.0))
+    coupler = Coupler(
+        Clock(datetime(2000, 1, 3), 600.0, 1, calendar="noleap"),
+        components=(source, ocean),
+        exchanges=(
+            Exchange(
+                "CICE",
+                "OCN",
+                VERIS_TO_OCEAN_FLUX_FIELDS,
+                quantity="source_flux",
+                source_coverage="binary",
+            ),
+        ),
+        run_order=("CICE", "OCN"),
+        runtime=RuntimeOptions(dtype=DTypePolicy(enable_x64=True)),
+    )
+    initial = coupler.initial_state()
+
+    def response(stress: jax.Array) -> jax.Array:
+        candidate = initial.replace_fields(
+            "CICE",
+            {"ocean_u_stress": stress[0] * tag_u, "ocean_v_stress": stress[1] * tag_v},
+        )
+        fields = coupler.run(candidate).component("OCN")
+        return jnp.stack(
+            tuple(
+                jnp.sum(fields.field(name) * tag) / jnp.sum(wet)
+                for name, tag in (
+                    ("ocean_u_velocity", tag_u),
+                    ("ocean_v_velocity", tag_v),
+                    ("sea_surface_height", tag_h),
+                )
+            )
+        )
+
+    values = jnp.asarray([0.01, 0.02])
+    forward = jax.jacfwd(response)(values)
+    reverse = jax.jacrev(response)(values)
+    assert np.all(np.max(np.abs(np.asarray(forward)), axis=1) > 1e-10)
+    np.testing.assert_allclose(reverse, forward, rtol=1e-8, atol=1e-10)
+    finite = jnp.stack(
+        [
+            (response(values + 1e-5 * axis) - response(values - 1e-5 * axis)) / 2e-5
+            for axis in jnp.eye(2)
+        ],
+        axis=1,
+    )
+    np.testing.assert_allclose(finite, forward, rtol=1e-5, atol=1e-9)

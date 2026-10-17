@@ -12,6 +12,8 @@ from vercor.components import (
     ComponentSpec,
 )
 from vercor.output import OutputSpec
+from vercor.fields import _flatten_field_items
+from vercor.recipes import VERIS_TO_OCEAN_FLUX_FIELDS, OCEAN_TO_VERIS_FORCING_FIELDS
 from vercor.setups.config import VerosConfig
 
 
@@ -63,6 +65,7 @@ def make_veros_gcm(
         restore_to_climatology_temp=config.restore_to_climatology_temp,
         restore_to_climatology_salt=config.restore_to_climatology_salt,
         do_spinup=config.spinup.enabled,
+        surface_forcing=config.surface_forcing,
     )
     component = CallableComponent(
         config.name,
@@ -70,12 +73,22 @@ def make_veros_gcm(
         partial(_veros_runtime.step_veros_runtime, state),
         spec=ComponentSpec(
             inputs=(
-                _veros_gcm_state.VEROS_INPUT_FIELD_NAMES
-                if state.uses_atmosphere_forcing
-                else ()
+                tuple(_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS))
+                if config.surface_forcing == "coupled"
+                else (
+                    _veros_gcm_state.VEROS_INPUT_FIELD_NAMES
+                    if state.uses_atmosphere_forcing
+                    else ()
+                )
             ),
-            outputs=("sea_surface_temperature",),
-            initial_fields=_veros_gcm_state.veros_default_fields(),
+            outputs=(
+                tuple(_flatten_field_items(OCEAN_TO_VERIS_FORCING_FIELDS))
+                if config.surface_forcing == "coupled"
+                else ("sea_surface_temperature",)
+            ),
+            initial_fields=_veros_gcm_state.veros_default_fields(
+                coupled=config.surface_forcing == "coupled"
+            ),
             execution=config.execution,
             lifecycle=LifecycleHooks(setup=state.setup),
             output=OutputSpec(

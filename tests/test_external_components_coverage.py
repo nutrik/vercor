@@ -2261,6 +2261,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_coefficient
     assert prepared.taux.shape == (2, 2, 1)
     assert prepared.tauy.shape == (2, 2, 1)
     assert prepared.qnet.shape == (2, 2, 1)
+    assert prepared.qnec is not None
     assert prepared.qnec.shape == (2, 2, 1)
     taux_out, tauy_out, qnet_out, qnec_out, salt_out = prepared
     assert_allclose_compact(salt_out, np.asarray([[9.0, 11.0], [10.0, 0.0]]))
@@ -2268,6 +2269,7 @@ def test_veros_prepare_surface_forcing_fields_shapes_nan_cleanup_and_coefficient
     assert taux_out.shape == (2, 2, 1)
     assert tauy_out.shape == (2, 2, 1)
     assert qnet_out.shape == (2, 2, 1)
+    assert qnec_out is not None
     assert qnec_out.shape == (2, 2, 1)
     assert_allclose_compact(taux_out, np.asarray([[[1.0], [3.0]], [[0.0], [4.0]]]))
     assert_allclose_compact(qnet_out, np.asarray([[[9.0], [11.0]], [[10.0], [0.0]]]))
@@ -2715,6 +2717,7 @@ def test_veros_initialize_spinup_follows_enabled_only(
     )
     component.dt_tracer = 10.0
     component.do_spinup = do_spinup
+    component.surface_forcing = "atmosphere"
     component.spinup_time = timedelta(seconds=20.0)
     component.spinup_steps = 2
     component._veros_state = _make_fake_veros_state(surface_temperature=10.0)

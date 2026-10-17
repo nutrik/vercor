@@ -138,7 +138,7 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
 - Coupled mode requires pressure/free-surface execution (`enable_streamfunction=False`) so native `ssh` is active; reject conflicting explicit streamfunction overrides. Atmosphere-only behavior is unchanged.
 - Produces `extract_veros_runtime_surface_fields(state, *, coupled: bool) -> dict[str, Array]`: coupled mode exports SST in K, SSS in g/kg, canonical native east/north surface u/v in m/s, and actual native ssh in m. Atmosphere mode continues SST-only.
 
-- [ ] **Write RED conversions and real native increments.** Define `test_total_feedback_enters_native_tracers_once`. Use a four-by-four, two-level actual Veros fixture with mixing/advection disabled only to isolate the source increment; retain actual surface kernels/callbacks. With S_ref=34.7, rho_fw=1000, M=1e-4 and J=0:
+- [x] **Write RED conversions and real native increments.** Define `test_total_feedback_enters_native_tracers_once`. Use a four-by-four, two-level actual Veros fixture with mixing/advection disabled only to isolate the source increment; retain actual surface kernels/callbacks. With S_ref=34.7, rho_fw=1000, M=1e-4 and J=0:
 
   ```python
   np.testing.assert_allclose(salt_flux, -3.47e-6, rtol=1e-12)
@@ -147,10 +147,10 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
   ```
 
   Add pure-freezing actual-salt, zero-local-salinity/reference-budget, nondefault density, masked and no-double-dt/depth cases. Tag native u/v/sss/ssh and an unrelated large psi: verify real units/positions and no psi-as-height conversion. Parameterize independent temperature/salinity restoring switches. At SST below -1.8 C with cooling, coupled heat and salt remain nonzero while the old atmosphere-only control retains its behavior.
-- [ ] **Run RED in separate lanes.** Run the stock test module and the corresponding `veros_autodiff` cases in the exact-fork process; reproduce missing mode/exports and the cold-cutoff loss rather than use cross-backend mocks.
-- [ ] **Implement the one-owner mode.** Add native scalar activation metadata initialized inactive for ocean climatological spinup and set active only when total feedback is installed. The callback then gates the proxy cutoff without Python branching on traced values. Preserve restoring coefficients/weights and nonaccumulating salt assignment; skip bulk/rain/snow recomputation in coupled runtime. Keep single host payload copy and functional JAX copying. Extract updated surfaces after native stepping with native time levels; never fabricate zero SSH to satisfy the export.
-- [ ] **Verify GREEN and compatibility.** Check spinup before activation, first activation, repeated substeps, all restoring combinations, boundary halos, canonical faces and both dtypes. Test invalid mode/ACC/conflicting streamfunction settings early. Use JVP/VJP/directional finite differences for total heat/mass/salt and native output surfaces. Run old atmosphere-only tests, shared gates and AD.
-- [ ] **Commit.** Commit as `feat: couple Veros to total sea-ice surface forcing` with config/signature/docs/progress.
+- [x] **Run RED in separate lanes.** Run the stock test module and the corresponding `veros_autodiff` cases in the exact-fork process; reproduce missing mode/exports and the cold-cutoff loss rather than use cross-backend mocks.
+- [x] **Implement the one-owner mode.** Add native scalar activation metadata initialized inactive for ocean climatological spinup and set active only when total feedback is installed. The callback then gates the proxy cutoff without Python branching on traced values. Preserve restoring coefficients/weights and nonaccumulating salt assignment; skip bulk/rain/snow recomputation in coupled runtime. Keep single host payload copy and functional JAX copying. Extract updated surfaces after native stepping with native time levels; never fabricate zero SSH to satisfy the export.
+- [x] **Verify GREEN and compatibility.** Check spinup before activation, first activation, repeated substeps, all restoring combinations, boundary halos, canonical faces and both dtypes. Test invalid mode/ACC/conflicting streamfunction settings early. Use JVP/VJP/directional finite differences for total heat/mass/salt and native output surfaces. Run old atmosphere-only tests, shared gates and AD.
+- [x] **Commit.** Commit as `feat: couple Veros to total sea-ice surface forcing` with config/signature/docs/progress.
 
 ### Task 5: C5 — Shared prognostic setup and reusable synthetic calibration
 
