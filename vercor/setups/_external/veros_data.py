@@ -47,8 +47,10 @@ class VerosDataSnapshot:
         object.__setattr__(self, "fields", _copy_arrays(self.fields))
 
 
-def snapshot_veros_state(state: Any) -> VerosDataSnapshot:
-    """Extract physical native interiors without retaining the mutable state."""
+def _snapshot_veros_geometry(
+    state: Any,
+) -> tuple[RectilinearGrid, Mapping[str, RuntimeArray]]:
+    """Extract authoritative geometry without fabricating prognostic surfaces."""
     vs = state.variables
     geometry = {
         name: np.asarray(getattr(vs, name))[2:-2, 2:-2]
@@ -91,6 +93,13 @@ def snapshot_veros_state(state: Any) -> VerosDataSnapshot:
         latitude_edges=np.asarray(vs.yu)[1:-2],
         radius=np.asarray(state.settings.radius),
     )
+    return grid, geometry
+
+
+def snapshot_veros_state(state: Any) -> VerosDataSnapshot:
+    """Own geometry and prescribed climatology without retaining native state."""
+    grid, geometry = _snapshot_veros_geometry(state)
+    vs = state.variables
     sst = np.asarray(vs.sst_clim)[2:-2, 2:-2].transpose(2, 1, 0) + 273.15
     surface_fields = {
         "sea_surface_temperature": sst,

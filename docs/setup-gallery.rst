@@ -61,6 +61,14 @@ Example:
      - Run Veris with prescribed Veros ocean and ERA5 data.
      - Veris, Veros
      - Yes
+   * - ``run_veris_veros_era5``
+     - Couple prognostic Veris and Veros with prescribed ERA5 air.
+     - Veris, Veros
+     - Yes
+   * - ``run_veris_calibration``
+     - Recover native h0 from synthetic concentration with a cold-forcing holdout.
+     - Veris
+     - No
    * - ``run_camulator_with_veros``
      - Couple CAMulator atmosphere/land to Veros.
      - CAMulator, Veros
@@ -242,3 +250,34 @@ are ERA5 data components; CICE sends no feedback to these prescribed components.
 CESM reference-air diagnostics and heat/freshwater conventions are described
 above. The short native tests verify operation and local derivatives; they do
 not establish long-term climate or spherical-dynamics accuracy.
+
+Prognostic sea ice and ocean
+----------------------------
+
+``run_veris_veros_era5`` uses ``make_veris_veros`` to initialize one native ocean
+and share its exact geometry with sea ice. The daily ``LND -> CICE -> OCN -> ATM``
+sequence is explicitly lagged: ice receives the latest ocean/air state, ocean
+receives the current ice interval means, then ERA5 advances. Heat, total bulk
+mass and actual salt mass use a conservative scalar route. Stress uses the
+vector-capable shared-grid identity route. Both outgoing routes use binary
+source support and together carry ``VERIS_TO_OCEAN_FLUX_FIELDS``; concentration
+is not applied twice. This same-grid proof does not establish different-grid
+staggered stress conservation.
+
+Synthetic parameter recovery
+-----------------------------
+
+``run_veris_calibration`` needs no external data assets. It fits h0 (m) from
+synthetic concentration using public state replacement, a fixed wet observation
+mask including ice-free cells, and a residual scale of 1e-3. Its reusable
+``calibrate_lead_closing_thickness`` accepts a Coupler, fixed initial RunState,
+observed_fraction, optional weights, initial_h0, positive bounds and a component
+name. The default bounds are 0.25--0.8 m. Invalid observations/weights, all-dry
+weights and an insensitive observation window fail before minimization.
+
+The JAX-jitted value/gradient drives SciPy L-BFGS-B with ftol=1e-14, gtol=1e-10
+and maxiter=100. The frozen PyTree result contains fitted h0, scaled loss and
+gradient, optimizer iteration/evaluation counts and convergence. The example
+prints recovery of truth 0.43 m and a distinct cold-forcing holdout error.
+This validates numerical recovery rather than observed climate skill; float32
+concentration quantization limits recovery accuracy relative to float64.

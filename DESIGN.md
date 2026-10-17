@@ -459,3 +459,11 @@ cold-water proxy applies only while total feedback is inactive. Native pressure/
 free-surface execution provides actual SSH, with canonical native surface
 velocities and salinity alongside SST. Salt conversion uses fixed S_ref and
 actual M/J, separately from physical local-salinity inventory accounting.
+
+The prognostic Veris/Veros factory reuses the sole Veros setup owner and extracts
+geometry without copying prescribed climatology proxies. Both components share
+one exact grid. Scalar total fluxes use conservative routing; vector stresses
+use existing shared-grid identity routing, with binary coverage for both. The
+focused calibration gallery fits native h0 through public immutable state and
+fields using fixed wet weights, an identifiability guard and JAX value/gradient
+evaluation inside bounded SciPy minimization; it adds no generic optimizer API.
