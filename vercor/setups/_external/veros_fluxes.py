@@ -9,6 +9,7 @@ import jax
 import jax.numpy as jnp
 
 from vercor.dtypes import DTypePolicy, as_jax_real_array
+from vercor._numerical_safety import replace_missing_nan
 from vercor.setups._surface_fluxes import compute_surface_fluxes
 from vercor.physics import PhysicalConstants
 from vercor.types import RuntimeArray
@@ -104,4 +105,40 @@ def compute_fluxes(
     )
 
 
-__all__ = ["compute_fluxes"]
+@partial(jax.jit, static_argnames=("dtype",))
+def compute_coupled_fluxes(
+    fields: Mapping[str, RuntimeArray],
+    constants: PhysicalConstants,
+    dtype: DTypePolicy,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    """Convert total downward heat/mass/salt and canonical face stresses once.
+
+    Salinity forcing is (-S_ref*M + 1000*J)/rho_fw in (g/kg)*m/s.
+    M is total bulk mass, J actual salt mass, both kg/m2/s. Fixed-reference
+    Boussinesq virtual salt differs from physical inventory at other salinities.
+    Missing inactive values are neutralized before parameter arithmetic; the
+    component's receive boundary rejects missing values on its active domain.
+    Native tracer kernels own rho_0, heat capacity, timestep and layer depth.
+    """
+
+    def clean(name: str) -> jax.Array:
+        return replace_missing_nan(
+            as_jax_real_array(fields[name], dtype),
+            owner=f"Veros total feedback '{name}'",
+        )
+
+    mass = clean("sea_surface_mass_flux")
+    salt = clean("sea_surface_salt_mass_flux")
+    virtual = (
+        -as_jax_real_array(constants.surface_salinity_reference, dtype) * mass
+        + as_jax_real_array(1000.0, dtype) * salt
+    ) / as_jax_real_array(constants.freshwater_density, dtype)
+    return (
+        clean("ocean_u_stress"),
+        clean("ocean_v_stress"),
+        clean("sea_surface_heat_flux"),
+        virtual,
+    )
+
+
+__all__ = ["compute_fluxes", "compute_coupled_fluxes"]

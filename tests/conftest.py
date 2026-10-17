@@ -14,6 +14,11 @@ import pytest
 
 from tests._parallel_support import configure_test_cache_environment
 
+# Match the adapter's host I/O policy before collection imports native core.
+# Backend and precision remain configured explicitly in separate stock/AD lanes.
+os.environ.setdefault("VEROS_FORCE_OVERWRITE", "1")
+os.environ.setdefault("VEROS_DISKLESS_MODE", "1")
+
 jax.config.update("jax_enable_x64", True)
 
 _TEST_CACHE_ROOT = Path(tempfile.gettempdir())

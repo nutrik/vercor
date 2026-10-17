@@ -22,7 +22,7 @@ class VerosForcingFields(NamedTuple):
     taux: jax.Array
     tauy: jax.Array
     qnet: jax.Array
-    qnec: jax.Array
+    qnec: jax.Array | None
     coupled_salt_flux: jax.Array
 
 
@@ -47,7 +47,8 @@ def prepare_surface_forcing_fields(
     """Clean and transpose surface arrays into native Veros forcing layouts.
 
     Stress and heat have a singleton month axis for broadcast into the native
-    climatology arrays. The already-converted salt flux remains a 2D T-grid
+    climatology arrays. qnec=None preserves the native climatological restoring
+    coefficient. The already-converted salt flux remains a 2D T-grid
     array in m (g/kg)/s; the native tracer owns timestep/depth integration.
     Restoring weights are applied by the native callback, including spinup;
     this layout boundary preserves the raw heat-correction coefficient.
@@ -60,7 +61,9 @@ def prepare_surface_forcing_fields(
     taux_prepared = _prepare(taux, "Veros taux surface forcing")
     tauy_prepared = _prepare(tauy, "Veros tauy surface forcing")
     qnet_prepared = _prepare(qnet, "Veros qnet surface forcing")
-    qnec_prepared = _prepare(qnec, "Veros qnec surface forcing")
+    qnec_prepared = (
+        None if qnec is None else _prepare(qnec, "Veros qnec surface forcing")
+    )
 
     return VerosForcingFields(
         taux=taux_prepared,
@@ -180,13 +183,54 @@ def extract_veros_runtime_sst(state: VerosState) -> jax.Array:
     )
 
 
+def extract_veros_runtime_surface_fields(
+    state: VerosState,
+    *,
+    coupled: bool,
+) -> dict[str, jax.Array]:
+    """Extract native SST K and, for coupled mode, actual prognostic surfaces.
+
+    SSS retains native g/kg, east/north face velocities are m/s, and active
+    native SSH is metres. Native psi has different units and is never used as
+    height. Dry/coastal operands use their actual native wet masks.
+    """
+    vs = state.variables
+    result = {"sea_surface_temperature": extract_veros_runtime_sst(state)}
+    if not coupled:
+        return result
+    tau = as_jax_index_array(vs.tau)
+
+    def surface(array: object, mask: object) -> jax.Array:
+        return (
+            as_jax_real_array(array)[2:-2, 2:-2, -1, tau]
+            * as_jax_real_array(mask)[2:-2, 2:-2, -1]
+        ).T
+
+    result.update(
+        sea_surface_salinity=surface(vs.salt, vs.maskT),
+        ocean_u_velocity=surface(vs.u, vs.maskU),
+        ocean_v_velocity=surface(vs.v, vs.maskV),
+        sea_surface_height=(
+            as_jax_real_array(vs.ssh)[2:-2, 2:-2]
+            * as_jax_real_array(vs.maskT)[2:-2, 2:-2, -1]
+        ).T,
+    )
+    return result
+
+
 def apply_veros_forcing_fields(
     state: VerosState,
     forcing_fields: VerosForcingFields,
     *,
     execution: Literal["host", "jax"],
+    activate_coupled_feedback: bool = False,
 ) -> VerosState:
-    """Write prepared VerCOR forcing fields into Veros state variables."""
+    """Write forcing once, preserving omitted qnec and optionally activating totals.
+
+    Host callers already own a copied payload; JAX callers retain functional
+    copying. Activation is explicit even for zero flux and persists through
+    later native substeps, while climatological spinup starts inactive.
+    """
 
     updated_state = (
         state if execution == "host" else copy_state(state, execution=execution)
@@ -198,12 +242,19 @@ def apply_veros_forcing_fields(
             forcing_fields,
             strict=True,
         ):
+            if variable_value is None:
+                continue
             current = getattr(variables, variable_name)
             updated = update_veros_interior(current, variable_value)
             setattr(
                 variables,
                 variable_name,
                 updated if execution == "jax" else runtime_array_to_host(updated),
+            )
+        if activate_coupled_feedback:
+            active = jnp.ones_like(variables.coupled_feedback_active)
+            variables.coupled_feedback_active = (
+                active if execution == "jax" else runtime_array_to_host(active)
             )
     return updated_state
 

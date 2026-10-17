@@ -83,3 +83,27 @@ open-water traction from one shared bulk calculation. Export these total-area
 fields with ``quantity="source_flux", source_coverage="binary"`` so complete
 melt does not suppress ocean input or apply ice concentration twice. The final
 instantaneous native diagnostics remain separate from the canonical means.
+
+Total feedback into Veros
+-------------------------
+
+``VerosConfig(surface_forcing="coupled")`` selects total ocean boundary inputs
+from ``VERIS_TO_OCEAN_FLUX_FIELDS`` for the global setup. It requires pressure/
+free-surface execution (``enable_streamfunction=False``) to export actual native
+SSH; ACC retains internal forcing and rejects this mode. The default atmosphere
+mode preserves existing behavior. Coupled mode exports SST in K, SSS in native
+g/kg, actual east/north surface currents in m/s and native SSH in m. Streamfunction
+or surface pressure is never used as SSH.
+
+Native ocean kernels apply timestep, layer depth, ocean density and heat capacity
+once. Virtual salt input is ``(-S_ref*M + 1000*J)/rho_fw`` in (g/kg)*m/s using
+fixed reference salinity (34.7 g/kg by default), total downward bulk mass M and
+actual downward salt mass J in kg/m2/s. This Boussinesq reference budget differs
+from physical ocean salt inventory when local salinity differs from S_ref.
+No atmospheric bulk, rain, snow or evaporation is recomputed in this mode.
+
+Temperature and salinity restoring remain independent. Omitting the coupled
+qnec coefficient preserves its native climatology. Climatological spinup starts
+with total feedback inactive and retains the native cold-water cooling proxy.
+Installing total feedback activates it even for zero input; thereafter the
+proxy cannot discard heat or salt already diagnosed by the sea-ice model.

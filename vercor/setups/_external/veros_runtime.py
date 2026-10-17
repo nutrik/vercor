@@ -34,7 +34,21 @@ def step_veros_runtime(
     if execution == "host" and time is None:
         return StepResult(payload=native_state)
 
-    if uses_atmosphere_forcing:
+    coupled = getattr(resources, "surface_forcing", "atmosphere") == "coupled"
+    if coupled:
+        taux, tauy, qnet, salt_flux = _veros_fluxes.compute_coupled_fluxes(
+            fields, context.constants, context.dtype
+        )
+        forcing_fields = _veros_state.prepare_surface_forcing_fields(
+            taux, tauy, qnet, None, salt_flux
+        )
+        native_state = _veros_state.apply_veros_forcing_fields(
+            native_state,
+            forcing_fields,
+            execution=execution,
+            activate_coupled_feedback=True,
+        )
+    elif uses_atmosphere_forcing:
         taux, tauy, qnet, qnec, salt_flux = _veros_fluxes.compute_fluxes(
             native_state,
             fields,
@@ -57,11 +71,9 @@ def step_veros_runtime(
         logger=context.logger if execution == "host" else None,
     )
     return StepResult(
-        fields={
-            "sea_surface_temperature": _veros_state.extract_veros_runtime_sst(
-                native_state
-            )
-        },
+        fields=_veros_state.extract_veros_runtime_surface_fields(
+            native_state, coupled=coupled
+        ),
         payload=native_state,
     )
 

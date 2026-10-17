@@ -451,3 +451,11 @@ are checked at every substep with a sticky validity carry and a single coupling
 boundary guard, including accumulation overflow. Stress combines retained
 momentum AreaW/AreaS with ice traction and complementary shared-bulk open-water
 traction before shifting west/south to east/north faces.
+
+Global Veros selects atmosphere or total sea-ice surface forcing explicitly.
+Total mode consumes the five canonical rates once, preserves independent native
+restoring, and activates a scalar native flag after climatological spinup. The
+cold-water proxy applies only while total feedback is inactive. Native pressure/
+free-surface execution provides actual SSH, with canonical native surface
+velocities and salinity alongside SST. Salt conversion uses fixed S_ref and
+actual M/J, separately from physical local-salinity inventory accounting.

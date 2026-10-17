@@ -51,7 +51,9 @@ class VerosConfig:
     correction and ``restore_to_climatology_salt`` independently adds 30-day
     SSS restoring to the coupled virtual salt flux. Both default to False
     and apply during spinup and coupled stepping in either execution lane.
-    The ACC setup retains its native internal forcing.
+    The ACC setup retains its native internal forcing. Explicit ``surface_forcing="coupled"``
+    accepts only total sea-ice ocean fluxes on the global grid, keeps independent
+    restoring, and requires native pressure/free-surface execution for real SSH.
     """
 
     name: str = "OCN"
@@ -62,6 +64,9 @@ class VerosConfig:
     restore_to_climatology_salt: bool = False
     spinup: Spinup = field(default_factory=Spinup)
     output: OutputSpec = field(default_factory=OutputSpec)
+    surface_forcing: Literal["atmosphere", "coupled"] = field(
+        default="atmosphere", kw_only=True
+    )
 
     def __post_init__(self) -> None:
         """Validate execution policy and copy caller mappings into owned state."""
@@ -70,6 +75,18 @@ class VerosConfig:
             raise ValueError("setup must be 'global_4deg' or 'acc'")
         if self.execution not in ("host", "jax"):
             raise ValueError("execution must be 'host' or 'jax'")
+
+        if not isinstance(self.surface_forcing, str):
+            raise TypeError("surface_forcing must be a string")
+        if self.surface_forcing not in ("atmosphere", "coupled"):
+            raise ValueError("surface_forcing must be 'atmosphere' or 'coupled'")
+        if self.surface_forcing == "coupled":
+            if self.setup != "global_4deg":
+                raise ValueError("coupled surface_forcing requires global_4deg")
+            if (self.custom_parameters or {}).get("enable_streamfunction", False):
+                raise ValueError(
+                    "coupled surface_forcing requires enable_streamfunction=False for native SSH"
+                )
 
         if self.custom_parameters is not None:
             object.__setattr__(

@@ -49,11 +49,19 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
 
         super().set_parameter(state)
         state.var_meta.update(
+            coupled_feedback_active=Variable(
+                "Total feedback activation",
+                (),
+                "1",
+                "One after total sea-ice feedback is installed; zero during climatological spinup",
+                initial=0.0,
+                time_dependent=False,
+            ),
             coupled_salt_flux=Variable(
                 "Coupled virtual salt flux",
                 ("xt", "yt"),
                 "m g kg-1 s-1",
-                "VerCOR-computed freshwater contribution to surface salinity flux",
+                "VerCOR-computed total virtual salt contribution from bulk mass and actual salt",
                 initial=0.0,
             ),
             temp_restoring=Variable(
@@ -135,19 +143,22 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
             vs.temp[:, :, -1, vs.tau] * vs.maskT[:, :, -1] < -1.8,
             vs.forc_temp_surface < 0.0,
         )
+        mask = npx.logical_and(mask, vs.coupled_feedback_active == 0)
         vs.forc_temp_surface = npx.where(mask, 0.0, vs.forc_temp_surface)
         vs.forc_salt_surface = npx.where(mask, 0.0, vs.forc_salt_surface)
         vs.forc_salt_surface = enforce_boundaries(
             vs.forc_salt_surface, settings.enable_cyclic_x
         )
 
-        return KernelOutput(
+        output = dict(
             surface_taux=vs.surface_taux,
             surface_tauy=vs.surface_tauy,
-            forc_tke_surface=vs.forc_tke_surface,
             forc_temp_surface=vs.forc_temp_surface,
             forc_salt_surface=vs.forc_salt_surface,
         )
+        if settings.enable_tke:
+            output["forc_tke_surface"] = vs.forc_tke_surface
+        return KernelOutput(**output)
 
     @veros_routine
     def set_diagnostics(self, state):  # type: ignore
