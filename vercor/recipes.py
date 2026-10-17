@@ -46,6 +46,15 @@ OCEAN_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
 """Prescribed tracer surfaces and native face velocities on the shared ocean grid."""
 
 
+VERIS_TO_OCEAN_FLUX_FIELDS: tuple[_ExchangeField, ...] = (
+    "sea_surface_heat_flux",
+    "sea_surface_mass_flux",
+    "sea_surface_salt_mass_flux",
+    _vector("ocean_u_stress", "ocean_v_stress"),
+)
+"""Total-area interval means: downward W/m2, kg/m2/s, kg salt/m2/s and Pa."""
+
+
 ATMOSPHERE_TO_DATA_OCEAN_FIELDS: tuple[_ExchangeField, ...] = (
     _vector("u_velocity", "v_velocity"),
     "specific_humidity",
@@ -183,4 +192,5 @@ __all__ = [
     "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS",
     "SLAB_ATMOSPHERE_TO_OCEAN_FIELDS",
     "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS",
+    "VERIS_TO_OCEAN_FLUX_FIELDS",
 ]

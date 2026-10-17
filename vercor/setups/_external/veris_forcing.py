@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from functools import partial
+from dataclasses import dataclass
+from typing import cast
 
 import jax
 import jax.numpy as jnp
@@ -24,15 +26,30 @@ from vercor.setups._surface_fluxes import compute_surface_fluxes
 from vercor.types import RuntimeArray
 
 
+@jax.tree_util.register_dataclass
+@dataclass(frozen=True)
+class VerisForcingPack:
+    """Native forcing and direct-water stresses on physical west/south faces.
+
+    Arrays use native (x, y) storage without halos; stress is in Pa. Bulk
+    tracer-cell stress is averaged to each wet face before concentration
+    weighting by the momentum-time face fraction in the flux adapter.
+    """
+
+    native_forcing: dict[str, RuntimeArray]
+    open_water_u_stress: RuntimeArray
+    open_water_v_stress: RuntimeArray
+
+
 @partial(jax.jit, static_argnames=("dtype",))
-def prepare_veris_forcing(
+def prepare_veris_forcing_pack(
     fields: Mapping[str, RuntimeArray],
     *,
     ocean_mask: RuntimeArray,
     constants: PhysicalConstants,
     dtype: DTypePolicy,
-) -> dict[str, RuntimeArray]:
-    """Return fresh prescribed forcing; callers reapply it every native substep."""
+) -> VerisForcingPack:
+    """Evaluate shared bulk physics once and pack native forcing and face stress."""
     wet = as_jax_real_array(ocean_mask, dtype) > 0
     clean: dict[str, jax.Array] = {}
     for name, field in fields.items():
@@ -75,7 +92,7 @@ def prepare_veris_forcing(
         return jnp.where(wet, value, as_jax_real_array(dry, dtype)).T
 
     zero = jnp.zeros_like(u)
-    return {
+    forcing = {
         "theta": native(clean["sea_surface_temperature"], 273.15),
         "ocSalt": native(clean["sea_surface_salinity"]),
         "uOcean": native(west),
@@ -95,3 +112,32 @@ def prepare_veris_forcing(
         "evap": native(bulk.evap / rho),
         "runoff": zero.T,
     }
+
+    west_wet = wet & jnp.roll(wet, 1, axis=1)
+    south_wet = wet & jnp.concatenate((jnp.zeros_like(wet[:1]), wet[:-1]), axis=0)
+    tau_u = 0.5 * (bulk.taux + jnp.roll(bulk.taux, 1, axis=1))
+    tau_v = 0.5 * (
+        bulk.tauy
+        + jnp.concatenate((jnp.zeros_like(bulk.tauy[:1]), bulk.tauy[:-1]), axis=0)
+    )
+    return VerisForcingPack(
+        forcing, jnp.where(west_wet, tau_u, 0.0).T, jnp.where(south_wet, tau_v, 0.0).T
+    )
+
+
+@partial(jax.jit, static_argnames=("dtype",))
+def prepare_veris_forcing(
+    fields: Mapping[str, RuntimeArray],
+    *,
+    ocean_mask: RuntimeArray,
+    constants: PhysicalConstants,
+    dtype: DTypePolicy,
+) -> dict[str, RuntimeArray]:
+    """Return prescribed native forcing through the shared single-bulk packer."""
+    pack = cast(
+        VerisForcingPack,
+        prepare_veris_forcing_pack(
+            fields, ocean_mask=ocean_mask, constants=constants, dtype=dtype
+        ),
+    )
+    return pack.native_forcing

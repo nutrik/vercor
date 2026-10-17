@@ -442,3 +442,12 @@ constructor signatures, removed primary modules, the dependency-free slab, and
 the composed external extension. CI builds and uploads only the two VerCOR
 distributions once, shares that artifact bundle with all matrix cells, and
 builds the fixture separately for each external-extension contract job.
+
+The Veris runtime retains final native diagnostics and separately integrates
+complete ocean heat, actual mass/salt and face-stress products over native
+substeps. Canonical fields are total-area interval means; two external boundary
+means in the payload support independent column budgets. Native inputs/outputs
+are checked at every substep with a sticky validity carry and a single coupling
+boundary guard, including accumulation overflow. Stress combines retained
+momentum AreaW/AreaS with ice traction and complementary shared-bulk open-water
+traction before shifting west/south to east/north faces.

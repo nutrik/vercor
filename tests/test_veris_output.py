@@ -22,6 +22,7 @@ from vercor.output import OutputContext, OutputSpec, OutputTarget, PeriodOutput
 from vercor.state import ComponentState
 from vercor.grids import RectilinearGrid
 from vercor.setups._external.veris_runtime import VerisPayload
+from vercor.setups._external.veris_fluxes import VerisIntervalBudget
 
 
 @pytest.mark.fast_always
@@ -35,6 +36,8 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
     assert grid.longitude_edges is not None and grid.latitude_edges is not None
     expected_x = np.asarray(grid.longitude_edges)[:-1]
     expected_y = np.asarray(grid.latitude_edges)[:-1]
+    expected_east = np.asarray(grid.longitude_edges)[1:]
+    expected_north = np.asarray(grid.latitude_edges)[1:]
     if not with_edges:
         grid = RectilinearGrid(
             "inferred",
@@ -68,11 +71,26 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
         }
     )
     diagnostics.physics_status = jnp.zeros_like(tagged)
-    payload = VerisPayload(state, diagnostics, physical_constants=None)
+    payload = VerisPayload(
+        state,
+        diagnostics,
+        physical_constants=None,
+        interval_budget=VerisIntervalBudget(jnp.zeros((2, 3)), jnp.zeros((2, 3))),
+    )
+    canonical = {
+        name: jnp.arange(6.0).reshape(2, 3) + offset
+        for name, offset in (
+            ("sea_surface_heat_flux", 400),
+            ("sea_surface_mass_flux", 500),
+            ("sea_surface_salt_mass_flux", 600),
+            ("ocean_u_stress", 700),
+            ("ocean_v_stress", 800),
+        )
+    }
     component = CallableComponent("CICE", grid, lambda f: {}, spec=ComponentSpec())
     context = OutputContext(
         component,
-        ComponentState("CICE", grid),
+        ComponentState("CICE", grid, fields=canonical),
         payload,
         1,
         datetime(2000, 1, 1),
@@ -103,12 +121,25 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
     np.testing.assert_array_equal(frame.coordinates["y_center"].values, grid.latitude)
     np.testing.assert_array_equal(frame.coordinates["x_face"].values, expected_x)
     np.testing.assert_array_equal(frame.coordinates["y_face"].values, expected_y)
+    for name, value in canonical.items():
+        np.testing.assert_array_equal(frame.variables[name].values, value)
+        assert frame.variables[name].attrs["cell_methods"] == "time: mean"
+    assert frame.variables["ocean_u_stress"].dims == ("y_center", "x_east_face")
+    assert frame.variables["ocean_v_stress"].dims == ("y_north_face", "x_center")
+    np.testing.assert_array_equal(
+        frame.coordinates["x_east_face"].values, expected_east
+    )
+    np.testing.assert_array_equal(
+        frame.coordinates["y_north_face"].values, expected_north
+    )
     assert set(frame.coordinates) == {
         "time",
         "x_center",
         "y_center",
         "x_face",
         "y_face",
+        "x_east_face",
+        "y_north_face",
     }
 
 
@@ -132,7 +163,13 @@ def test_provider_requires_native_payload() -> None:
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "variables", [(), ("Area", "hIceMean"), ("unknown_native_variable",)]
+    "variables",
+    [
+        (),
+        ("Area", "hIceMean"),
+        ("Area", "hIceMean", "sea_surface_heat_flux", "ocean_u_stress"),
+        ("unknown_native_variable",),
+    ],
 )
 def test_shared_period_selection_and_snapshot_metadata(
     tmp_path: Path, variables: tuple[str, ...]
@@ -160,7 +197,7 @@ def test_shared_period_selection_and_snapshot_metadata(
         assert (
             set(ds.data_vars) == set(variables)
             if variables
-            else len(ds.data_vars) == 16
+            else len(ds.data_vars) == 21
         )
         np.testing.assert_allclose(
             ds["Area"][0], final.component("CICE").field("ice_fraction")
@@ -181,6 +218,17 @@ def test_shared_period_selection_and_snapshot_metadata(
         )
         assert ds["forc_salt_surface"].attrs["units"] == "g kg-1 m s-1"
         assert ds["OceanStressV"].dims == ("time", "y_face", "x_center")
+        assert ds["sea_surface_heat_flux"].attrs["units"] == "W m-2"
+        assert ds["sea_surface_salt_mass_flux"].attrs["units"] == "kg m-2 s-1"
+        assert ds["ocean_u_stress"].dims == ("time", "y_center", "x_east_face")
+        for name in (
+            "sea_surface_heat_flux",
+            "sea_surface_mass_flux",
+            "sea_surface_salt_mass_flux",
+            "ocean_u_stress",
+            "ocean_v_stress",
+        ):
+            np.testing.assert_allclose(ds[name][0], final.component("CICE").field(name))
     with xr.open_dataset(tmp_path / "cice.runtime_fields.nc") as ds:
         np.testing.assert_allclose(ds["fmask_FORCING_CICE"], component.grid.binary_mask)
 

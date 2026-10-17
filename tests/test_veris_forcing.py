@@ -219,3 +219,37 @@ def test_mass_conversion_uses_traced_freshwater_density(
         np.testing.assert_allclose(
             jax.grad(objective)(jnp.array(1000.0)), -3e-11, rtol=1e-12
         )
+
+
+def test_forcing_pack_evaluates_bulk_once_and_uses_native_faces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from vercor.setups._external import veris_forcing
+    from vercor.setups._surface_fluxes import SurfaceFluxes
+
+    calls: list[bool] = []
+    stress = jnp.array([[1.0, 3.0, 7.0], [2.0, 6.0, 14.0]])
+
+    def bulk(fields: Any, **kwargs: Any) -> Any:
+        calls.append(True)
+        zero = jnp.zeros_like(stress)
+        return SurfaceFluxes(
+            stress, 10 * stress, zero, zero, zero, zero + 270.0, zero + 0.001
+        )
+
+    monkeypatch.setattr(veris_forcing, "compute_surface_fluxes", bulk)
+    with jax.disable_jit():
+        pack = veris_forcing.prepare_veris_forcing_pack(
+            surface_fields(),
+            ocean_mask=jnp.ones((2, 3)),
+            constants=PhysicalConstants(),
+            dtype=DTypePolicy(enable_x64=True),
+        )
+    assert len(calls) == 1
+    np.testing.assert_array_equal(
+        pack.open_water_u_stress.T, [[4.0, 2.0, 5.0], [8.0, 4.0, 10.0]]
+    )
+    np.testing.assert_array_equal(
+        pack.open_water_v_stress.T, [[0.0, 0.0, 0.0], [15.0, 45.0, 105.0]]
+    )
+    assert isinstance(pack.native_forcing, dict)
