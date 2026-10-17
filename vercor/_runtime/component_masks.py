@@ -78,16 +78,24 @@ def field_active_mask(
     default_mask: RuntimeArray | None,
     fractional_mask: RuntimeArray,
     produced: bool,
+    binary_mask: RuntimeArray | None = None,
+    binary_output_fields: tuple[str, ...] = (),
 ) -> RuntimeArray | None:
     """Select finite-value support, keeping mask fields finite everywhere.
 
-    Produced fields may be missing outside evolving coverage. Inputs retain
+    Binary-route exports require finite values across binary support. Other
+    produced fields may be missing outside evolving coverage. Inputs retain
     their computational or incoming-route support even on ice-free cells.
     Call ``resolve_component_masks`` before using these exemptions.
     """
     declaration = component.spec.masks
+    if declaration is not None and field_name in (
+        declaration.binary_field,
+        declaration.fractional_field,
+    ):
+        return None
+    if field_name in binary_output_fields:
+        return binary_mask
     if declaration is None:
         return default_mask
-    if field_name in (declaration.binary_field, declaration.fractional_field):
-        return None
     return fractional_mask if produced else default_mask

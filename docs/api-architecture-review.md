@@ -131,7 +131,7 @@ could otherwise be confused with data:
 ```text
 Coupler(clock, *, components=(), exchanges=(), run_order=(), runtime=None,
         constants=None, logger=None, log_level="INFO")
-Exchange(source, target, fields, *, route_id=None, regridder_factory=bilinear)
+Exchange(source, target, fields, *, route_id=None, regridder_factory=bilinear, quantity="legacy", source_coverage="component")
 ComponentSpec(inputs=(), outputs=(), initial_fields=None, *, execution="jax",
               lifecycle=None, transfer=None, output=None)
 RuntimeOptions(dtype=DTypePolicy(), backend="auto", workflow=SequentialWorkflow(),

@@ -32,6 +32,9 @@ The exact API inventory and compatibility decisions are in
   Stored imports retain the coverage of their last dispatch, separately from
   current route diagnostics, so a source can reactivate before its recipient
   runs. Imported mask fields are validated before author physics executes.
+  Explicit routes can select `source_coverage="binary"` for total-area fluxes;
+  their exported fields require finite binary support in sends and supplied
+  states, including wet cells with zero fractional coverage.
 
 The stable release does not provide registries, entry-point discovery, Pydantic
 models, fan-in reducers, a public prepared graph, fractional subcycling,

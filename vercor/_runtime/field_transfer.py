@@ -66,7 +66,7 @@ def send_runtime_fields(
 ) -> ComponentRuntimeState:
     """Move component fields into sent runtime fields."""
 
-    _, fraction = resolve_component_masks(
+    binary, fraction = resolve_component_masks(
         component,
         component_state.fields.to_mapping(),
         DTypePolicy.from_jax_config() if dtype is None else dtype,
@@ -88,6 +88,8 @@ def send_runtime_fields(
                 default_mask=component.grid.binary_mask,
                 fractional_mask=fraction,
                 produced=True,
+                binary_mask=binary,
+                binary_output_fields=contract.binary_sends,
             ),
             owner=f"Component '{component.name}' sent field '{field_name}'",
         )

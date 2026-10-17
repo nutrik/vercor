@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Sequence
 
 from vercor.exceptions import CouplerError
@@ -14,6 +14,7 @@ class ExchangeContract:
 
     receives: tuple[str, ...] = ()
     sends: tuple[str, ...] = ()
+    binary_sends: tuple[str, ...] = ()
 
     @property
     def all_fields(self) -> tuple[str, ...]:
@@ -103,19 +104,20 @@ def build_exchange_contracts(
 
         flattened_fields = flatten_exchange_fields(exchange.fields)
         source_contract = contracts[exchange.source]
-        destination_contract = contracts[exchange.target]
-        contracts[exchange.source] = ExchangeContract(
-            receives=source_contract.receives,
-            sends=_extend_contract_fields(
-                source_contract.sends,
-                flattened_fields,
+        contracts[exchange.source] = replace(
+            source_contract,
+            sends=_extend_contract_fields(source_contract.sends, flattened_fields),
+            binary_sends=(
+                _extend_contract_fields(source_contract.binary_sends, flattened_fields)
+                if exchange.source_coverage == "binary"
+                else source_contract.binary_sends
             ),
         )
-        contracts[exchange.target] = ExchangeContract(
+        destination_contract = contracts[exchange.target]
+        contracts[exchange.target] = replace(
+            destination_contract,
             receives=_extend_contract_fields(
-                destination_contract.receives,
-                flattened_fields,
+                destination_contract.receives, flattened_fields
             ),
-            sends=destination_contract.sends,
         )
     return contracts

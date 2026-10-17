@@ -152,6 +152,7 @@ def validate_runtime_state(
             component_state,
             component=component,
             received_masks=received_masks,
+            contract=contracts[component.name],
         )
     for component in components.values():
         component._validate_runtime_state(
@@ -221,6 +222,7 @@ def _validate_component_store_finiteness(
     *,
     component: Any,
     received_masks: Mapping[tuple[str, str], Any],
+    contract: ExchangeContract,
 ) -> None:
     """Reject non-finite values before a runtime store crosses its next owner."""
 
@@ -245,6 +247,10 @@ def _validate_component_store_finiteness(
                 field_name,
                 default_mask=active_mask,
                 fractional_mask=fraction,
+                binary_mask=binary,
+                binary_output_fields=(
+                    contract.binary_sends if store_name != "received" else ()
+                ),
                 produced=(
                     store_name == "sent"
                     or (store_name == "fields" and field_name in component.spec.outputs)

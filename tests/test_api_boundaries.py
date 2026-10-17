@@ -354,7 +354,7 @@ def test_runtime_private_state_uses_public_domain_vocabulary() -> None:
     component_state_parameters = signature(ComponentState).parameters
 
     assert tuple(state_parameters) == ("fields", "received", "sent", "payload")
-    assert tuple(contract_parameters) == ("receives", "sends")
+    assert tuple(contract_parameters) == ("receives", "sends", "binary_sends")
     assert "received" in component_state_parameters
     assert "sent" in component_state_parameters
     assert "incoming" not in component_state_parameters

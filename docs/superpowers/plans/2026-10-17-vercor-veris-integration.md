@@ -37,9 +37,9 @@
 
 ## Prerequisite and shared gates
 
-- [ ] Complete native N1–N4; read its exact SHA, artifact/source location, status/diagnostic metadata and results. Install that local wheel/source in a task-specific target for development; verify import provenance, not just distribution version. Do not overwrite the user's environments or use the older editable native checkout.
-- [ ] Activate the existing working Python 3.12 `scipy` environment. Use a unique `/private/tmp` test base/cache, never a repo-local basetemp. Native assets and the installed-GitHub-CLI test need cache-lock/localhost permissions, not code changes.
-- [ ] Preserve current baseline evidence: stock 1,955/1,955, fast 1,057/1,057, exact-fork AD 10/10, Black/strict flake8/mypy/compileall passing. Run new focused tests RED before each unit.
+- [x] Complete native N1–N4; read its exact SHA, artifact/source location, status/diagnostic metadata and results. Install that local wheel/source in a task-specific target for development; verify import provenance, not just distribution version. Do not overwrite the user's environments or use the older editable native checkout.
+- [x] Activate the existing working Python 3.12 `scipy` environment. Use a unique `/private/tmp` test base/cache, never a repo-local basetemp. Native assets and the installed-GitHub-CLI test need cache-lock/localhost permissions, not code changes.
+- [x] Preserve current baseline evidence: stock 1,955/1,955, fast 1,057/1,057, exact-fork AD 10/10, Black/strict flake8/mypy/compileall passing. Run new focused tests RED before each unit.
 
 For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-length=120 --statistics` (no exit-zero for acceptance), `mypy vercor tests`, compileall, whitespace, full stock `pytest tests/ -q -m 'not veros_autodiff' --tb=short`, then the required fast gate. Run isolated exact-fork AD for units changing native/coupled execution, masks, payloads or fluxes. Native and stock checks stay separate; record exact commands/counts and known third-party warnings. Update active API signature/manifests and private-module inventory in the same unit as an intentional API/file change. Never rewrite historical specifications or audit SHA citations during repinning.
 
@@ -87,7 +87,7 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
 - Extends shared `field_active_mask` with keyword-only `binary_mask: RuntimeArray | None=None`, `binary_output_fields: tuple[str, ...]=()`; the default remains unchanged. Send/supplied-state validation passes contract metadata and current binary support for those fields.
 - `exchange_mask_operands` chooses source binary or fractional support once; dispatch weighting, overlap, current diagnostics and last-received support consume that same result.
 
-- [ ] **Write RED cases.** Extend the existing test-only `_scenario` builder with a forwarded source_coverage keyword. Define `test_binary_source_flux_survives_zero_ice`:
+- [x] **Write RED cases.** Extend the existing test-only `_scenario` builder with a forwarded source_coverage keyword. Define `test_binary_source_flux_survives_zero_ice`:
 
   ```python
   state, route, context = _scenario("source_flux", source_area=jnp.zeros((2, 2)), source_coverage="binary")
@@ -97,10 +97,10 @@ For each code commit: Black `vercor tests`, strict `flake8 . --count --max-line-
   ```
 
   Default component source_flux delivers zero; A=.5 still delivers 12 under binary support. Add `test_binary_coverage_retains_last_dispatch_support` for complete melt, source omission, supplied replacement and host/JAX parity, and `test_binary_send_requires_finite_wet_flux` for NaN with A=0 at send/supplied-state boundaries. Cover invalid choice/type, binary+legacy, topology intersections, empty overlap and inactive NaNs.
-- [ ] **Run RED.** `pytest tests/test_dynamic_mask_exchanges.py tests/test_dynamic_mask_rollouts.py -q --fast --tb=short`; first demonstrate missing keyword, then pin the numerical/stored-support failures.
-- [ ] **Implement one support policy.** Build binary_sends through the existing contract builder, preserving it when a component is both source and destination. Use the shared mask resolver for weighting, coverage and validation rather than create a parallel dispatch path. Any field sent by a binary route needs finite binary support even if another route uses component coverage. Keep last-dispatch support separate from current coverage.
-- [ ] **Verify GREEN.** Assert source weighting before remapping, conservative scalar totals, vector transformation, distinct finite east/north/coast/exterior values, topology restrictions, current versus stored masks, and old default behavior. Use JVP/VJP/finite differences through continuous fields/fractions; binary membership stays discrete. Run shared gates and exact-fork AD.
-- [ ] **Commit.** Commit as `feat: support binary source coverage for total-area fluxes` with signatures/docs/progress.
+- [x] **Run RED.** `pytest tests/test_dynamic_mask_exchanges.py tests/test_dynamic_mask_rollouts.py -q --fast --tb=short`; first demonstrate missing keyword, then pin the numerical/stored-support failures.
+- [x] **Implement one support policy.** Build binary_sends through the existing contract builder, preserving it when a component is both source and destination. Use the shared mask resolver for weighting, coverage and validation rather than create a parallel dispatch path. Any field sent by a binary route needs finite binary support even if another route uses component coverage. Keep last-dispatch support separate from current coverage.
+- [x] **Verify GREEN.** Assert source weighting before remapping, conservative scalar totals, vector transformation, distinct finite east/north/coast/exterior values, topology restrictions, current versus stored masks, and old default behavior. Use JVP/VJP/finite differences through continuous fields/fractions; binary membership stays discrete. Run shared gates and exact-fork AD.
+- [x] **Commit.** Commit as `feat: support binary source coverage for total-area fluxes` with signatures/docs/progress.
 
 ### Task 3: C3 — Interval-mean Veris ocean fluxes and correct face stresses
 
