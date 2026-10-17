@@ -28,11 +28,13 @@ def exchange_mask_operands(
     """Return source fraction, target binary/fraction, and remapped overlap."""
     source = context.components[exchange.source]
     target = context.components[exchange.target]
-    _, source_fraction = resolve_component_masks(
+    source_binary, source_fraction = resolve_component_masks(
         source,
         state._component_state(exchange.source).fields.to_mapping(),
         context.dtype,
     )
+    if exchange.source_coverage == "binary":
+        source_fraction = source_binary
     target_binary, target_fraction = resolve_component_masks(
         target,
         state._component_state(exchange.target).fields.to_mapping(),

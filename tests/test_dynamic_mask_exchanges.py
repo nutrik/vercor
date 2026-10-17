@@ -45,6 +45,7 @@ class _MeanRegridder:
 def _scenario(
     quantity: Any,
     *,
+    source_coverage: Any = "component",
     vectors: bool = False,
     source_area: jax.Array | None = None,
     target_area: float = 0.25,
@@ -104,6 +105,7 @@ def _scenario(
         "DST",
         fields=(vector("u", "v"),) if vectors else ("flux",),
         quantity=quantity,
+        source_coverage=source_coverage,
         regridder_factory=regridder_factory
         or (conservative if conservative_case else _MeanRegridder),
     )
@@ -348,3 +350,183 @@ def test_diagnostic_masks_match_quantity_coverage(
     binary_masks, fractions = runtime_exchange_masks(state, context=context)
     np.testing.assert_array_equal(binary_masks[exchange.route_id], binary)
     np.testing.assert_allclose(fractions[exchange.route_id], target_area)
+
+
+@pytest.mark.parametrize("area", [0.0, 0.5, 1.0])
+def test_binary_source_flux_survives_zero_ice(area: float) -> None:
+    state, route, context = _scenario(
+        "source_flux", source_area=jnp.full((2, 2), area), source_coverage="binary"
+    )
+    state = state.replace_fields("SRC", {"flux": jnp.full((2, 2), 12.0)})
+    result = _dispatch(state, route, context)
+    np.testing.assert_allclose(
+        result.component("DST").field("flux", scope="received"), 12.0
+    )
+    np.testing.assert_allclose(
+        result._received_fractional_masks.get(route.route_id), 1.0
+    )
+    # Default source coverage still applies the component's continuous fraction.
+    original, default, default_context = _scenario(
+        "source_flux", source_area=jnp.full((2, 2), area)
+    )
+    original = original.replace_fields("SRC", {"flux": jnp.full((2, 2), 12.0)})
+    np.testing.assert_allclose(
+        _dispatch(original, default, default_context)
+        .component("DST")
+        .field("flux", scope="received"),
+        12.0 * area,
+    )
+
+
+@pytest.mark.parametrize("value", [None, 0, True])
+def test_source_coverage_must_be_text(value: Any) -> None:
+    with pytest.raises(TypeError, match="source_coverage"):
+        _scenario("source_flux", source_coverage=value)
+
+
+@pytest.mark.parametrize(
+    "quantity,coverage", [("legacy", "binary"), ("source_flux", "ice")]
+)
+def test_invalid_source_coverage_is_rejected(quantity: str, coverage: str) -> None:
+    with pytest.raises(ValueError, match="source_coverage"):
+        _scenario(quantity, source_coverage=coverage)
+
+
+@pytest.mark.parametrize("boundary", ["send", "supplied", "dispatch"])
+def test_binary_send_requires_finite_wet_flux(boundary: str) -> None:
+    from vercor._runtime.field_transfer import send_runtime_fields
+    from vercor._runtime.state_validation import validate_runtime_state
+
+    state, route, context = _scenario(
+        "source_flux", source_area=jnp.zeros((2, 2)), source_coverage="binary"
+    )
+    source = state._component_state("SRC")
+    bad = jnp.full((2, 2), jnp.nan)
+    state = state._with_component_state(
+        "SRC", source.with_fields(source.fields.replace_many({"flux": bad}))
+    )
+    with pytest.raises(CouplerError, match="SRC.*flux"):
+        if boundary == "send":
+            send_runtime_fields(
+                context.components["SRC"],
+                state._component_state("SRC"),
+                contract=context.contracts["SRC"],
+                dtype=context.dtype,
+            )
+        elif boundary == "supplied":
+            validate_runtime_state(
+                state,
+                components=context.components,
+                exchanges=context.exchanges,
+                contracts=context.contracts,
+                regridders=context.regridders,
+                run_order=("SRC", "DST"),
+            )
+        else:
+            source = state._component_state("SRC")
+            state = state._with_component_state(
+                "SRC", source.with_sent(source.sent.replace_many({"flux": bad}))
+            )
+            _dispatch(state, route, context)
+
+
+@pytest.mark.parametrize("vectors", [False, True])
+def test_binary_coverage_preserves_remap_rotation_and_topology(vectors: bool) -> None:
+    state, route, context = _scenario(
+        "source_flux",
+        source_coverage="binary",
+        vectors=vectors,
+        source_area=jnp.zeros((2, 2)),
+        topology=_Patch(),
+    )
+    view = _dispatch(state, route, context).component("DST")
+    for name, scale in (("u", 12.0), ("v", 6.0)) if vectors else (("flux", 6.0),):
+        np.testing.assert_allclose(
+            view.field(name, scope="received"), [[0.0, scale], [0.0, scale]]
+        )
+
+
+def test_binary_conservative_flux_and_gradient_ignore_fraction() -> None:
+    state, route, context = _scenario(
+        "source_flux", source_coverage="binary", conservative_case=True
+    )
+    np.testing.assert_allclose(
+        _dispatch(state, route, context)
+        .component("DST")
+        .field("flux", scope="received"),
+        6.0,
+    )
+
+    def loss(x: jax.Array) -> jax.Array:
+        current = state.replace_fields(
+            "SRC", {"flux": jnp.full((2, 4), x), "area": jnp.full((2, 4), 0.0)}
+        )
+        return jnp.mean(
+            _dispatch(current, route, context)
+            .component("DST")
+            .field("flux", scope="received")
+        )
+
+    x = jnp.array(2.0)
+    value, tangent = jax.jvp(jax.jit(loss), (x,), (jnp.ones_like(x),))
+    np.testing.assert_allclose([value, tangent, jax.grad(loss)(x)], [2.0, 1.0, 1.0])
+    np.testing.assert_allclose((loss(x + 1e-4) - loss(x - 1e-4)) / 2e-4, 1.0, rtol=1e-9)
+
+
+def test_binary_coverage_empty_support_neutralizes_inactive_nan() -> None:
+    state, route, context = _scenario(
+        "source_flux",
+        source_coverage="binary",
+        source_wet=jnp.zeros((2, 2)),
+        source_area=jnp.zeros((2, 2)),
+        regridder_factory=bilinear,
+    )
+    state = state.replace_fields("SRC", {"flux": jnp.full((2, 2), jnp.nan)})
+    result = _dispatch(state, route, context)
+    np.testing.assert_array_equal(
+        result.component("DST").field("flux", scope="received"), 0.0
+    )
+
+
+def test_binary_contract_metadata_survives_incoming_and_self_routes() -> None:
+    from vercor._runtime.contracts import build_exchange_contracts
+
+    routes = (
+        Exchange(
+            "SRC", "MID", ("a",), quantity="source_flux", source_coverage="binary"
+        ),
+        Exchange(
+            "MID", "DST", ("b",), quantity="source_flux", source_coverage="binary"
+        ),
+        Exchange("MID", "MID", ("c",), quantity="intensive"),
+    )
+    contract = build_exchange_contracts(
+        ("SRC", "MID", "DST"), routes, validate_endpoints=True
+    )["MID"]
+    assert contract.receives == ("a", "c")
+    assert contract.sends == ("b", "c")
+    assert contract.binary_sends == ("b",)
+
+
+def test_binary_export_requires_full_support_without_component_mask() -> None:
+    from vercor._runtime.component_masks import field_active_mask
+
+    grid = RectilinearGrid("relay", longitude=jnp.arange(2.0), latitude=jnp.arange(2.0))
+    relay = CallableComponent(
+        "RELAY",
+        grid,
+        lambda f: {},
+        spec=ComponentSpec(inputs=("flux",), outputs=("flux",)),
+    )
+    # A relay may have received nothing in its last dispatch. Sending that field
+    # on a total-area route still requires valid values across its wet domain.
+    active = field_active_mask(
+        relay,
+        "flux",
+        default_mask=jnp.zeros((2, 2)),
+        fractional_mask=jnp.ones((2, 2)),
+        produced=True,
+        binary_mask=jnp.ones((2, 2)),
+        binary_output_fields=("flux",),
+    )
+    np.testing.assert_array_equal(active, 1.0)

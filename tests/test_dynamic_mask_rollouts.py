@@ -483,3 +483,60 @@ def test_ice_free_receiver_keeps_intensive_forcing() -> None:
     np.testing.assert_allclose(
         coupler.run().component("CICE").field("temperature"), 270.0
     )
+
+
+@pytest.mark.parametrize("execution", ["host", "jax"])
+@pytest.mark.parametrize("omit_source", [False, True])
+def test_binary_coverage_retains_last_dispatch_support(
+    execution: str, omit_source: bool
+) -> None:
+    grid = RectilinearGrid("wet", longitude=jnp.arange(2.0), latitude=jnp.arange(2.0))
+    source = CallableComponent(
+        "SRC",
+        grid,
+        lambda f: {"area": jnp.zeros_like(f["area"])},
+        spec=ComponentSpec(
+            outputs=("area", "flux"),
+            initial_fields={"area": 0.5, "flux": 12.0},
+            masks=ComponentMaskSpec(fractional_field="area"),
+            execution=cast(Any, execution),
+        ),
+    )
+    target = CallableComponent(
+        "DST",
+        grid,
+        lambda f: {"total": f["total"] + f["flux"]},
+        spec=ComponentSpec(
+            inputs=("flux",),
+            outputs=("total",),
+            initial_fields={"total": 0.0},
+            execution=cast(Any, execution),
+        ),
+    )
+    coupler = Coupler(
+        Clock(datetime(2000, 1, 1), 60.0, 1),
+        components=(source, target),
+        exchanges=(
+            Exchange(
+                "SRC",
+                "DST",
+                ("flux",),
+                quantity="source_flux",
+                source_coverage="binary",
+            ),
+        ),
+        run_order=("DST",) if omit_source else ("SRC", "DST"),
+        runtime=RuntimeOptions(dtype=DTypePolicy(enable_x64=True)),
+    )
+    initial = coupler.initial_state()
+    updated = initial.replace_fields(
+        "SRC", {"area": jnp.zeros((2, 2)), "flux": jnp.full((2, 2), 14.0)}
+    )
+    final = coupler.run(updated)
+    np.testing.assert_array_equal(final.component("DST").field("total"), 14.0)
+    np.testing.assert_array_equal(final._fractional_mask("SRC->DST"), 1.0)
+    np.testing.assert_array_equal(final._received_fractional_masks.get("SRC->DST"), 1.0)
+    np.testing.assert_array_equal(
+        coupler.run(final).component("DST").field("total"), 28.0
+    )
+    np.testing.assert_array_equal(initial.component("SRC").field("area"), 0.5)
