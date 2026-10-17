@@ -38,6 +38,7 @@ JAX components and connect them with exchanges.
 
    cli
    setup-gallery
+   veris-validation
    troubleshooting
    api/index
    project-resources

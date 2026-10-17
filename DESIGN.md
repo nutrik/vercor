@@ -467,3 +467,9 @@ use existing shared-grid identity routing, with binary coverage for both. The
 focused calibration gallery fits native h0 through public immutable state and
 fields using fixed wet weights, an identifiability guard and JAX value/gradient
 evaluation inside bounded SciPy minimization; it adds no generic optimizer API.
+
+Extended Veris validation reuses the prescribed gallery, Coupler.run, native
+stored areas and the shared output coordinator. A private index counter measures
+actual guarded native transitions; pure device reductions provide scalar budget
+rates. Host-only benchmark reporting and segmented comparisons introduce no
+alternative integrator or mutable model state. See docs/veris-validation.rst.

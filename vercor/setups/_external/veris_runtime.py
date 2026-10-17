@@ -46,6 +46,7 @@ class VerisPayload:
     diagnostics: Any
     physical_constants: Any
     interval_budget: VerisIntervalBudget
+    checked_native_steps: jax.Array
 
 
 _VerisCarry: TypeAlias = tuple[
@@ -90,6 +91,13 @@ def _valid_native_payload(payload: VerisPayload) -> jax.Array:
             & jnp.all(state.hIceMean >= 0)
             & jnp.all(state.hSnowMean >= 0)
             & jnp.all((state.Area >= 0) & (state.Area <= 1))
+            & jnp.all(
+                jnp.where(
+                    state.iceMask > 0,
+                    True,
+                    (state.hIceMean == 0) & (state.hSnowMean == 0) & (state.Area == 0),
+                )
+            )
             & jnp.all(payload.diagnostics.physics_status == 0)
         ),
     )
@@ -146,7 +154,13 @@ def step_veris_runtime(
                 forcing.native_forcing,
                 physics="coupled",
             )
-            updated = replace(current, state=state, diagnostics=diagnostics)
+            updated = replace(
+                current,
+                state=state,
+                diagnostics=diagnostics,
+                checked_native_steps=current.checked_native_steps
+                + jnp.asarray(1, dtype=context.dtype.jax_index),
+            )
             fluxes = veris_surface_fluxes(
                 state, diagnostics, forcing, dtype=context.dtype
             )
@@ -287,7 +301,11 @@ class VerisSetupState:
         return SetupResult(
             fields={"ice_fraction": state.Area[2:-2, 2:-2].T, **fluxes.to_fields()},
             payload=VerisPayload(
-                state, diagnostics, constants, VerisIntervalBudget(zero, zero)
+                state,
+                diagnostics,
+                constants,
+                VerisIntervalBudget(zero, zero),
+                jnp.asarray(0, dtype=context.dtype.jax_index),
             ),
         )
 

@@ -76,6 +76,7 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
         diagnostics,
         physical_constants=None,
         interval_budget=VerisIntervalBudget(jnp.zeros((2, 3)), jnp.zeros((2, 3))),
+        checked_native_steps=jnp.asarray(0, dtype=jnp.int32),
     )
     canonical = {
         name: jnp.arange(6.0).reshape(2, 3) + offset

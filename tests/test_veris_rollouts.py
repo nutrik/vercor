@@ -93,7 +93,19 @@ def test_two_wrapper_steps_equal_direct_native_advances() -> None:
     assert cast(Any, jax.tree_util.tree_structure(actual)) == cast(
         Any, jax.tree_util.tree_structure(original)
     )
-    assert all(x.dtype == jnp.float64 for x in jax.tree_util.tree_leaves(actual))
+    assert all(
+        x.dtype == jnp.float64
+        for x in jax.tree_util.tree_leaves(
+            (
+                actual.state,
+                actual.diagnostics,
+                actual.physical_constants,
+                actual.interval_budget,
+            )
+        )
+    )
+    assert actual.checked_native_steps.dtype == jnp.int32
+    assert int(actual.checked_native_steps) == 4
 
 
 def test_each_native_substep_reapplies_prescribed_heat_fluxes() -> None:

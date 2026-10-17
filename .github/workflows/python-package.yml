@@ -227,7 +227,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERCOR_ARTIFACT_DIR: ${{ github.workspace }}/dist
-      VERIS_COMMIT: ee9614eb51726509c2b7f037a2a20b25c8d117e5
+      VERIS_COMMIT: 4551fc86181c660ceb0010160ec7f569d97e52c6
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # checkout major 4
         with:
@@ -285,7 +285,7 @@ jobs:
     env:
       # Includes the global_4deg fix for variable-owned c_k and c_eps.
       VEROS_AD_COMMIT: 7a8c964cf00b5aa0713c995edd760643a431b3c9
-      VERIS_COMMIT: ee9614eb51726509c2b7f037a2a20b25c8d117e5
+      VERIS_COMMIT: 4551fc86181c660ceb0010160ec7f569d97e52c6
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # checkout major 4
         with:

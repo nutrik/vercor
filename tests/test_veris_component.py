@@ -291,7 +291,7 @@ def test_optional_dependency_is_immutable_and_preserves_veros_extras() -> None:
     metadata = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
     extras = metadata["project"]["optional-dependencies"]
     assert extras["veris"] == [
-        "veris @ git+https://github.com/team-ocean/veris.git@ee9614eb51726509c2b7f037a2a20b25c8d117e5"
+        "veris @ git+https://github.com/team-ocean/veris.git@4551fc86181c660ceb0010160ec7f569d97e52c6"
     ]
     assert extras["veros"] == ["veros>=1.6.2,<1.7"]
 
@@ -304,7 +304,19 @@ def test_native_state_and_diagnostics_follow_runtime_dtype(enable_x64: bool) -> 
     payload = final._component_state("CICE").payload
     assert payload is not None
     expected = jnp.float64 if enable_x64 else jnp.float32
-    assert all(value.dtype == expected for value in jax.tree_util.tree_leaves(payload))
+    assert all(
+        value.dtype == expected
+        for value in jax.tree_util.tree_leaves(
+            (
+                payload.state,
+                payload.diagnostics,
+                payload.physical_constants,
+                payload.interval_budget,
+            )
+        )
+    )
+    assert payload.checked_native_steps.dtype == jnp.int32
+    assert int(payload.checked_native_steps) == 2
     owner = component.spec.lifecycle.setup.__self__
     assert owner.resources.configuration.dtype == (
         "float64" if enable_x64 else "float32"
