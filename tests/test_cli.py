@@ -30,6 +30,8 @@ from vercor.cli import cli
         "run_slab_driver",
         "run_veros_with_era5data",
         "run_veris_dataveros_era5",
+        "run_veris_calibration",
+        "run_veris_veros_era5",
     ),
 )
 def test_every_bundled_setup_exposes_keyword_only_run_contract(

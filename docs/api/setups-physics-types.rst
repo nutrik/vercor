@@ -8,7 +8,7 @@ Use the lightweight slab factories directly; model-specific factories require
 their documented optional packages or input data.
 
 .. automodule:: vercor.setups
-   :members: CAMulatorConfig, JAXGCMConfig, JCMLandAtmosphereConfig, JCMLandAtmosphereSetup, JCMInputs, Spinup, VerosConfig, VerisConfig, VerisVerosDataSetup, load_jcm_inputs, make_slab_atmosphere, make_slab_land, make_slab_ocean, make_slab_seaice, make_jcm_land_atmosphere, make_camulator_gcm, make_camulator_land, make_era5_atmosphere, make_era5_land, make_era5_ocean, make_erainterim_ocean, make_jax_gcm, make_jcm_land, make_veros_gcm, make_veris, make_veris_verosdata
+   :members: CAMulatorConfig, JAXGCMConfig, JCMLandAtmosphereConfig, JCMLandAtmosphereSetup, JCMInputs, Spinup, VerosConfig, VerisConfig, VerisVerosDataSetup, VerisVerosSetup, load_jcm_inputs, make_slab_atmosphere, make_slab_land, make_slab_ocean, make_slab_seaice, make_jcm_land_atmosphere, make_camulator_gcm, make_camulator_land, make_era5_atmosphere, make_era5_land, make_era5_ocean, make_erainterim_ocean, make_jax_gcm, make_jcm_land, make_veros_gcm, make_veris, make_veris_verosdata, make_veris_veros
    :show-inheritance:
 
 
@@ -107,3 +107,15 @@ qnec coefficient preserves its native climatology. Climatological spinup starts
 with total feedback inactive and retains the native cold-water cooling proxy.
 Installing total feedback activates it even for zero input; thereafter the
 proxy cannot discard heat or salt already diagnosed by the sea-ice model.
+
+Shared prognostic setup
+------------------------
+
+``make_veris_veros(config=VerisConfig(...), ocean_config=VerosConfig(surface_forcing="coupled"))``
+returns frozen ``VerisVerosSetup(seaice, ocean)``. It initializes one native ocean,
+extracts its authoritative edges, areas, radius and masks once, and shares the
+exact grid object with sea ice. The ocean retains the existing setup/runtime
+owner; no second ocean or prescribed current/height proxy is created. The default
+ocean configuration is global coupled mode; incompatible explicit modes fail
+before initialization. The prescribed ``make_veris_verosdata`` workflow remains
+available for experiments without ocean feedback.

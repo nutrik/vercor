@@ -52,6 +52,8 @@ _LAZY_EXPORTS = {
     "replace_veris_parameters": _LazyExport(
         "_external.veris_parameters", "replace_veris_parameters"
     ),
+    "make_veris_veros": _LazyExport("_veris", "make_veris_veros"),
+    "VerisVerosSetup": _LazyExport("_veris", "VerisVerosSetup"),
     "make_veris_verosdata": _LazyExport("_veris", "make_veris_verosdata"),
     "VerisVerosDataSetup": _LazyExport("_veris", "VerisVerosDataSetup"),
 }

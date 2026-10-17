@@ -67,3 +67,8 @@ passed through the factory and setup-state owners, and applied through
 native scalar temperature/salinity weights in `vercor/setups/_external/veros_setup.py`.
 `veros_state.py` owns forcing layouts and cleanup, not restoring policy.
 The existing import layers are unchanged.
+
+The prognostic pair in layer 17 reuses layer-16 Veros owner/component assembly
+and geometry-only extraction, then binds sea ice on the same grid. The two
+packaged Veris galleries depend on this setup facade, recipes and public state
+replacement; the calibration objective accesses no private payload owner.

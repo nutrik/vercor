@@ -141,6 +141,12 @@ def test_native_ci_installs_and_verifies_pinned_veris() -> None:
         workflow["jobs"]["veros-autodiff"]["env"]["VEROS_AD_COMMIT"]
         == "7a8c964cf00b5aa0713c995edd760643a431b3c9"
     )
+    ad = workflow["jobs"]["veros-autodiff"]
+    ad_commands = "\n".join(step.get("run", "") for step in ad["steps"])
+    assert ad["env"]["VERIS_COMMIT"] == quality["env"]["VERIS_COMMIT"]
+    assert ".[dev,jcm,veros,veris]" in ad_commands
+    assert "tests/test_veris_prognostic_autodiff.py" in ad_commands
+    assert 'distribution("veris")' in ad_commands
 
 
 @pytest.mark.slow

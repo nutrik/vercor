@@ -34,6 +34,12 @@ def make_veros_gcm(
 ) -> Component:
     """Return a host-backed or differentiable JAX Veros GCM component."""
 
+    config = VerosConfig() if config is None else config
+    return _make_veros_component(_initialize_veros_owner(config), config)
+
+
+def _initialize_veros_owner(config: VerosConfig) -> Any:
+    """Initialize the sole native ocean owner after configuring its runtime."""
     try:
         import veros  # noqa: F401
     except ImportError as error:
@@ -44,7 +50,6 @@ def make_veros_gcm(
 
     from vercor.setups._external import veros_runtime_settings
 
-    config = VerosConfig() if config is None else config
     veros_runtime_settings.configure_veros_runtime(config.execution)
     if config.execution == "jax":
         veros_runtime_settings.require_differentiable_veros_capabilities()
@@ -56,7 +61,7 @@ def make_veros_gcm(
         VerosGCMSetupState,
     ) = _load_veros_implementation()
 
-    state = VerosGCMSetupState(
+    return VerosGCMSetupState(
         name=config.name,
         setup=config.setup,
         execution=config.execution,
@@ -67,6 +72,11 @@ def make_veros_gcm(
         do_spinup=config.spinup.enabled,
         surface_forcing=config.surface_forcing,
     )
+
+
+def _make_veros_component(state: Any, config: VerosConfig) -> Component:
+    """Bind the existing owner to its current shared grid without reinitializing."""
+    _veros_gcm_state, _veros_output, _veros_runtime, _ = _load_veros_implementation()
     component = CallableComponent(
         config.name,
         state.grid,

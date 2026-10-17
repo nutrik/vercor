@@ -1180,9 +1180,12 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
     )
 
     assert autodiff["runs-on"] == "ubuntu-latest"
-    assert autodiff["env"] == {"VEROS_AD_COMMIT": VEROS_AD_COMMIT}
+    assert autodiff["env"] == {
+        "VEROS_AD_COMMIT": VEROS_AD_COMMIT,
+        "VERIS_COMMIT": jobs["quality"]["env"]["VERIS_COMMIT"],
+    }
     assert install_index < verify_index < rollout_index
-    assert 'python -m pip install ".[dev,jcm,veros]"' in install["run"]
+    assert 'python -m pip install ".[dev,jcm,veros,veris]"' in install["run"]
     assert "ipdb==0.13.13" in install["run"]
     assert f'"git+{VEROS_AD_REPOSITORY}@${{VEROS_AD_COMMIT}}"' in install["run"]
     assert "--no-deps" in install["run"]
@@ -1193,7 +1196,7 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
     for capability in ("VerosState.copy", "safe_sqrt", "c_k", "c_eps"):
         assert capability in verify["run"]
     assert rollout["run"] == (
-        "python -m pytest tests/test_veros_autodiff_rollouts.py "
+        "python -m pytest tests/test_veros_autodiff_rollouts.py tests/test_veris_prognostic_autodiff.py "
         "-q -n0 -m veros_autodiff --tb=short "
         "--cov=vercor --cov-branch --cov-report= --cov-fail-under=0"
     )
@@ -1476,6 +1479,8 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
         "vercor/setups/gallery/run_slab_driver.py",
         "vercor/setups/gallery/run_veros_with_era5data.py",
         "vercor/setups/gallery/run_veris_dataveros_era5.py",
+        "vercor/setups/gallery/run_veris_calibration.py",
+        "vercor/setups/gallery/run_veris_veros_era5.py",
     }
     runner_name = "vercor/_setup_runner.py"
 
