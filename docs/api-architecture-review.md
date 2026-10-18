@@ -268,6 +268,7 @@ vercor.setups._external.jax_gcm_fields
 vercor.setups._external.jax_gcm_output
 vercor.setups._external.jax_gcm_runtime
 vercor.setups._external.jax_gcm_state
+vercor.setups._external.jax_gcm_surface
 vercor.setups._external.jax_gcm_tools
 vercor.setups._external.veris
 vercor.setups._external.veris_fluxes
@@ -379,7 +380,7 @@ second component adapter, duplicate accumulator, or native period-file path.
   `camulator_init`, `camulator_land`, `camulator_output`, `camulator_runtime`,
   `camulator_runtime_settings`, `camulator_stepper`, `camulator_tensors`,
   `camulator_wind_filter`, `jax_gcm`, `jax_gcm_fields`, `jax_gcm_output`,
-  `jax_gcm_runtime`, `jax_gcm_state`, `jax_gcm_tools`, `veros_fluxes`,
+  `jax_gcm_runtime`, `jax_gcm_state`, `jax_gcm_surface`, `jax_gcm_tools`, `veros_fluxes`,
   `veros_gcm`, `veros_gcm_state`, `veros_output`, `veros_runtime`,
   `veros_runtime_settings`, `veros_setup`, and `veros_state`.
 - Runnable gallery: `vercor.setups.gallery`, `custom_component_wrapping`,
