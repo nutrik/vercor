@@ -531,8 +531,8 @@ def _map_uniform_jcm_column(
             8314.47,
             1.0e5,
             0.286,
-            jnp.zeros((1, 1, 1)),
-            jnp.zeros((1, 1, 1)),
+            jnp.zeros((1, 1, 3)),
+            jnp.zeros((1, 1, 3)),
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
             jnp.broadcast_to(jnp.asarray(normalized_surface_pressure), (1, 1)),
@@ -540,6 +540,8 @@ def _map_uniform_jcm_column(
             jnp.zeros_like(temperature_profile),
             temperature_profile,
             jnp.full_like(temperature_profile, 10.0),
+            downward_shortwave_radiation_flux=0.0,
+            open_water_albedo=0.07,
             large_scale_precipitation=jnp.zeros((1, 1)),
             convective_precipitation=jnp.zeros((1, 1)),
             temperature_2m=jnp.full((1, 1), 275.46),
@@ -574,8 +576,8 @@ def test_jcm_precipitation_sums_both_diagnostics_and_converts_grams_before_excha
             8314.47,
             1e5,
             0.286,
-            jnp.zeros((3, 2, 2)),
-            jnp.zeros((3, 2, 2)),
+            jnp.zeros((3, 2, 3)),
+            jnp.zeros((3, 2, 3)),
             jnp.zeros((3, 2)),
             jnp.zeros((3, 2)),
             jnp.ones((3, 2)),
@@ -583,6 +585,8 @@ def test_jcm_precipitation_sums_both_diagnostics_and_converts_grams_before_excha
             jnp.zeros((2, 3, 2)),
             jnp.full((2, 3, 2), 280.0),
             jnp.full((2, 3, 2), 10.0),
+            downward_shortwave_radiation_flux=0.0,
+            open_water_albedo=0.07,
             large_scale_precipitation=precls,
             convective_precipitation=jnp.asarray([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),
             temperature_2m=jnp.full((3, 2), 275.46),
@@ -664,6 +668,8 @@ def test_map_jcm_output_fields_supports_jit(
     mapped_fields = jax.jit(
         lambda *args: jax_gcm_fields_module.map_jcm_output_fields(
             *args,
+            downward_shortwave_radiation_flux=0.0,
+            open_water_albedo=0.07,
             large_scale_precipitation=jnp.zeros((2, 2)),
             convective_precipitation=jnp.zeros((2, 2)),
             temperature_2m=jnp.full((2, 2), 275.46),
@@ -679,8 +685,8 @@ def test_map_jcm_output_fields_supports_jit(
         8314.47,
         1.0e5,
         0.286,
-        jnp.full((2, 2, 2), 5.0),
-        jnp.full((2, 2, 2), 2.0),
+        jnp.full((2, 2, 3), 5.0),
+        jnp.full((2, 2, 3), 2.0),
         jnp.full((2, 2), 40.0),
         jnp.full((2, 2), 30.0),
         jnp.asarray([[0.9, 1.0], [1.1, 1.2]]),
@@ -723,10 +729,10 @@ def test_map_jcm_output_fields_supports_jit(
         mapped_fields["specific_humidity"],
         np.asarray([[0.05, 0.07], [0.06, 0.08]]),
     )
-    assert_allclose_compact(mapped_fields["sensible_heat_flux"], np.full((2, 2), -10.0))
+    assert_allclose_compact(mapped_fields["sensible_heat_flux"], np.full((2, 2), -5.0))
     assert_allclose_compact(
         mapped_fields["latent_heat_flux"],
-        np.full((2, 2), -10000.0),
+        np.full((2, 2), -5000.0),
     )
     assert_allclose_compact(
         mapped_fields["pressure"],
@@ -766,8 +772,8 @@ def test_map_jcm_output_fields_supports_jit(
             8314.47,
             1.0e5,
             0.286,
-            jnp.full((2, 2, 2), 5.0),
-            jnp.full((2, 2, 2), 2.0),
+            jnp.full((2, 2, 3), 5.0),
+            jnp.full((2, 2, 3), 2.0),
             jnp.full((2, 2), 40.0),
             jnp.full((2, 2), 30.0),
             jnp.asarray([[0.9, 1.0], [1.1, 1.2]]),
@@ -775,6 +781,8 @@ def test_map_jcm_output_fields_supports_jit(
             jnp.full((2, 2, 2), 2.0),
             temperature_values,
             jnp.full((2, 2, 2), 20.0),
+            downward_shortwave_radiation_flux=0.0,
+            open_water_albedo=0.07,
             large_scale_precipitation=jnp.zeros((2, 2)),
             convective_precipitation=jnp.zeros((2, 2)),
             temperature_2m=jnp.full((2, 2), 275.46),
@@ -930,7 +938,11 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
     monkeypatch.setattr(
         jax_gcm_state_module.Parameters,
         "default",
-        staticmethod(lambda: SimpleNamespace()),
+        staticmethod(
+            lambda: SimpleNamespace(
+                mod_radcon=SimpleNamespace(albsea=jnp.asarray(0.07))
+            )
+        ),
     )
     monkeypatch.setattr(
         jax_gcm_state_module,
@@ -1229,6 +1241,7 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         coords=_make_jax_gcm_output_coords(),
         physics=SimpleNamespace(),
     )
+    component.open_water_albedo = jnp.asarray(0.07)
     component.forcing = _FakeForcing()
     cast(Any, component).sigma_levels = np.asarray([0.2, 1.0], dtype=float)
     component._state = jax_gcm_state_module.JCMState(
@@ -1240,12 +1253,14 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
 
     p = {
         "_surface_flux": SimpleNamespace(
-            shf=np.full((2, 2, 2), 5.0, dtype=float),
-            evap=np.full((2, 2, 2), 2.0, dtype=float),
+            shf=np.full((2, 2, 3), 5.0, dtype=float),
+            evap=np.full((2, 2, 3), 2.0, dtype=float),
             rlds=np.full((2, 2), 40.0, dtype=float),
             t0=np.asarray([[270.0, 275.0], [280.0, 275.0]]),
         ),
-        "_shortwave_rad": SimpleNamespace(rsns=np.full((2, 2), 30.0, dtype=float)),
+        "_shortwave_rad": SimpleNamespace(
+            rsns=np.full((2, 2), 30.0, dtype=float), rsds=np.full((2, 2), 35.0)
+        ),
         "_condensation": SimpleNamespace(precls=np.full((2, 2), 20.0)),
         "_convection": SimpleNamespace(precnv=np.full((2, 2), 5.0)),
     }
@@ -1381,12 +1396,12 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         data.get("specific_humidity"),
         np.asarray([[0.05, 0.07], [0.06, 0.08]]),
     )
-    assert_allclose_compact(data.get("sensible_heat_flux"), np.full((2, 2), -10.0))
+    assert_allclose_compact(data.get("sensible_heat_flux"), np.full((2, 2), -5.0))
     assert_allclose_compact(
         data.get("latent_heat_flux"),
         np.full(
             (2, 2),
-            -2.0 / 1e3 * coupler.constants.latent_heat_of_vaporization * 2.0,
+            -2.0 / 1e3 * coupler.constants.latent_heat_of_vaporization,
         ),
     )
     assert_allclose_compact(

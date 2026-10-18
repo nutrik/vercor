@@ -201,6 +201,14 @@ OCEAN_TO_SEAICE_SURFACE_FIELDS: tuple[_ExchangeField, ...] = (
 SEAICE_TO_OCEAN_FIELDS: tuple[_ExchangeField, ...] = ("ice_fraction",)
 """Sea-ice fields imported by ocean components."""
 
+
+JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS: tuple[_ExchangeField, ...] = (
+    "land_latent_heat_flux",
+    "land_sensible_heat_flux",
+)
+"""Native per-land-area turbulent fluxes; remap as intensive on land support."""
+
+
 __all__ = [
     "ATMOSPHERE_TO_DATA_OCEAN_FIELDS",
     "ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS",
@@ -211,6 +219,7 @@ __all__ = [
     "ATMOSPHERE_TO_OCEAN_STATE_FIELDS",
     "ATMOSPHERE_TO_VEROS_FORCING_FIELDS",
     "ATMOSPHERE_TO_VERIS_FORCING_FIELDS",
+    "JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS",
     "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS",
     "JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS",
     "JCM_LAND_TO_ATMOSPHERE_FIELDS",

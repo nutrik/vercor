@@ -121,7 +121,24 @@ JAXGCM_INPUT_GRID_FIELD_NAMES = (
     "sea_surface_temperature",
     "soil_moisture",
 )
+JAXGCM_COUPLED_INPUT_GRID_FIELD_NAMES = (
+    "land_surface_temperature",
+    "soil_moisture",
+    "open_water_temperature_contribution",
+    "ice_surface_temperature",
+    "ice_surface_albedo",
+    "ice_fraction",
+)
+JAXGCM_COUPLED_OUTPUT_GRID_FIELD_NAMES = (
+    "marine_surface_albedo",
+    "marine_ice_fraction",
+)
 JAXGCM_OUTPUT_GRID_FIELD_NAMES = (
+    "downward_shortwave_radiation_flux",
+    "surface_pressure",
+    "open_water_albedo",
+    "land_sensible_heat_flux",
+    "land_latent_heat_flux",
     "u_velocity",
     "v_velocity",
     "temperature",
@@ -219,6 +236,8 @@ def map_jcm_output_fields(
     temperature: object,
     specific_humidity: object,
     *,
+    downward_shortwave_radiation_flux: object,
+    open_water_albedo: object,
     large_scale_precipitation: object,
     convective_precipitation: object,
     temperature_2m: object,
@@ -279,13 +298,13 @@ def map_jcm_output_fields(
     rain_rate = (total_precipitation - snow_precipitation).T
     snow_rate = snow_precipitation.T
 
-    sensible_heat_flux = -jnp.sum(
-        as_jax_real_array(surface_sensible_heat_flux, dtype), axis=2
-    ).T
-    latent_heat_flux = -jnp.sum(
-        as_jax_real_array(surface_evaporation, dtype) / 1e3 * latvap_array,
-        axis=2,
-    ).T
+    # SPEEDY stores land, marine, then the area-combined channel.
+    sensible_channels = as_jax_real_array(surface_sensible_heat_flux, dtype)
+    latent_channels = as_jax_real_array(surface_evaporation, dtype) * (
+        latvap_array / 1000
+    )
+    sensible_heat_flux = -sensible_channels[:, :, 2].T
+    latent_heat_flux = -latent_channels[:, :, 2].T
     net_shortwave_radiation_flux_surface = as_jax_real_array(
         net_shortwave_radiation_flux, dtype
     ).T
@@ -315,6 +334,17 @@ def map_jcm_output_fields(
     )
 
     return {
+        "land_sensible_heat_flux": -sensible_channels[:, :, 0].T,
+        "land_latent_heat_flux": -latent_channels[:, :, 0].T,
+        "downward_shortwave_radiation_flux": jnp.broadcast_to(
+            as_jax_real_array(downward_shortwave_radiation_flux, dtype),
+            temperature_bottom.T.shape,
+        ).T,
+        "surface_pressure": reference_pressure_array
+        * normalized_surface_pressure_array,
+        "open_water_albedo": jnp.broadcast_to(
+            as_jax_real_array(open_water_albedo, dtype), temperature_bottom.shape
+        ),
         "u_velocity": u_velocity_bottom,
         "v_velocity": v_velocity_bottom,
         "temperature": temperature_bottom,
