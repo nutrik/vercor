@@ -51,6 +51,8 @@ def _map_fields(
             jnp.full_like(profile, 2.0),
             profile,
             jnp.full_like(profile, 10.0),
+            downward_shortwave_radiation_flux=0.0,
+            open_water_albedo=0.07,
             large_scale_precipitation=(
                 jnp.full(shape, 8.0) if precls is None else precls
             ),

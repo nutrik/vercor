@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Any, cast
 
 import jax
 import jax.numpy as jnp
@@ -179,6 +179,12 @@ def prefill_jax_gcm_runtime_fields(
         data.setdefault(
             name, jax_full(component.grid.shape, value, state._dtype_policy)
         )
+    if getattr(state, "seaice_coupling", False):
+        for name in (
+            *_jax_gcm_fields.JAXGCM_COUPLED_INPUT_GRID_FIELD_NAMES,
+            *_jax_gcm_fields.JAXGCM_COUPLED_OUTPUT_GRID_FIELD_NAMES,
+        ):
+            data.setdefault(name, jax_zeros(component.grid.shape, state._dtype_policy))
     sigma_levels = jnp.asarray(state.sigma_levels)
     data.setdefault(
         "pressure",
@@ -200,7 +206,14 @@ def validate_jax_gcm_runtime_state(
             f"for component '{component.name}'"
         )
 
-    for field_name in _jax_gcm_fields.JAXGCM_REQUIRED_GRID_FIELD_NAMES:
+    required: tuple[str, ...] = _jax_gcm_fields.JAXGCM_REQUIRED_GRID_FIELD_NAMES
+    if getattr(state, "seaice_coupling", False):
+        required = (
+            *required,
+            *_jax_gcm_fields.JAXGCM_COUPLED_INPUT_GRID_FIELD_NAMES,
+            *_jax_gcm_fields.JAXGCM_COUPLED_OUTPUT_GRID_FIELD_NAMES,
+        )
+    for field_name in required:
         if field_name not in context.state.fields():
             raise CouplerError(
                 "Runtime missing required data field "
@@ -255,6 +268,100 @@ def _required_speedy_diagnostics(
     )
 
 
+def _map_jax_gcm_state_fields(
+    state: "JAXGCMSetupState",
+    jcm_state: Any,
+    constants: PhysicalConstants,
+    dtype: DTypePolicy,
+) -> dict[str, jax.Array]:
+    """Map one diagnosed native snapshot with shared units and channel selection."""
+    surface_flux, shortwave_rad, condensation, convection = (
+        _required_speedy_diagnostics(
+            jcm_state.physics,
+            component_name=state.name,
+        )
+    )
+
+    return cast(
+        dict[str, jax.Array],
+        _jax_gcm_fields.map_jcm_output_fields(
+            constants.latent_heat_of_vaporization,
+            JCM_REFERENCE_PRESSURE,
+            state.sigma_levels,
+            constants.dry_air_molecular_weight,
+            constants.universal_gas_constant,
+            constants.reference_pressure,
+            constants.dry_air_kappa,
+            surface_flux.shf,
+            surface_flux.evap,
+            surface_flux.rlds,
+            shortwave_rad.rsns,
+            jcm_state.dynamics.normalized_surface_pressure,
+            jcm_state.dynamics.u_wind,
+            jcm_state.dynamics.v_wind,
+            jcm_state.dynamics.temperature,
+            jcm_state.dynamics.specific_humidity,
+            downward_shortwave_radiation_flux=shortwave_rad.rsds,
+            open_water_albedo=state.open_water_albedo,
+            large_scale_precipitation=condensation.precls,
+            convective_precipitation=convection.precnv,
+            temperature_2m=surface_flux.t0,
+            snow_temperature=constants.precipitation_snow_temperature,
+            rain_temperature=constants.precipitation_rain_temperature,
+            dtype=dtype,
+        ),
+    )
+
+
+def diagnose_jax_gcm_initial_fields(
+    state: "JAXGCMSetupState",
+    payload: JAXGCMRuntimePayload,
+    constants: PhysicalConstants,
+    dtype: DTypePolicy,
+) -> tuple[dict[str, Any], JAXGCMRuntimePayload]:
+    """Evaluate current native physics without advancing dycore or cross-step carry.
+
+    The diagnostic snapshot uses the original climatological surface until the
+    first scheduled atmosphere step receives coupled component fields.
+    """
+    current = state.model.dycore.to_physics_state(payload.jcm_state.dycore_state)
+    date = state.model._date_from_sim_time(
+        state.model.dycore.sim_time(payload.jcm_state.dycore_state)
+    )
+    selected = payload.forcing.select(date, calendar=state.model.calendar)
+    _, diagnostics = state.model.physics.compute_tendencies(
+        current,
+        selected,
+        state.model.terrain,
+        prev_physics_data=payload.jcm_state.physics_carry,
+    )
+    snapshot = replace(
+        payload.jcm_state,
+        dynamics=tree_as_runtime_dtype(current, dtype),
+        physics=tree_as_runtime_dtype(diagnostics, dtype),
+    )
+    fields: dict[str, Any] = _map_jax_gcm_state_fields(
+        state, snapshot, constants, dtype
+    )
+    land = as_jax_real_array(state.model.terrain.fmask, dtype).T
+    land_temperature = as_jax_real_array(selected.stl_am, dtype).T
+    sea_temperature = as_jax_real_array(selected.sea_surface_temperature, dtype).T
+    fields.update(
+        {
+            "land_surface_temperature": land_temperature,
+            "sea_surface_temperature": sea_temperature,
+            "soil_moisture": as_jax_real_array(selected.soilw_am, dtype).T,
+            "total_surface_temperature": land * land_temperature
+            + (1 - land) * sea_temperature,
+            "marine_surface_albedo": as_jax_real_array(
+                diagnostics["_mod_radcon"].alb_s, dtype
+            ).T,
+            "marine_ice_fraction": as_jax_real_array(selected.sice_am, dtype).T,
+        }
+    )
+    return fields, JAXGCMRuntimePayload(snapshot, payload.forcing)
+
+
 def step_jax_gcm_runtime(
     state: "JAXGCMSetupState",
     fields: Mapping[str, Any],
@@ -275,26 +382,65 @@ def step_jax_gcm_runtime(
         stage="step input",
     )
 
-    (
-        land_surface_temperature,
-        sea_surface_temperature,
-        total_surface_temperature,
-        _,
-    ) = _jax_gcm_fields.cleanup_surface_temperature_fields(
-        fields.get("land_surface_temperature"),
-        fields.get("sea_surface_temperature"),
-    )
+    surface_fields: dict[str, Any]
+    if getattr(state, "seaice_coupling", False):
+        from vercor.setups._external.jax_gcm_surface import CoupledJCMForcing
 
-    land_surface_temperature_forcing, sea_surface_temperature_forcing = (
-        _jax_gcm_fields.prepare_surface_temperature_forcing(
-            total_surface_temperature,
+        composed = _jax_gcm_fields.prepare_coupled_surface_forcing(
+            {
+                name: fields[name]
+                for name in _jax_gcm_fields.JAXGCM_COUPLED_INPUT_GRID_FIELD_NAMES
+            },
             as_jax_real_array(state.model.terrain.fmask, dtype).T,
+            state.open_water_albedo,
+            dtype=dtype,
         )
-    )
-    applied_forcing = payload.forcing.copy(
-        stl_am=land_surface_temperature_forcing.T,
-        sea_surface_temperature=sea_surface_temperature_forcing.T,
-    )
+        applied_forcing = CoupledJCMForcing(
+            payload.forcing.copy(
+                stl_am=composed.land_surface_temperature.T,
+                sea_surface_temperature=composed.sea_surface_temperature.T,
+                soilw_am=composed.soil_moisture.T,
+                sice_am=composed.marine_ice_fraction.T,
+            ),
+            composed.marine_surface_albedo.T,
+        )
+        surface_fields = {
+            name: getattr(composed, name)
+            for name in (
+                "land_surface_temperature",
+                "sea_surface_temperature",
+                "soil_moisture",
+                "total_surface_temperature",
+                "marine_surface_albedo",
+                "marine_ice_fraction",
+            )
+        }
+    else:
+        (
+            land_surface_temperature,
+            sea_surface_temperature,
+            total_surface_temperature,
+            _,
+        ) = _jax_gcm_fields.cleanup_surface_temperature_fields(
+            fields.get("land_surface_temperature"),
+            fields.get("sea_surface_temperature"),
+        )
+
+        land_surface_temperature_forcing, sea_surface_temperature_forcing = (
+            _jax_gcm_fields.prepare_surface_temperature_forcing(
+                total_surface_temperature,
+                as_jax_real_array(state.model.terrain.fmask, dtype).T,
+            )
+        )
+        applied_forcing = payload.forcing.copy(
+            stl_am=land_surface_temperature_forcing.T,
+            sea_surface_temperature=sea_surface_temperature_forcing.T,
+        )
+        surface_fields = {
+            "land_surface_temperature": land_surface_temperature,
+            "sea_surface_temperature": sea_surface_temperature,
+            "total_surface_temperature": total_surface_temperature,
+        }
     jcm_state, prediction = state._step_function(
         payload.jcm_state,
         applied_forcing,
@@ -304,43 +450,11 @@ def step_jax_gcm_runtime(
         component_name=state.name,
         stage="step output",
     )
-    surface_flux, shortwave_rad, condensation, convection = (
-        _required_speedy_diagnostics(
-            jcm_state.physics,
-            component_name=state.name,
-        )
-    )
-
-    mapped_fields = _jax_gcm_fields.map_jcm_output_fields(
-        constants.latent_heat_of_vaporization,
-        JCM_REFERENCE_PRESSURE,
-        state.sigma_levels,
-        constants.dry_air_molecular_weight,
-        constants.universal_gas_constant,
-        constants.reference_pressure,
-        constants.dry_air_kappa,
-        surface_flux.shf,
-        surface_flux.evap,
-        surface_flux.rlds,
-        shortwave_rad.rsns,
-        jcm_state.dynamics.normalized_surface_pressure,
-        jcm_state.dynamics.u_wind,
-        jcm_state.dynamics.v_wind,
-        jcm_state.dynamics.temperature,
-        jcm_state.dynamics.specific_humidity,
-        large_scale_precipitation=condensation.precls,
-        convective_precipitation=convection.precnv,
-        temperature_2m=surface_flux.t0,
-        snow_temperature=constants.precipitation_snow_temperature,
-        rain_temperature=constants.precipitation_rain_temperature,
-        dtype=dtype,
-    )
+    mapped_fields = _map_jax_gcm_state_fields(state, jcm_state, constants, dtype)
 
     step_result = StepResult(
         fields={
-            "land_surface_temperature": land_surface_temperature,
-            "sea_surface_temperature": sea_surface_temperature,
-            "total_surface_temperature": total_surface_temperature,
+            **surface_fields,
             **mapped_fields,
         },
         payload=JAXGCMRuntimePayload(

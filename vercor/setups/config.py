@@ -31,10 +31,13 @@ class JAXGCMConfig:
     spinup: Spinup = field(default_factory=Spinup)
     output: OutputSpec = field(default_factory=OutputSpec)
     jitted: bool = True
+    seaice_coupling: bool = field(default=False, kw_only=True)
 
     def __post_init__(self) -> None:
         """Copy mutable caller-provided mappings into owned config state."""
 
+        if not isinstance(self.seaice_coupling, bool):
+            raise TypeError("seaice_coupling must be bool")
         if self.custom_parameters is not None:
             object.__setattr__(
                 self,

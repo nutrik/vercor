@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import jax
@@ -20,6 +20,7 @@ from jcm.physics.speedy.speedy_terms import speedy_physics
 from jcm.physics_interface import PhysicsState
 from jcm.terrain import TerrainData
 
+from vercor.calendar import DateTime365, ModelDateTime
 from vercor.components import (
     Component,
     SetupContext,
@@ -67,10 +68,36 @@ def _bootstrap_jcm_state(model: Model) -> JCMState:
     )
 
 
+def jax_gcm_noleap_epoch(
+    start: datetime | ModelDateTime, effective_spinup: timedelta
+) -> Any:
+    """Bind JCM's 365-day calendar by ordinal days since its 1970 epoch."""
+    import jax_datetime as jdt
+    from jcm.date import MODEL_EPOCH
+
+    noleap = DateTime365(
+        start.year,
+        start.month,
+        start.day,
+        start.hour,
+        start.minute,
+        start.second,
+        start.microsecond,
+    )
+    offset = noleap - DateTime365(1970, 1, 1, 0, 0, 0, 0)
+    assert isinstance(offset, timedelta)
+    delta = offset - effective_spinup
+    if delta.microseconds:
+        raise ValueError("JCM epoch requires whole seconds")
+    with jax.ensure_compile_time_eval():
+        return MODEL_EPOCH + jdt.Timedelta(days=delta.days, seconds=delta.seconds)
+
+
 class JAXGCMSetupState:
     """Mutable setup-time owner for a JAXGCM/JCM atmosphere adapter."""
 
     _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, ModelPredictions]]
+    _epoch_key: tuple[datetime | ModelDateTime, timedelta, timedelta]
     _state: JCMState
     forcing: ForcingData
     data: dict[str, RuntimeArray]
@@ -89,9 +116,11 @@ class JAXGCMSetupState:
         forcing_data: ForcingData | None = None,
         do_spinup: bool = False,
         jitted: bool = True,
+        seaice_coupling: bool = False,
     ) -> None:
         """Build JAXGCM model resources and the VerCOR grid."""
 
+        self.seaice_coupling = seaice_coupling
         self.forcing_data = forcing_data
         self.model_timestep = model_timestep
         self.save_interval = save_interval
@@ -107,7 +136,15 @@ class JAXGCMSetupState:
                 default_parameters=jcm_parameters,
             )
 
+        self.open_water_albedo = jcm_parameters.mod_radcon.albsea
         physics = speedy_physics(parameters=jcm_parameters)
+        if seaice_coupling:
+            from vercor.setups._external.jax_gcm_surface import CoupledSpeedyForcing
+
+            physics = physics.replace(
+                "forcing",
+                CoupledSpeedyForcing(mod_radcon_params=jcm_parameters.mod_radcon),
+            )
 
         self.model = Model(
             coords=coords,
@@ -188,6 +225,24 @@ class JAXGCMSetupState:
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
 
+        if getattr(self, "seaice_coupling", False):
+            effective_spinup = self.spinup_time if self.do_spinup else timedelta(0)
+            if (
+                effective_spinup < timedelta(0)
+                or effective_spinup % self.coupling_timestep
+            ):
+                raise ValueError("Enabled JCM spinup must align to coupling intervals")
+            epoch_key = (context.start, effective_spinup, self.coupling_timestep)
+            if hasattr(self, "_epoch_key") and self._epoch_key != epoch_key:
+                raise ValueError(
+                    "JCM epoch already bound; construct a new component for another start"
+                )
+            self._epoch_key = epoch_key
+            self.model.calendar = "365_day"
+            self.model.start_date = jax_gcm_noleap_epoch(
+                context.start, effective_spinup
+            )
+
         self._state = _bootstrap_jcm_state(self.model)
 
         if self.forcing_data is not None:
@@ -222,10 +277,13 @@ class JAXGCMSetupState:
                 step=spinup_step,
             )
 
-        return SetupResult(
-            fields=initial_fields,
-            payload=_jax_gcm_runtime.create_jax_gcm_runtime_payload(self, component),
-        )
+        payload = _jax_gcm_runtime.create_jax_gcm_runtime_payload(self, component)
+        if getattr(self, "seaice_coupling", False):
+            diagnosed, payload = _jax_gcm_runtime.diagnose_jax_gcm_initial_fields(
+                self, payload, context.constants, context.dtype
+            )
+            initial_fields.update(diagnosed)
+        return SetupResult(fields=initial_fields, payload=payload)
 
 
 __all__ = [

@@ -21,7 +21,12 @@ else:
     _CoordinateSystem = Any
     _ForcingData = Any
 
-_JCM_LAND_INPUT_NAMES = ("latent_heat_flux", "sensible_heat_flux")
+_JCM_LAND_INPUT_NAMES = (
+    "latent_heat_flux",
+    "sensible_heat_flux",
+    "land_latent_heat_flux",
+    "land_sensible_heat_flux",
+)
 _JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture")
 
 

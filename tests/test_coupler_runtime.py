@@ -109,6 +109,7 @@ class _FakeSurfaceFlux(NamedTuple):
 
 class _FakeShortwaveRad(NamedTuple):
     rsns: jax.Array
+    rsds: jax.Array
 
 
 class _FakeCondensation(NamedTuple):
@@ -188,6 +189,7 @@ def _fake_jcm_step(
         (
             surface_temperature,
             surface_temperature * 0.5,
+            surface_temperature * 0.75,
         ),
         axis=-1,
     )
@@ -207,6 +209,7 @@ def _fake_jcm_step(
             ),
             "_shortwave_rad": _FakeShortwaveRad(
                 rsns=(surface_temperature + 4.0)[jnp.newaxis, ...],
+                rsds=(surface_temperature + 5.0)[jnp.newaxis, ...],
             ),
         },
         dynamics=_FakeDynamicsPrediction(
@@ -236,6 +239,7 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
     state = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
+    state.open_water_albedo = jnp.asarray(0.07)
     state.name = "ATM"
     state.grid = grid
     state._dtype_policy = DTypePolicy()
@@ -267,13 +271,14 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
             "_condensation": _FakeCondensation(jnp.zeros(grid.shape)),
             "_convection": _FakeConvection(jnp.zeros(grid.shape)),
             "_surface_flux": _FakeSurfaceFlux(
-                shf=jnp.zeros((*grid.shape, 2), dtype=jnp.float64),
-                evap=jnp.zeros((*grid.shape, 2), dtype=jnp.float64),
+                shf=jnp.zeros((*grid.shape, 3), dtype=jnp.float64),
+                evap=jnp.zeros((*grid.shape, 3), dtype=jnp.float64),
                 rlds=jnp.zeros(grid.shape, dtype=jnp.float64),
                 t0=jnp.full(grid.shape, 288.15, dtype=jnp.float64),
             ),
             "_shortwave_rad": _FakeShortwaveRad(
                 rsns=jnp.zeros(grid.shape, dtype=jnp.float64),
+                rsds=jnp.zeros(grid.shape, dtype=jnp.float64),
             ),
         },
         dycore_state={"marker": jnp.asarray(0.0)},
