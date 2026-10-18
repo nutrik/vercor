@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 from functools import partial
+from dataclasses import dataclass
+from collections.abc import Mapping
 
 import jax
 import jax.numpy as jnp
 
-from vercor._numerical_safety import replace_missing_nan
+from vercor._numerical_safety import (
+    _require_zero,
+    replace_missing_nan,
+    require_active_finite,
+)
 from vercor.dtypes import DTypePolicy, as_jax_real_array
+from vercor.types import RuntimeArray
 from vercor.fluxes.vertical_coordinates import (
     _compute_surface_nearest_sigma_level_altitude,
     compute_sigma_pressure_levels,
@@ -18,6 +25,97 @@ REFERENCE_SURFACE_TEMPERATURE = 273.15 + 15.0
 REFERENCE_AIR_DENSITY = 1.2
 REFERENCE_MODEL_LEVEL_HEIGHT = 50.0
 COLD_SURFACE_TEMPERATURE_THRESHOLD = 250.0
+
+
+@jax.tree_util.register_dataclass
+@dataclass(frozen=True)
+class JCMCoupledSurface:
+    """Intensive native surface forcing and area-weighted total temperature.
+
+    Arrays use canonical (latitude, longitude) layout. Marine temperature and
+    albedo are per ocean area; ice concentration is normalized by ocean area.
+    Land temperature and native soil availability retain their independent values.
+    """
+
+    land_surface_temperature: jax.Array
+    sea_surface_temperature: jax.Array
+    soil_moisture: jax.Array
+    marine_surface_albedo: jax.Array
+    marine_ice_fraction: jax.Array
+    total_surface_temperature: jax.Array
+
+
+@partial(jax.jit, static_argnames=("dtype",))
+def prepare_coupled_surface_forcing(
+    fields: Mapping[str, RuntimeArray],
+    land_fraction: RuntimeArray,
+    open_water_albedo: RuntimeArray,
+    *,
+    dtype: DTypePolicy,
+) -> JCMCoupledSurface:
+    """Compose separately remapped water/ice contributions without reweighting.
+
+    Incoming ice properties already contain R(W*A*property); ice_fraction is
+    R(W*A), and the ocean temperature contribution is R(W*(1-A)*SST).
+    Static land coverage follows the existing ocean-mask helper's threshold.
+    Undefined absent-surface operands are neutralized before arithmetic, and
+    a finite reference temperature fills native branches on absent surfaces.
+    """
+    land = as_jax_real_array(land_fraction, dtype)
+    require_active_finite(land, active_mask=None, owner="JCM land fraction")
+    _require_zero(
+        jnp.count_nonzero((land < 0) | (land > 1)), "JCM land fraction", "range [0, 1]"
+    )
+    ocean = 1 - land
+    marine = ocean > 0
+    ice = as_jax_real_array(fields["ice_fraction"], dtype)
+    require_active_finite(ice, active_mask=marine, owner="JCM ice_fraction")
+    ice = jnp.where(marine, ice, 0)
+    _require_zero(
+        jnp.count_nonzero((ice < 0) | (ice > ocean)),
+        "JCM ice_fraction",
+        "ocean-area bounds",
+    )
+    water = ocean - ice
+
+    def supported(value: RuntimeArray, support: jax.Array, owner: str) -> jax.Array:
+        array = jnp.broadcast_to(as_jax_real_array(value, dtype), support.shape)
+        require_active_finite(array, active_mask=support, owner=owner)
+        return jnp.where(support, array, 0)
+
+    land_active = land > 0
+    land_temperature = supported(
+        fields["land_surface_temperature"], land_active, "JCM land temperature"
+    )
+    soil = supported(fields["soil_moisture"], land_active, "JCM soil moisture")
+    water_temperature = supported(
+        fields["open_water_temperature_contribution"],
+        water > 0,
+        "JCM open-water contribution",
+    )
+    ice_temperature = supported(
+        fields["ice_surface_temperature"], ice > 0, "JCM ice temperature contribution"
+    )
+    ice_albedo = supported(
+        fields["ice_surface_albedo"], ice > 0, "JCM ice albedo contribution"
+    )
+    water_albedo = supported(open_water_albedo, water > 0, "JCM open-water albedo")
+    denominator = jnp.where(marine, ocean, 1)
+    temperature = (water_temperature + ice_temperature) / denominator
+    albedo = (water * water_albedo + ice_albedo) / denominator
+    reference = as_jax_real_array(REFERENCE_SURFACE_TEMPERATURE, dtype)
+    land_temperature = jnp.where(land_active, land_temperature, reference)
+    temperature = jnp.where(marine, temperature, reference)
+    return JCMCoupledSurface(
+        land_temperature,
+        temperature,
+        soil,
+        albedo,
+        ice / denominator,
+        land * land_temperature + ocean * temperature,
+    )
+
+
 JAXGCM_INPUT_GRID_FIELD_NAMES = (
     "land_surface_temperature",
     "sea_surface_temperature",
