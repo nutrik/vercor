@@ -71,11 +71,20 @@ def prepare_coupled_surface_forcing(
     ice = as_jax_real_array(fields["ice_fraction"], dtype)
     require_active_finite(ice, active_mask=marine, owner="JCM ice_fraction")
     ice = jnp.where(marine, ice, 0)
+    # The independently remapped ice coverage and 1-(1-R(W)) can differ
+    # through unit-scale subtraction/remapping roundoff. Reconcile a full-ice
+    # endpoint within two machine epsilons before deciding water support.
+    roundoff = 2 * jnp.finfo(land.dtype).eps
     _require_zero(
-        jnp.count_nonzero((ice < 0) | (ice > ocean)),
+        jnp.count_nonzero((ice < 0) | (ice > ocean + roundoff)),
         "JCM ice_fraction",
         "ocean-area bounds",
     )
+    full_ice = jnp.abs(ice - ocean) <= roundoff
+    reconciled = jnp.where(full_ice, ocean, ice)
+    # This corrects only floating-point representation. Keep the identity
+    # tangent of valid coverage, including the one-sided full-ice limit.
+    ice = ice + jax.lax.stop_gradient(reconciled - ice)
     water = ocean - ice
 
     def supported(
