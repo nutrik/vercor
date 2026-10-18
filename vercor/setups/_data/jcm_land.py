@@ -77,6 +77,19 @@ def make_jcm_land(
         field_name="soilw_am",
         expected_spatial_shape=forcing_spatial_shape,
     )
+    daily = land_surface_temperature.ndim == 3 or soil_moisture.ndim == 3
+    if daily:
+        records = max(
+            (
+                land_surface_temperature.shape[0]
+                if land_surface_temperature.ndim == 3
+                else 1
+            ),
+            soil_moisture.shape[0] if soil_moisture.ndim == 3 else 1,
+        )
+        shape = (records, *land_surface_temperature.shape[-2:])
+        land_surface_temperature = jnp.broadcast_to(land_surface_temperature, shape)
+        soil_moisture = jnp.broadcast_to(soil_moisture, shape)
     lnd_bmask, _ = create_lnd_mask_from_ocn(
         atm_lat=latitude,
         atm_lon=longitude,
@@ -101,7 +114,7 @@ def make_jcm_land(
             inputs=_JCM_LAND_INPUT_NAMES,
             outputs=_JCM_LAND_FIELD_NAMES,
             initial_fields={field_name: 0.0 for field_name in _JCM_LAND_INPUT_NAMES},
-            transfer=TransferPolicy(time_selection="daily"),
+            transfer=TransferPolicy(time_selection="daily" if daily else "current"),
             output=resolve_output(output),
         ),
     )

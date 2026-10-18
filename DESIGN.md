@@ -473,3 +473,34 @@ stored areas and the shared output coordinator. A private index counter measures
 actual guarded native transitions; pure device reductions provide scalar budget
 rates. Host-only benchmark reporting and segmented comparisons introduce no
 alternative integrator or mutable model state. See docs/veris-validation.rst.
+
+
+## Coupled Veris–Veros–JCM surface assembly
+
+`run_veris_veros_jcm.py` reuses the paired native factories and the sequential
+LND → CICE → OCN → ATM workflow. Ice exports current per-ice temperature and
+native category/snow albedo, plus current concentration. Ocean exports current
+`(1-A)*SST` after its native advance; full SST/SSS/currents/SSH remain available
+under ice. Total ocean boundary rates pass through Veris once.
+
+Explicit routes form source products before conservative remapping:
+`R(W*A*Tice)`, `R(W*A*alpha_ice)`, `R(W*A)` and `R(W*(1-A)*SST)`.
+The JCM compositor normalizes by static ocean area only. Land temperature and
+moisture retain their independent native fields. A frozen forcing wrapper
+carries marine albedo through native time/solar selection; a narrow native
+SPEEDY forcing subclass replaces only marine and combined albedo diagnostics.
+Native concentration remains the real marine ice fraction. All evolving values
+are payload/field leaves, with no model or physics-term ice-state mutation.
+
+Coupled JCM binds a 365-day ordinal epoch, evaluates physical initial diagnostics
+without advancing native carry, and retains explicit lagged air feedback.
+`SurfaceMaskPolicy` still validates static land/ocean geometry and patches binary
+land support, while fractional patches apply only to legacy routes. Explicit
+quantity routes own their coverage, so the generic custom topology conflict
+check remains unchanged. Static/daily JCM land fields share a compatible time
+layout; no generic transfer-selection behavior changes.
+
+JCM's single marine channel uses the area-composed effective temperature;
+separate ice/water turbulent channels and long-term climate validation remain
+outside this functional integration. Canonical marine output joins the native
+provider through the existing shared output coordinator.

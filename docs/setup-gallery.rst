@@ -65,6 +65,10 @@ Example:
      - Couple prognostic Veris and Veros with prescribed ERA5 air.
      - Veris, Veros
      - Yes
+   * - ``run_veris_veros_jcm``
+     - Couple JCM land/atmosphere, prognostic Veros and native Veris sea ice.
+     - JCM, Veris, Veros
+     - Yes
    * - ``run_veris_calibration``
      - Recover native h0 from synthetic concentration with a cold-forcing holdout.
      - Veris
@@ -282,3 +286,60 @@ gradient, optimizer iteration/evaluation counts and convergence. The example
 prints recovery of truth 0.43 m and a distinct cold-forcing holdout error.
 This validates numerical recovery rather than observed climate skill; float32
 concentration quantization limits recovery accuracy relative to float64.
+
+Coupled Veris, Veros and JCM
+----------------------------
+
+Copy ``run_veris_veros_jcm`` with the standard CLI, or import its public
+``build_coupler`` function. The default is 365 daily noleap intervals starting
+2000-01-03, after two days of native JCM climatological spinup. The builder
+selects precision before constructing models, initializes the ocean once, and
+reuses ``make_veris_veros`` and ``make_jcm_land_atmosphere``. Optional models
+remain lazy imports. Inject ``clock``, native ``jcm_inputs`` or an already built
+``pair`` for shorter runs; pair configuration overrides cannot accompany a pair.
+
+The execution order is ``LND -> CICE -> OCN -> ATM``. Veris uses the latest
+available ocean and atmospheric fields; its interval-mean total ocean heat,
+mass, salt and stress enter Veros once. There is no direct ATM-to-OCN route.
+JCM then receives current Veris ice temperature/albedo/concentration and
+post-advance Veros open-water SST contributions. JCM land supplies separate
+land temperature and soil availability. Land remains prescribed: receiving
+heat fluxes does not make it a prognostic land model.
+
+For wet mask W and current ice fraction A, conservative remapping transfers
+``R(W*(1-A)*SST)``, ``R(W*A*Tice)``, ``R(W*A*alpha_ice)`` and ``R(W*A)``.
+Products are formed on their source grid, preserving covariance. With native
+land fraction fl, ocean fraction fo=1-fl and remapped ice fraction fi, JCM uses
+marine temperature ``(water_temperature_contribution+ice_temperature_contribution)/fo``
+and marine albedo ``((fo-fi)*alpha_water+ice_albedo_contribution)/fo``.
+Concentration supplied to native JCM is ``fi/fo``. The configured native
+open-water albedo is used wherever water is free of ice. Absent branches use
+finite reference temperatures and zero inactive contributions. The existing
+static mask helper's 0.001 threshold defines absent land/ocean support.
+
+Enable the three explicit policies when supplying configurations:
+``VerisConfig(atmosphere_forcing="model_level")``,
+``VerosConfig(surface_forcing="coupled", export_open_water_surface=True)`` and
+``JAXGCMConfig(seaice_coupling=True)``. Incompatible supplied modes fail early.
+The builder requires noleap dates; coupled JCM binds its native 365-day ordinal
+epoch and requires whole-second dates and spinup aligned to coupling intervals.
+Initial air/radiation is evaluated from initialized native JCM physics without
+advancing its dycore or cross-step carry. Its initial boundary is the native
+climatology; subsequent ATM intervals use the incoming coupled surfaces. Thus
+the first CICE interval has physical air/radiation and the explicit air lag is
+retained. JCM model-level winds are converted to actual 10 m vectors using the
+same CESM bulk solution that diagnoses temperature/humidity for Veris.
+
+JCM's SPEEDY scheme has one effective marine temperature. This coupling does
+not resolve separate marine turbulent fluxes over ice and water. Raw downward
+shortwave radiation is exported separately: Veris applies the configured water
+albedo to its open-water branch and native ice albedo to ice. JCM's already
+combined turbulent flux channel is selected once; land receives its separate
+per-land-area channels with downward-positive heat signs. Dynamic surface
+weighting never adds another concentration or ocean-area factor.
+
+Shared JCM period files add canonical ``sea_surface_temperature`` (K),
+``marine_surface_albedo`` (1) and ``marine_ice_fraction`` (1) on ``lat, lon``;
+native diagnostics remain available. Output is owned by the existing shared
+coordinator. The two-day global smoke and smooth native AD tests establish
+functional coupling and derivative behavior, not long-term climate accuracy.
