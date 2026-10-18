@@ -37,6 +37,7 @@ COMMON_FIELD_NAMES: tuple[str, ...] = (
     "temperature_2m",
     "potential_temperature",
     "sea_surface_temperature",
+    "open_water_temperature_contribution",
     "land_surface_temperature",
     "model_level_height",
     "u_velocity",

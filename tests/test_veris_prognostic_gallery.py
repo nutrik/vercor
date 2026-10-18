@@ -175,7 +175,11 @@ assert not {'veris', 'veros'} & sys.modules.keys()
 
 
 def _prognostic_coupler(
-    monkeypatch: pytest.MonkeyPatch, *, execution: Any = "host", steps: int = 1
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    execution: Any = "host",
+    steps: int = 1,
+    export_open_water_surface: bool = False,
 ) -> Any:
     """Use the public pair with real native small-grid ocean and prescribed air."""
     from datetime import datetime
@@ -203,7 +207,11 @@ def _prognostic_coupler(
             custom_parameters={"nEVPsteps": 8},
             initial_conditions={"Area": 0.5, "hIceMean": 0.25, "TSurf": 260.0},
         ),
-        ocean_config=VerosConfig(execution=execution, surface_forcing="coupled"),
+        ocean_config=VerosConfig(
+            execution=execution,
+            surface_forcing="coupled",
+            export_open_water_surface=export_open_water_surface,
+        ),
     )
     fields = _cold_fields(
         pair.ocean.grid.shape, policy=DTypePolicy(enable_x64=True), calm=True
@@ -242,6 +250,20 @@ def _prognostic_coupler(
                 route_id="CICE->OCN.stress",
                 quantity="source_flux",
                 source_coverage="binary",
+            ),
+            *(
+                (
+                    Exchange(
+                        "CICE",
+                        "OCN",
+                        ("ice_fraction",),
+                        route_id="CICE->OCN.coverage",
+                        quantity="intensive",
+                        source_coverage="binary",
+                    ),
+                )
+                if export_open_water_surface
+                else ()
             ),
         ),
         run_order=("CICE", "OCN", "ATM"),
