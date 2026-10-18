@@ -2726,6 +2726,7 @@ def test_veros_initialize_spinup_follows_enabled_only(
     component.dt_tracer = 10.0
     component.do_spinup = do_spinup
     component.surface_forcing = "atmosphere"
+    component.export_open_water_surface = False
     component.spinup_time = timedelta(seconds=20.0)
     component.spinup_steps = 2
     component._veros_state = _make_fake_veros_state(surface_temperature=10.0)

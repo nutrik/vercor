@@ -79,6 +79,11 @@ VERIS_TO_JCM_SURFACE_FIELDS: tuple[_ExchangeField, ...] = (
 VERIS_TO_JCM_COVERAGE_FIELDS: tuple[_ExchangeField, ...] = ("ice_fraction",)
 """Ice concentration; use binary wet support to avoid a second concentration factor."""
 
+OCEAN_TO_JCM_OPEN_WATER_FIELDS: tuple[_ExchangeField, ...] = (
+    "open_water_temperature_contribution",
+)
+"""Post-ocean (1-A)*SST; use binary source-flux support before conservative remapping."""
+
 
 ATMOSPHERE_TO_DATA_OCEAN_FIELDS: tuple[_ExchangeField, ...] = (
     _vector("u_velocity", "v_velocity"),
@@ -212,6 +217,7 @@ __all__ = [
     "LAND_TO_ATMOSPHERE_SOIL_FIELDS",
     "LAND_TO_ATMOSPHERE_SURFACE_FIELDS",
     "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS",
+    "OCEAN_TO_JCM_OPEN_WATER_FIELDS",
     "OCEAN_TO_SEAICE_SURFACE_FIELDS",
     "OCEAN_TO_VERIS_FORCING_FIELDS",
     "SEAICE_TO_OCEAN_FIELDS",

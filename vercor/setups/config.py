@@ -68,9 +68,17 @@ class VerosConfig:
         default="atmosphere", kw_only=True
     )
 
+    export_open_water_surface: bool = field(default=False, kw_only=True)
+
     def __post_init__(self) -> None:
         """Validate execution policy and copy caller mappings into owned state."""
 
+        if not isinstance(self.export_open_water_surface, bool):
+            raise TypeError("export_open_water_surface must be bool")
+        if self.export_open_water_surface and self.surface_forcing != "coupled":
+            raise ValueError(
+                "export_open_water_surface requires coupled surface_forcing"
+            )
         if self.setup not in ("global_4deg", "acc"):
             raise ValueError("setup must be 'global_4deg' or 'acc'")
         if self.execution not in ("host", "jax"):

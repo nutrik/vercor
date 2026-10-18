@@ -71,33 +71,36 @@ def _initialize_veros_owner(config: VerosConfig) -> Any:
         restore_to_climatology_salt=config.restore_to_climatology_salt,
         do_spinup=config.spinup.enabled,
         surface_forcing=config.surface_forcing,
+        export_open_water_surface=config.export_open_water_surface,
     )
 
 
 def _make_veros_component(state: Any, config: VerosConfig) -> Component:
     """Bind the existing owner to its current shared grid without reinitializing."""
     _veros_gcm_state, _veros_output, _veros_runtime, _ = _load_veros_implementation()
+    if config.surface_forcing == "coupled":
+        input_fields = tuple(_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS))
+        output_fields = tuple(_flatten_field_items(OCEAN_TO_VERIS_FORCING_FIELDS))
+    else:
+        input_fields = (
+            _veros_gcm_state.VEROS_INPUT_FIELD_NAMES
+            if state.uses_atmosphere_forcing
+            else ()
+        )
+        output_fields = ("sea_surface_temperature",)
+    if config.export_open_water_surface:
+        input_fields += ("ice_fraction",)
+        output_fields += ("open_water_temperature_contribution",)
     component = CallableComponent(
         config.name,
         state.grid,
         partial(_veros_runtime.step_veros_runtime, state),
         spec=ComponentSpec(
-            inputs=(
-                tuple(_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS))
-                if config.surface_forcing == "coupled"
-                else (
-                    _veros_gcm_state.VEROS_INPUT_FIELD_NAMES
-                    if state.uses_atmosphere_forcing
-                    else ()
-                )
-            ),
-            outputs=(
-                tuple(_flatten_field_items(OCEAN_TO_VERIS_FORCING_FIELDS))
-                if config.surface_forcing == "coupled"
-                else ("sea_surface_temperature",)
-            ),
+            inputs=input_fields,
+            outputs=output_fields,
             initial_fields=_veros_gcm_state.veros_default_fields(
-                coupled=config.surface_forcing == "coupled"
+                coupled=config.surface_forcing == "coupled",
+                export_open_water_surface=config.export_open_water_surface,
             ),
             execution=config.execution,
             lifecycle=LifecycleHooks(setup=state.setup),

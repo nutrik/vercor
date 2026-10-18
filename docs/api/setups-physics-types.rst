@@ -44,6 +44,13 @@ temperature, humidity and open-water fluxes. It retains the moving-ocean
 reference frame and uses ``(1 - open_water_albedo) * SW_down`` for open water.
 Raw downward shortwave remains the separate native ice forcing.
 
+``VerosConfig.export_open_water_surface=True`` requires coupled ocean forcing.
+It adds a binary-supported concentration import and exports
+``open_water_temperature_contribution = (1 - A) * SST`` after the native ocean
+step. ``OCEAN_TO_JCM_OPEN_WATER_FIELDS`` transfers this contribution with binary
+source-flux support and conservative remapping. Full SST and the ocean wet mask
+remain available beneath ice; no second concentration factor is applied.
+
 Physics
 -------
 
