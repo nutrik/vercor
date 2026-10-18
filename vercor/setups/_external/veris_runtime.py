@@ -63,6 +63,26 @@ class VerisRuntimeResources:
     dtype: DTypePolicy
 
 
+def veris_surface_state_fields(
+    payload: VerisPayload, resources: VerisRuntimeResources
+) -> dict[str, RuntimeArray]:
+    """Extract current native (x, y) surfaces into canonical physical (y, x).
+
+    Temperature and albedo remain per ice area; the exchange dispatcher applies
+    current concentration on the source grid. Flux exports remain interval means.
+    """
+    from veris import diagnose_surface_albedo
+
+    albedo = diagnose_surface_albedo(
+        payload.state, resources.configuration, payload.physical_constants
+    )
+    return {
+        "ice_fraction": payload.state.Area[2:-2, 2:-2].T,
+        "ice_surface_temperature": payload.state.TSurf[2:-2, 2:-2].T,
+        "ice_surface_albedo": albedo[2:-2, 2:-2].T,
+    }
+
+
 def _runtime_veris_constants(constants: Any) -> Any:
     """Normalize independent leaves to the native runtime precision schema."""
     return jax.tree.map(
@@ -208,7 +228,7 @@ def step_veris_runtime(
         "valid native substeps, interval means and physical status",
     )
     return StepResult(
-        fields={"ice_fraction": updated.state.Area[2:-2, 2:-2].T, **means.to_fields()},
+        fields={**veris_surface_state_fields(updated, resources), **means.to_fields()},
         payload=updated,
     )
 
@@ -298,15 +318,20 @@ class VerisSetupState:
         )
         zero = zeros[2:-2, 2:-2].T
         fluxes = VerisSurfaceFluxes(zero, zero, zero, zero, zero)
+        payload = VerisPayload(
+            state,
+            diagnostics,
+            constants,
+            VerisIntervalBudget(zero, zero),
+            jnp.asarray(0, dtype=context.dtype.jax_index),
+        )
+        assert self.resources is not None
         return SetupResult(
-            fields={"ice_fraction": state.Area[2:-2, 2:-2].T, **fluxes.to_fields()},
-            payload=VerisPayload(
-                state,
-                diagnostics,
-                constants,
-                VerisIntervalBudget(zero, zero),
-                jnp.asarray(0, dtype=context.dtype.jax_index),
-            ),
+            fields={
+                **veris_surface_state_fields(payload, self.resources),
+                **fluxes.to_fields(),
+            },
+            payload=payload,
         )
 
     def step(

@@ -291,9 +291,52 @@ def test_optional_dependency_is_immutable_and_preserves_veros_extras() -> None:
     metadata = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
     extras = metadata["project"]["optional-dependencies"]
     assert extras["veris"] == [
-        "veris @ git+https://github.com/team-ocean/veris.git@4551fc86181c660ceb0010160ec7f569d97e52c6"
+        "veris @ git+https://github.com/team-ocean/veris.git@225aa34c4f12c337c7198f67927ca098afae3f9c"
     ]
     assert extras["veros"] == ["veros>=1.6.2,<1.7"]
+
+
+@pytest.mark.parametrize("after_step", [False, True])
+def test_veris_surface_exports_follow_payload(after_step: bool) -> None:
+    """Current ice properties use native orientation and per-ice-area meaning."""
+    from veris import diagnose_surface_albedo
+
+    coupler, component, _, _ = small_coupler(steps=1)
+    initial = coupler.initial_state()
+    result = coupler.run(initial) if after_step else initial
+    state = result._component_state("CICE")
+    payload = state.payload
+    owner = component.spec.lifecycle.setup.__self__
+    fields = result.component("CICE").fields()
+    assert payload is not None
+    np.testing.assert_allclose(
+        fields["ice_surface_temperature"], payload.state.TSurf[2:-2, 2:-2].T
+    )
+    expected = diagnose_surface_albedo(
+        payload.state, owner.resources.configuration, payload.physical_constants
+    )[2:-2, 2:-2].T
+    np.testing.assert_allclose(fields["ice_surface_albedo"], expected)
+    assert expected.shape == (2, 3)
+    assert fields["ice_surface_albedo"].dtype == payload.state.Area.dtype
+    np.testing.assert_array_equal(
+        jnp.where(component.grid.binary_mask == 0, fields["ice_surface_albedo"], 0), 0
+    )
+    if after_step:
+        original = initial._component_state("CICE").payload
+        assert original is not None
+        assert original is not payload
+        assert int(original.checked_native_steps) == 0
+
+
+def test_factory_requires_native_current_surface_diagnosis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import veris
+    from vercor.setups._external.veris import load_standalone_veris
+
+    monkeypatch.delattr(veris, "diagnose_surface_albedo")
+    with pytest.raises(ImportError, match=r"vercor\[veris\]"):
+        load_standalone_veris()
 
 
 @pytest.mark.parametrize("enable_x64", [False, True])
