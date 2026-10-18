@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, fields as dataclass_fields, replace
-from typing import Any, TypeAlias, cast
+from typing import Any, Literal, TypeAlias, cast
 
 import jax
 import jax.numpy as jnp
@@ -61,6 +61,7 @@ class VerisRuntimeResources:
     configuration: Any
     model_substeps: int
     dtype: DTypePolicy
+    atmosphere_forcing: Literal["observed_10m", "model_level"] = "observed_10m"
 
 
 def veris_surface_state_fields(
@@ -145,6 +146,7 @@ def step_veris_runtime(
         ocean_mask=payload.state.iceMask[2:-2, 2:-2].T,
         constants=context.constants,
         dtype=context.dtype,
+        atmosphere_forcing=resources.atmosphere_forcing,
     )
     resolved = _runtime_veris_constants(
         payload.physical_constants.with_overrides(
@@ -278,6 +280,7 @@ class VerisSetupState:
             previous.dtype != context.dtype
             or previous.model_substeps != alignment.model_substeps
             or previous.configuration.deltatDyn != seconds
+            or previous.atmosphere_forcing != self.config.atmosphere_forcing
         ):
             raise ComponentError(
                 "Construct a new Veris component for a different runtime dtype or timestep"
@@ -295,7 +298,10 @@ class VerisSetupState:
         state, configuration, constants = native.initialize_experiment(experiment)
         if previous is None:
             self.resources = VerisRuntimeResources(
-                configuration, alignment.model_substeps, context.dtype
+                configuration,
+                alignment.model_substeps,
+                context.dtype,
+                self.config.atmosphere_forcing,
             )
         if "rhoFresh" in (self.config.physical_constants or {}):
             _require_zero(

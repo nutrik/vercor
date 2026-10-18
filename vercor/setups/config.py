@@ -104,6 +104,8 @@ class VerisConfig:
     hIceMean/hSnowMean in grid-cell volume-equivalent metres and Area in [0, 1].
     Numerical configuration is static. Native physical constants, evolving state
     and prescribed forcing are differentiable runtime payload inputs.
+    ``atmosphere_forcing="model_level"`` derives actual 10 m winds through the
+    shared CESM solve and absorbs raw shortwave with the open-water albedo.
     """
 
     name: str = "CICE"
@@ -112,9 +114,18 @@ class VerisConfig:
     physical_constants: Mapping[str, object] | None = field(default=None, kw_only=True)
     initial_conditions: Mapping[str, object] | None = None
     output: OutputSpec = field(default_factory=OutputSpec)
+    atmosphere_forcing: Literal["observed_10m", "model_level"] = field(
+        default="observed_10m", kw_only=True
+    )
 
     def __post_init__(self) -> None:
         """Validate the native clock and copy caller-owned mappings/arrays."""
+        if not isinstance(self.atmosphere_forcing, str):
+            raise TypeError("atmosphere_forcing must be a string")
+        if self.atmosphere_forcing not in ("observed_10m", "model_level"):
+            raise ValueError(
+                "atmosphere_forcing must be 'observed_10m' or 'model_level'"
+            )
         if not isinstance(self.name, str) or not self.name:
             raise ValueError("name must be a non-empty string")
         if not isinstance(self.model_timestep, timedelta):

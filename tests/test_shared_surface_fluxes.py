@@ -98,7 +98,9 @@ def test_shared_cesm_diagnostics_match_reference(enable_x64: bool) -> None:
         0.01106368351883935,
     ]
     np.testing.assert_allclose(
-        [np.mean(v) for v in result], expected, rtol=2e-5 if not enable_x64 else 1e-10
+        [np.mean(v) for v in result[:7]],
+        expected,
+        rtol=2e-5 if not enable_x64 else 1e-10,
     )
     assert all(v.dtype == dtype.jax_real for v in result)
 

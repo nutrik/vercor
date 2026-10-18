@@ -1735,6 +1735,8 @@ def test_jax_gcm_unit_metadata_uses_packaged_speedy_fallback(
 def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from vercor.fluxes.bulk_formula_cesm import _OceanBulkResult
+
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
@@ -1768,7 +1770,7 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
         u_tgrid: np.ndarray,
         v_tgrid: np.ndarray,
         surface_temperature: np.ndarray,
-    ) -> tuple[np.ndarray, ...]:
+    ) -> _OceanBulkResult:
         _ = (
             constants,
             model_level_height,
@@ -1783,7 +1785,7 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
         captured["u_tgrid"] = u_tgrid
         captured["v_tgrid"] = v_tgrid
         captured["surface_temperature"] = surface_temperature
-        return (
+        fluxes = (
             np.full((2, 2), -1.0),
             np.full((2, 2), -2.0),
             np.full((2, 2), -3.0),
@@ -1799,9 +1801,15 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
             np.asarray([[-1e10, -1e11], [0.5, -2.0]]),
         )
 
+        return _OceanBulkResult(
+            tuple(jnp.asarray(value) for value in fluxes),
+            jnp.zeros_like(fluxes[0]),
+            jnp.zeros_like(fluxes[0]),
+        )
+
     monkeypatch.setattr(
         surface_fluxes_module,
-        "compute_ocean_surface_fluxes",
+        "_compute_ocean_surface_fluxes_with_winds",
         fake_compute_ocean_surface_fluxes,
     )
 

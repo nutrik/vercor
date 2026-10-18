@@ -323,6 +323,8 @@ def test_jax_gcm_tree_helpers_transform_pytrees() -> None:
 def test_veros_compute_fluxes_preserves_sign_conventions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from vercor.fluxes.bulk_formula_cesm import _OceanBulkResult
+
     shape = (8, 8, 1, 1)
     variables = SimpleNamespace(
         u=np.arange(np.prod(shape), dtype=float).reshape(shape),
@@ -346,9 +348,9 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
         "snow_rate": np.full((4, 4), 2e-5),
     }
 
-    def fake_compute_ocean_surface_fluxes(*args: Any) -> tuple[Any, ...]:
+    def fake_compute_ocean_surface_fluxes(*args: Any) -> _OceanBulkResult:
         _ = args
-        return (
+        fluxes = (
             np.full((4, 4), 1.0),
             np.full((4, 4), 2.0),
             np.full((4, 4), 3.0),
@@ -371,9 +373,15 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
             ),
         )
 
+        return _OceanBulkResult(
+            tuple(jnp.asarray(value) for value in fluxes),
+            jnp.zeros_like(fluxes[0]),
+            jnp.zeros_like(fluxes[0]),
+        )
+
     monkeypatch.setattr(
         surface_fluxes_module,
-        "compute_ocean_surface_fluxes",
+        "_compute_ocean_surface_fluxes_with_winds",
         fake_compute_ocean_surface_fluxes,
     )
 

@@ -37,6 +37,13 @@ the current payload; the five ocean boundary fluxes remain interval means.
 ``VERIS_TO_JCM_COVERAGE_FIELDS`` uses binary wet support to transfer concentration
 without multiplying it by itself.
 
+``VerisConfig.atmosphere_forcing`` defaults to ``"observed_10m"``. The
+``"model_level"`` mode uses ``JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS`` and
+diagnoses actual 10 m winds from the same converged CESM solve used for air
+temperature, humidity and open-water fluxes. It retains the moving-ocean
+reference frame and uses ``(1 - open_water_albedo) * SW_down`` for open water.
+Raw downward shortwave remains the separate native ice forcing.
+
 Physics
 -------
 
