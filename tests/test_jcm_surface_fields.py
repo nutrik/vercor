@@ -216,3 +216,101 @@ def test_finite_surface_endpoint_gradients_match_one_sided_mixture(ice: float) -
     np.testing.assert_allclose(forward, [-30.0, 0.6], rtol=1e-12, atol=1e-12)
     np.testing.assert_allclose(reverse, forward, rtol=1e-12, atol=1e-12)
     np.testing.assert_allclose(finite, forward, rtol=1e-8, atol=1e-8)
+
+
+@pytest.mark.parametrize("raw_ocean", [0.001, 0.00101, 0.0011, 0.0012])
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("missing_water", [False, True])
+def test_full_ice_coast_accepts_roundoff_from_fractional_land_complement(
+    raw_ocean: float,
+    dtype: Any,
+    missing_water: bool,
+) -> None:
+    """R(W*A) and 1-(1-R(W)) must share full-ice support despite cancellation."""
+    from vercor.grid_masks import compute_ocn_lnd_masks_on_atm_grid
+
+    raw = jnp.full((1, 1), raw_ocean, dtype=dtype)
+
+    class Remap:
+        def regrid(self, _: Any) -> Any:
+            return raw
+
+    _, land, _ = compute_ocn_lnd_masks_on_atm_grid(jnp.ones((1, 1)), cast(Any, Remap()))
+
+    def surface(alpha: jax.Array) -> Any:
+        fields = {
+            "land_surface_temperature": jnp.full((1, 1), 300.0),
+            "soil_moisture": jnp.full((1, 1), 0.42),
+            "ice_fraction": raw,
+            "ice_surface_temperature": raw * 260,
+            "ice_surface_albedo": raw * alpha,
+            "open_water_temperature_contribution": jnp.full(
+                (1, 1), jnp.nan if missing_water else 0.0
+            ),
+        }
+        return prepare(fields, land, jnp.array(0.1), dtype=dtype)
+
+    point = jnp.array(0.7, dtype=dtype)
+    result, forward = jax.jvp(jax.jit(surface), (point,), (jnp.ones_like(point),))
+    reverse = jax.grad(lambda alpha: surface(alpha).marine_surface_albedo.sum())(point)
+    assert bool(
+        jnp.all((result.marine_ice_fraction >= 0) & (result.marine_ice_fraction <= 1))
+    )
+    assert all(
+        bool(jnp.all(jnp.isfinite(x)))
+        for x in jax.tree.leaves((result, forward, reverse))
+    )
+    tolerance = 1e-4 if dtype == jnp.float32 else 1e-12
+    np.testing.assert_allclose(result.sea_surface_temperature, 260.0, rtol=tolerance)
+    np.testing.assert_allclose(result.marine_surface_albedo, 0.7, rtol=tolerance)
+    np.testing.assert_allclose(result.marine_ice_fraction, 1.0, rtol=0, atol=0)
+    np.testing.assert_allclose(forward.marine_surface_albedo, reverse, rtol=tolerance)
+
+
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+def test_roundoff_reconciliation_preserves_finite_coastal_endpoint_derivatives(
+    dtype: Any,
+) -> None:
+    raw = jnp.array(0.0011, dtype=dtype)
+    land = jnp.full((1, 1), 1 - raw, dtype=dtype)
+
+    def mixture(area: jax.Array) -> jax.Array:
+        fields = {
+            "land_surface_temperature": jnp.full((1, 1), 300.0),
+            "soil_moisture": jnp.full((1, 1), 0.42),
+            "ice_fraction": jnp.full((1, 1), raw * area),
+            "ice_surface_temperature": jnp.full((1, 1), raw * area * 260),
+            "ice_surface_albedo": jnp.full((1, 1), raw * area * 0.7),
+            "open_water_temperature_contribution": jnp.full(
+                (1, 1), raw * (1 - area) * 290
+            ),
+        }
+        result = prepare(fields, land, jnp.array(0.1), dtype=dtype)
+        return jnp.stack(
+            (
+                result.sea_surface_temperature[0, 0],
+                result.marine_surface_albedo[0, 0],
+                result.marine_ice_fraction[0, 0],
+            )
+        )
+
+    point = jnp.array(1.0, dtype=dtype)
+    _, forward = jax.jvp(jax.jit(mixture), (point,), (jnp.ones_like(point),))
+    reverse = jax.jacrev(mixture)(point)
+    scale = raw / (1 - land[0, 0])
+    np.testing.assert_allclose(
+        forward, jnp.array([-30.0, 0.6, 1.0]) * scale, rtol=1e-5, atol=1e-6
+    )
+    np.testing.assert_allclose(forward, reverse, rtol=1e-5, atol=1e-6)
+    h = 1e-2 if dtype == jnp.float32 else 1e-4
+    finite = (mixture(point) - mixture(point - h)) / h
+    np.testing.assert_allclose(
+        finite, forward, rtol=5e-3 if dtype == jnp.float32 else 1e-8, atol=1e-6
+    )
+
+
+def test_roundoff_reconciliation_rejects_materially_excessive_ice() -> None:
+    fields = fields_for(ocean=0.0011, ice=0.0012)
+    with pytest.raises(Exception, match="ocean-area bounds"):
+        result = prepare(fields, jnp.full((2, 3), 1 - 0.0011))
+        jax.block_until_ready(result)
