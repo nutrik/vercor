@@ -1,13 +1,68 @@
+"""CESM ocean bulk exchange and actual reference winds from one retained solve.
+
+The public thirteen-field flux tuple retains its existing units and order.
+Private diagnostics evaluate the converged momentum profile at ten metres,
+preserving the absolute air-wind frame over moving water.
+"""
+
 import jax
 import jax.numpy as jnp
 from jax import lax
 from jax.typing import ArrayLike
-from typing import cast
+from typing import NamedTuple, cast
 
 from vercor._numerical_safety import require_active_finite
 from vercor.dtypes import as_jax_real_array
 from vercor.fluxes.utilities import cdn, psimhu, psixhu, qsat
 from vercor.physics import PhysicalConstants
+
+
+class _OceanBulkResult(NamedTuple):
+    """Unchanged public flux tuple plus actual air wind at ten metres."""
+
+    fluxes: tuple[jax.Array, ...]
+    u_velocity_10m: jax.Array
+    v_velocity_10m: jax.Array
+
+
+@jax.jit
+def _reference_height_wind(
+    constants: PhysicalConstants,
+    ubot: jax.Array,
+    vbot: jax.Array,
+    us: jax.Array,
+    vs: jax.Array,
+    zbot: jax.Array,
+    zref: jax.Array,
+    rd: jax.Array,
+    hol: jax.Array,
+    psimh: jax.Array,
+    stable: jax.Array,
+    mask: jax.Array,
+) -> tuple[jax.Array, jax.Array]:
+    """Evaluate the retained momentum profile in the absolute air-wind frame.
+
+    The converged drag scale and stability terms come from the same CESM solve.
+    Relative vectors retain direction at calm wind without normalizing a zero
+    vector. Neutralize inactive operands before nonlinear operations.
+    """
+    active = mask > 0
+    ubot, vbot, us, vs, rd, hol, psimh = (
+        jnp.where(active, value, 0) for value in (ubot, vbot, us, vs, rd, hol, psimh)
+    )
+    zbot = jnp.where(active, zbot, 1)
+    zref = jnp.where(active, zref, 1)
+    stable = jnp.where(active, stable, 1)
+    reference_hol = hol * zref / zbot
+    x = jnp.sqrt(jnp.sqrt(jnp.maximum(jnp.abs(1 - 16 * reference_hol), 1)))
+    reference_psi = -5 * reference_hol * stable + (1 - stable) * psimhu(x)
+    factor = 1 - rd / constants.von_karman_constant * (
+        jnp.log(zbot / zref) - psimh + reference_psi
+    )
+    return (
+        jnp.where(active, us + (ubot - us) * factor, 0),
+        jnp.where(active, vs + (vbot - vs) * factor, 0),
+    )
 
 
 def _prepare_bulk_flux_operand(
@@ -108,6 +163,7 @@ def _iterate_ocean_exchange(
         next_ustar,
         next_tstar,
         next_qstar,
+        psimh,
     )
 
 
@@ -127,6 +183,41 @@ def compute_ocean_surface_fluxes(
     use_coldair_outbreak_mod: bool = False,
     missval: float = 0.0,
 ) -> tuple[jax.Array, ...]:
+    """Compute the established thirteen CESM flux diagnostics."""
+    return _compute_ocean_surface_fluxes_with_winds(
+        constants,
+        mask,
+        zbot,
+        ubot,
+        vbot,
+        thbot,
+        qbot,
+        rbot,
+        tbot,
+        us,
+        vs,
+        ts,
+        use_coldair_outbreak_mod,
+        missval,
+    ).fluxes
+
+
+def _compute_ocean_surface_fluxes_with_winds(
+    constants: PhysicalConstants,
+    mask: ArrayLike,
+    zbot: ArrayLike,
+    ubot: ArrayLike,
+    vbot: ArrayLike,
+    thbot: ArrayLike,
+    qbot: ArrayLike,
+    rbot: ArrayLike,
+    tbot: ArrayLike,
+    us: ArrayLike,
+    vs: ArrayLike,
+    ts: ArrayLike,
+    use_coldair_outbreak_mod: bool = False,
+    missval: float = 0.0,
+) -> _OceanBulkResult:
     """Compute atmosphere-ocean surface fluxes with JAX-compatible iteration control."""
 
     _ = missval
@@ -266,6 +357,7 @@ def compute_ocean_surface_fluxes(
         ustar0,
         tstar0,
         qstar0,
+        jnp.zeros_like(mask_array),
     )
 
     def body_fn(_: int, carry: tuple[jax.Array, ...]) -> tuple[jax.Array, ...]:
@@ -282,6 +374,7 @@ def compute_ocean_surface_fluxes(
             ustar,
             tstar,
             qstar,
+            psimh,
         ) = carry
         continue_iteration = jnp.any(
             jnp.abs((ustar - ustar_prev) / ustar) > flux_con_tol
@@ -298,6 +391,7 @@ def compute_ocean_surface_fluxes(
             next_ustar,
             next_tstar,
             next_qstar,
+            next_psimh,
         ) = _iterate_ocean_exchange(
             constants,
             zbot_array,
@@ -327,6 +421,7 @@ def compute_ocean_surface_fluxes(
                 (next_ustar, ustar),
                 (next_tstar, tstar),
                 (next_qstar, qstar),
+                (next_psimh, psimh),
             )
         )
 
@@ -343,6 +438,7 @@ def compute_ocean_surface_fluxes(
         ustar,
         tstar,
         qstar,
+        psimh,
     ) = lax.fori_loop(0, flux_con_max_iter, body_fn, init_carry)
 
     tau = rbot_array * ustar * ustar
@@ -375,7 +471,7 @@ def compute_ocean_surface_fluxes(
     dflhdt = -constants.latent_heat_of_vaporization * devdt
     df0dt = dflwupdt + dfshdt + dflhdt * mask_array
 
-    return cast(
+    fluxes = cast(
         tuple[jax.Array, ...],
         (
             sen,
@@ -393,6 +489,21 @@ def compute_ocean_surface_fluxes(
             df0dt,
         ),
     )
+    u_reference, v_reference = _reference_height_wind(
+        constants,
+        ubot_array,
+        vbot_array,
+        us_array,
+        vs_array,
+        zbot_array,
+        jnp.asarray(10.0, dtype=zbot_array.dtype),
+        rd,
+        hol,
+        psimh,
+        stable,
+        mask_array,
+    )
+    return _OceanBulkResult(fluxes, u_reference, v_reference)
 
 
 def shr_flux_atmIce(

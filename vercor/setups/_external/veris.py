@@ -18,6 +18,7 @@ from vercor.grids import RectilinearGrid
 from vercor.output import OutputSpec
 from vercor.recipes import (
     ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
+    JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
     OCEAN_TO_VERIS_FORCING_FIELDS,
     VERIS_TO_OCEAN_FLUX_FIELDS,
     VERIS_TO_JCM_SURFACE_FIELDS,
@@ -115,7 +116,11 @@ def make_veris(
             inputs=tuple(
                 _flatten_field_items(
                     (
-                        *ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
+                        *(
+                            JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS
+                            if config.atmosphere_forcing == "model_level"
+                            else ATMOSPHERE_TO_VERIS_FORCING_FIELDS
+                        ),
                         *OCEAN_TO_VERIS_FORCING_FIELDS,
                     )
                 )

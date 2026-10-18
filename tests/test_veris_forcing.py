@@ -17,6 +17,55 @@ from vercor.physics import PhysicalConstants
 pytestmark = pytest.mark.fast_always
 
 
+def test_model_level_mode_uses_actual_reference_winds_and_water_albedo() -> None:
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+    from vercor.recipes import JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS
+    from vercor.fields import _flatten_field_items
+
+    fields = surface_fields()
+    for name in ("u_velocity_10m", "v_velocity_10m", "net_shortwave_radiation_flux"):
+        fields.pop(name)
+        assert name not in _flatten_field_items(JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS)
+    fields["downward_shortwave_radiation_flux"] = jnp.full((2, 3), 200.0)
+    fields["open_water_albedo"] = jnp.full((2, 3), 0.1)
+    result = prepare_veris_forcing(
+        fields,
+        ocean_mask=jnp.ones((2, 3)),
+        constants=PhysicalConstants(),
+        dtype=DTypePolicy(enable_x64=True),
+        atmosphere_forcing="model_level",
+    )
+    np.testing.assert_allclose(result["SWdown"], 200)
+    np.testing.assert_allclose(result["Qsw"], -180)
+    np.testing.assert_allclose(result["uWind"], fields["u_velocity"].T)
+    np.testing.assert_allclose(result["vWind"], fields["v_velocity"].T)
+
+
+@pytest.mark.parametrize("mode", ["unknown", 1])
+def test_veris_atmospheric_mode_is_validated(mode: Any) -> None:
+    from vercor.setups import VerisConfig
+
+    with pytest.raises((ValueError, TypeError), match="atmosphere_forcing"):
+        VerisConfig(atmosphere_forcing=mode)
+
+
+@pytest.mark.parametrize("albedo", [-0.01, 1.01])
+def test_model_level_mode_rejects_invalid_open_water_albedo(albedo: float) -> None:
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+
+    fields = surface_fields()
+    fields["open_water_albedo"] = jnp.full((2, 3), albedo)
+    with pytest.raises(Exception, match="albedo"):
+        result = prepare_veris_forcing(
+            fields,
+            ocean_mask=jnp.ones((2, 3)),
+            constants=PhysicalConstants(),
+            dtype=DTypePolicy(enable_x64=True),
+            atmosphere_forcing="model_level",
+        )
+        jax.block_until_ready(result)
+
+
 def test_veris_recipes_keep_model_and_ten_metre_winds_distinct() -> None:
     from vercor.recipes import (
         ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
@@ -43,7 +92,15 @@ def _fixed_bulk(monkeypatch: pytest.MonkeyPatch, captured: dict[str, Any]) -> No
         captured.update(kwargs, fields=f)
         value = jnp.ones_like(f["temperature"])
         return SurfaceFluxes(
-            value, value, 45 * value, value, -2e-5 * value, 268.5 * value, 0.001 * value
+            value,
+            value,
+            45 * value,
+            value,
+            -2e-5 * value,
+            268.5 * value,
+            0.001 * value,
+            8 * value,
+            2 * value,
         )
 
     monkeypatch.setattr(veris_forcing, "compute_surface_fluxes", compute)
@@ -234,7 +291,15 @@ def test_forcing_pack_evaluates_bulk_once_and_uses_native_faces(
         calls.append(True)
         zero = jnp.zeros_like(stress)
         return SurfaceFluxes(
-            stress, 10 * stress, zero, zero, zero, zero + 270.0, zero + 0.001
+            stress,
+            10 * stress,
+            zero,
+            zero,
+            zero,
+            zero + 270.0,
+            zero + 0.001,
+            zero + 8.0,
+            zero + 2.0,
         )
 
     monkeypatch.setattr(veris_forcing, "compute_surface_fluxes", bulk)

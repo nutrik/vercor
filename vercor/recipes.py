@@ -36,6 +36,22 @@ ATMOSPHERE_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
 )
 """Colocated bulk inputs and separate observed 10 m winds for native Veris."""
 
+JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
+    _vector("u_velocity", "v_velocity"),
+    "specific_humidity",
+    "model_level_height",
+    "density",
+    "potential_temperature",
+    "temperature",
+    "surface_pressure",
+    "downward_shortwave_radiation_flux",
+    "downward_longwave_radiation_flux",
+    "rain_rate",
+    "snow_rate",
+    "open_water_albedo",
+)
+"""Model-level JCM air and raw radiation; derive actual 10 m winds with the bulk solve."""
+
 
 OCEAN_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
     "sea_surface_temperature",
@@ -191,6 +207,7 @@ __all__ = [
     "ATMOSPHERE_TO_VEROS_FORCING_FIELDS",
     "ATMOSPHERE_TO_VERIS_FORCING_FIELDS",
     "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS",
+    "JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS",
     "JCM_LAND_TO_ATMOSPHERE_FIELDS",
     "LAND_TO_ATMOSPHERE_SOIL_FIELDS",
     "LAND_TO_ATMOSPHERE_SURFACE_FIELDS",
