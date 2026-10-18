@@ -188,3 +188,31 @@ def test_surface_jvp_vjp_matches_independent_area_derivatives_and_fd() -> None:
     directions = jnp.eye(6) * 1e-4
     finite = jnp.array([(loss(point + d) - loss(point - d)) / 2e-4 for d in directions])
     np.testing.assert_allclose(gradient, finite, rtol=1e-8)
+
+
+@pytest.mark.parametrize("ice", [0.0, 1.0])
+def test_finite_surface_endpoint_gradients_match_one_sided_mixture(ice: float) -> None:
+    """Retain the limiting derivatives of already weighted finite contributions."""
+
+    def mixture(area: jax.Array) -> jax.Array:
+        values = {
+            "land_surface_temperature": jnp.full((1, 1), jnp.nan),
+            "soil_moisture": jnp.full((1, 1), jnp.nan),
+            "ice_fraction": jnp.full((1, 1), area),
+            "ice_surface_temperature": jnp.full((1, 1), area * 260),
+            "ice_surface_albedo": jnp.full((1, 1), area * 0.7),
+            "open_water_temperature_contribution": jnp.full((1, 1), (1 - area) * 290),
+        }
+        result = prepare(values, jnp.zeros((1, 1)), jnp.array(0.1))
+        return jnp.stack(
+            (result.sea_surface_temperature[0, 0], result.marine_surface_albedo[0, 0])
+        )
+
+    point = jnp.array(ice)
+    _, forward = jax.jvp(jax.jit(mixture), (point,), (jnp.ones_like(point),))
+    reverse = jax.jacrev(mixture)(point)
+    direction = 1 if ice == 0 else -1
+    finite = (mixture(point + direction * 1e-5) - mixture(point)) / (direction * 1e-5)
+    np.testing.assert_allclose(forward, [-30.0, 0.6], rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(reverse, forward, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(finite, forward, rtol=1e-8, atol=1e-8)

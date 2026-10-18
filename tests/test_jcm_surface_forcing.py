@@ -84,14 +84,14 @@ def test_forcing_extension_is_a_normalizable_pytree(enable_x64: bool) -> None:
     np.testing.assert_allclose(normalized.marine_surface_albedo, 0.34, rtol=1e-6)
 
 
-def native_case() -> tuple[Any, Any, Any, Any]:
+def native_case(*, resolution: int = 31) -> tuple[Any, Any, Any, Any]:
     """Construct actual native coordinate/state/forcing resources without files."""
     from jcm.physics.speedy.speedy_coords import get_speedy_coords
     from jcm.physics_interface import PhysicsState
     from jcm.terrain import TerrainData
     from jcm.forcing import ForcingData
 
-    coords = get_speedy_coords()
+    coords = get_speedy_coords(spectral_truncation=resolution)
     shape = coords.horizontal.nodal_shape
     terrain = TerrainData.from_coords(
         coords, fmask=jnp.full(shape, 0.25), orography=jnp.zeros(shape), lfluxland=True

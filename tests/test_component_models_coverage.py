@@ -1171,7 +1171,7 @@ def test_jcm_land_constructor_converts_coords_and_preserves_data(
     coupler = cast(Any, CoverageCouplerStub())
     _step_component(component, timedelta(hours=1), datetime(2000, 1, 1), coupler)
 
-    assert component.spec.transfer.time_selection == "daily"
+    assert component.spec.transfer.time_selection == "current"
     assert component.spec.outputs == (
         "land_surface_temperature",
         "soil_moisture",

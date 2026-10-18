@@ -307,7 +307,7 @@ jobs:
           python -c 'from veros import variables; from veros.core.operators import safe_sqrt; from veros.state import VerosState; assert callable(VerosState.copy), "missing VerosState.copy"; assert callable(safe_sqrt), "missing safe_sqrt"; assert all(name in variables.VARIABLES for name in ("c_k", "c_eps")), "missing c_k/c_eps"'
       - name: Run differentiable Veros rollouts
         run: >-
-          python -m pytest tests/test_veros_autodiff_rollouts.py tests/test_veris_prognostic_autodiff.py
+          python -m pytest tests/test_veros_autodiff_rollouts.py tests/test_veris_prognostic_autodiff.py tests/test_veris_veros_jcm_autodiff.py
           -q -n0 -m veros_autodiff --tb=short
           --cov=vercor --cov-branch --cov-report= --cov-fail-under=0
       - name: Stage autodiff coverage data

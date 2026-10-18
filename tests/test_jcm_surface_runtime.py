@@ -201,3 +201,40 @@ def test_coupled_policy_is_keyword_only_and_specific_land_recipe_is_explicit() -
         "land_latent_heat_flux",
         "land_sensible_heat_flux",
     )
+
+
+@pytest.mark.parametrize("series_field", [None, "stl_am", "soilw_am"])
+def test_land_static_fields_keep_spatial_axes_with_daily_inputs(
+    series_field: str | None,
+) -> None:
+    from types import SimpleNamespace
+    from vercor.setups import make_jcm_land
+    from tests.test_jcm_surface_forcing import native_case
+
+    coords, _, _, _ = native_case(resolution=21)
+    shape = coords.horizontal.nodal_shape
+    values = {"stl_am": jnp.full(shape, 280.0), "soilw_am": jnp.full(shape, 0.6)}
+    if series_field is not None:
+        values[series_field] = jnp.stack([values[series_field] + k for k in range(365)])
+    ocean = RectilinearGrid(
+        "ocean",
+        longitude=np.array([90.0, 270.0]),
+        latitude=np.array([-45.0, 45.0]),
+        binary_mask=np.zeros((2, 2)),
+    )
+    land = make_jcm_land(coords, SimpleNamespace(**values), ocean)
+    assert land.spec.transfer.time_selection == (
+        "current" if series_field is None else "daily"
+    )
+    for name, native in (
+        ("land_surface_temperature", "stl_am"),
+        ("soil_moisture", "soilw_am"),
+    ):
+        field = land.spec.initial_fields[name]
+        expected = (
+            values[native].T
+            if series_field is None
+            else jnp.broadcast_to(values[native], (365, *shape)).transpose(0, 2, 1)
+        )
+        assert jnp.shape(field) == expected.shape
+        np.testing.assert_array_equal(field, expected)

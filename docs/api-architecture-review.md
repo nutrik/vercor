@@ -301,6 +301,7 @@ vercor.setups.gallery.run_slab_driver
 vercor.setups.gallery.run_veris_calibration
 vercor.setups.gallery.run_veris_dataveros_era5
 vercor.setups.gallery.run_veris_veros_era5
+vercor.setups.gallery.run_veris_veros_jcm
 vercor.setups.gallery.run_veros_with_era5data
 vercor.setups._jcm
 vercor.setups._lazy_imports

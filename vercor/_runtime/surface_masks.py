@@ -175,10 +175,12 @@ def build_surface_mask_topology_patch(
         destination = exchange.target
         route_id = exchange.route_id
         if source == policy.ocean and destination == policy.atmosphere:
-            fractional_masks[route_id] = ocn_fmask_on_atm_grid
+            if exchange.quantity == "legacy":
+                fractional_masks[route_id] = ocn_fmask_on_atm_grid
         elif source == policy.land and destination == policy.atmosphere:
             binary_masks[route_id] = lnd_bmask_on_atm_grid
-            fractional_masks[route_id] = lnd_fmask_on_atm_grid
+            if exchange.quantity == "legacy":
+                fractional_masks[route_id] = lnd_fmask_on_atm_grid
     return ExchangeTopologyPatch(
         binary_masks=binary_masks,
         fractional_masks=fractional_masks,

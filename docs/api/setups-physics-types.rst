@@ -141,3 +141,24 @@ owner; no second ocean or prescribed current/height proxy is created. The defaul
 ocean configuration is global coupled mode; incompatible explicit modes fail
 before initialization. The prescribed ``make_veris_verosdata`` workflow remains
 available for experiments without ocean feedback.
+
+Coupled JCM surface contracts
+-----------------------------
+
+``JAXGCMConfig.seaice_coupling`` is keyword-only and defaults to false.
+Enabled ATM inputs are land temperature, soil moisture, preweighted open-water
+temperature, preweighted ice temperature/albedo and atmosphere-grid ice
+coverage. The paired factory copies terrain with the ocean-derived fractional
+land mask. Static land fields retain both spatial axes; mixed static/daily
+inputs broadcast the static companion before daily selection.
+
+``JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS`` selects per-land-area latent and sensible
+heat; the legacy land recipe is retained. All JCM modes export raw downward
+shortwave, surface pressure, configured open-water albedo and separate land
+heat fluxes. Native flux channels zero and two supply land and combined heat,
+respectively; evaporation converts g/m2/s to kg/m2/s once.
+
+The runnable ``run_veris_veros_jcm.build_coupler`` uses the public paired
+factories and explicit quantity/coverage recipes. See :doc:`../setup-gallery`
+for the route ownership, equations, spinup/initial lag and native single-marine
+channel limitation.

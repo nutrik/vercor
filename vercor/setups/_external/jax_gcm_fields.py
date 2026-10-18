@@ -78,10 +78,20 @@ def prepare_coupled_surface_forcing(
     )
     water = ocean - ice
 
-    def supported(value: RuntimeArray, support: jax.Array, owner: str) -> jax.Array:
+    def supported(
+        value: RuntimeArray,
+        support: jax.Array,
+        owner: str,
+        *,
+        retain_finite: bool = False,
+    ) -> jax.Array:
         array = jnp.broadcast_to(as_jax_real_array(value, dtype), support.shape)
         require_active_finite(array, active_mask=support, owner=owner)
-        return jnp.where(support, array, 0)
+        # Weighted fields are already zero on absent surfaces. Retain their
+        # finite zero operands so their limiting area derivatives survive;
+        # sanitize missing inactive NaNs before they enter arithmetic.
+        active = (marine & jnp.isfinite(array)) if retain_finite else support
+        return jnp.where(active, array, 0)
 
     land_active = land > 0
     land_temperature = supported(
@@ -92,14 +102,23 @@ def prepare_coupled_surface_forcing(
         fields["open_water_temperature_contribution"],
         water > 0,
         "JCM open-water contribution",
+        retain_finite=True,
     )
     ice_temperature = supported(
-        fields["ice_surface_temperature"], ice > 0, "JCM ice temperature contribution"
+        fields["ice_surface_temperature"],
+        ice > 0,
+        "JCM ice temperature contribution",
+        retain_finite=True,
     )
     ice_albedo = supported(
-        fields["ice_surface_albedo"], ice > 0, "JCM ice albedo contribution"
+        fields["ice_surface_albedo"],
+        ice > 0,
+        "JCM ice albedo contribution",
+        retain_finite=True,
     )
-    water_albedo = supported(open_water_albedo, water > 0, "JCM open-water albedo")
+    water_albedo = supported(
+        open_water_albedo, water > 0, "JCM open-water albedo", retain_finite=True
+    )
     denominator = jnp.where(marine, ocean, 1)
     temperature = (water_temperature + ice_temperature) / denominator
     albedo = (water * water_albedo + ice_albedo) / denominator

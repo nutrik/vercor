@@ -412,6 +412,7 @@ class _JAXGCMOutputProvider:
     """Ordinary provider adapting the runtime JCM payload into a native frame."""
 
     def __init__(self, state: Any) -> None:
+        self._coupled = getattr(state, "seaice_coupling", False)
         self._coords = state.model.coords
         self._physics = (
             getattr(state.model, "physics", None) or _default_physics_module()
@@ -431,11 +432,22 @@ class _JAXGCMOutputProvider:
             coords=self._coords,
             physics_module=self._physics,
         )
+        variables = jax_gcm_data_variables_with_unit_metadata(
+            variables, self._unit_metadata
+        )
+        if self._coupled:
+            for name, units in (
+                ("sea_surface_temperature", "K"),
+                ("marine_surface_albedo", "1"),
+                ("marine_ice_fraction", "1"),
+            ):
+                variables[name] = OutputVariable(
+                    (JAX_GCM_TIME_DIM, _LAT_NAME, _LON_NAME),
+                    as_jax_real_array(context.state.field(name))[jnp.newaxis, ...],
+                    {"units": units},
+                )
         return OutputFrame(
-            jax_gcm_data_variables_with_unit_metadata(
-                variables,
-                self._unit_metadata,
-            ),
+            variables,
             coordinates=jax_gcm_coordinate_variables(
                 coords=self._coords,
                 output_time=context.time,
