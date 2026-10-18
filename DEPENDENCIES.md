@@ -77,3 +77,7 @@ replacement; the calibration objective accesses no private payload owner.
     `docs/veris-validation.rst` consume layers 16–23 for host-only scientific
     acceptance: native-area scalar inventories, guarded transition counts,
     shared period output, model-calendar segmentation and timestep comparisons.
+
+Veris current surface extraction stays in layer 15 with its runtime payload;
+source-grid ice weighting belongs to the existing exchange dispatcher. Recipes
+declare separate per-ice-area properties and binary-supported concentration.

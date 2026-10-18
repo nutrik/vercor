@@ -86,6 +86,8 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
             ("sea_surface_salt_mass_flux", 600),
             ("ocean_u_stress", 700),
             ("ocean_v_stress", 800),
+            ("ice_surface_temperature", 260),
+            ("ice_surface_albedo", 0.5),
         )
     }
     component = CallableComponent("CICE", grid, lambda f: {}, spec=ComponentSpec())
@@ -124,7 +126,9 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
     np.testing.assert_array_equal(frame.coordinates["y_face"].values, expected_y)
     for name, value in canonical.items():
         np.testing.assert_array_equal(frame.variables[name].values, value)
-        assert frame.variables[name].attrs["cell_methods"] == "time: mean"
+        assert frame.variables[name].attrs["cell_methods"] == (
+            "time: point" if name.startswith("ice_surface_") else "time: mean"
+        )
     assert frame.variables["ocean_u_stress"].dims == ("y_center", "x_east_face")
     assert frame.variables["ocean_v_stress"].dims == ("y_north_face", "x_center")
     np.testing.assert_array_equal(
@@ -142,6 +146,30 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
         "x_east_face",
         "y_north_face",
     }
+
+
+def test_provider_samples_current_canonical_ice_properties() -> None:
+    from vercor.setups._external.veris_output import veris_output_provider
+
+    coupler, component, _, _ = small_coupler(steps=1)
+    result = coupler.run()
+    state = result.component("CICE")
+    frame = veris_output_provider().sample(
+        OutputContext(
+            component,
+            state,
+            native_payload(result),
+            1,
+            datetime(2000, 1, 1),
+            timedelta(seconds=600),
+        )
+    )
+    for name, units in (("ice_surface_temperature", "K"), ("ice_surface_albedo", "1")):
+        variable = frame.variables[name]
+        np.testing.assert_allclose(variable.values, state.field(name))
+        assert variable.dims == ("y_center", "x_center")
+        assert variable.attrs["units"] == units
+        assert variable.attrs["cell_methods"] == "time: point"
 
 
 @pytest.mark.fast_always
@@ -198,7 +226,7 @@ def test_shared_period_selection_and_snapshot_metadata(
         assert (
             set(ds.data_vars) == set(variables)
             if variables
-            else len(ds.data_vars) == 21
+            else len(ds.data_vars) == 23
         )
         np.testing.assert_allclose(
             ds["Area"][0], final.component("CICE").field("ice_fraction")

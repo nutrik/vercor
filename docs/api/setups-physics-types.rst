@@ -29,6 +29,14 @@ are grid-cell volume-equivalent metres. Native numerical configuration and
 physical constants are traced payload leaves; native state, forcing and ice fractions retain
 JAX differentiation. No CICE feedback is sent to the prescribed ocean or ERA5.
 
+Veris exports current ``ice_surface_temperature`` in kelvin and
+``ice_surface_albedo`` per ice area, diagnosed with native snow thickness,
+surface temperature, hemisphere and thickness categories. Both exports follow
+the current payload; the five ocean boundary fluxes remain interval means.
+``VERIS_TO_JCM_SURFACE_FIELDS`` requires source ice coverage, while
+``VERIS_TO_JCM_COVERAGE_FIELDS`` uses binary wet support to transfer concentration
+without multiplying it by itself.
+
 Physics
 -------
 

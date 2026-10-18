@@ -20,6 +20,7 @@ from vercor.recipes import (
     ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
     OCEAN_TO_VERIS_FORCING_FIELDS,
     VERIS_TO_OCEAN_FLUX_FIELDS,
+    VERIS_TO_JCM_SURFACE_FIELDS,
 )
 from vercor.setups.config import VerisConfig
 
@@ -28,7 +29,7 @@ def load_standalone_veris() -> Any:
     """Require maintained standalone entry points rather than the legacy plugin."""
     message = (
         "Standalone Veris requires initialize_experiment/advance, spherical OceanGeometry, "
-        "physical-parameter AD and corrected ocean budgets; "
+        "physical-parameter AD, current surface albedo and corrected ocean budgets; "
         "install the approved model with `pip install 'vercor[veris]'`."
     )
     try:
@@ -44,6 +45,7 @@ def load_standalone_veris() -> Any:
             "OceanGeometry",
             "initialize_experiment",
             "advance",
+            "diagnose_surface_albedo",
         )
     ):
         raise ImportError(message)
@@ -118,11 +120,16 @@ def make_veris(
                     )
                 )
             ),
-            outputs=("ice_fraction", *_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS)),
+            outputs=(
+                "ice_fraction",
+                *_flatten_field_items(VERIS_TO_JCM_SURFACE_FIELDS),
+                *_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS),
+            ),
             initial_fields={
                 name: 0.0
                 for name in (
                     "ice_fraction",
+                    *_flatten_field_items(VERIS_TO_JCM_SURFACE_FIELDS),
                     *_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS),
                 )
             },

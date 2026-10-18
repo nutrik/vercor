@@ -209,6 +209,8 @@ PUBLIC_MODULE_EXPORTS = {
         "SLAB_ATMOSPHERE_TO_OCEAN_FIELDS",
         "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS",
         "VERIS_TO_OCEAN_FLUX_FIELDS",
+        "VERIS_TO_JCM_SURFACE_FIELDS",
+        "VERIS_TO_JCM_COVERAGE_FIELDS",
     ),
     "vercor.regridding": (
         "Regridder",

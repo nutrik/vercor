@@ -54,6 +54,15 @@ VERIS_TO_OCEAN_FLUX_FIELDS: tuple[_ExchangeField, ...] = (
 )
 """Total-area interval means: downward W/m2, kg/m2/s, kg salt/m2/s and Pa."""
 
+VERIS_TO_JCM_SURFACE_FIELDS: tuple[_ExchangeField, ...] = (
+    "ice_surface_temperature",
+    "ice_surface_albedo",
+)
+"""Current per-ice-area properties; weight by source ice coverage before remapping."""
+
+VERIS_TO_JCM_COVERAGE_FIELDS: tuple[_ExchangeField, ...] = ("ice_fraction",)
+"""Ice concentration; use binary wet support to avoid a second concentration factor."""
+
 
 ATMOSPHERE_TO_DATA_OCEAN_FIELDS: tuple[_ExchangeField, ...] = (
     _vector("u_velocity", "v_velocity"),
@@ -193,4 +202,6 @@ __all__ = [
     "SLAB_ATMOSPHERE_TO_OCEAN_FIELDS",
     "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS",
     "VERIS_TO_OCEAN_FLUX_FIELDS",
+    "VERIS_TO_JCM_SURFACE_FIELDS",
+    "VERIS_TO_JCM_COVERAGE_FIELDS",
 ]

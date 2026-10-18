@@ -47,6 +47,8 @@ COMMON_FIELD_NAMES: tuple[str, ...] = (
     "pressure",
     "density",
     "ice_fraction",
+    "ice_surface_temperature",
+    "ice_surface_albedo",
     "soil_moisture",
     "sensible_heat_flux",
     "latent_heat_flux",

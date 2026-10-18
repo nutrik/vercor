@@ -95,6 +95,15 @@ def _sample(
             canonical_fields[name],
             {"units": units, "long_name": description, "cell_methods": "time: mean"},
         )
+    for name, units, description in (
+        ("ice_surface_temperature", "K", "Current per-ice-area surface temperature"),
+        ("ice_surface_albedo", "1", "Current per-ice-area surface albedo"),
+    ):
+        variables[name] = OutputVariable(
+            ("y_center", "x_center"),
+            canonical_fields[name],
+            {"units": units, "long_name": description, "cell_methods": "time: point"},
+        )
     x_edges = grid.longitude_edges
     y_edges = grid.latitude_edges
     values = {
