@@ -126,6 +126,12 @@ non-finite durations, divides each energy by that native duration once, and
 recovers downward longwave as ``sigma * TS**4 + FLNS / native_step_seconds``.
 Surface emission is added exactly once. The adapter does not infer rate units
 or guess a different training contract.
+Startup uses timestamp-matched native ``TS/FSNS/FLNS`` diagnostics for channels
+absent from the initial input, with the same forecast-step duration. Initial
+and predicted meteorology share one pure hybrid-coordinate mapping, including
+canonical ``surface_pressure`` and lowest-level ``pressure`` in Pa. Specific
+humidity must come from an explicitly declared vapor-specific native channel
+available in both input and prediction; ``Qtot`` is rejected as total water.
 
 This follows CREDIT revision
 ``bc078d7a39300fb8c8fe867a22ec218a5e02da11``:

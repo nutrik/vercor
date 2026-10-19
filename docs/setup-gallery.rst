@@ -202,7 +202,35 @@ CAMulator achieves these results with a 350 times speedup over CAM6, making it a
 
 CAMulator configuration paths and checkpoint paths are machine-specific.
 Reconfigure those paths, their associated data, and the checkpoint before
-running a CAMulator driver.
+running a CAMulator driver. The coupled gallery additionally requires
+``VERCOR_CAMULATOR_WATER_VAPOR_VARIABLE`` naming a real vapor-specific
+prognostic variable in the selected model's input and prediction layouts, and
+``VERCOR_CAMULATOR_INITIAL_DIAGNOSTICS`` pointing to native initial-condition
+NetCDF data with ``time``, ``latitude``, ``longitude`` and ``TS/FSNS/FLNS``.
+It selects the exact configured native start time and uses a Gregorian clock.
+The published ``Qtot``-only configuration represents total water and cannot
+supply vapor humidity; it fails explicitly. There is no known locally tested
+vapor-trained checkpoint, and setting an invented channel name does not make
+that checkpoint compatible.
+
+``CAMulatorConfig.initial_diagnostics`` owns a defensive copy of supplied
+setup values. Its ``time`` must equal the effective initial cursor time
+(including explicit ``time_alignment="forcing_start"``). Missing input
+``TS`` is kelvin; ``FSNS`` and ``FLNS`` are downward-positive J/m² accumulated
+over the configured native forecast step. These required absent-input
+channels cannot be reconstructed from a prediction without advancing time.
+Setup decodes only the latest normalized history frame with CREDIT's separate
+``inverse_transform_input``. The pure meteorology kernel is shared with
+prediction mapping and uses traced physical constants for humidity, lowest-level
+pressure, height, density, potential temperature and winds. There is no
+reference-weather or total-water partition fallback.
+
+Initial exports are evaluated before existing inference tracing and do not
+advance native prognostic state or cursor or resample initialization noise.
+The immutable runtime payload retains the same initialized model-state sample.
+Host-boundary stand-ins verify startup, energy conversion and finite bulk
+forcing; unavailable CREDIT, model weights and native data prevent a native
+climate or tracing-performance certification.
 
 Veris forcing conventions
 -------------------------

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 CAMULATOR_RUNTIME_FIELD_NAMES = (
     "specific_humidity",
+    "surface_pressure",
+    "pressure",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
     "sea_surface_temperature",

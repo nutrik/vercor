@@ -1,4 +1,8 @@
 from datetime import datetime, timedelta
+import os
+
+import xarray as xr
+import yaml
 
 from vercor import (
     Clock,
@@ -25,6 +29,41 @@ from vercor.topology import SurfaceMaskPolicy
 def run_setup(*, loglevel: str, float_type: str) -> None:
     """Run this setup through the shared VerCOR CLI contract."""
 
+    # Select a vapor-trained native configuration/checkpoint explicitly. The
+    # published Qtot-only model cannot supply physical water-vapor humidity.
+    config_path = "/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml"
+    water_vapor_variable = os.environ.get("VERCOR_CAMULATOR_WATER_VAPOR_VARIABLE")
+    if not water_vapor_variable:
+        raise ValueError(
+            "CAMulator gallery requires VERCOR_CAMULATOR_WATER_VAPOR_VARIABLE "
+            "naming a real native vapor channel."
+        )
+    with open(config_path) as stream:
+        native_conf = yaml.safe_load(stream)
+    if (
+        water_vapor_variable.casefold() == "qtot"
+        or water_vapor_variable not in native_conf["data"]["variables"]
+    ):
+        raise ValueError(
+            "CAMulator gallery requires a vapor-specific prognostic channel in both "
+            "native input and prediction; Qtot is total water."
+        )
+    initial_time = datetime.fromisoformat(str(native_conf["predict"]["start_datetime"]))
+    diagnostics_path = os.environ.get("VERCOR_CAMULATOR_INITIAL_DIAGNOSTICS")
+    if not diagnostics_path:
+        raise ValueError(
+            "CAMulator gallery requires VERCOR_CAMULATOR_INITIAL_DIAGNOSTICS pointing "
+            "to timestamped native TS/FSNS/FLNS initial-condition data."
+        )
+    with xr.open_dataset(diagnostics_path) as initial_data:
+        # Exact selection: never nearest-time interpolation or fabricated weather.
+        selected = initial_data.sel(time=initial_time)
+        initial_diagnostics: dict[str, object] = {"time": initial_time}
+        for name in ("TS", "FSNS", "FLNS"):
+            initial_diagnostics[name] = (
+                selected[name].transpose("latitude", "longitude").values.copy()
+            )
+
     dtype = DTypePolicy(enable_x64=float_type == "float64")
     ocn = make_veros_gcm(
         config=VerosConfig(
@@ -50,7 +89,9 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
 
     atm = make_camulator_gcm(
         config=CAMulatorConfig(
-            config_path="/glade/u/home/rnuterman/veros_coupling/climate/camulator_config.yml",
+            config_path=config_path,
+            initial_diagnostics=initial_diagnostics,
+            water_vapor_variable=water_vapor_variable,
             model_weights_path="/glade/u/home/rnuterman/veros_coupling/climate/checkpoint.pt00091.pt",
             output=OutputSpec(period=PeriodOutput(frequency="month")),
         ),
@@ -63,10 +104,10 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     )
 
     clock = Clock(
-        start=datetime(1981, 1, 3, 0, 0, 0),
+        start=initial_time,
         dt_seconds=86400.0 // 4,
         steps=365 - 2 * 4,
-        calendar="noleap",
+        calendar="gregorian",
     )
     run_order = ["OCN", "LND", "ATM"]
 

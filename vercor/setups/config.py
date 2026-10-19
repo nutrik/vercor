@@ -158,7 +158,12 @@ class VerisConfig:
 
 @dataclass(frozen=True)
 class CAMulatorConfig:
-    """Configuration for the bundled CAMulator atmosphere setup factory."""
+    """Native CAMulator setup declarations, without importing optional dependencies.
+
+    Initial diagnostics contain an exact ``time`` and physical TS/FSNS/FLNS
+    absent from input. ``water_vapor_variable`` declares a vapor-specific native
+    channel present in both input and prediction; Qtot is total water.
+    """
 
     config_path: str
     name: str = "ATM"
@@ -169,9 +174,18 @@ class CAMulatorConfig:
     device: str = "cuda"
     time_alignment: Literal["strict", "forcing_start"] = "strict"
     logger: LoggerLike | None = None
+    initial_diagnostics: Mapping[str, object] | None = None
+    water_vapor_variable: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate CAMulator forcing-time alignment policy."""
+        """Validate alignment and own caller-supplied native diagnostics."""
+
+        if self.initial_diagnostics is not None:
+            object.__setattr__(
+                self,
+                "initial_diagnostics",
+                MappingProxyType(deepcopy(dict(self.initial_diagnostics))),
+            )
 
         if self.time_alignment not in ("strict", "forcing_start"):
             raise ValueError("time_alignment must be 'strict' or 'forcing_start'")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import io
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -9,6 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 import torch
+import xarray as xr
 
 from tests.assertions import assert_allclose_compact
 from vercor import Clock, Coupler, RectilinearGrid
@@ -35,6 +37,30 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     tmp_path: Path,
 ) -> None:
     """Exercise the unavailable CAMulator gallery through a finite host fake."""
+
+    # Actual file-backed initial diagnostics; model construction remains fake.
+    diagnostic_path = tmp_path / "native-initial.nc"
+    xr.Dataset(
+        {
+            name: (("time", "latitude", "longitude"), np.full((1, 2, 2), value))
+            for name, value in (
+                ("TS", 280.0),
+                ("FSNS", 21600 * 100.0),
+                ("FLNS", -21600 * 3.0),
+            )
+        },
+        coords={"time": [datetime(1981, 1, 3)]},
+    ).to_netcdf(diagnostic_path, engine="h5netcdf")
+    monkeypatch.setenv("VERCOR_CAMULATOR_WATER_VAPOR_VARIABLE", "VAPOR")
+    monkeypatch.setenv("VERCOR_CAMULATOR_INITIAL_DIAGNOSTICS", str(diagnostic_path))
+    monkeypatch.setattr(
+        run_camulator_with_veros,
+        "open",
+        lambda path: io.StringIO(
+            "data:\n  variables: [U, V, T, VAPOR]\npredict:\n  start_datetime: '1981-01-03 00:00:00'\n"
+        ),
+        raising=False,
+    )
 
     ocean_mask = np.asarray([[1.0, 0.0], [0.0, 1.0]])
     land_mask = 1.0 - ocean_mask
@@ -125,11 +151,16 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     )
 
     monkeypatch.setattr(run_camulator_with_veros, "make_veros_gcm", lambda **_: ocean)
-    monkeypatch.setattr(
-        run_camulator_with_veros,
-        "make_camulator_gcm",
-        lambda **_: atmosphere,
-    )
+
+    def make_atmosphere(*, config: Any) -> Any:
+        assert config.water_vapor_variable == "VAPOR"
+        assert config.initial_diagnostics["time"] == datetime(1981, 1, 3)
+        assert_allclose_compact(config.initial_diagnostics["TS"], 280.0)
+        assert_allclose_compact(config.initial_diagnostics["FSNS"], 21600 * 100.0)
+        assert_allclose_compact(config.initial_diagnostics["FLNS"], -21600 * 3.0)
+        return atmosphere
+
+    monkeypatch.setattr(run_camulator_with_veros, "make_camulator_gcm", make_atmosphere)
     monkeypatch.setattr(
         run_camulator_with_veros,
         "make_camulator_land",
@@ -144,10 +175,10 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         run_camulator_with_veros,
         "Clock",
         lambda *args, **kwargs: real_clock(
-            start=datetime(1981, 1, 3),
+            start=kwargs["start"],
             dt_seconds=21600.0,
             steps=2,
-            calendar="noleap",
+            calendar=kwargs["calendar"],
         ),
     )
     monkeypatch.setattr(
