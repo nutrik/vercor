@@ -210,6 +210,7 @@ def step_camulator_runtime(
         context.constants,
         camulator_reference_pressure=resources.P0,
         native_step_seconds=resources.model_timestep.total_seconds(),
+        water_vapor_variable=resources.water_vapor_variable,
         hyai=resources.hyai,
         hybi=resources.hybi,
         hyam=resources.hyam,

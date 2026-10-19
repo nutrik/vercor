@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Literal, Optional
@@ -19,9 +20,8 @@ from vercor.grids import RectilinearGrid
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
-    grid_field_defaults,
 )
-import vercor.setups._external.camulator_contracts as _camulator_contracts
+import vercor.setups._external.camulator_fields as _camulator_fields
 from vercor.setups._external.camulator_forcing import CamulatorRuntimeCursor
 import vercor.setups._external.camulator_init as _camulator_init
 import vercor.setups._external.camulator_tensors as _camulator_tensors
@@ -58,6 +58,9 @@ class CAMulatorGCMSetupState:
         device: str = "cuda",
         time_alignment: Literal["strict", "forcing_start"] = "strict",
         logger: LoggerLike | None = None,
+        *,
+        initial_diagnostics: Mapping[str, object] | None,
+        water_vapor_variable: str | None,
     ) -> None:
         """Build CAMulator model resources and the VerCOR atmosphere grid."""
 
@@ -67,6 +70,8 @@ class CAMulatorGCMSetupState:
         self.device = device
         self.init_noise = init_noise
         self.time_alignment = time_alignment
+        self.initial_diagnostics = initial_diagnostics
+        self.water_vapor_variable = water_vapor_variable
 
         context = _camulator_init.initialize_camulator(
             config_path=self.config_path,
@@ -123,12 +128,6 @@ class CAMulatorGCMSetupState:
                 logger=logger,
             )
 
-        logger.info("Tracing model with torch.jit...")
-        dummy_input = torch.zeros_like(model_state)
-        traced_model = torch.jit.trace(self.stepper.model, dummy_input)
-        self.stepper.model = traced_model
-        logger.info(f"Model traced with input shape: {dummy_input.shape}")
-
         ds_physics = xr.open_dataset(self.conf["data"]["save_loc_physics"])
 
         self.P0 = 100000.0
@@ -163,11 +162,17 @@ class CAMulatorGCMSetupState:
         self.accessor_output = _camulator_tensors.StateVariableAccessor(
             self.conf, tensor_type="output"
         )
+        initial_fields = _camulator_fields.map_camulator_initial_runtime_fields(
+            self, model_state, cursor, context.constants
+        )
+        # Bootstrap validation precedes the existing inference compilation.
+        logger.info("Tracing model with torch.jit...")
+        dummy_input = torch.zeros_like(model_state)
+        self.stepper.model = torch.jit.trace(self.stepper.model, dummy_input)
+        logger.info(f"Model traced with input shape: {dummy_input.shape}")
         _ = component
         return SetupResult(
-            fields=grid_field_defaults(
-                _camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES,
-            ),
+            fields=initial_fields,
             payload=CAMulatorRuntimePayload(
                 model_state=model_state,
                 cursor=cursor,

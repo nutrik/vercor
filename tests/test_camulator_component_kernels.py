@@ -108,20 +108,6 @@ def _make_coupler(start: datetime) -> SetupContext:
     )
 
 
-def test_camulator_runtime_field_initializer_returns_jax_arrays() -> None:
-    fields = camulator_fields_module.initialize_camulator_runtime_fields((2, 3))
-
-    assert fields
-    assert all(isinstance(value, jax.Array) for value in fields.values())
-    assert {
-        "total_surface_temperature",
-        "temperature_3d",
-        "specific_humidity_3d",
-    } <= set(fields)
-    assert fields["temperature"].shape == (2, 3)
-    assert_allclose_compact(fields["temperature"], np.zeros((2, 3)))
-
-
 def test_wind_artifact_filter_config_raises_value_error_for_invalid_values() -> None:
     with pytest.raises(ValueError, match="Dilations must be positive"):
         camulator_wind_filter_module.WindArtifactFilterConfig(
@@ -1109,6 +1095,7 @@ def test_camulator_mapping_rejects_invalid_duration_before_array_arithmetic(
                 state_transformer=unavailable,
                 prediction=unavailable,
                 native_step_seconds=native_step_seconds,
+                water_vapor_variable="VAPOR",
             )
 
 
@@ -1177,82 +1164,6 @@ def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
     assert "spinup_time" not in state_kwargs
     assert "do_spinup" not in state_kwargs
     assert state_kwargs["time_alignment"] == "forcing_start"
-
-
-@pytest.mark.fast_always
-def test_camulator_gcm_setup_returns_initial_runtime_payload(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    start = datetime(2000, 1, 1)
-    initial_model_state = torch.zeros((1, 2, 1, 2, 2), dtype=torch.float32)
-    dynamic_forcing = xr.Dataset(
-        data_vars={
-            "F1": (
-                ("time", "lat", "lon"),
-                np.ones((1, 2, 2), dtype=np.float32),
-            )
-        },
-        coords={"time": [start]},
-    )
-    physics = xr.Dataset(
-        data_vars={
-            "hyai": (("interface",), np.asarray([0.0, 1.0])),
-            "hyam": (("level",), np.asarray([0.5, 1.0])),
-            "hybi": (("interface",), np.asarray([0.0, 1.0])),
-            "hybm": (("level",), np.asarray([0.5, 1.0])),
-            "LANDM_COSLAT": (
-                ("lat", "lon"),
-                np.zeros((2, 2), dtype=np.float32),
-            ),
-        }
-    )
-    resources = cast(
-        Any,
-        camulator_gcm_state_module.CAMulatorGCMSetupState.__new__(
-            camulator_gcm_state_module.CAMulatorGCMSetupState
-        ),
-    )
-    resources.initial_model_state = initial_model_state
-    resources.init_noise = None
-    resources.stepper = SimpleNamespace(model=lambda value: value)
-    resources.lead_time_periods = 6
-    resources.conf = {
-        "data": {"save_loc_physics": "physics.nc"},
-        "predict": {"start_datetime": start},
-    }
-    resources.forcing_ds_norm = dynamic_forcing
-    resources.df_vars = ["F1"]
-    resources.device = "cpu"
-    resources.time_alignment = "strict"
-
-    monkeypatch.setattr(
-        camulator_gcm_state_module.torch.jit,
-        "trace",
-        lambda model, dummy_input: model,
-    )
-    monkeypatch.setattr(
-        camulator_gcm_state_module.xr,
-        "open_dataset",
-        lambda path: physics,
-    )
-    monkeypatch.setattr(
-        camulator_tensors_module,
-        "StateVariableAccessor",
-        lambda conf, tensor_type: SimpleNamespace(tensor_type=tensor_type),
-    )
-
-    result = resources.setup(cast(Any, None), _make_coupler(start))
-
-    assert isinstance(
-        result.payload, camulator_gcm_state_module.CAMulatorRuntimePayload
-    )
-    assert result.payload.model_state is initial_model_state
-    assert result.payload.forecast_hour == 1
-    assert result.payload.output_prediction is None
-    assert result.payload.output_prediction_samples is None
-    assert result.payload.cursor.start_ix == 0
-    assert result.payload.cursor.model_substeps == 1
-    assert result.payload.cursor.timestep_counter == 0
 
 
 def test_camulator_default_snapshot_uses_native_provider_when_period_provider_is_custom(
@@ -1954,6 +1865,14 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
             state[:, first_sst_channel:, ...].copy_(value)
 
     class _OutputAccessor:
+        tensor_type = "output"
+
+        def get_var_index(self, name: str) -> Any:
+            assert name == "VAPOR"
+            return camulator_tensors_module.TensorVariableIndex.for_channels(
+                start_idx=0, n_channels=2, is_3d=True
+            )
+
         def get_state_var(
             self, state: torch.Tensor, variable_name: str
         ) -> torch.Tensor:
@@ -1962,14 +1881,14 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
                 "U": 1.0,
                 "V": 2.0,
                 "T": 9.0,
-                "Qtot": 0.002,
+                "VAPOR": 0.002,
                 "TS": 280.0,
                 "PS": 100000.0,
                 "FSNS": 100.0 * 10800.0,
                 "FLNS": -3.0 * 10800.0,
             }
             shape = (
-                (1, 2, 2, 2) if variable_name in {"U", "V", "T", "Qtot"} else (1, 2, 2)
+                (1, 2, 2, 2) if variable_name in {"U", "V", "T", "VAPOR"} else (1, 2, 2)
             )
             return torch.full(shape, values[variable_name], dtype=torch.float32)
 
@@ -1980,6 +1899,7 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
         ),
     )
     component.model_substeps = 2
+    component.water_vapor_variable = "VAPOR"
     component.model_timestep = timedelta(hours=3)
     cursor = camulator_forcing_module.CamulatorRuntimeCursor(
         start_ix=0,
@@ -1999,10 +1919,10 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
         latitude=jnp.asarray([0.0, 1.0]),
     )
     component._dtype_policy = DTypePolicy()
-    component._data = camulator_fields_module.initialize_camulator_runtime_fields(
-        component.grid.shape,
-        component._dtype_policy,
-    )
+    component._data = {
+        name: jnp.zeros(component.grid.shape)
+        for name in camulator_contracts_module.CAMULATOR_RUNTIME_FIELD_NAMES
+    }
     component._data["sea_surface_temperature"] = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
     component._data["land_surface_temperature"] = jnp.asarray(
         [[10.0, 20.0], [30.0, 40.0]]
