@@ -370,25 +370,7 @@ def map_camulator_initial_runtime_fields(
         resources.accessor_input, resources.water_vapor_variable, owner=owner
     )
     _require_camulator_vapor_channel(resources.accessor_output, vapor, owner=owner)
-    diagnostics = resources.initial_diagnostics
-    if diagnostics is None or "time" not in diagnostics:
-        raise ComponentError(f"{owner} initial diagnostics require time.")
-    try:
-        timestamp = np.asarray(diagnostics["time"])
-        if timestamp.shape != ():
-            raise ValueError("expected a scalar time")
-        time_matches = np.datetime64(cast(Any, timestamp[()])) == np.datetime64(
-            cursor.init_datetime
-        )
-    except (TypeError, ValueError) as exc:
-        raise ComponentError(
-            f"{owner} initial diagnostics require a scalar timestamp."
-        ) from exc
-    if not time_matches:
-        raise ComponentError(
-            f"{owner} initial diagnostics time must match effective initial time {cursor.init_datetime}."
-        )
-    native_diagnostics: dict[str, object] = {}
+    missing_diagnostics = []
     for name in ("TS", "FSNS", "FLNS"):
         try:
             index = resources.accessor_input.get_var_index(name)
@@ -396,14 +378,36 @@ def map_camulator_initial_runtime_fields(
             index = None
         if index is not None and index.available:
             continue
-        if name not in diagnostics:
-            raise ComponentError(f"{owner} initial diagnostics require {name}.")
-        value = np.asarray(diagnostics[name])
-        if value.shape != resources.grid.shape or not np.all(np.isfinite(value)):
-            raise ComponentError(
-                f"{owner} initial {name} must have finite grid shape {resources.grid.shape}."
+        missing_diagnostics.append(name)
+    native_diagnostics: dict[str, object] = {}
+    if missing_diagnostics:
+        diagnostics = resources.initial_diagnostics
+        if diagnostics is None or "time" not in diagnostics:
+            raise ComponentError(f"{owner} initial diagnostics require time.")
+        try:
+            timestamp = np.asarray(diagnostics["time"])
+            if timestamp.shape != ():
+                raise ValueError("expected a scalar time")
+            time_matches = np.datetime64(cast(Any, timestamp[()])) == np.datetime64(
+                cursor.init_datetime
             )
-        native_diagnostics[name] = value
+        except (TypeError, ValueError) as exc:
+            raise ComponentError(
+                f"{owner} initial diagnostics require a scalar timestamp."
+            ) from exc
+        if not time_matches:
+            raise ComponentError(
+                f"{owner} initial diagnostics time must match effective initial time {cursor.init_datetime}."
+            )
+        for name in missing_diagnostics:
+            if name not in diagnostics:
+                raise ComponentError(f"{owner} initial diagnostics require {name}.")
+            value = np.asarray(diagnostics[name])
+            if value.shape != resources.grid.shape or not np.all(np.isfinite(value)):
+                raise ComponentError(
+                    f"{owner} initial {name} must have finite grid shape {resources.grid.shape}."
+                )
+            native_diagnostics[name] = value
     if (
         model_state.ndim != 5
         or model_state.shape[0] != 1

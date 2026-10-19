@@ -201,6 +201,58 @@ def test_native_bootstrap_maps_latest_input_without_advancing(native_case: Any) 
     assert mapped["specific_humidity_3d"].shape == (2, 2, 3)
 
 
+@pytest.mark.parametrize("native_names", [("TS", "FSNS", "FLNS"), ("TS", "FSNS")])
+def test_bootstrap_uses_native_diagnostics_and_only_missing_supplements(
+    native_case: Any, native_names: tuple[str, ...]
+) -> None:
+    resources, context, calls = native_case
+    data = resources.conf["data"]
+    data["surface_variables"] = ["PS", *native_names]
+    data["diagnostic_variables"] = [
+        name for name in ("TS", "FSNS", "FLNS") if name not in native_names
+    ]
+    model_state = torch.zeros((1, 10 + len(native_names), 2, 2, 3), dtype=torch.float64)
+    model_state[:, :9] = resources.initial_model_state[:, :9]
+    for channel, name in enumerate(native_names, start=9):
+        # The fixture input inverse doubles its input; old history is unrelated.
+        model_state[:, channel, 0] = -100
+        model_state[:, channel, -1] = torch.as_tensor(
+            resources.initial_diagnostics[name] / 2
+        )
+    resources.initial_model_state = model_state
+    if len(native_names) == 3:
+        resources.initial_diagnostics = None
+    else:
+        resources.initial_diagnostics = {
+            "time": context.start,
+            "FLNS": np.full((2, 3), -50.0 * 21600),
+            # Native channels take precedence over unused supplemental values.
+            "TS": np.full((1, 1), np.nan),
+            "FSNS": np.full((1, 1), np.nan),
+        }
+    original = model_state.clone()
+    result = resources.setup(cast(Any, None), context)
+    assert calls == {"input": 1, "output": 0, "model": 0, "trace": 1}
+    assert torch.equal(model_state, original)
+    assert result.payload.model_state is model_state
+    assert result.payload.cursor.init_datetime == context.start
+    assert result.payload.cursor.timestep_counter == 0
+    assert result.payload.output_prediction is None
+    for name, expected in {
+        "temperature": 280.0,
+        "specific_humidity": 0.004,
+        "u_velocity": 4.0,
+        "v_velocity": 2.0,
+        "surface_pressure": 100000.0,
+        "total_surface_temperature": 290.0,
+        "net_shortwave_radiation_flux": 200.0,
+        "downward_longwave_radiation_flux": (
+            context.constants.stefan_boltzmann_constant * 290**4 - 50
+        ),
+    }.items():
+        assert_allclose_compact(result.fields[name], np.full((2, 3), expected))
+
+
 @pytest.mark.parametrize(
     "problem",
     [

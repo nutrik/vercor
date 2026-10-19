@@ -241,22 +241,32 @@ environment with Dinosaur 1.5.1 and Flax 0.12.10.
 Final source and coupling cleanup acceptance
 --------------------------------------------
 
-The final cleanup uses actual stock Veros 1.7.0 with the same Veris/JCM/JAX
-provenance above. Full stock 2,292, fresh fast 1,365 and fresh exact-fork native
-AD 15 tests pass without failures, errors or skips. Combined aggregate coverage
-passes the unchanged 90% gate at 92.56588072122052%: statements 8,406/8,885
-(94.60889138998311%) and branches 1,605/1,930 (83.16062176165804%).
-These are separate native backend processes; the exact full stock branch
-receipt is reused only after confirming unchanged final source/test identity.
+After the final-review CAMulator I1 correction, actual stock Veros 1.7.0 uses
+the same Veris/JCM/JAX provenance above. Fresh full stock 2,294, fresh fast
+1,367 and fresh exact-fork native AD 15 tests pass without failures, errors
+or skips. Combined aggregate coverage passes the unchanged 90% gate at
+92.58985493855678%: statements 8,411/8,889
+(94.62256721790978%) and branches 1,610/1,934
+(83.24715615305067%). These are separate native backend
+processes, with fresh branch coverage after the source change. Historical
+pre-I1 Task9 receipts are superseded for current acceptance. Both current raw
+lanes were archived before combining expendable copies, and their hashes and
+existence were verified unchanged afterward.
 
-Fresh final wheel/sdist build, Twine, outside-checkout installed extension
+A complete native CAMulator input now accepts ``initial_diagnostics=None``;
+mixed native/supplemental input consumes only absent TS/FSNS/FLNS channels.
+Consumed supplements still require exact effective time, finite values and
+grid shape. The existing latest-input accessor, physical conversions, vapor
+capability and runtime payload ownership remain the sole implementation path.
+
+Fresh wheel/sdist build, Twine, outside-checkout installed extension
 runtime/strict typing, slab and CLI probes pass. The actual final wheel imports
-from ``/private/tmp/vercor-task9-wheel/vercor/__init__.py``. Its independent
+from ``/private/tmp/vercor-finalfix-wheel/vercor/__init__.py``. Its independent
 CLI-copied real two-day JCM/Veris/Veros gallery completes 2,319 wet ocean cells,
 48 checked native ice steps, nine explicit routes and 13 shared NetCDF files;
 all 486 numeric saved variable instances are finite. Ice support evolves on
 13 fractional cells; fixed coastal target support has 1,555 fractional cells.
-All 179 packaged Python modules match the final tested source byte for byte.
+All 179 packaged Python modules match the tested source byte for byte.
 
 Black, maintained-source lint, mypy, compileall, whitespace and prescribed
 strict Sphinx pass. The whole-tree lint report retains 200 diagnostics solely
@@ -265,7 +275,9 @@ JCM/xarray and JAX scatter FutureWarnings, and the latitude-bound warning for
 the skipped whole-grid ocean-mask integral comparison, remain unsuppressed.
 The durable ``docs/source-coupling-audit.md`` records every source retention,
 removal, surviving test assertion, original requirement, exact receipt and
-failed approach. Native CREDIT/checkpoint execution remains unavailable;
-CAMulator boundary stand-ins do not certify native model skill. The short
-coupled run does not certify long-term climate or binary-transition/host AD.
-All cleanup delivery is local, with no push, merge or publication.
+failed approach, including the historical missing partial coverage datasets.
+Current evidence is in ``test_logs/source-coupling-cleanup/final-fix/``.
+Native CREDIT/checkpoint execution remains unavailable; CAMulator boundary
+stand-ins do not certify native model skill. The short coupled run does not
+certify long-term climate or binary-transition/host AD. All cleanup delivery
+is local, with no push, merge or publication.
