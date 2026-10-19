@@ -32,10 +32,16 @@ def _update_soil_moisture(
     latent_heat_flux: object,
     dt_seconds: float,
 ) -> jax.Array:
+    """Advance dimensionless moisture using downward-positive latent heat.
+
+    Negative W/m2 flux dries soil; positive flux wets it over dt_seconds.
+    The retained 1e-9 coefficient is a toy closure, not latent-heat physics.
+    Grid-shaped moisture is clipped to [0, 1].
+    """
     soil_moisture_array = as_jax_real_array(soil_moisture)
     latent_heat_flux_array = as_jax_real_array(latent_heat_flux)
-    evap = 1e-9 * latent_heat_flux_array
-    return jnp.clip(soil_moisture_array - evap * dt_seconds, 0.0, 1.0)
+    moisture_tendency = 1e-9 * latent_heat_flux_array
+    return jnp.clip(soil_moisture_array + moisture_tendency * dt_seconds, 0.0, 1.0)
 
 
 def make_slab_land(

@@ -566,7 +566,7 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     assert atmosphere_data.get("latent_heat_flux").shape == grid.shape
     assert atmosphere_data.get("u_velocity_10m").shape == grid.shape
     assert atmosphere_data.get("v_velocity_10m").shape == grid.shape
-    assert np.all(np.asarray(atmosphere_data.get("sensible_heat_flux")) < 0.0)
+    assert np.all(np.asarray(atmosphere_data.get("sensible_heat_flux")) > 0.0)
     assert np.all(np.asarray(atmosphere_data.get("latent_heat_flux")) > 0.0)
     assert np.any(np.asarray(atmosphere_data.get("u_velocity_10m")) != 0.0)
     assert np.any(np.asarray(atmosphere_data.get("v_velocity_10m")) != 0.0)
@@ -634,7 +634,7 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     land_state = _step_component(land, timedelta(seconds=10.0), timestamp, coupler)
     soil_moisture = land_state.fields.get("soil_moisture")
     assert soil_moisture.shape == grid.shape
-    assert np.all(np.asarray(soil_moisture) < 0.3)
+    assert np.all(np.asarray(soil_moisture) > 0.3)
 
     seaice = cast(Any, make_slab_seaice(grid=grid))
     assert seaice.spec.inputs == ("sea_surface_temperature",)

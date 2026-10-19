@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from typing import cast
+
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from tests.assertions import assert_allclose_compact, assert_finite_jvp_vjp
 from vercor.setups._slab.atmosphere import (
@@ -13,6 +16,83 @@ from vercor.setups._slab.atmosphere import (
 from vercor.setups._slab.land import _update_soil_moisture
 from vercor.setups._slab.ocean import _advance_sea_surface_temperature
 from vercor.setups._slab.seaice import _diagnose_ice_fraction
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("anomaly", [-1.0, 1.0])
+def test_ocean_zero_flux_restores_anomaly_and_analytic_derivatives(
+    anomaly: float,
+) -> None:
+    """A one-day Euler step contracts either anomaly by 29/30."""
+
+    def advance(sst: jax.Array) -> jax.Array:
+        return cast(
+            jax.Array,
+            _advance_sea_surface_temperature(
+                sst,
+                0.0,
+                0.0,
+                86400.0,
+                1025.0,
+                3990.0,
+                30.0,
+                1.0 / (30.0 * 86400.0),
+                288.15,
+            ),
+        )
+
+    sst = jnp.asarray(288.15 + anomaly)
+    actual, tangent = jax.jvp(advance, (sst,), (jnp.ones_like(sst),))
+    _, pullback = jax.vjp(advance, sst)
+    assert_allclose_compact(actual - 288.15, anomaly * 29.0 / 30.0)
+    assert_allclose_compact(tangent, 29.0 / 30.0)
+    assert_allclose_compact(pullback(jnp.ones_like(sst))[0], 29.0 / 30.0)
+    epsilon = 1e-3
+    finite_difference = (advance(sst + epsilon) - advance(sst - epsilon)) / (
+        2 * epsilon
+    )
+    assert_allclose_compact(finite_difference, 29.0 / 30.0, rtol=1e-8)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "air,expected_shf,expected_lhf", [(280.0, -100.0, -50.0), (300.0, 100.0, 50.0)]
+)
+def test_bulk_flux_transfers_heat_down_temperature_gradient(
+    air: float,
+    expected_shf: float,
+    expected_lhf: float,
+) -> None:
+    sensible, latent, _ = _bulk_flux_step(jnp.asarray(air), jnp.asarray(290.0))
+    assert_allclose_compact(sensible, expected_shf)
+    assert_allclose_compact(latent, expected_lhf)
+    # Reference equals SST so the direction comes solely from the received fluxes.
+    updated = _advance_sea_surface_temperature(
+        290.0,
+        sensible,
+        latent,
+        86400.0,
+        1025.0,
+        3990.0,
+        30.0,
+        1.0 / (30.0 * 86400.0),
+        290.0,
+    )
+    assert float(updated - 290.0) * expected_shf > 0.0
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("latent,expected", [(-100.0, 0.29136), (100.0, 0.30864)])
+def test_soil_moisture_evaporation_dries_and_condensation_wets(
+    latent: float,
+    expected: float,
+) -> None:
+    assert_allclose_compact(_update_soil_moisture(0.3, latent, 86400.0), expected)
+
+
+def test_soil_zero_flux_preserves_moisture() -> None:
+    moisture = jnp.asarray([0.0, 0.3, 1.0])
+    assert_allclose_compact(_update_soil_moisture(moisture, 0.0, 86400.0), moisture)
 
 
 def test_atmosphere_kernels_support_jit_and_gradients() -> None:
@@ -31,9 +111,9 @@ def test_atmosphere_kernels_support_jit_and_gradients() -> None:
     assert_allclose_compact(default_sst, np.full((2, 2), 288.15))
     assert_allclose_compact(
         sensible_heat_flux,
-        -10.0 * (np.asarray(temperature_2m) - np.asarray(sea_surface_temperature)),
+        10.0 * (np.asarray(temperature_2m) - np.asarray(sea_surface_temperature)),
     )
-    assert_allclose_compact(latent_heat_flux, -0.5 * sensible_heat_flux)
+    assert_allclose_compact(latent_heat_flux, 0.5 * sensible_heat_flux)
     assert_allclose_compact(
         updated_temperature_2m,
         np.asarray(temperature_2m)
@@ -45,7 +125,7 @@ def test_atmosphere_kernels_support_jit_and_gradients() -> None:
     gradient = jax.grad(lambda sst: jnp.sum(_bulk_flux_step(temperature_2m, sst)[0]))(
         sea_surface_temperature
     )
-    assert_allclose_compact(gradient, np.full((2, 2), 10.0))
+    assert_allclose_compact(gradient, np.full((2, 2), -10.0))
     assert_finite_jvp_vjp(
         lambda sst: jnp.sum(_bulk_flux_step(jnp.full_like(sst, 288.0), sst)[0]),
         jnp.full((2, 2), 285.0),
@@ -120,7 +200,7 @@ def test_land_kernel_supports_jit_and_clipping() -> None:
     out = jax.jit(_update_soil_moisture)(soil_moisture, latent_heat_flux, 10.0)
 
     expected = np.clip(
-        np.asarray(soil_moisture) - 1e-9 * np.asarray(latent_heat_flux) * 10.0,
+        np.asarray(soil_moisture) + 1e-9 * np.asarray(latent_heat_flux) * 10.0,
         0.0,
         1.0,
     )

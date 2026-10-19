@@ -61,11 +61,17 @@ def _advance_sea_surface_temperature(
     lambda_relax: float,
     reference_temperature: float,
 ) -> jax.Array:
+    """Advance grid-shaped SST in K with downward-positive heat and restoring.
+
+    Heat fluxes are in W/m2, rho in kg/m3, cp in J/(kg K), depth in m and
+    lambda_relax in 1/s. Explicit Euler damps SST toward reference_temperature
+    for positive lambda_relax and dt_seconds below the restoring timescale.
+    """
     sea_surface_temperature_array = as_jax_real_array(sea_surface_temperature)
     sensible_heat_flux_array = as_jax_real_array(sensible_heat_flux)
     latent_heat_flux_array = as_jax_real_array(latent_heat_flux)
     qnet = sensible_heat_flux_array + latent_heat_flux_array
-    tendency = qnet / (rho * cp * mixed_layer_depth) + lambda_relax * (
+    tendency = qnet / (rho * cp * mixed_layer_depth) - lambda_relax * (
         sea_surface_temperature_array - reference_temperature
     )
     return sea_surface_temperature_array + tendency * dt_seconds

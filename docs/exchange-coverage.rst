@@ -109,6 +109,14 @@ JCM 3 publishes grid-mean turbulent fluxes and removed separate land/marine
 channels. Unused imports into prescribed JCM land and the unavailable land-only
 recipe are removed. The JCM/slab demonstration applies grid-mean turbulent flux
 densities to both toy tiles; it does not certify separate tile heat budgets.
+Slab turbulent heat fluxes are downward-positive W/m²: sensible heat is
+``10 * (T_air - SST)`` and latent heat is half of sensible heat. Positive
+fluxes warm the mixed layer; the independent ocean restoring tendency is
+``-(SST - 288.15 K) / (30 days)``. Slab soil moisture changes by
+``1e-9 * latent_heat_flux * dt_seconds``, clipped to [0, 1], so negative
+latent heat (evaporation) dries soil and positive latent heat wets it.
+The latent and moisture coefficients remain toy closures and do not certify
+a physical water budget.
 CAMulator's existing ML land-mask branch is retained.
 
 Released models and the dependency exception
