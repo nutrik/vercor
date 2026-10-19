@@ -808,5 +808,6 @@ changed test SHA256 is
 The final-prose strict Sphinx log is `vercor-finalfix-sphinx-final.log`; Git
 branch/history/clean-status delivery evidence is in the final-fix report.
 All15AD cases passed with the known upstream scatter and JCM/xarray
-FutureWarnings retained; no warning suppression was added. Scoped final review
-is the controller's next action. Local delivery only: no remote change.
+FutureWarnings retained; no warning suppression was added. Final whole-branch
+review and the scoped rereview are complete: I1/M1 addressed, scoped rereview
+clean, no open findings. Local delivery only: no remote change.
