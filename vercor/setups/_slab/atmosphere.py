@@ -50,11 +50,16 @@ def _bulk_flux_step(
     temperature_2m: object,
     sea_surface_temperature: object,
 ) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """Return downward-positive sensible/latent heat fluxes and relaxed air.
+
+    Grid-shaped temperatures are in K and fluxes in W/m2. The latent flux
+    is a toy half-sensible closure, not a humidity-based water budget.
+    """
     temperature_2m_array = as_jax_real_array(temperature_2m)
     sea_surface_temperature_array = as_jax_real_array(sea_surface_temperature)
     delta_temperature = temperature_2m_array - sea_surface_temperature_array
-    sensible_heat_flux = -10.0 * delta_temperature
-    latent_heat_flux = -0.5 * sensible_heat_flux
+    sensible_heat_flux = 10.0 * delta_temperature
+    latent_heat_flux = 0.5 * sensible_heat_flux
     updated_temperature_2m = temperature_2m_array - 0.01 * delta_temperature
     return sensible_heat_flux, latent_heat_flux, updated_temperature_2m
 

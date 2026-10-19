@@ -822,9 +822,9 @@ def test_run_matches_one_step_closed_form_for_slab_ocean() -> None:
     ocean_sst = final_state._component_state("OCN").fields.get(
         "sea_surface_temperature"
     )
-    sensible = -10.0 * (288.15 - 286.15)
-    latent = -0.5 * sensible
-    restoring = (np.asarray(initial_sst) - 288.15) / (30.0 * 86400.0)
+    sensible = 10.0 * (288.15 - 286.15)
+    latent = 0.5 * sensible
+    restoring = -(np.asarray(initial_sst) - 288.15) / (30.0 * 86400.0)
     expected = (
         np.asarray(initial_sst)
         + ((sensible + latent) / (1025.0 * 3990.0 * 30.0) + restoring) * 3600.0
