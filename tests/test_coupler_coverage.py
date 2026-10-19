@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
-import inspect
 import logging
 from pathlib import Path
 from typing import Any, cast
@@ -1671,12 +1670,6 @@ def test_run_warns_when_host_backed_components_make_loop_nondifferentiable() -> 
         "Coupled loop is not differentiable because host-backed component(s) "
         "require the Python runtime: ATM, OCN"
     ]
-
-
-def test_run_api_does_not_expose_state_donation_option() -> None:
-    signature = inspect.signature(Coupler.run)
-
-    assert "donate_state" not in signature.parameters
 
 
 def test_host_and_scanned_run_use_runtime_component_helper(

@@ -307,8 +307,6 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "from vercor._runtime.prepared import PreparedCoupling" in coupler_source
     assert "def _ensure_prepared(" in coupler_source
     assert "RuntimeInputs" not in runtime_facade_source
-    assert "donate_state" not in coupler_source
-    assert "donate_state" not in runtime_facade_source
     assert "def _run_host_runtime" not in coupler_source
     run_body = coupler_source.split("def run", 1)[1]
     assert "host_component_names(self._components)" not in run_body

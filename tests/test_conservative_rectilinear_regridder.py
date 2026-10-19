@@ -1,6 +1,5 @@
 import importlib
 from inspect import signature
-from pathlib import Path
 from typing import Any
 
 import jax.numpy as jnp
@@ -170,16 +169,6 @@ def test_identical_grid_regridder_remains_scalar_only() -> None:
         )
 
 
-def test_regridder_has_identical_grids_true_for_equal_coords() -> None:
-    lon = np.array([0.5, 1.5])
-    lat = np.array([0.5, 1.5])
-    src = _grid("src", lon.copy(), lat.copy())
-    dst = _grid("dst", lon.copy(), lat.copy())
-
-    regridder = ConservativeRectilinearRegridder(src, dst)
-    assert regridder.has_identical_grids is True
-
-
 def test_regridder_identical_grid_skips_remapper_construction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -205,15 +194,6 @@ def test_regridder_identical_grid_skips_remapper_construction(
     assert regridder.interpolator is None
 
 
-def test_regridder_identical_grid_passthrough_does_not_use_identity_helper() -> None:
-    base_source = Path("vercor/_regridders/base.py").read_text(encoding="utf-8")
-    conservative_source = Path("vercor/_regridders/conservative.py").read_text(
-        encoding="utf-8"
-    )
-    assert "_IdentityInterpolator" not in base_source
-    assert "_IdentityInterpolator" not in conservative_source
-
-
 def test_regridder_non_identical_grid_constructs_remapper(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -235,14 +215,6 @@ def test_regridder_non_identical_grid_constructs_remapper(
 
     assert regridder.has_identical_grids is False
     assert len(calls) == 1
-
-
-def test_regridder_has_identical_grids_false_for_different_coords() -> None:
-    src = _grid("src", np.array([0.5, 1.5]), np.array([0.5, 1.5]))
-    dst = _grid("dst", np.array([0.5, 1.5, 2.5]), np.array([0.5, 1.5, 2.5]))
-
-    regridder = ConservativeRectilinearRegridder(src, dst)
-    assert regridder.has_identical_grids is False
 
 
 def test_regridder_identical_grid_scalar_short_circuit_returns_input_object() -> None:

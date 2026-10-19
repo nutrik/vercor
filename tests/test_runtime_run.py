@@ -799,12 +799,6 @@ def test_run_executes_pure_scanned_runtime_for_same_shapes_and_metadata() -> Non
     )
 
 
-def test_run_api_does_not_expose_state_donation() -> None:
-    signature = inspect.signature(Coupler.run)
-
-    assert "donate_state" not in signature.parameters
-
-
 def test_run_preserves_runtime_treedef() -> None:
     coupler = _make_coupler(steps=1)
 

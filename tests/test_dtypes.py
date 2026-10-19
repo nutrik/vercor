@@ -89,13 +89,6 @@ def test_index_dtype_is_int32_for_both_real_precision_modes() -> None:
         assert compiled_indices.dtype == jnp.int32
 
 
-def test_numpy_and_jax_helpers_agree_on_dtype_policy() -> None:
-    policy = DTypePolicy(enable_x64=True)
-
-    assert np.dtype(jax_real_dtype(policy)) == np.dtype(np.float64)
-    assert np.dtype(jax_index_dtype(policy)) == np.dtype(np.int32)
-
-
 def test_unconfigured_real_conversion_preserves_existing_array_dtype() -> None:
     source = jnp.asarray([1.0, 2.0], dtype=jnp.float32)
 

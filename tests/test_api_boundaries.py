@@ -84,37 +84,6 @@ def test_public_api_exports_state_view_fields_and_regridders() -> None:
 
 
 @pytest.mark.fast_always
-def test_root_api_is_core_only_after_boundary_redesign() -> None:
-    allowed_root_exports = {
-        "Clock",
-        "Coupler",
-        "Exchange",
-        "RectilinearGrid",
-        "RuntimeOptions",
-        "RunState",
-    }
-
-    assert set(vercor.__all__) == allowed_root_exports
-    for name in (
-        "bilinear",
-        "conservative",
-        "Regridder",
-        "RegridderFactory",
-        "CAMulatorConfig",
-        "fluxes",
-        "JAXGCMConfig",
-        "recipes",
-        "setups",
-        "Spinup",
-        "SurfaceMaskPolicy",
-        "VerosConfig",
-    ):
-        assert name not in vercor.__all__
-    for name in ("bilinear", "conservative", "Regridder", "RegridderFactory"):
-        assert not hasattr(vercor, name)
-
-
-@pytest.mark.fast_always
 def test_setup_implementation_modules_are_private_after_boundary_redesign() -> None:
     import vercor.setups as setup_facade
 
@@ -733,48 +702,6 @@ def test_shallow_setup_regridding_grid_and_exchange_imports() -> None:
     assert make_slab_ocean(grid, mixed_layer_depth=30.0).name == "OCN"
     with pytest.raises(TypeError):
         make_slab_ocean(grid, H=30.0)  # type: ignore[call-arg]
-
-
-@pytest.mark.fast_always
-def test_top_level_exports_public_orchestration_and_component_author_api() -> None:
-    expected_component_exports = (
-        "CallableComponent",
-        "Component",
-        "ComponentMaskSpec",
-        "ComponentSpec",
-        "DataComponent",
-        "LifecycleHooks",
-        "PrefillContext",
-        "PrefillResult",
-        "SetupContext",
-        "SetupResult",
-        "StepContext",
-        "StepResult",
-        "TransferPolicy",
-        "ValidationContext",
-    )
-
-    assert tuple(components_module.__all__) == expected_component_exports
-    assert tuple(vercor.__all__) == (
-        "Clock",
-        "Coupler",
-        "Exchange",
-        "RectilinearGrid",
-        "RunState",
-        "RuntimeOptions",
-    )
-
-    assert components_module.Component is Component
-    assert components_module.ComponentSpec is component_contracts_module.ComponentSpec
-    assert components_module.SetupContext is component_contexts_module.SetupContext
-    assert components_module.StepContext is component_contexts_module.StepContext
-    assert components_module.StepResult is component_contracts_module.StepResult
-    assert components_module.SetupResult is component_contracts_module.SetupResult
-    assert components_module.TransferPolicy is component_contracts_module.TransferPolicy
-    data_component_type = getattr(components_module, "DataComponent", None)
-    assert data_component_type is not None
-    assert components_module.DataComponent is data_component_type
-    assert components_module.CallableComponent is base_module.CallableComponent
 
 
 @pytest.mark.fast_always

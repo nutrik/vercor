@@ -451,6 +451,11 @@ Paired JCM configuration owns land and atmosphere output independently. CI has
 installed base, JCM, and Veros lanes. CAMulator remains lazy and source-tested
 because a compatible external release is not yet pinned.
 
+The [source and coupling audit](source-coupling-audit.md) records the complete
+current source inventory, removed private alternatives, necessary adapters and
+exact surviving test assertions after the 2026-10-19 cleanup. Private naming
+checks are subordinate to these behavior and owner contracts.
+
 ## 7. Compatibility plan
 
 The 0.4 API does not include legacy compatibility adapters. Task 9 was
@@ -458,7 +463,11 @@ explicitly skipped. Applications use the current researcher and developer
 guides for imports and construction; primary 0.4 modules remain alias-free.
 
 No legacy compatibility adapter namespace or executable pre-redesign evidence
-ships. No earlier API is restored.
+ships. No earlier API is restored. Current gallery compositions omit feedback
+routes into prescribed producers and imports unused by slab kernels. Explicit
+DataComponent diagnostics remain supported; CAMulator applications must provide
+a real vapor-channel declaration and timestamped native initial diagnostics.
+See the [migration and evidence record](source-coupling-audit.md).
 
 Compatibility within the 0.4.x line is defined by canonical public owner
 manifests, signatures, public-only plugin behavior, output-free gradients, and

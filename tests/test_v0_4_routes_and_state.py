@@ -718,20 +718,10 @@ def _state_coupler(*, backend: Any | None = None) -> Coupler:
     )
 
 
-@pytest.mark.parametrize("corrupt, message", _STATE_CORRUPTIONS)
+@pytest.mark.parametrize(
+    "corrupt, message", _STATE_CORRUPTIONS + _INCOMING_STATE_INVARIANTS
+)
 def test_supplied_foreign_state_is_strictly_validated(
-    corrupt: Any,
-    message: str,
-) -> None:
-    coupler = _state_coupler()
-    foreign = corrupt(coupler.initial_state())
-
-    with pytest.raises(CouplerError, match=message):
-        coupler.run(foreign)
-
-
-@pytest.mark.parametrize("corrupt, message", _INCOMING_STATE_INVARIANTS)
-def test_supplied_state_enforces_full_private_alignment_schema(
     corrupt: Any,
     message: str,
 ) -> None:

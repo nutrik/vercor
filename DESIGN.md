@@ -3,7 +3,9 @@
 VerCOR is a JAX-first, fully differentiable coupler for composing Earth-system
 components. This document describes the implemented stable `0.4.0` architecture.
 The exact API inventory and compatibility decisions are in
-`docs/api-architecture-review.md`.
+`docs/api-architecture-review.md`. The completed source/test removal decisions,
+retained native adapters and assertion migrations are recorded in
+`docs/source-coupling-audit.md`.
 
 ## 1. Goals and constraints
 

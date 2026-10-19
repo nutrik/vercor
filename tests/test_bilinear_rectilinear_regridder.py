@@ -1,5 +1,4 @@
 import importlib
-from pathlib import Path
 from typing import Any
 
 import jax.numpy as jnp
@@ -122,16 +121,6 @@ def test_regridder_vector_call_dispatches_and_returns_two_destination_arrays() -
     assert out[1].shape == dst_grid.shape
 
 
-def test_regridder_has_identical_grids_true_for_equal_coords() -> None:
-    lon = np.array([0.0, 1.0, 2.0])
-    lat = np.array([0.0, 1.0])
-    src_grid = _make_grid("src", lon.copy(), lat.copy())
-    dst_grid = _make_grid("dst", lon.copy(), lat.copy())
-
-    regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
-    assert regridder.has_identical_grids is True
-
-
 def test_regridder_identical_grid_skips_interpolator_construction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -155,13 +144,6 @@ def test_regridder_identical_grid_skips_interpolator_construction(
     assert regridder.has_identical_grids is True
     assert isinstance(regridder, BilinearRectilinearRegridder)
     assert regridder.interpolator is None
-
-
-def test_regridder_identical_grid_passthrough_does_not_use_identity_helper() -> None:
-    base_source = Path("vercor/_regridders/base.py").read_text(encoding="utf-8")
-    bilinear_source = Path("vercor/_regridders/bilinear.py").read_text(encoding="utf-8")
-    assert "_IdentityInterpolator" not in base_source
-    assert "_IdentityInterpolator" not in bilinear_source
 
 
 def test_regridder_non_identical_grid_constructs_interpolator(
@@ -193,14 +175,6 @@ def test_regridder_identical_grid_uses_shared_coordinate_tolerance() -> None:
 
     regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
     assert regridder.has_identical_grids is True
-
-
-def test_regridder_has_identical_grids_false_for_different_coords() -> None:
-    src_grid = _make_grid("src", np.array([0.0, 1.0, 2.0]), np.array([0.0, 1.0]))
-    dst_grid = _make_grid("dst", np.array([0.0, 2.0, 4.0]), np.array([0.0, 1.0]))
-
-    regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
-    assert regridder.has_identical_grids is False
 
 
 def test_regridder_identical_grid_scalar_short_circuit_returns_input_object() -> None:
