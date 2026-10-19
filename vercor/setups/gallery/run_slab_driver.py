@@ -21,12 +21,10 @@ from vercor.setups import (
     make_slab_seaice,
 )
 from vercor.recipes import (
-    LAND_TO_ATMOSPHERE_SOIL_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_SEAICE_SURFACE_FIELDS,
-    SEAICE_TO_OCEAN_FIELDS,
     SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-    SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+    SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
 )
 from vercor.diagnostics import (
     plot_component_scalar_vector_comparison,
@@ -92,7 +90,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             quantity="intensive",
             source="ATM",
             target="OCN",
-            fields=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+            fields=SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
@@ -111,23 +109,9 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         ),
         Exchange(
             quantity="intensive",
-            source="LND",
-            target="ATM",
-            fields=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
-            regridder_factory=bilinear,
-        ),
-        Exchange(
-            quantity="intensive",
             source="ATM",
             target="LND",
             fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-            regridder_factory=conservative,
-        ),
-        Exchange(
-            quantity="intensive",
-            source="ICE",
-            target="OCN",
-            fields=SEAICE_TO_OCEAN_FIELDS,
             regridder_factory=conservative,
         ),
     )
@@ -167,13 +151,6 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             (
                 "ATM",
                 views["ATM"],
-                "sea_surface_temperature",
-                "u_velocity_10m",
-                "v_velocity_10m",
-            ),
-            (
-                "OCN",
-                views["OCN"],
                 "sea_surface_temperature",
                 "u_velocity_10m",
                 "v_velocity_10m",

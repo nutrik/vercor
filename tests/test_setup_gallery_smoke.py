@@ -25,7 +25,6 @@ from vercor.components import (
 from vercor.fields import _flatten_field_items
 from vercor.output import OutputTarget
 from vercor.recipes import (
-    ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
     ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
 )
 from vercor.setups.gallery import run_camulator_with_veros
@@ -100,18 +99,12 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         fields={
             "land_surface_temperature": np.asarray([[np.nan, 282.0], [286.0, np.nan]])
         },
-        spec=ComponentSpec(
-            inputs=tuple(_flatten_field_items(ATMOSPHERE_TO_LAND_RADIATION_FIELDS))
-        ),
     )
 
     atmosphere_output_names = tuple(
         dict.fromkeys(
             _flatten_field_items(
-                (
-                    *_flatten_field_items(ATMOSPHERE_TO_VEROS_FORCING_FIELDS),
-                    *ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
-                )
+                (*_flatten_field_items(ATMOSPHERE_TO_VEROS_FORCING_FIELDS),)
             )
         )
     )
@@ -210,7 +203,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     coupler = cast(Coupler, captured["coupler"])
     topology = coupler._ensure_prepared().topology_maps
     assert_allclose_compact(topology.binary_masks["ATM->OCN"], ocean_mask)
-    assert_allclose_compact(topology.binary_masks["ATM->LND"], land_mask)
+    assert_allclose_compact(topology.binary_masks["LND->ATM"], land_mask)
 
     final_state = captured["final_state"]
     views = final_state.components(("OCN", "LND", "ATM"))

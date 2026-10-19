@@ -1445,16 +1445,11 @@ def test_camulator_land_stores_jax_runtime_arrays(
         _make_coupler(start),
         DTypePolicy.from_jax_config(),
     )
-    assert component.spec.inputs == (
-        "net_shortwave_radiation_flux",
-        "downward_longwave_radiation_flux",
-    )
+    assert component.spec.inputs == ()
     assert component.spec.outputs == ("land_surface_temperature", "land_fraction")
     assert set(component.spec.initial_fields) == {
         "land_surface_temperature",
         "land_fraction",
-        "net_shortwave_radiation_flux",
-        "downward_longwave_radiation_flux",
     }
     assert isinstance(component._data["land_surface_temperature"], jax.Array)
     assert_allclose_compact(
@@ -1512,7 +1507,7 @@ def test_camulator_land_stores_jax_runtime_arrays(
 
 
 @pytest.mark.fast_always
-def test_camulator_land_declares_radiation_exchange_inputs(
+def test_camulator_land_rejects_unused_physical_feedback(
     monkeypatch: Any,
 ) -> None:
     start = datetime(2000, 1, 1, 0, 0, 0)
@@ -1572,9 +1567,10 @@ def test_camulator_land_declares_radiation_exchange_inputs(
         ),
     )
 
+    assert land.spec.inputs == ()
     assert contracts["LND"].receives == radiation_fields
-    for name, component in components.items():
-        validate_exchange_fields_declared(component, contracts[name])
+    with pytest.raises(CouplerError, match="not declared"):
+        validate_exchange_fields_declared(land, contracts["LND"])
 
 
 class _FiniteCamulatorBoundaryStepper:

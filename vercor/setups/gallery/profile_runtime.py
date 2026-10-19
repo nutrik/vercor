@@ -24,12 +24,10 @@ from vercor.setups import (
     make_slab_seaice,
 )
 from vercor.recipes import (
-    LAND_TO_ATMOSPHERE_SOIL_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_SEAICE_SURFACE_FIELDS,
-    SEAICE_TO_OCEAN_FIELDS,
     SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-    SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+    SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
 )
 from vercor.topology import SurfaceMaskPolicy
 
@@ -131,7 +129,7 @@ def build_slab_coupler(
             quantity="intensive",
             source="ATM",
             target="OCN",
-            fields=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+            fields=SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
@@ -143,24 +141,10 @@ def build_slab_coupler(
         ),
         Exchange(
             quantity="intensive",
-            source="LND",
-            target="ATM",
-            fields=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
-            regridder_factory=bilinear,
-        ),
-        Exchange(
-            quantity="intensive",
             source="OCN",
             target="ICE",
             fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
             regridder_factory=bilinear,
-        ),
-        Exchange(
-            quantity="intensive",
-            source="ICE",
-            target="OCN",
-            fields=SEAICE_TO_OCEAN_FIELDS,
-            regridder_factory=conservative,
         ),
     )
     return Coupler(

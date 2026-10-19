@@ -15,7 +15,7 @@ from typing import Any, cast
 
 import pytest
 
-from vercor import Clock, RuntimeOptions
+from vercor import Clock, Exchange, RuntimeOptions
 from vercor.dtypes import DTypePolicy
 from vercor.setups import JCMInputs
 
@@ -29,8 +29,8 @@ class _FakeCoupler:
     def __init__(self, *args: object, **kwargs: object) -> None:
         self.args = args
         self.kwargs = kwargs
-        self.exchanges: tuple[object, ...] = tuple(
-            cast(Iterable[object], kwargs.get("exchanges", ()))
+        self.exchanges: tuple[Exchange, ...] = tuple(
+            cast(Iterable[Exchange], kwargs.get("exchanges", ()))
         )
 
 
@@ -115,7 +115,11 @@ def test_build_coupler_uses_injected_ocean_inputs_and_clock(
     assert coupler.args[0] is clock
     assert coupler.kwargs["components"] == [ocean, setup.land, setup.atmosphere]
     assert setup_calls == [(ocean.grid, jcm_inputs)]
-    assert len(coupler.exchanges) == 3
+    assert len(coupler.exchanges) == 2
+    assert {(route.source, route.target) for route in coupler.exchanges} == {
+        ("OCN", "ATM"),
+        ("LND", "ATM"),
+    }
     assert coupler.kwargs["log_level"] == "warning"
     runtime = cast(RuntimeOptions, coupler.kwargs["runtime"])
     assert runtime.dtype == DTypePolicy(enable_x64=True)

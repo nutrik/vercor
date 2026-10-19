@@ -16,13 +16,12 @@ from vercor.grids import RectilinearGrid
 from vercor.output import OutputSpec
 from vercor.setups._output import resolve_output
 
-_LAND_INPUTS = ("latent_heat_flux", "sensible_heat_flux")
+_LAND_INPUTS = ("latent_heat_flux",)
 _LAND_OUTPUTS = ("soil_moisture", "land_surface_temperature")
 _LAND_DEFAULT_FIELDS = {
     "soil_moisture": 0.3,
     "land_surface_temperature": 288.15,
     "latent_heat_flux": 0.0,
-    "sensible_heat_flux": 0.0,
 }
 
 

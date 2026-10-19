@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime
 
 import matplotlib.pyplot as plt
@@ -9,7 +10,7 @@ from vercor import (
     RuntimeOptions,
 )
 from vercor.dtypes import DTypePolicy
-from vercor.components import Component
+from vercor.components import Component, DataComponent
 from vercor.diagnostics import (
     ComponentMetric,
     component_vector_speed,
@@ -41,6 +42,48 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     atm = make_era5_atmosphere()
     ocn = make_erainterim_ocean()
     lnd = make_era5_land()
+
+    # These imports are displayed below; prescribed temperatures do not respond
+    # to them. Declare the gallery's diagnostic role independently of factories.
+    atm = DataComponent(
+        atm.name,
+        atm.grid,
+        spec=replace(
+            atm.spec, inputs=("sea_surface_temperature", "land_surface_temperature")
+        ),
+    )
+    ocn = DataComponent(
+        ocn.name,
+        ocn.grid,
+        spec=replace(
+            ocn.spec,
+            inputs=(
+                "u_velocity",
+                "v_velocity",
+                "specific_humidity",
+                "model_level_height",
+                "density",
+                "potential_temperature",
+                "temperature",
+                "net_shortwave_radiation_flux",
+                "downward_longwave_radiation_flux",
+            ),
+        ),
+    )
+    lnd = DataComponent(
+        lnd.name,
+        lnd.grid,
+        spec=replace(
+            lnd.spec,
+            inputs=(
+                "specific_humidity",
+                "model_level_height",
+                "potential_temperature",
+                "net_shortwave_radiation_flux",
+                "downward_longwave_radiation_flux",
+            ),
+        ),
+    )
 
     # Clock and sequence
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=3600, steps=10)
@@ -108,20 +151,24 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     )
 
     final_state = cpl.run(output=OutputTarget("."))
-    views = final_state.components(("ATM", "OCN"))
+    views = final_state.components(("ATM", "OCN", "LND"))
 
     variables: list[tuple[ComponentMetric, str]] = [
         ("sea_surface_temperature", "sst"),
         ("specific_humidity", "qbot"),
         ("potential_temperature", "tbot"),
         ("model_level_height", "zbot"),
+        ("temperature", "air_temperature"),
+        ("density", "air_density"),
+        ("net_shortwave_radiation_flux", "net_shortwave"),
+        ("downward_longwave_radiation_flux", "downward_longwave"),
         (component_vector_speed, "speed"),
     ]
 
     print_component_field_means_table(
         components=views,
         fields=variables,
-        component_order=["ATM", "OCN"],
+        component_order=["ATM", "OCN", "LND"],
     )
 
     fig, axs, scalar_mappable = plot_component_scalar_vector_comparison(

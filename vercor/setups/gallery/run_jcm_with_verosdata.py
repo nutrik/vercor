@@ -10,7 +10,6 @@ from vercor.dtypes import DTypePolicy
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.setups import make_erainterim_ocean
 from vercor.recipes import (
-    ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
     JCM_LAND_TO_ATMOSPHERE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
@@ -53,13 +52,6 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
 
     # Exchanges
     exchanges = (
-        Exchange(
-            quantity="intensive",
-            source="ATM",
-            target="OCN",
-            fields=ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
-            regridder_factory=bilinear,
-        ),
         Exchange(
             quantity="intensive",
             source="OCN",
