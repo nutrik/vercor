@@ -9,7 +9,8 @@ import pytest
 from tests.assertions import assert_array_equal_compact
 from vercor.grids import RectilinearGrid
 from vercor._regridders.base import _BaseRegridder
-from vercor._regridders.bilinear import BilinearRectilinearRegridder, bilinear
+from vercor._regridders.bilinear import BilinearRectilinearRegridder
+from vercor.regridding import bilinear
 from vercor._interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 
 
@@ -60,6 +61,7 @@ def test_regridder_constructor_propagates_interpolator_options() -> None:
         fill_value=-99.0,
     )
 
+    assert isinstance(regridder, BilinearRectilinearRegridder)
     interp = regridder.interpolator
     if isinstance(interp, BilinearRectilinearInterpolator):
         assert interp is not None
@@ -148,9 +150,10 @@ def test_regridder_identical_grid_skips_interpolator_construction(
     src_grid = _make_grid("src", lon.copy(), lat.copy())
     dst_grid = _make_grid("dst", lon.copy(), lat.copy())
 
-    regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
+    regridder = bilinear(src_grid, dst_grid)
 
     assert regridder.has_identical_grids is True
+    assert isinstance(regridder, BilinearRectilinearRegridder)
     assert regridder.interpolator is None
 
 
@@ -285,6 +288,7 @@ def test_bilinear_factory_forwards_interpolator_options() -> None:
         fill_value=-99.0,
     )
 
+    assert isinstance(regridder, BilinearRectilinearRegridder)
     interp = regridder.interpolator
     assert isinstance(interp, BilinearRectilinearInterpolator)
     assert interp.periodic is False

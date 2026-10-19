@@ -16,7 +16,6 @@ from vercor.setups._data.era5_atmosphere import (
     _decode_surface_pressure,
 )
 from vercor.setups._data._field_helpers import (
-    canonicalize_surface_field,
     mask_time_last_surface_field,
     positive_binary_mask,
 )
@@ -312,8 +311,10 @@ def test_shared_field_helpers_canonicalize_surface_fields_and_positive_masks() -
     )
     mask_source = jnp.asarray([[0.0, 0.2], [-1.0, 3.0]])
 
-    prepared_2d = jax.jit(canonicalize_surface_field)(surface_2d)
-    prepared_time_series = jax.jit(canonicalize_surface_field)(surface_time_last)
+    prepared_2d = jax.jit(lambda value: as_jax_real_array(value).T)(surface_2d)
+    prepared_time_series = jax.jit(canonicalize_time_last_surface_field)(
+        surface_time_last
+    )
     binary_mask = jax.jit(positive_binary_mask)(mask_source)
 
     assert_allclose_compact(prepared_2d, np.asarray(surface_2d).T)
@@ -377,8 +378,8 @@ def test_jcm_land_layout_uses_shared_jax_helpers() -> None:
         lambda lon, lat, temperature, soil: (
             jnp.rad2deg(as_jax_real_array(lon)),
             jnp.rad2deg(as_jax_real_array(lat)),
-            canonicalize_surface_field(temperature),
-            canonicalize_surface_field(soil),
+            as_jax_real_array(temperature).T,
+            as_jax_real_array(soil).T,
         )
     )(
         longitude_radians,
@@ -400,7 +401,7 @@ def test_jcm_land_layout_uses_shared_jax_helpers() -> None:
 
     temperature_gradient, soil_gradient = jax.grad(
         lambda temperature, soil: jnp.sum(
-            canonicalize_surface_field(temperature) + canonicalize_surface_field(soil)
+            as_jax_real_array(temperature).T + as_jax_real_array(soil).T
         ),
         argnums=(0, 1),
     )(land_surface_temperature, soil_moisture)

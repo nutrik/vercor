@@ -194,19 +194,19 @@ def density_coupler(density: float, *, authored: float | None = None) -> Any:
 def test_configured_density_round_trips_si_atmospheric_mass(density: float) -> None:
     from tests.test_veris_component import cold_fields
     from vercor.physics import PhysicalConstants
-    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
 
     c = density_coupler(density, authored=density)
     initial = c.initial_state()
     p = native_payload(initial).physical_constants
     assert float(p.h0) == 0.43 and float(p.rhoFresh) == density
     mask = np.asarray(c.components["CICE"].grid.binary_mask)
-    forcing = prepare_veris_forcing(
+    forcing = prepare_veris_forcing_pack(
         cold_fields(),
         ocean_mask=mask,
         constants=PhysicalConstants(freshwater_density=density),
         dtype=c.runtime.dtype,
-    )
+    ).native_forcing
     expected = np.asarray(cold_fields()["snow_rate"]).T * mask.T
     np.testing.assert_allclose(
         p.rhoFresh * forcing["snowfall"], expected, rtol=1e-14, atol=0

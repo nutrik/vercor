@@ -263,7 +263,7 @@ class JAXGCMSetupState:
             )
 
         payload = _jax_gcm_runtime.create_jax_gcm_runtime_payload(self, component)
-        if getattr(self, "seaice_coupling", False):
+        if self.seaice_coupling:
             diagnosed, payload = _jax_gcm_runtime.diagnose_jax_gcm_initial_fields(
                 self, payload, context.constants, context.dtype
             )

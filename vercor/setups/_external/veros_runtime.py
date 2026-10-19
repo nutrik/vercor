@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any
 
 import jax
 import jax.numpy as jnp
@@ -57,17 +57,14 @@ def step_veros_runtime(
 
     if payload is None:
         raise ComponentError("Veros runtime requires a native runtime payload.")
-    execution = cast(
-        Literal["host", "jax"],
-        getattr(resources, "execution", "host"),
-    )
-    uses_atmosphere_forcing = getattr(resources, "uses_atmosphere_forcing", True)
+    execution = resources.execution
+    uses_atmosphere_forcing = resources.uses_atmosphere_forcing
     native_state = payload
     time = context.time
     if execution == "host" and time is None:
         return StepResult(payload=native_state)
 
-    coupled = getattr(resources, "surface_forcing", "atmosphere") == "coupled"
+    coupled = resources.surface_forcing == "coupled"
     if coupled:
         taux, tauy, qnet, salt_flux = _veros_fluxes.compute_coupled_fluxes(
             fields, context.constants, context.dtype
@@ -106,7 +103,7 @@ def step_veros_runtime(
     surface_fields = _veros_state.extract_veros_runtime_surface_fields(
         native_state, coupled=coupled
     )
-    if getattr(resources, "export_open_water_surface", False):
+    if resources.export_open_water_surface:
         surface_fields["open_water_temperature_contribution"] = (
             open_water_temperature_contribution(
                 surface_fields["sea_surface_temperature"],

@@ -15,7 +15,7 @@ from vercor.dtypes import DTypePolicy
 from vercor.physics import PhysicalConstants
 from vercor.state import RunState
 from vercor.setups._external.veris_runtime import VerisPayload
-from vercor.setups._external.veris_forcing import prepare_veris_forcing
+from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
 
 pytestmark = pytest.mark.slow
 
@@ -52,12 +52,12 @@ def test_two_wrapper_steps_equal_direct_native_advances() -> None:
     initial = coupler.initial_state()
     original = native_payload(initial)
     state, conf, constants = _direct_initial(geometry, config)
-    forcing = prepare_veris_forcing(
+    forcing = prepare_veris_forcing_pack(
         cold_fields(),
         ocean_mask=component.grid.binary_mask,
         constants=PhysicalConstants(),
         dtype=DTypePolicy(enable_x64=True),
-    )
+    ).native_forcing
     for _ in range(4):
         state, diagnostics = veris.advance(
             state, conf, constants, forcing, physics="coupled"
@@ -112,12 +112,12 @@ def test_each_native_substep_reapplies_prescribed_heat_fluxes() -> None:
     veris = pytest.importorskip("veris")
     coupler, component, geometry, config = small_coupler(steps=1)
     state, conf, constants = _direct_initial(geometry, config)
-    forcing = prepare_veris_forcing(
+    forcing = prepare_veris_forcing_pack(
         cold_fields(),
         ocean_mask=component.grid.binary_mask,
         constants=PhysicalConstants(),
         dtype=DTypePolicy(enable_x64=True),
-    )
+    ).native_forcing
     once, _ = veris.advance(state, conf, constants, forcing)
     correct, _ = veris.advance(once, conf, constants, forcing)
     retained_residual, _ = veris.advance(once, conf, constants, None)

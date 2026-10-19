@@ -406,6 +406,14 @@ output. It imports no private VerCOR module.
 The 0.4 API does not include legacy compatibility adapters or executable
 pre-redesign evidence. Applications use the current contracts directly.
 
+`calendar.YearType` is the sole forcing-year enum owner. Public regridding
+factories construct concrete private implementations directly while retaining
+their signatures, including `radius_km`. JCM output reads only runtime context
+payloads; a missing final snapshot payload raises a component-scoped error
+before output is created. Setup constructors own all native runtime policy
+attributes. Veris forcing consumers use the single production forcing pack,
+which contains native forcing and open-water face stresses.
+
 ## 10. Testing and release evidence
 
 Tests are layered across pure numerical kernels, component contracts, routes,

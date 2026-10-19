@@ -12,10 +12,7 @@ from vercor.calendar import (
     is_leap_year as _is_leap_year,
 )
 
-type ForcingYearType = _YearType
-
 __all__ = [
-    "ForcingYearType",
     "daily_forcing_day_of_year",
     "daily_forcing_index",
     "day_of_year_360_to_gregorian",

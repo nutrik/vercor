@@ -348,19 +348,30 @@ def _make_flux_ready_veros_state() -> Any:
     )
 
 
-def test_jax_gcm_tree_as_real_dtype_converts_tree_leaves() -> None:
+@pytest.mark.parametrize("enable_x64", [False, True])
+def test_jax_gcm_runtime_dtype_preserves_numeric_leaf_semantics(
+    enable_x64: bool,
+) -> None:
+    policy = DTypePolicy(enable_x64=enable_x64)
     tree = {
-        "a": jnp.asarray([1, 2], dtype=jnp.int32),
+        "a": jnp.asarray([1.0, 2.0]),
         "b": jnp.asarray([[3, 4]], dtype=jnp.int32),
         "c": True,
+        "complex": jnp.asarray([1 + 2j, 3 - 4j]),
+        "metadata": "category",
     }
-
-    converted = jax_gcm_pytree_module.tree_as_real_dtype(tree)
-
-    assert jnp.issubdtype(converted["a"].dtype, jnp.floating)
-    assert jnp.issubdtype(converted["b"].dtype, jnp.floating)
-    assert jnp.issubdtype(converted["c"].dtype, jnp.floating)
+    converted = jax_gcm_pytree_module.tree_as_runtime_dtype(tree, policy)
+    assert converted["a"].dtype == policy.jax_real
+    assert converted["b"].dtype == jnp.int32
+    assert converted["c"].dtype == jnp.bool_
+    assert converted["complex"].dtype == (
+        jnp.complex128 if enable_x64 else jnp.complex64
+    )
+    assert converted["metadata"] == "category"
     assert_allclose_compact(converted["a"], np.asarray([1.0, 2.0]))
+    np.testing.assert_array_equal(converted["b"], [[3, 4]])
+    assert bool(converted["c"])
+    np.testing.assert_array_equal(converted["complex"], [1 + 2j, 3 - 4j])
 
 
 def test_independent_surface_temperatures_support_jit_and_gradients() -> None:
@@ -402,6 +413,7 @@ def test_jcm_surface_forcing_rejects_infinity(bad_value: float) -> None:
 def test_jax_gcm_prefill_uses_physical_bulk_flux_defaults() -> None:
     grid = make_test_grid(name="jax-gcm-physical-prefill")
     state = SimpleNamespace(
+        seaice_coupling=False,
         _dtype_policy=DTypePolicy(enable_x64=True),
         sigma_levels=jnp.asarray([0.25, 0.75]),
     )
@@ -763,6 +775,7 @@ def test_generate_step_function_threads_jcm_3_clock_and_carry() -> None:
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
+    component.seaice_coupling = False
     component.save_interval = timedelta(days=2)
     component.coupling_timestep = timedelta(hours=12)
     component._dtype_policy = DTypePolicy()
@@ -963,6 +976,7 @@ def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
+    component.seaice_coupling = False
     component.spinup_time = timedelta(hours=6)
     component.model_timestep = timedelta(minutes=45)
     component.model = SimpleNamespace()
@@ -981,6 +995,7 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
+    component.seaice_coupling = False
     component.spinup_time = timedelta(hours=2)
     component.model_timestep = timedelta(hours=1)
     component.jitted = False
@@ -1055,6 +1070,7 @@ def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
+    component.seaice_coupling = False
     component.spinup_time = timedelta(hours=1)
     component.model_timestep = timedelta(hours=1)
     component.jitted = False
@@ -1166,6 +1182,7 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
+    component.seaice_coupling = False
     component.spinup_time = timedelta(hours=1)
     component.model_timestep = timedelta(hours=1)
     component.jitted = False
@@ -1233,6 +1250,7 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
+    component.seaice_coupling = False
     component.name = "ATM"
     component.grid = make_test_grid(name="atm")
     component._dtype_policy = DTypePolicy()
@@ -1483,18 +1501,32 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
             times=np.asarray([1.0]),
         ),
     ]
-    frames = tuple(
-        OutputFrame(
-            jax_gcm_output_module.jax_gcm_prediction_output_variables(
-                prediction,
-                coords=coords,
-                physics_module=physics_module,
-            ),
-            sample_dimension=jax_gcm_output_module.JAX_GCM_TIME_DIM,
-            time_dimension=jax_gcm_output_module.JAX_GCM_TIME_DIM,
-            dimension_order=jax_gcm_output_module.JAX_GCM_OUTPUT_DIMENSION_ORDER,
+    provider = jax_gcm_output_module.jax_gcm_output_provider(
+        SimpleNamespace(
+            seaice_coupling=False,
+            model=SimpleNamespace(coords=coords, physics=physics_module),
         )
-        for prediction in predictions
+    )
+    frames = tuple(
+        provider.sample(
+            OutputContext(
+                component=cast(Any, None),
+                state=cast(Any, None),
+                payload=SimpleNamespace(
+                    jcm_state=SimpleNamespace(
+                        dynamics={
+                            name: values[0]
+                            for name, values in prediction.dynamics.asdict().items()
+                        },
+                        physics={},
+                    )
+                ),
+                step=index,
+                time=datetime(2000, 1, 1) + timedelta(days=index),
+                dt=timedelta(days=1),
+            )
+        )
+        for index, prediction in enumerate(predictions)
     )
     accumulator = _accumulate_frames(frames)
     temperature_index = accumulator.names.index("temperature")
@@ -1578,18 +1610,32 @@ def test_jax_gcm_write_output_preserves_model_calendar_attrs(
             times=np.asarray([0.0]),
         )
     ]
-    frames = tuple(
-        OutputFrame(
-            jax_gcm_output_module.jax_gcm_prediction_output_variables(
-                prediction,
-                coords=coords,
-                physics_module=physics_module,
-            ),
-            sample_dimension=jax_gcm_output_module.JAX_GCM_TIME_DIM,
-            time_dimension=jax_gcm_output_module.JAX_GCM_TIME_DIM,
-            dimension_order=jax_gcm_output_module.JAX_GCM_OUTPUT_DIMENSION_ORDER,
+    provider = jax_gcm_output_module.jax_gcm_output_provider(
+        SimpleNamespace(
+            seaice_coupling=False,
+            model=SimpleNamespace(coords=coords, physics=physics_module),
         )
-        for prediction in predictions
+    )
+    frames = tuple(
+        provider.sample(
+            OutputContext(
+                component=cast(Any, None),
+                state=cast(Any, None),
+                payload=SimpleNamespace(
+                    jcm_state=SimpleNamespace(
+                        dynamics={
+                            name: values[0]
+                            for name, values in prediction.dynamics.asdict().items()
+                        },
+                        physics={},
+                    )
+                ),
+                step=index,
+                time=datetime(2000, 1, 1) + timedelta(days=index),
+                dt=timedelta(days=1),
+            )
+        )
+        for index, prediction in enumerate(predictions)
     )
     accumulator = _accumulate_frames(frames)
     variables = _period_variables(
@@ -1629,7 +1675,8 @@ def test_jax_gcm_snapshot_output_uses_final_runtime_payload_not_runtime_data(
     coords = _make_jax_gcm_output_coords()
     physics_module = _FakePhysicsModule()
     setup_state = SimpleNamespace(
-        model=SimpleNamespace(coords=coords, physics=physics_module)
+        seaice_coupling=False,
+        model=SimpleNamespace(coords=coords, physics=physics_module),
     )
     jcm_state = SimpleNamespace(
         dynamics={
@@ -1644,6 +1691,9 @@ def test_jax_gcm_snapshot_output_uses_final_runtime_payload_not_runtime_data(
             ),
         },
         physics={},
+    )
+    setup_state._state = SimpleNamespace(
+        dynamics={"temperature": np.full((3, 2, 3), -777.0)}, physics={}
     )
     component_state = ComponentRuntimeState(
         fields=FieldStore.from_mapping({"temperature": np.full((3, 2, 3), -999.0)}),
@@ -1685,11 +1735,29 @@ def test_jax_gcm_snapshot_output_uses_final_runtime_payload_not_runtime_data(
             ),
         )
 
+    # A setup resource may retain a conflicting mutable state. It cannot stand
+    # in for the immutable final runtime payload when that payload is absent.
+    missing_output = tmp_path / "ATM.missing-payload.nc"
+    with pytest.raises(ComponentError, match="ATM.*runtime payload"):
+        jax_gcm_output_module.write_jax_gcm_snapshot_output(
+            setup_state,
+            SnapshotContext(
+                component=cast(Any, None),
+                state=ComponentState._from_runtime("ATM", None, component_state),
+                payload=None,
+                output_path=missing_output,
+                time=datetime(2000, 1, 2),
+                logger=None,
+            ),
+        )
+    assert not missing_output.exists()
+
 
 def test_jax_gcm_output_provider_samples_post_step_payload() -> None:
     coords = _make_jax_gcm_output_coords()
     physics_module = _FakePhysicsModule()
     setup_state = SimpleNamespace(
+        seaice_coupling=False,
         model=SimpleNamespace(coords=coords, physics=physics_module),
     )
     jcm_state = SimpleNamespace(
@@ -1765,6 +1833,10 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
+    component.execution = "host"
+    component.uses_atmosphere_forcing = True
+    component.surface_forcing = "atmosphere"
+    component.export_open_water_surface = False
     component._veros_state = _make_flux_ready_veros_state()
     component.data = {
         "model_level_height": np.full((2, 2), 100.0),
@@ -2731,6 +2803,10 @@ def test_veros_initialize_validates_timestep_multiple() -> None:
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
+    component.execution = "host"
+    component.uses_atmosphere_forcing = True
+    component.surface_forcing = "atmosphere"
+    component.export_open_water_surface = False
     component.dt_tracer = 7.0
 
     with pytest.raises(ValueError, match="dt_tracer"):
@@ -2748,6 +2824,8 @@ def test_veros_initialize_spinup_follows_enabled_only(
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
+    component.execution = "host"
+    component.uses_atmosphere_forcing = True
     component.dt_tracer = 10.0
     component.do_spinup = do_spinup
     component.surface_forcing = "atmosphere"
@@ -2900,6 +2978,10 @@ def test_veros_host_runtime_owns_one_complete_copy_before_forcing(
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
+    component.execution = "host"
+    component.uses_atmosphere_forcing = True
+    component.surface_forcing = "atmosphere"
+    component.export_open_water_surface = False
     component.model_substeps = 2
     initial_native_state = _make_copyable_fake_veros_state(surface_temperature=12.0)
     component._veros_state = initial_native_state
@@ -3029,6 +3111,10 @@ def test_veros_step_requires_native_runtime_payload() -> None:
     resources = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
+    resources.execution = "host"
+    resources.uses_atmosphere_forcing = True
+    resources.surface_forcing = "atmosphere"
+    resources.export_open_water_surface = False
     context = StepContext(dt_seconds=20.0, time=None, logger=None)
 
     with pytest.raises(ComponentError, match="native runtime payload"):
@@ -3041,6 +3127,8 @@ def test_veros_acc_jax_step_uses_internal_forcing_without_host_logging(
     resources = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
+    resources.surface_forcing = "atmosphere"
+    resources.export_open_water_surface = False
     resources.name = "OCN"
     resources.execution = "jax"
     resources.uses_atmosphere_forcing = False
@@ -3084,6 +3172,10 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
     component = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
+    component.execution = "host"
+    component.uses_atmosphere_forcing = True
+    component.surface_forcing = "atmosphere"
+    component.export_open_water_surface = False
     component.model_substeps = 0
     component._veros_state = _make_copyable_fake_veros_state(surface_temperature=12.0)
     component.name = "OCN"

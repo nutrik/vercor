@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from functools import partial
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Literal
 
 import jax
 import jax.numpy as jnp
@@ -146,26 +146,3 @@ def prepare_veris_forcing_pack(
     return VerisForcingPack(
         forcing, jnp.where(west_wet, tau_u, 0.0).T, jnp.where(south_wet, tau_v, 0.0).T
     )
-
-
-@partial(jax.jit, static_argnames=("dtype", "atmosphere_forcing"))
-def prepare_veris_forcing(
-    fields: Mapping[str, RuntimeArray],
-    *,
-    ocean_mask: RuntimeArray,
-    constants: PhysicalConstants,
-    dtype: DTypePolicy,
-    atmosphere_forcing: Literal["observed_10m", "model_level"] = "observed_10m",
-) -> dict[str, RuntimeArray]:
-    """Return prescribed native forcing through the shared single-bulk packer."""
-    pack = cast(
-        VerisForcingPack,
-        prepare_veris_forcing_pack(
-            fields,
-            ocean_mask=ocean_mask,
-            constants=constants,
-            dtype=dtype,
-            atmosphere_forcing=atmosphere_forcing,
-        ),
-    )
-    return pack.native_forcing

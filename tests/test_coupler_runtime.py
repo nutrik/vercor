@@ -236,6 +236,7 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
     state = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
+    state.seaice_coupling = False
     state.open_water_albedo = jnp.asarray(0.07)
     state.name = "ATM"
     state.grid = grid

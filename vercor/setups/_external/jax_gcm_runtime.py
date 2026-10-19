@@ -180,7 +180,7 @@ def prefill_jax_gcm_runtime_fields(
         data.setdefault(
             name, jax_full(component.grid.shape, value, state._dtype_policy)
         )
-    if getattr(state, "seaice_coupling", False):
+    if state.seaice_coupling:
         for name in (
             *_jax_gcm_fields.JAXGCM_COUPLED_INPUT_GRID_FIELD_NAMES,
             *_jax_gcm_fields.JAXGCM_COUPLED_OUTPUT_GRID_FIELD_NAMES,
@@ -208,7 +208,7 @@ def validate_jax_gcm_runtime_state(
         )
 
     required: tuple[str, ...] = _jax_gcm_fields.JAXGCM_REQUIRED_GRID_FIELD_NAMES
-    if getattr(state, "seaice_coupling", False):
+    if state.seaice_coupling:
         required = (
             *required,
             *_jax_gcm_fields.JAXGCM_COUPLED_INPUT_GRID_FIELD_NAMES,
@@ -388,7 +388,7 @@ def step_jax_gcm_runtime(
     )
 
     surface_fields: dict[str, Any]
-    if getattr(state, "seaice_coupling", False):
+    if state.seaice_coupling:
         from vercor.setups._external.jax_gcm_surface import CoupledJCMForcing
 
         composed = _jax_gcm_fields.prepare_coupled_surface_forcing(
