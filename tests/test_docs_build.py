@@ -48,6 +48,7 @@ PROJECT_RESOURCE_PAGES = (
     "release-notes-0.4.5",
     "release-notes-0.4.6",
     "releasing",
+    "source-coupling-audit",
 )
 
 

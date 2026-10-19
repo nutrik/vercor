@@ -371,3 +371,12 @@ Shared JCM period files add canonical ``sea_surface_temperature`` (K),
 native diagnostics remain available. Output is owned by the existing shared
 coordinator. The two-day global smoke and smooth native AD tests establish
 functional coupling and derivative behavior, not long-term climate accuracy.
+
+Source and coupling audit
+-------------------------
+
+The maintained :doc:`source-coupling-audit` records the current gallery route
+owners and removed no-op recipes. Prescribed producers declare no physical
+feedback inputs; the data gallery declares and displays diagnostic imports
+explicitly. Native geometry, vapor species and timing requirements remain part
+of each model boundary.

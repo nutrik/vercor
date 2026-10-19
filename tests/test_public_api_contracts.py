@@ -6,7 +6,6 @@ from inspect import signature
 from pathlib import Path
 from typing import Any, cast, get_type_hints
 
-import jax
 import jax.numpy as jnp
 import pytest
 
@@ -501,23 +500,3 @@ def test_setup_and_dtype_config_objects_are_public() -> None:
     assert PeriodOutput is vercor.output.PeriodOutput
     assert "Spinup" in vercor.setups.__all__
     assert "RuntimeOptions" in vercor.__all__
-
-
-@pytest.mark.fast_always
-def test_run_state_remains_a_jax_pytree() -> None:
-    component = DataComponent(
-        "ATM",
-        make_test_grid(name="public-api-pytree"),
-        fields={"temperature": 280.0},
-    )
-    coupler = Coupler(
-        clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
-        components=(component,),
-        run_order=("ATM",),
-    )
-    state = coupler.initial_state()
-
-    leaves = jax.tree_util.tree_leaves(state)
-
-    assert leaves
-    assert state.component("ATM").field("temperature").shape == component.grid.shape

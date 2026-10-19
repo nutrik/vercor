@@ -498,19 +498,6 @@ def test_constructor_normalizes_log_level_before_configuring_custom_logger() -> 
     [
         (("MODEL", "MODEL"), "Duplicate run-order component.*MODEL"),
         (("UNKNOWN",), "Unknown run-order component.*UNKNOWN"),
-    ],
-)
-def test_constructor_rejects_invalid_nonempty_run_order(
-    run_order: tuple[str, ...],
-    message: str,
-) -> None:
-    with pytest.raises(CouplerError, match=message):
-        Coupler(_clock(), components=(_component(),), run_order=run_order)
-
-
-@pytest.mark.parametrize(
-    ("run_order", "message"),
-    [
         (None, "run_order must be a sequence"),
         ("MODEL", "run_order must be a sequence"),
         ({"MODEL"}, "run_order must be a sequence"),

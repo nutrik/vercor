@@ -124,3 +124,10 @@ Slab factories declare only fields read by their existing kernels. Layer 6
 recipes and galleries retain physical routes and explicit diagnostic routes.
 The test-only coastal case data is shared by dispatch and substitution tests;
 no production field registry or new runtime layer is introduced.
+
+Final source audit (2026-10-19): all 179 Python modules are retained in their
+existing layers; 164 non-gallery modules are enumerated above and the 15 gallery
+modules form the application layer. Task 8 changes tests/documentation only.
+The complete inventory, remaining adapters with actual callers, and removal
+decisions are in `docs/source-coupling-audit.md`. No new runtime dependency or
+alternate preparation/output path is introduced.

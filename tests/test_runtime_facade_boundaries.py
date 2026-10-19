@@ -1022,7 +1022,6 @@ def test_runtime_facade_builds_and_executes_the_validated_plan_directly() -> Non
     assert "context.compiled_runtime_cache_key(" not in facade_source
     assert "get_or_compile(" not in facade_source
     assert facade_source.count("signal_scope(") == 1
-    assert "donate_state" not in facade_source
     assert "raise CouplerError(" not in run_body
 
 

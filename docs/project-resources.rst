@@ -19,3 +19,10 @@ authoring and released versions.
    release-notes-0.4.5
    release-notes-0.4.6
    releasing
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Maintained architecture records
+
+   source-coupling-audit
