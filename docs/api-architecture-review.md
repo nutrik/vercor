@@ -365,8 +365,13 @@ calls.
 - Output: `vercor.output._dataset`, `_netcdf`, `_period`, `_runtime`, and
   `_session`.
 
-The component adapter is the only declaration-to-runtime normalization
-boundary. The output session is the only cadence and mean-accumulation owner;
+The component adapter is the only declaration-to-runtime preparation
+boundary. It checks structural step signatures and binds their public method
+directly; callable arity normalization belongs only to CallableComponent.
+Contracts are prepared once with validated endpoints, topology is constructed
+from declared factories and policy, and supplied RunState values always pass
+the prepared schema validation. The output session is the only cadence and
+mean-accumulation owner;
 `_netcdf` is the only file-writing primitive. There is no hidden output marker,
 second component adapter, duplicate accumulator, or native period-file path.
 

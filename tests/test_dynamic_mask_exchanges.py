@@ -583,9 +583,7 @@ def test_binary_contract_metadata_survives_incoming_and_self_routes() -> None:
         ),
         Exchange("MID", "MID", ("c",), quantity="intensive"),
     )
-    contract = build_exchange_contracts(
-        ("SRC", "MID", "DST"), routes, validate_endpoints=True
-    )["MID"]
+    contract = build_exchange_contracts(("SRC", "MID", "DST"), routes)["MID"]
     assert contract.receives == ("a", "c")
     assert contract.sends == ("b", "c")
     assert contract.binary_sends == ("b",)

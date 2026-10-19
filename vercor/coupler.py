@@ -255,11 +255,6 @@ class Coupler:
             )
         return self._prepared
 
-    def _initialize_runtime(self) -> None:
-        """Prepare components, topology, contracts, and runtime dispatch once."""
-
-        self._ensure_prepared()
-
     def initial_state(self, *, prefill_missing: bool = True) -> _RunState:
         """Create and validate the coupled runtime state."""
 

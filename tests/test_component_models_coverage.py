@@ -319,7 +319,6 @@ def test_jcm_land_exchange_recipe_fields_are_declared() -> None:
                 regridder_factory=bilinear,
             ),
         ),
-        validate_endpoints=True,
     )
 
     assert contracts["LND"].receives == ()
@@ -394,7 +393,6 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
     contracts = build_exchange_contracts(
         tuple(components),
         exchanges,
-        validate_endpoints=True,
     )
 
     assert contracts["ATM"].receives == _DATA_ATMOSPHERE_INPUTS
@@ -434,7 +432,6 @@ def test_public_data_ocean_recipe_fields_are_declared_by_data_factories(
                 regridder_factory=bilinear,
             ),
         ),
-        validate_endpoints=True,
     )
 
     assert contracts["OCN"].receives == _DATA_OCEAN_PUBLIC_RECIPE_INPUTS
@@ -497,7 +494,6 @@ def test_slab_driver_exchange_recipes_are_declared_by_slab_factories() -> None:
                 regridder_factory=conservative,
             ),
         ),
-        validate_endpoints=True,
     )
 
     assert contracts["ATM"].receives == (

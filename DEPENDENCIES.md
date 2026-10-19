@@ -95,6 +95,13 @@ surface fields; lifecycle/runtime layers install the term and carry arrays.
     upper bound is overridden for the released Veris 0.2.1 combined lane.
     `tests/test_native_dependency_install.py` guards the exact exception.
 
+Runtime contracts are built once with endpoint and fan-in validation. The state
+builder requires those prepared contracts; supplied state is always validated.
+Structural component steps bind directly after their three-argument protocol
+signature is checked at preparation; only CallableComponent normalizes author
+callable arities. Topology is built from declared factories and policy, and
+policy contexts expose the original author objects retained by bindings.
+
 The existing component declaration layer owns fractional coverage, topology owns
 only binary route restrictions, and the runtime mask resolver feeds the single
 scalar/vector quantity dispatcher. No parallel mask framework is introduced.

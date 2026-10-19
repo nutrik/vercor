@@ -24,7 +24,6 @@ def runtime_state_from_components(
     topology_maps = prepared.topology_maps
     runtime_state = _runtime_state_from_components(
         prepared.components,
-        prepared.exchanges,
         topology_maps.binary_masks,
         contracts=prepared.contracts,
         prefill_missing=prefill_missing,
@@ -84,7 +83,6 @@ def prepare_runtime_state(
     initial_state: RunState | None,
     *,
     prepared: PreparedCoupling,
-    validate_state: bool = True,
 ) -> RunState:
     """Return a runtime state ready for execution."""
 
@@ -98,11 +96,10 @@ def prepare_runtime_state(
             "Coupler.run state must be a RunState or None; "
             f"got {type(initial_state).__name__}."
         )
-    if validate_state:
-        validate_runtime_state(
-            initial_state,
-            prepared=prepared,
-        )
+    validate_runtime_state(
+        initial_state,
+        prepared=prepared,
+    )
     return refresh_runtime_masks(initial_state, context=prepared.dispatch_context)
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from typing import Any, Literal, NamedTuple, cast
 
@@ -52,6 +53,7 @@ from vercor.grids import RectilinearGrid
 from vercor.physics import PhysicalConstants
 from vercor.regridding import bilinear, conservative
 from vercor.runtime import RuntimeOptions
+from vercor._runtime.topology_state import RuntimeTopologyMaps
 from vercor._runtime.state import ComponentRuntimeState
 from vercor._runtime.preparation import (
     validate_runtime_state as validate_prepared_runtime_state,
@@ -60,7 +62,6 @@ from vercor.state import RunState
 from vercor._runtime.stores import FieldStore
 from tests._runtime_helpers import (
     create_runtime_state_from_coupler,
-    replace_runtime_topology_maps,
     run_scanned_coupler,
 )
 
@@ -432,20 +433,6 @@ def _make_coupler(steps: int) -> Coupler:
             "ICE",
         ),
     )
-    key = "OCN->ATM"
-    regridders = cast(
-        Any,
-        {
-            key: _IdentityRegridder(),
-            "ATM->OCN": _IdentityRegridder(),
-            "ATM->LND": _IdentityRegridder(),
-            "OCN->ICE": _IdentityRegridder(),
-        },
-    )
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=regridders,
-    )
     return coupler
 
 
@@ -534,7 +521,7 @@ def _make_initialized_slab_coupler(steps: int) -> Coupler:
         exchanges=exchanges,
         run_order=("ATM", "OCN", "LND", "ICE"),
     )
-    coupler._initialize_runtime()
+    coupler._ensure_prepared()
     return coupler
 
 
@@ -650,7 +637,7 @@ def _make_initialized_mixed_grid_slab_coupler(steps: int) -> Coupler:
         exchanges=exchanges,
         run_order=("ATM", "OCN", "LND", "ICE"),
     )
-    coupler._initialize_runtime()
+    coupler._ensure_prepared()
     return coupler
 
 
@@ -981,7 +968,7 @@ def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None
         ),
         run_order=("OCN", "LND", "ATM"),
     )
-    coupler._initialize_runtime()
+    coupler._ensure_prepared()
 
     final_state = coupler.run()
     ocean_state = final_state._component_state("OCN")
@@ -1136,17 +1123,6 @@ def test_data_forcing_components_run_inside_runtime() -> None:
             "ATM",
         ),
     )
-    regridders = cast(
-        Any,
-        {
-            "OCN->ATM": _IdentityRegridder(),
-            "LND->ATM": _IdentityRegridder(),
-        },
-    )
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=regridders,
-    )
 
     initial_state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1235,11 +1211,6 @@ def test_public_data_component_monthly_output_validates_and_sends_runtime_slice(
             "ATM",
         ),
     )
-    key = "OCN->ATM"
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=cast(Any, {key: _IdentityRegridder()}),
-    )
 
     initial_state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
     ocean_state = initial_state._component_state("OCN")
@@ -1294,11 +1265,6 @@ def test_daily_data_forcing_sends_time_slice_to_slab_component_with_real_regridd
             "OCN",
             "ATM",
         ),
-    )
-    key = "OCN->ATM"
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=cast(Any, {key: bilinear(grid, grid)}),
     )
     initial_state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1360,7 +1326,6 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
             "ATM",
         ),
     )
-    key = "OCN->ATM"
     regridder = bilinear(ocean_grid, atmosphere_grid)
     cast(Any, atmosphere)._data = {
         "temperature_2m": jnp.full(atmosphere_grid.shape, 288.15, dtype=jnp.float64),
@@ -1370,10 +1335,6 @@ def test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_r
         "v_velocity_10m": jnp.zeros(atmosphere_grid.shape, dtype=jnp.float64),
         "sea_surface_temperature": jnp.zeros(atmosphere_grid.shape, dtype=jnp.float64),
     }
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=cast(Any, {key: regridder}),
-    )
 
     initial_state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1464,11 +1425,6 @@ def test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad() 
             "ATM",
         ),
     )
-    key = "LND->ATM"
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=cast(Any, {key: bilinear(grid, grid)}),
-    )
 
     initial_state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1558,11 +1514,6 @@ def test_noleap_daily_forcing_replays_calendar_slice_under_jit_and_grad() -> Non
             "ATM",
         ),
     )
-    key = "LND->ATM"
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=cast(Any, {key: _IdentityRegridder()}),
-    )
 
     initial_state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -1650,11 +1601,6 @@ def test_360_day_daily_forcing_matches_host_calendar_mapping_under_jit_and_grad(
             "LND",
             "ATM",
         ),
-    )
-    key = "LND->ATM"
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=cast(Any, {key: _IdentityRegridder()}),
     )
     _, runtime_time, _ = next(coupler.clock.iter())
     expected_index = daily_forcing_index(
@@ -1752,11 +1698,6 @@ def test_monthly_forcing_wraps_year_boundary_under_jit_and_grad() -> None:
             "OCN",
             "ATM",
         ),
-    )
-    key = "OCN->ATM"
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=cast(Any, {key: _IdentityRegridder()}),
     )
     # Half a day before January 1 in a 365-day year, with 12 centered records.
     left_index, right_index = 11, 0
@@ -2262,11 +2203,6 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
             "ATM",
         ),
     )
-    key = "OCN->ATM"
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=cast(Any, {key: _IdentityRegridder()}),
-    )
 
     initial_state = create_runtime_state_from_coupler(coupler, prefill_missing=True)
     final_state = jax.jit(lambda state: run_scanned_coupler(coupler, state))(
@@ -2470,7 +2406,13 @@ def test_scanned_runtime_rejects_veros_runtime_boundary() -> None:
 def test_run_validates_regridders_and_fractional_masks() -> None:
     coupler = _make_coupler(steps=1)
     state = _make_initial_state(coupler, jnp.full((2, 2), 286.15, dtype=jnp.float64))
-    replace_runtime_topology_maps(coupler, regridders={})
+    prepared = coupler._ensure_prepared()
+    coupler._prepared = replace(
+        prepared,
+        topology_maps=RuntimeTopologyMaps(
+            regridders={}, binary_masks=prepared.topology_maps.binary_masks
+        ),
+    )
 
     with pytest.raises(CouplerError, match="initialized regridder"):
         run_scanned_coupler(coupler, state)
@@ -2904,10 +2846,6 @@ def test_runtime_store_finiteness_uses_route_mask_only_for_inbound_stores() -> N
     fractional_masks["OCN->ATM"] = jnp.asarray(
         [[1.0, 0.0], [1.0, 1.0]],
         dtype=jnp.float64,
-    )
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=prepared.topology_maps.regridders,
     )
     prepared = coupler._ensure_prepared()
     state = create_runtime_state_from_coupler(coupler, prefill_missing=True)

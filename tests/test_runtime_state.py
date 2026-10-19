@@ -234,7 +234,6 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "def _runtime_daily_index" not in coupler_source
     assert "def _build_exchange_contracts" not in coupler_source
     assert "class ExchangeContract" in runtime_contracts_source
-    assert "def flatten_exchange_fields" in runtime_contracts_source
     assert "def append_unique_runtime_fields" in runtime_contracts_source
     assert "def build_exchange_contracts" in runtime_contracts_source
     assert "def exchange_key" not in runtime_contracts_source
@@ -360,12 +359,11 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "def receive_runtime_fields" in runtime_field_transfer_source
     assert "def send_runtime_fields" in runtime_field_transfer_source
     assert "def validate_component_runtime_contract_fields" in runtime_validation_source
-    assert "def check_not_empty_import_export_lists" in runtime_validation_source
     assert "def validate_exchange_fields_declared" in runtime_validation_source
-    assert "prepare_component," in runtime_initialization_source
+    assert "import prepare_component" in runtime_initialization_source
     assert "name: prepare_component(" in runtime_initialization_source
     assert "def initialize_coupler_runtime(" in runtime_initialization_source
-    assert "from vercor.components._adapter import (" in runtime_initialization_source
+    assert "from vercor.components._adapter import" in runtime_initialization_source
     assert "validate_component_contract" not in runtime_initialization_source
     assert "from vercor.components.setup_validation import" not in (
         runtime_initialization_source
@@ -605,34 +603,23 @@ def test_prepared_runtime_fields_are_frozen_and_read_only() -> None:
 
 
 @pytest.mark.fast_always
-def test_runtime_topology_maps_copying_stays_at_exchange_topology_boundary() -> None:
-    topology_state_source = Path("vercor/_runtime/topology_state.py").read_text(
-        encoding="utf-8"
-    )
-    exchange_topology_source = Path("vercor/_runtime/exchange_topology.py").read_text(
-        encoding="utf-8"
-    )
-
-    assert "def from_mappings(" not in topology_state_source
-    assert "RuntimeTopologyMaps.from_mappings" not in exchange_topology_source
-    assert "regridders = {}" in exchange_topology_source
-
-    regridders = cast(Any, {"ATM->OCN": object()})
-    binary_masks: dict[str, RuntimeArray] = {"ATM->OCN": jnp.ones((2, 2))}
+def test_runtime_topology_maps_copy_and_freeze_input_mappings() -> None:
+    regridder = object()
+    regridders = cast(Any, {"ATM->OCN": regridder})
+    mask = jnp.ones((2, 2))
+    binary_masks: dict[str, RuntimeArray] = {"ATM->OCN": mask}
     topology_maps = RuntimeTopologyMaps(
         regridders=regridders,
         binary_masks=binary_masks,
     )
-
-    copied = RuntimeTopologyMaps(
-        regridders=dict(topology_maps.regridders),
-        binary_masks=dict(topology_maps.binary_masks),
-    )
-
-    assert copied.regridders == topology_maps.regridders
-    assert copied.binary_masks == topology_maps.binary_masks
-    assert copied.regridders is not topology_maps.regridders
-    assert copied.binary_masks is not topology_maps.binary_masks
+    regridders.clear()
+    binary_masks.clear()
+    assert topology_maps.regridders["ATM->OCN"] is regridder
+    assert topology_maps.binary_masks["ATM->OCN"] is mask
+    with pytest.raises(TypeError):
+        topology_maps.regridders["extra"] = object()  # type: ignore[index]
+    with pytest.raises(TypeError):
+        topology_maps.binary_masks["extra"] = mask  # type: ignore[index]
 
 
 def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:

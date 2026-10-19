@@ -21,7 +21,6 @@ from tests._coverage_support import (
     make_test_grid,
 )
 from tests._runtime_helpers import (
-    replace_runtime_topology_maps,
     run_scanned_coupler,
     runtime_state_from_coupler_components,
 )
@@ -54,7 +53,6 @@ from vercor._runtime.surface_masks import (
     validate_land_mask_consistency,
 )
 from vercor.state import ComponentState
-from vercor._runtime.topology import build_exchange_topology
 from vercor._runtime.topology_state import RuntimeTopologyMaps
 from vercor.topology import SurfaceMaskPolicy
 
@@ -241,6 +239,7 @@ def _topology_components() -> dict[str, DataComponent]:
             name="ATM",
             grid=make_test_grid(name="atm"),
             fields={"temperature": 0.0},
+            spec=ComponentSpec(inputs=("soil_moisture",)),
         ),
         "OCN": DataComponent(
             name="OCN",
@@ -253,9 +252,29 @@ def _topology_components() -> dict[str, DataComponent]:
         "LND": DataComponent(
             name="LND",
             grid=make_test_grid(name="lnd", binary_mask=lnd_mask),
-            fields={"temperature": 0.0},
+            fields={"temperature": 0.0, "soil_moisture": 0.0},
         ),
     }
+
+
+def _prepare_topology(
+    *,
+    components: dict[str, DataComponent],
+    exchanges: Any,
+    dtype: DTypePolicy,
+    logger: Any,
+    topology_policy: Any = None,
+) -> RuntimeTopologyMaps:
+    return (
+        make_coupler(
+            components=tuple(components.values()),
+            exchanges=exchanges,
+            runtime=RuntimeOptions(dtype=dtype, topology=topology_policy),
+            logger=logger,
+        )
+        ._ensure_prepared()
+        .topology_maps
+    )
 
 
 def _dispatch_runtime_fields(
@@ -759,7 +778,7 @@ def test_coupler_initialize_happy_path_builds_unique_regridders_and_supports_x64
         "create_surface_exchange_masks",
         fake_create_surface_exchange_masks,
     )
-    coupler._initialize_runtime()
+    coupler._ensure_prepared()
 
     assert coupler.runtime.dtype.enable_x64 is True
     assert len(created_keys) == 6
@@ -814,7 +833,7 @@ def test_build_exchange_topology_returns_runtime_topology_maps(
         ),
     )
 
-    topology_maps = build_exchange_topology(
+    topology_maps = _prepare_topology(
         components=cast(Any, components),
         exchanges=(exchange,),
         dtype=DTypePolicy(),
@@ -837,7 +856,7 @@ def test_build_exchange_topology_defaults_to_target_active_domain() -> None:
         regridder_factory=bilinear,
     )
 
-    topology_maps = build_exchange_topology(
+    topology_maps = _prepare_topology(
         components=cast(Any, components),
         exchanges=(exchange,),
         dtype=DTypePolicy(),
@@ -874,9 +893,9 @@ def test_build_exchange_topology_rejects_duplicate_topology_keys() -> None:
     )
     with pytest.raises(
         CouplerError,
-        match="Duplicate exchange route ID 'OCN->ATM'",
+        match="Exchange route ID 'OCN->ATM'.*unique",
     ):
-        build_exchange_topology(
+        _prepare_topology(
             components=cast(Any, components),
             exchanges=exchanges,
             dtype=DTypePolicy(),
@@ -914,7 +933,7 @@ def test_surface_mask_policy_uses_one_build_protocol(
         ),
     )
 
-    build_exchange_topology(
+    _prepare_topology(
         components=cast(Any, components),
         exchanges=(exchange,),
         dtype=DTypePolicy(),
@@ -926,9 +945,7 @@ def test_surface_mask_policy_uses_one_build_protocol(
 
 
 @pytest.mark.fast_always
-def test_build_exchange_topology_does_not_mutate_existing_mappings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_prepared_topology_keeps_declared_route_maps_immutable() -> None:
     components = _topology_components()
     exchange = Exchange(
         quantity="intensive",
@@ -937,42 +954,19 @@ def test_build_exchange_topology_does_not_mutate_existing_mappings(
         fields=["soil_moisture"],
         regridder_factory=bilinear,
     )
-    seeded_route = "seeded"
-    seeded_regridder = object()
-    seeded_binary_mask = np.ones((2, 2))
-    existing_regridders: dict[str, Any] = {seeded_route: seeded_regridder}
-    existing_binary_masks: dict[str, Any] = {seeded_route: seeded_binary_mask}
-    monkeypatch.setattr(
-        surface_masks_module,
-        "create_surface_exchange_masks",
-        lambda *args, **kwargs: (
-            np.zeros((2, 2)),
-            np.full((2, 2), 0.75),
-            np.asarray([[1.0, 0.0], [0.0, 1.0]]),
-        ),
-    )
-
-    topology_maps = build_exchange_topology(
-        components=cast(Any, components),
+    maps = _prepare_topology(
+        components=components,
         exchanges=(exchange,),
-        topology_maps=RuntimeTopologyMaps(
-            regridders=existing_regridders,
-            binary_masks=existing_binary_masks,
-        ),
         dtype=DTypePolicy(),
-        topology_policy=SurfaceMaskPolicy(),
-        logger=cast(Any, _RecordingLogger()),
+        logger=_RecordingLogger(),
     )
-
-    assert existing_regridders == {seeded_route: seeded_regridder}
-    assert existing_binary_masks[seeded_route] is seeded_binary_mask
-    assert topology_maps.regridders is not existing_regridders
-    assert topology_maps.regridders[seeded_route] is seeded_regridder
-    assert topology_maps.binary_masks[seeded_route] is seeded_binary_mask
-    assert_allclose_compact(
-        topology_maps.binary_masks["LND->ATM"],
-        np.asarray([[1.0, 0.0], [0.0, 1.0]]),
-    )
+    assert set(maps.regridders) == {"LND->ATM"}
+    assert set(maps.binary_masks) == {"LND->ATM"}
+    with pytest.raises(TypeError):
+        maps.regridders["extra"] = object()  # type: ignore[index]
+    with pytest.raises(TypeError):
+        maps.binary_masks["extra"] = np.ones((2, 2))  # type: ignore[index]
+    assert_allclose_compact(maps.binary_masks["LND->ATM"], np.ones((2, 2)))
 
 
 def test_validate_land_mask_consistency_rejects_shape_and_value_mismatches() -> None:
@@ -1191,7 +1185,12 @@ def test_runtime_field_dispatch_handles_scalar_and_vector_paths() -> None:
         target="ATM",
         fields=["temperature"],
         route_id="ocn-atm-scalar",
-        regridder_factory=bilinear,
+        regridder_factory=cast(
+            Any,
+            lambda source_grid, target_grid: RecordingRegridder(
+                source_grid=source_grid, target_grid=target_grid
+            ),
+        ),
     )
     vector_exchange = Exchange(
         quantity="intensive",
@@ -1199,27 +1198,21 @@ def test_runtime_field_dispatch_handles_scalar_and_vector_paths() -> None:
         target="ATM",
         fields=[vector("u_velocity", "v_velocity")],
         route_id="ocn-atm-vector",
-        regridder_factory=bilinear,
+        regridder_factory=cast(
+            Any,
+            lambda source_grid, target_grid: RecordingRegridder(
+                vector_result=(
+                    np.full((2, 2), 9.0),
+                    np.full((2, 2), -9.0),
+                ),
+                source_grid=source_grid,
+                target_grid=target_grid,
+            ),
+        ),
     )
     coupler = make_coupler(
         components=(cast(Any, source), cast(Any, destination)),
         exchanges=(scalar_exchange, vector_exchange),
-    )
-    regridders = cast(
-        Any,
-        {
-            "ocn-atm-scalar": RecordingRegridder(),
-            "ocn-atm-vector": RecordingRegridder(
-                vector_result=(
-                    np.full((2, 2), 9.0),
-                    np.full((2, 2), -9.0),
-                )
-            ),
-        },
-    )
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=regridders,
     )
 
     runtime_state = _dispatch_runtime_fields(
@@ -1261,19 +1254,16 @@ def test_runtime_field_dispatch_accepts_mixed_numpy_and_jax_arrays() -> None:
         source="OCN",
         target="ATM",
         fields=["temperature"],
-        regridder_factory=bilinear,
+        regridder_factory=cast(
+            Any,
+            lambda source_grid, target_grid: RecordingRegridder(
+                source_grid=source_grid, target_grid=target_grid
+            ),
+        ),
     )
     coupler = make_coupler(
         components=(cast(Any, source), cast(Any, destination)),
         exchanges=(exchange,),
-    )
-    regridders = cast(
-        Any,
-        {"OCN->ATM": RecordingRegridder()},
-    )
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=regridders,
     )
 
     runtime_state = _dispatch_runtime_fields(
@@ -1306,19 +1296,18 @@ def test_runtime_field_dispatch_rejects_missing_scalar_and_vector_fields() -> No
         source="OCN",
         target="ATM",
         fields=["temperature"],
-        regridder_factory=bilinear,
+        regridder_factory=cast(
+            Any,
+            lambda source_grid, target_grid: RecordingRegridder(
+                scalar_result=np.ones((2, 2)),
+                source_grid=source_grid,
+                target_grid=target_grid,
+            ),
+        ),
     )
     coupler = make_coupler(
         components=(cast(Any, scalar_source), cast(Any, scalar_destination)),
         exchanges=(scalar_exchange,),
-    )
-    regridders = cast(
-        Any,
-        {"OCN->ATM": RecordingRegridder(scalar_result=np.ones((2, 2)))},
-    )
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=regridders,
     )
 
     with pytest.raises(ExchangeError, match="Field.*temperature.*not present"):
@@ -1344,23 +1333,18 @@ def test_runtime_field_dispatch_rejects_missing_scalar_and_vector_fields() -> No
         source="OCN",
         target="ATM",
         fields=[vector("u_velocity", "v_velocity")],
-        regridder_factory=bilinear,
+        regridder_factory=cast(
+            Any,
+            lambda source_grid, target_grid: RecordingRegridder(
+                vector_result=(np.ones((2, 2)), np.ones((2, 2))),
+                source_grid=source_grid,
+                target_grid=target_grid,
+            ),
+        ),
     )
     coupler = make_coupler(
         components=(cast(Any, vector_source), cast(Any, vector_destination)),
         exchanges=(vector_exchange,),
-    )
-    regridders = cast(
-        Any,
-        {
-            "OCN->ATM": RecordingRegridder(
-                vector_result=(np.ones((2, 2)), np.ones((2, 2)))
-            )
-        },
-    )
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=regridders,
     )
 
     with pytest.raises(ExchangeError, match="Field.*not present"):

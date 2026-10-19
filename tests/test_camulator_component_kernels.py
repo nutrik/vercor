@@ -1576,7 +1576,6 @@ def test_camulator_land_declares_radiation_exchange_inputs(
                 fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
             ),
         ),
-        validate_endpoints=True,
     )
 
     assert contracts["LND"].receives == radiation_fields

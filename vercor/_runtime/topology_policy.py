@@ -32,10 +32,7 @@ def build_topology_context(
     """Return public topology-policy context from private runtime inputs."""
 
     public_components = MappingProxyType(
-        {
-            name: getattr(component, "_component", component)
-            for name, component in components.items()
-        }
+        {name: component._component for name, component in components.items()}
     )
     return TopologyContext(
         components=public_components,

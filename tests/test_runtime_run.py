@@ -15,9 +15,6 @@ import pytest
 
 from tests.assertions import assert_allclose_compact
 from tests._coverage_support import make_test_grid
-from tests._runtime_helpers import (
-    replace_runtime_topology_maps,
-)
 from vercor.clock import Clock
 from vercor.components import CallableComponent, Component, ComponentSpec
 from vercor.exceptions import ComponentError, CouplerError
@@ -127,19 +124,6 @@ def _make_coupler(steps: int) -> Coupler:
             "LND",
             "ICE",
         ),
-    )
-    regridders = cast(
-        Any,
-        {
-            "OCN->ATM": _IdentityRegridder(),
-            "ATM->OCN": _IdentityRegridder(),
-            "ATM->LND": _IdentityRegridder(),
-            "OCN->ICE": _IdentityRegridder(),
-        },
-    )
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=regridders,
     )
     return coupler
 
