@@ -689,3 +689,52 @@ def test_runtime_options_accept_custom_execution_backend() -> None:
         final_state.component("MODEL").field("temperature"),
         jnp.full(grid.shape, 301.0),
     )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "step",
+    (
+        lambda fields: {},
+        lambda fields, context: {},
+        lambda fields, context, payload, extra: {},
+        lambda fields, context, *, payload: {},
+    ),
+)
+def test_structural_step_requires_protocol_signature_at_preparation(step: Any) -> None:
+    candidate = SimpleNamespace(
+        name="MODEL",
+        grid=make_test_grid(name="invalid-structural-step"),
+        spec=ComponentSpec(),
+        step=step,
+    )
+    coupler = Coupler(
+        Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
+        components=(candidate,),
+        run_order=("MODEL",),
+        runtime=RuntimeOptions(topology=None),
+    )
+    with pytest.raises(CouplerError, match="MODEL.*step.*fields.*context.*payload"):
+        coupler.initial_state()
+
+
+@pytest.mark.fast_always
+def test_structural_step_ignores_private_callable_convenience_attributes() -> None:
+    candidate = SimpleNamespace(
+        name="MODEL",
+        grid=make_test_grid(name="structural-direct-step"),
+        spec=ComponentSpec(outputs=("value",)),
+        step=lambda fields, context, payload: {"value": jnp.full((2, 2), 7.0)},
+        _normalized_step=lambda fields, context, payload: {
+            "value": jnp.full((2, 2), 99.0)
+        },
+    )
+    coupler = Coupler(
+        Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
+        components=(candidate,),
+        run_order=("MODEL",),
+        runtime=RuntimeOptions(topology=None),
+    )
+    assert_allclose_compact(
+        coupler.run().component("MODEL").field("value"), jnp.full((2, 2), 7.0)
+    )

@@ -17,11 +17,10 @@ from tests.assertions import assert_allclose_compact
 import vercor.diagnostics as diagnostics_module
 import vercor._runtime.surface_masks as surface_masks_module
 from vercor.exceptions import CouplerError
-from vercor.fields import vector
+from vercor.fields import vector, _flatten_field_items
 from vercor.grids import RectilinearGrid
 from vercor._runtime.contracts import (
     append_unique_runtime_fields,
-    flatten_exchange_fields,
 )
 from vercor._runtime.state import ComponentRuntimeState
 from vercor._runtime.stores import FieldStore
@@ -58,7 +57,7 @@ def test_test_environment_uses_writable_plotting_cache_defaults() -> None:
 
 
 def test_flatten_fields_and_append_unique() -> None:
-    flattened = flatten_exchange_fields(["a", vector("b", "c"), "d"])
+    flattened = _flatten_field_items(["a", vector("b", "c"), "d"])
     assert flattened == ["a", "b", "c", "d"]
 
     target = ["a", "b"]

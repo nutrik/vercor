@@ -6,11 +6,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from vercor.clock import Clock
-from vercor.components._adapter import (
-    _ComponentBinding,
-    _ComponentDeclaration,
-    prepare_component,
-)
+from vercor.components._adapter import prepare_component
 from vercor.components.contexts import SetupContext
 from vercor.dtypes import DTypePolicy
 from vercor.exchanges import Exchange
@@ -19,14 +15,11 @@ from vercor.physics import PhysicalConstants
 from vercor._runtime.contracts import ExchangeContract, build_exchange_contracts
 from vercor._runtime.topology import build_exchange_topology
 from vercor._runtime.topology_state import RuntimeTopologyMaps
-from vercor._runtime.validation import (
-    check_not_empty_import_export_lists,
-    validate_exchange_fields_declared,
-)
+from vercor._runtime.validation import validate_exchange_fields_declared
 from vercor.topology import TopologyPolicy
 
 if TYPE_CHECKING:
-    pass
+    from vercor.components._adapter import _ComponentBinding, _ComponentDeclaration
 
 
 @dataclass(frozen=True)
@@ -47,7 +40,6 @@ def initialize_coupler_runtime(
     constants: PhysicalConstants,
     dtype: DTypePolicy,
     logger: LoggerLike,
-    topology_maps: RuntimeTopologyMaps | None = None,
     topology_policy: TopologyPolicy | None = None,
 ) -> RuntimeInitializationState:
     """Initialize components, contracts, and exchange topology for a coupler."""
@@ -76,19 +68,15 @@ def initialize_coupler_runtime(
     runtime_contracts = build_exchange_contracts(
         tuple(prepared_components),
         exchanges,
-        validate_endpoints=True,
     )
 
     for name, component in prepared_components.items():
         contract = runtime_contracts[name]
-        if contract.all_fields:
-            check_not_empty_import_export_lists(component, contract)
-            validate_exchange_fields_declared(component, contract)
+        validate_exchange_fields_declared(component, contract)
 
     topology_maps = build_exchange_topology(
         components=prepared_components,
         exchanges=exchanges,
-        topology_maps=topology_maps,
         topology_policy=topology_policy,
         dtype=dtype,
         logger=logger,

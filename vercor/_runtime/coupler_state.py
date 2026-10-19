@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
-from vercor.exchanges import Exchange
 from vercor._runtime.component_state import create_runtime_component_state
-from vercor._runtime.contracts import (
-    ExchangeContract,
-    build_exchange_contracts,
-)
+from vercor._runtime.contracts import ExchangeContract
 from vercor.state import RunState
 from vercor._runtime.stores import FieldStore
 from vercor.types import RuntimeArray
@@ -19,28 +15,18 @@ if TYPE_CHECKING:
 
 def runtime_state_from_components(
     components: Mapping[str, _ComponentBinding],
-    exchanges: Sequence[Exchange],
     fractional_masks: Mapping[str, RuntimeArray],
     *,
-    contracts: Mapping[str, ExchangeContract] | None = None,
+    contracts: Mapping[str, ExchangeContract],
     prefill_missing: bool = False,
 ) -> RunState:
-    """Create immutable runtime state from component setup objects."""
+    """Create immutable runtime state using already-prepared component contracts."""
 
-    runtime_contracts = (
-        build_exchange_contracts(
-            tuple(components),
-            exchanges,
-            validate_endpoints=False,
-        )
-        if contracts is None
-        else contracts
-    )
     runtime_components = tuple(
         create_runtime_component_state(
             component,
             prefill_missing=prefill_missing,
-            contract=runtime_contracts[name],
+            contract=contracts[name],
         )
         for name, component in components.items()
     )
