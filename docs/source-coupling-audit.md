@@ -1,11 +1,14 @@
 # Source and coupling audit
 
 This is the durable audit of the approved 2026-10-19 source and coupling
-cleanup on `feat/veris-seaice`, from baseline `e1d417a` through Tasks 1–9.
+cleanup on `feat/veris-seaice`, from baseline `e1d417a` through Tasks 1–9
+and the final-review I1 correction.
 Task 8 changes tests and documentation only. It records completed changes,
 retained owners, exact assertion migrations, failures and validation limits.
-Final combined coverage, fresh artifacts and native gallery acceptance
-are recorded in the Task 9 receipt below.
+Current final-source combined coverage, fresh artifacts and native gallery
+acceptance are recorded in the final-review I1 fix section below. Task 8/9
+receipt sections are historical pre-I1 source evidence and are superseded
+for current acceptance.
 Historical archives are unchanged.
 
 The source inventory remains 179 Python modules. There are 104 `test_*.py`
@@ -109,8 +112,9 @@ restoring damps SST anomalies; land moisture responds with the correct
 latent-flux sign before clipping. Coefficients were not retuned. CAMulator
 radiation divides accumulated energy by `3600 * lead_time_periods` once and
 adds surface emission once to signed net longwave. Startup decodes the latest
-native input frame, requires exact-time TS/FSNS/FLNS diagnostics and an
-explicit vapor channel in input and output layouts. `Qtot` is total water and
+native input frame and requires exact-time supplemental TS/FSNS/FLNS only
+for channels absent from that input, plus an explicit vapor channel in input
+and output layouts. `Qtot` is total water and
 is rejected as vapor. Existing inference tracing is retained after validation.
 
 Prescribed ERA5/ERA-Interim oceans, ERA5 atmosphere/land and CAMulator land
@@ -464,7 +468,7 @@ the final combined 90% gate is unchanged. Code/test state is `1f679cf` plus
 exactly the two restored root lookup assertions; no source/test changes
 followed collection.
 
-## Task 9 final acceptance and local delivery
+## Task 9 acceptance and local delivery (historical pre-I1)
 
 The final production/test state is commit `6b60622`; this delivery adds only
 verification prose. The full stock receipt is reused exactly as authorized:
@@ -622,3 +626,187 @@ receipt prose also exits0 without warnings; final whitespace is clean,
 PROGRESS remains180lines, and every source/test SHA256 matches the artifact
 receipt. The current fast gate and exact-source full gate therefore apply to
 this documentation-only local delivery state.
+
+
+## Final review I1 fix and M1 evidence retention (2026-10-19)
+
+The final whole-branch review of `e1d417a..a20cb96` found one Important
+correctness issue: bootstrap required supplemental time before checking native
+TS/FSNS/FLNS availability. The existing bootstrap now determines missing native
+channels first. A complete native input accepts `initial_diagnostics=None`;
+a mixed input consumes only missing channels. Consumed supplemental values
+retain scalar exact-time, finite grid-shape validation before input decoding.
+The real accessor, latest input inverse, shared mapper, native energy duration,
+vapor checks, payload/cursor/noise ownership and retained inference trace are
+unchanged. No alternate initialization or weather approximation was added.
+
+The two successful-setup regressions use the real accessor and the existing
+fixture's SST forcing/lifecycle. They assert independent physical exports,
+latest-history decoding, original native tensor identity/content, no advance
+and zero prediction calls. Mixed input intentionally includes unusable unused
+TS/FSNS supplements, proving native precedence. Existing missing/wrong-time,
+shape, finite-value and vapor failures remain. On the reviewed base, the
+complete-native/None case failed with `initial diagnostics require time`, and
+the mixed case passed. Both pass with the minimal existing-owner fix.
+
+Test construction initially removed the fixture's SST forcing: selecting an
+empty xarray variable list dropped the cursor time index and raised KeyError
+before bootstrap. Preserving the authentic fixture forcing fixed the test
+construction; no unrelated cursor behavior changed. An initial focused command
+also named nonexistent `test_camulator_forcing.py`; the corrected focus uses
+the actual initialization, component-kernel and contract-boundary files. Both
+initial logs are retained rather than counted as successful RED/GREEN evidence.
+
+The earlier Task9 receipt sections describe the superseded pre-I1 source.
+Their partial raw-data disappearance remains an unresolved historical limit;
+no historical receipt was regenerated. Current final-source acceptance,
+artifacts, hashes and separately archived raw lanes are recorded next.
+
+Current environment is independently reprobed in
+`/private/tmp/vercor-finalfix-{stock,fork}-provenance.json`: stock Veros1.7.0,
+JAX/jaxlib0.11.2, Veris0.2.1/tagv0.2.1/commit6e3b56ee14922f4bae760d57772f610078aa1886,
+JCM3.0.0, Dinosaur1.5.1 and Flax0.12.10. The separate fork process resolves
+Veros under `/private/tmp/vercor-cleanup-ad.BvXQyJ`; PEP610 asserts repository
+https://github.com/Etienne-Meunier/veros.git and requested/actual revision
+`7a8c964cf00b5aa0713c995edd760643a431b3c9`. Fresh pip check retains exactly
+the approved JCM `jax<0.11,>=0.10` versus installed0.11.2 conflict; no pin or
+environment change was made. All Python commands use isolated scipy Python3.12
+`/private/tmp/vercor-time-ci/envs/scipy/bin/python`, and native lanes set
+`VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets`.
+
+Focused XML independently parsed: expected RED1failure/1pass of2(2.561s);
+bootstrap/kernels GREEN101/101(9.373s); contracts2/2(0.638s), zero errors or
+skips. Initial construction/command failures are separate receipts. Current
+Black300, maintained flake8 `vercor tests tools benchmarks`0, mypy300, compileall
+and whitespace pass. Requested repository flake8 report remains200 ignored
+historical findings; the report is not a whole-repository zero claim.
+
+Source/test freeze is `/private/tmp/vercor-finalfix-source-hashes.json`
+(300 Python files). Fresh build/Twine pass at
+`/private/tmp/vercor-finalfix-dist`. All179 packaged Python module bytes equal
+this source, recorded with every source/test hash in
+`/private/tmp/vercor-finalfix-artifact-receipt.json`. Later audit/progress prose
+does not change that tested code state.
+
+| Current artifact | Bytes | SHA256 |
+| --- | ---: | --- |
+| vercor-0.4.6-py3-none-any.whl | 289322 | 1d15f4921cb63fe6cda2e267d3c62ab5a0311757e8d9d54ce3f9fb5fbe8f1a25 |
+| vercor-0.4.6.tar.gz | 208709 | c64fec1f9a1554ad3cbfd50a4bef3cc14ef77132f4f870bd037d9b510e77dbd7 |
+
+Fresh four supplied-artifact tests pass4/4(41.046s), with zero failures/errors/
+skips, consuming `/private/tmp/vercor-finalfix-dist` via VERCOR_ARTIFACT_DIR.
+The fresh installed wheel root is `/private/tmp/vercor-finalfix-wheel`; the
+existing `/private/tmp/vercor-task9-gallery.py` verifier runs with that explicit
+PYTHONPATH from `/private/tmp`, writing only to
+`/private/tmp/vercor-finalfix-gallery/output`. It proves installed import
+provenance and no output before explicit run, then all48native ice steps,
+9routes,2319wet cells,7finite state fields and486finite numeric saved variables
+in exactly13NetCDF files. Order remains LND -> CICE -> OCN -> ATM. Ice-route
+fraction evolves on13cells (sum0to1.2220427113878587); binary source ocean and
+coverage routes retain1555fractional coastal target cells and unchanged sums.
+CICE fraction[0,0.18495306531914493], native ice temperature
+[265.6293064389419,273.15000000000003]K, ocean SST
+[270.7364529105436,302.956108601832]K and salinity<=37.798401334857076g/kg.
+Atmosphere temperature/humidity/precipitation/radiation physical bounds,
+albedo units and saved spatial coordinates pass the unchanged verifier.
+Its JSON, fields, copied gallery and raw output files are archived under
+`test_logs/source-coupling-cleanup/final-fix/native-gallery/`.
+
+Fresh prescribed Sphinx `-b html -W --keep-going` passes, with no warning
+suppression or exploratory nitpicky policy. Existing upstream JCM/xarray
+compat-default warnings and the skipped unequal-latitude whole-grid ocean-mask
+comparison remain visible in gallery logs. These do not certify future
+upstream defaults or the skipped global comparison; independent route
+conservation and supported-mask tests remain. Native CREDIT/checkpoint/vapor
+training, hidden tracing effects, host/binary-transition/higher derivatives,
+unsupported geometry, toy slab inventories, native-default Veris refinement
+and long-term climate/performance are still uncertified. This I1 correction
+certifies adapter boundaries only, not a native CAMulator run. All four
+previous rulings/costs and earlier removal/assertion maps remain intact.
+
+Current final-source commands (all logs/XML use `vercor-finalfix-` prefixes):
+
+```bash
+# python below is /private/tmp/vercor-time-ci/envs/scipy/bin/python
+python -m pytest tests/test_camulator_initialization.py -q -n0 -k uses_native_diagnostics --tb=short --basetemp=/private/tmp/vercor-finalfix-red-corrected --junitxml=/private/tmp/vercor-finalfix-red-corrected.xml
+python -m pytest tests/test_camulator_initialization.py tests/test_camulator_component_kernels.py -q -n0 --tb=short --basetemp=/private/tmp/vercor-finalfix-green-corrected --junitxml=/private/tmp/vercor-finalfix-green-corrected.xml
+python -m pytest tests/test_camulator_contract_boundaries.py -q -n0 --tb=short --basetemp=/private/tmp/vercor-finalfix-contracts --junitxml=/private/tmp/vercor-finalfix-contracts.xml
+COVERAGE_FILE=/private/tmp/vercor-finalfix.coverage.stock VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets python -m pytest tests/ -q -m 'not veros_autodiff' --cov=vercor --cov-branch --cov-report= --cov-fail-under=0 --tb=short --basetemp=/private/tmp/vercor-finalfix-full --junitxml=/private/tmp/vercor-finalfix-full.xml
+JAX_ENABLE_X64=true PYTHONPATH=/private/tmp/vercor-cleanup-ad.BvXQyJ COVERAGE_FILE=/private/tmp/vercor-finalfix.coverage.ad VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets python -m pytest tests/test_veros_autodiff_rollouts.py tests/test_veris_prognostic_autodiff.py tests/test_veris_veros_jcm_autodiff.py -q -n0 -m veros_autodiff --cov=vercor --cov-branch --cov-report= --cov-fail-under=0 --tb=short --basetemp=/private/tmp/vercor-finalfix-ad --junitxml=/private/tmp/vercor-finalfix-ad.xml
+VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets python -m pytest tests/ -q --fast -m 'not veros_autodiff' --tb=short --basetemp=/private/tmp/vercor-finalfix-fast --junitxml=/private/tmp/vercor-finalfix-fast.xml
+python -m black --check vercor tests
+python -m flake8 vercor tests tools benchmarks --count --max-line-length=120 --statistics
+python -m flake8 . --count --exit-zero --max-line-length=120 --statistics
+python -m mypy vercor tests
+python -m compileall -q vercor tests tools benchmarks
+git diff --check
+python -m sphinx -b html -W --keep-going docs /private/tmp/vercor-finalfix-html-strict
+python -m build --no-isolation --outdir /private/tmp/vercor-finalfix-dist
+python -m twine check /private/tmp/vercor-finalfix-dist/*
+VERCOR_ARTIFACT_DIR=/private/tmp/vercor-finalfix-dist VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets python -m pytest tests/test_distribution_boundaries.py::test_built_distributions_run_external_extension_fixture_outside_checkout tests/test_distribution_boundaries.py::test_built_sdist_installs_and_imports_outside_checkout tests/test_distribution_boundaries.py::test_installed_default_slab_factory_runs_v0_4_component tests/test_distribution_boundaries.py::test_supplied_wheel_console_uses_explicit_target_pythonpath -q -n0 --tb=short --basetemp=/private/tmp/vercor-finalfix-artifacts --junitxml=/private/tmp/vercor-finalfix-artifacts.xml
+python -m pip install --disable-pip-version-check --no-deps --target /private/tmp/vercor-finalfix-wheel /private/tmp/vercor-finalfix-dist/vercor-0.4.6-py3-none-any.whl
+# executed from /private/tmp, using the installed final wheel only
+PYTHONPATH=/private/tmp/vercor-finalfix-wheel JAX_ENABLE_X64=true VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets python /private/tmp/vercor-task9-gallery.py /private/tmp/vercor-finalfix-gallery /private/tmp/vercor-finalfix-wheel
+```
+
+The fast/full stock commands have authorized socket access from their first
+launch for the installed-gh loopback regression. The zero coverage thresholds
+collect each partial lane only; acceptance still requires unchanged90% after
+explicit combination. Stock/fork stay in separate native processes. No test
+timeout, skip, assertion, physics coefficient or coverage exclusion was added.
+
+
+### Current final-source acceptance after I1
+
+Fresh full stock passes 2294/2294 in 403.580s;
+fresh fast passes 1367/1367 in 284.041s;
+fresh separate exact-fork AD passes 15/15 in 665.686s.
+All three XML receipts have zero failures/errors/skips. These receipts replace
+the historical pre-I1 Task9 acceptance for the changed source; no whole-branch
+line data was reused. The live receipts are
+`/private/tmp/vercor-finalfix-{full,fast,ad}.xml`, with logs beside them and
+completed copies in `test_logs/source-coupling-cleanup/final-fix/`.
+
+Combined coverage passes the unchanged90% aggregate gate at
+`(8411+1610)/(8889+1934)*100=92.58985493855678%`.
+Statements are 8411/8889=94.62256721790978%;
+branches are 1610/1934=83.24715615305067%.
+There are 268partial branches, 324missing branches,
+478missing statements and 126excluded lines. Aggregate is distinct
+from branch-only coverage; gallery-only omission and all exclusions are unchanged.
+
+M1 is addressed prospectively: each raw dataset was copied to the ignored
+project archive before any combine operation. Hash/existence/branch-arcs and
+source/archive byte equality were checked; the combine consumed explicit
+expendable copies under `/private/tmp/vercor-finalfix-combine/`. Both archived
+originals still exist and retain their exact hashes afterward, as recorded
+by `coverage-lane-archives.json` with `verified_after_combine=true`. This does
+not repair or conceal the earlier missing historical partial datasets.
+
+| Archived raw dataset | Bytes | Measured files/arcs | SHA256 |
+| --- | ---: | --- | --- |
+| final-fix/coverage.stock | 729088 | 164/true | 21d6cbdae71d4887d777c90e08b6a20f850b3def59d9961740f7f539311f38f2 |
+| final-fix/coverage.ad | 475136 | 164/true | dbe080451f1493c514b7e6ea1b6d2ec0017e1f46876c1234f440e3db2333440b |
+| final-fix/coverage.combined | 720896 | 164/true | a6607cda83144da3d271008e240632a6da0cbbb359f48ac3e0d0fd61a548233f |
+
+```bash
+COVERAGE_FILE=/private/tmp/vercor-finalfix.coverage.combined python -m coverage combine --keep /private/tmp/vercor-finalfix-combine/coverage.stock /private/tmp/vercor-finalfix-combine/coverage.ad
+COVERAGE_FILE=/private/tmp/vercor-finalfix.coverage.combined python -m coverage report --fail-under=90
+COVERAGE_FILE=/private/tmp/vercor-finalfix.coverage.combined python -m coverage json -o /private/tmp/vercor-finalfix-coverage.json
+COVERAGE_FILE=/private/tmp/vercor-finalfix.coverage.combined python -m coverage xml -o /private/tmp/vercor-finalfix-coverage.xml
+python -m sphinx -b html -W --keep-going docs /private/tmp/vercor-finalfix-html-final
+```
+
+Current raw combined data, JSON/XML, lane logs/XML, archive receipts, static
+logs, source/test hashes and artifact provenance are all preserved under
+`test_logs/source-coupling-cleanup/final-fix/`. Source/tests remain byte-identical
+to the freeze and the installed-wheel receipt (300Python files,179packaged
+modules). Changed module SHA256 is
+`cea7ce2727e6b06d5bee2225233225e6d25363d36bcfec73e54f8872c82cfb9d`;
+changed test SHA256 is
+`18032604dbbf6559d7187ef154e18f44427972bf5a8b3ea8b3fd7f17af1900bd`.
+The final-prose strict Sphinx log is `vercor-finalfix-sphinx-final.log`; Git
+branch/history/clean-status delivery evidence is in the final-fix report.
+All15AD cases passed with the known upstream scatter and JCM/xarray
+FutureWarnings retained; no warning suppression was added. Scoped final review
+is the controller's next action. Local delivery only: no remote change.
