@@ -126,9 +126,8 @@ def _get_veros_linear_solver_interface() -> (
         or solver_cache is not wrapped_cache
     ):
         raise RuntimeError(
-            "component-scoped Veros solver caching requires Veros >=1.6.2,<1.7 "
-            "with get_linear_solver.cache and its wrapped accessor exposing "
-            "the same mutable mapping"
+            "component-scoped Veros solver caching requires a mutable cache mapping "
+            "shared by get_linear_solver.cache and its wrapped accessor"
         )
     return cast(Callable[[VerosState], Any], get_linear_solver), cast(
         MutableMapping[tuple[VerosState], Any], solver_cache

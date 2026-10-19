@@ -172,6 +172,7 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
     runtime_dependencies = tuple(project["dependencies"])
     extras = project["optional-dependencies"]
 
+    assert extras["veros"] == ["veros>=1.7.0"]
     assert extras["jcm"] == ["dinosaur>=1.5.0", "jcm==3.0.0"]
     assert extras["veris"] == [
         "veris @ git+https://github.com/team-ocean/veris.git@v0.2.1"
