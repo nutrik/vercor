@@ -8,6 +8,7 @@ from typing import Any
 from vercor._host_arrays import transposed_host_array
 from vercor.components import Component, DataComponent
 from vercor.grids import RectilinearGrid
+from vercor.dtypes import as_jax_real_array
 from vercor.setups.config import JCMLandAtmosphereConfig
 
 
@@ -86,15 +87,11 @@ def make_jcm_land_atmosphere(
     # JAXGCM expects the terrain mask in host/transposed JCM layout.
     if land.grid.binary_mask is None:
         raise ValueError("JCM land grid requires a binary mask for terrain patching")
-    if atmosphere_config.seaice_coupling:
-        from vercor.grid_masks import create_lnd_mask_from_ocn
-
-        _, fraction = create_lnd_mask_from_ocn(
-            atm_lat=land.grid.latitude, atm_lon=land.grid.longitude, ocn_grid=ocn_grid
+    terrain = terrain.copy(
+        fmask=transposed_host_array(
+            as_jax_real_array(land.spec.initial_fields["land_fraction"])
         )
-        terrain = terrain.copy(fmask=transposed_host_array(fraction))
-    else:
-        terrain.fmask = transposed_host_array(land.grid.binary_mask)
+    )
 
     atmosphere = make_jax_gcm(
         coords,

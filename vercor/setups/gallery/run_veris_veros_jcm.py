@@ -15,7 +15,6 @@ from vercor import Clock, Coupler, Exchange, RuntimeOptions
 from vercor.dtypes import DTypePolicy
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.recipes import (
-    JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
     JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
     JCM_LAND_TO_ATMOSPHERE_FIELDS,
     OCEAN_TO_JCM_OPEN_WATER_FIELDS,
@@ -56,15 +55,15 @@ def build_coupler(
     Explicit configurations must enable model-level ice forcing, total ocean
     feedback/current water contribution and coupled JCM surfaces. An injected
     pair must expose those contracts on the same grid and cannot also receive
-    pair configuration overrides. The native SPEEDY calendar requires noleap.
+    pair configuration overrides. The native SPEEDY calendar requires Gregorian.
     """
     clock = (
-        Clock(datetime(2000, 1, 3), 86400.0, 365, calendar="noleap")
+        Clock(datetime(2000, 1, 3), 86400.0, 365, calendar="gregorian")
         if clock is None
         else clock
     )
-    if clock.calendar != "noleap":
-        raise ValueError("Coupled JCM requires a noleap clock")
+    if clock.calendar != "gregorian":
+        raise ValueError("Coupled JCM requires a Gregorian clock")
     if pair is not None and (veris_config is not None or ocean_config is not None):
         raise ValueError(
             "Injected pair cannot also receive pair configuration overrides"
@@ -212,13 +211,6 @@ def build_coupler(
                 land.name,
                 atmosphere.name,
                 JCM_LAND_TO_ATMOSPHERE_FIELDS,
-                quantity="intensive",
-                regridder_factory=bilinear,
-            ),
-            Exchange(
-                atmosphere.name,
-                land.name,
-                JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
                 quantity="intensive",
                 regridder_factory=bilinear,
             ),

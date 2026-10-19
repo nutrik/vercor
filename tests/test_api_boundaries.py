@@ -294,7 +294,7 @@ def test_fields_facade_owns_vector_field_contract() -> None:
     with pytest.raises(
         TypeError, match="Tuple vector field declarations are unsupported"
     ):
-        Exchange("ATM", "OCN", (("u_velocity", "v_velocity"),))  # type: ignore[arg-type]
+        Exchange("ATM", "OCN", (("u_velocity", "v_velocity"),), quantity="intensive")  # type: ignore[arg-type]
 
 
 @pytest.mark.fast_always
@@ -570,7 +570,8 @@ def test_public_api_uses_canonical_breaking_names(
     with pytest.raises(TypeError):
         coupler.components["NEW"] = component  # type: ignore[index]
     with pytest.raises(AttributeError):
-        coupler.exchanges.append(Exchange("ATM", "ATM", ("temperature",)))  # type: ignore[attr-defined]
+        route = Exchange("ATM", "ATM", ("temperature",), quantity="intensive")
+        coupler.exchanges.append(route)  # type: ignore[attr-defined]
 
     state = coupler.initial_state()
     output_state = coupler.run(
@@ -648,6 +649,7 @@ def test_exchange_accepts_supported_names_only() -> None:
         "ATM",
         "OCN",
         ("temperature", vector("u_velocity", "v_velocity")),
+        quantity="intensive",
         regridder_factory=bilinear,
     )
 

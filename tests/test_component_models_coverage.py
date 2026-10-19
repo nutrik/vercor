@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 from numpy.typing import NDArray
 import pytest
@@ -311,12 +312,7 @@ def test_jcm_land_exchange_recipe_fields_are_declared() -> None:
         tuple(components),
         (
             Exchange(
-                source="ATM",
-                target="LND",
-                fields=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
-                regridder_factory=bilinear,
-            ),
-            Exchange(
+                quantity="intensive",
                 source="LND",
                 target="ATM",
                 fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
@@ -326,7 +322,7 @@ def test_jcm_land_exchange_recipe_fields_are_declared() -> None:
         validate_endpoints=True,
     )
 
-    assert contracts["LND"].receives == _JCM_LAND_INPUTS
+    assert contracts["LND"].receives == ()
     assert contracts["LND"].sends == tuple(
         _flatten_field_items(JCM_LAND_TO_ATMOSPHERE_FIELDS)
     )
@@ -349,6 +345,7 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
     }
     exchanges = (
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
@@ -356,6 +353,7 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
@@ -363,6 +361,7 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
             regridder_factory=conservative,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="LND",
             fields=ATMOSPHERE_TO_LAND_STATE_FIELDS,
@@ -370,6 +369,7 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="LND",
             fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
@@ -377,12 +377,14 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
             regridder_factory=conservative,
         ),
         Exchange(
+            quantity="intensive",
             source="OCN",
             target="ATM",
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="LND",
             target="ATM",
             fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
@@ -425,6 +427,7 @@ def test_public_data_ocean_recipe_fields_are_declared_by_data_factories(
         tuple(components),
         (
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
                 fields=ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
@@ -452,36 +455,42 @@ def test_slab_driver_exchange_recipes_are_declared_by_slab_factories() -> None:
         tuple(components),
         (
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
                 fields=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
+                quantity="intensive",
                 source="OCN",
                 target="ATM",
                 fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
+                quantity="intensive",
                 source="OCN",
                 target="ICE",
                 fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
+                quantity="intensive",
                 source="LND",
                 target="ATM",
                 fields=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="LND",
                 fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
                 regridder_factory=conservative,
             ),
             Exchange(
+                quantity="intensive",
                 source="ICE",
                 target="OCN",
                 fields=SEAICE_TO_OCEAN_FIELDS,
@@ -1104,7 +1113,11 @@ def test_era5_precipitation_is_zero_seeded_and_summed_before_monthly_exchange(
             calendar="noleap",
         ),
         components=(atmosphere, ocean),
-        exchanges=(Exchange("ATM", "OCN", fields=("rain_rate", "snow_rate")),),
+        exchanges=(
+            Exchange(
+                "ATM", "OCN", quantity="intensive", fields=("rain_rate", "snow_rate")
+            ),
+        ),
         run_order=("ATM", "OCN"),
     )
     initial = coupler.initial_state()
@@ -1140,7 +1153,7 @@ def test_jcm_land_constructor_converts_coords_and_preserves_data(
         recorded_inputs["atm_lat"] = np.asarray(atm_lat)
         recorded_inputs["atm_lon"] = np.asarray(atm_lon)
         recorded_inputs["ocn_lon"] = np.asarray(ocn_grid.longitude)
-        return expected_mask, np.zeros_like(expected_mask)
+        return expected_mask, 0.4 * expected_mask
 
     monkeypatch.setattr(
         jcm_land_module,
@@ -1175,6 +1188,7 @@ def test_jcm_land_constructor_converts_coords_and_preserves_data(
     assert component.spec.outputs == (
         "land_surface_temperature",
         "soil_moisture",
+        "land_fraction",
     )
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component._data["land_surface_temperature"], jax.Array)
@@ -1189,6 +1203,9 @@ def test_jcm_land_constructor_converts_coords_and_preserves_data(
         forcing.stl_am.T,
     )
     assert_allclose_compact(component._data["soil_moisture"], forcing.soilw_am.T)
+
+    assert component.spec.masks.fractional_field == "land_fraction"
+    assert_allclose_compact(component._data["land_fraction"], 0.4 * expected_mask)
 
 
 def test_jcm_land_canonicalizes_jcm_2_time_series_values(
@@ -1275,3 +1292,56 @@ def test_jcm_land_rejects_wrong_spatial_extents(
             cast(Any, forcing),
             make_test_grid(name="ocn"),
         )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "factory,field_name,value",
+    [
+        (make_slab_land, "land_surface_temperature", 288.15),
+        (make_slab_ocean, "sea_surface_temperature", 288.15),
+    ],
+)
+def test_slab_fractional_coasts_keep_local_temperature(
+    factory: Any,
+    field_name: str,
+    value: float,
+) -> None:
+    from vercor import Clock, Coupler, Exchange, RuntimeOptions
+    from vercor.components import ComponentSpec, DataComponent
+    from vercor.regridding import conservative
+    from datetime import datetime
+
+    fraction = jnp.asarray([[0.0, 0.25], [0.75, 1.0]])
+    grid = make_test_grid(name="surface", binary_mask=np.asarray(fraction > 0))
+    component = factory(grid, fractional_coverage=fraction)
+    target = DataComponent(
+        "DST",
+        make_test_grid(name="target"),
+        {field_name: 0.0},
+        spec=ComponentSpec(inputs=(field_name,)),
+    )
+    coupler = Coupler(
+        Clock(datetime(2000, 1, 1), dt_seconds=60, steps=1),
+        components=(component, target),
+        run_order=(component.name, "DST"),
+        exchanges=(
+            Exchange(
+                component.name,
+                "DST",
+                (field_name,),
+                quantity="intensive",
+                regridder_factory=conservative,
+            ),
+        ),
+        runtime=RuntimeOptions(topology=None),
+    )
+    state = coupler.run()
+    np.testing.assert_allclose(
+        state.component("DST").field(field_name, scope="received"),
+        np.where(fraction > 0, value, 0.0),
+    )
+    np.testing.assert_array_equal(
+        state.component(component.name).field("surface_fraction"),
+        fraction,
+    )

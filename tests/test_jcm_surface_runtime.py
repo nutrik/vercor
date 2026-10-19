@@ -24,10 +24,11 @@ def make_native_jcm(
     coupling_seconds: float = 1800.0,
     spinup: Spinup = Spinup(),
     water_albedo: float = 0.1,
+    seaice_coupling: bool = True,
 ) -> tuple[Coupler, Any, Any]:
     """Build actual flat native JCM with prescribed covered surface contributions."""
     config = JAXGCMConfig(
-        seaice_coupling=True,
+        seaice_coupling=seaice_coupling,
         spinup=spinup,
         model_timestep=timedelta(minutes=30),
         save_interval=timedelta(seconds=coupling_seconds),
@@ -59,9 +60,15 @@ def make_native_jcm(
         "ice_surface_albedo": jnp.full(canonical, 0.3 * 0.7),
         "ice_fraction": jnp.full(canonical, 0.3),
     }
+    if not seaice_coupling:
+        fields = {
+            "land_surface_temperature": 300 + tag,
+            "soil_moisture": jnp.full(canonical, 0.77),
+            "sea_surface_temperature": jnp.full(canonical, 290.0),
+        }
     surface = DataComponent("SURFACE", atmosphere.grid, fields)
     coupler = Coupler(
-        Clock(start, coupling_seconds, 1, calendar="noleap"),
+        Clock(start, coupling_seconds, 1, calendar="gregorian"),
         components=(surface, atmosphere),
         run_order=("SURFACE", "ATM"),
         exchanges=(Exchange("SURFACE", "ATM", tuple(fields), quantity="intensive"),),
@@ -78,8 +85,8 @@ def test_native_flux_channels_are_selected_once() -> None:
 
     shape = (3, 2)
     profile = jnp.full((2, *shape), 280.0)
-    shf = jnp.broadcast_to(jnp.array([10.0, 20.0, 17.5]), (*shape, 3))
-    evap = jnp.broadcast_to(jnp.array([1.0, 2.0, 1.75]), (*shape, 3))
+    shf = jnp.full(shape, 17.5)
+    evap = jnp.full(shape, 1.75)
     mapped = map_jcm_output_fields(
         2.5e6,
         1e5,
@@ -107,9 +114,9 @@ def test_native_flux_channels_are_selected_once() -> None:
         dtype=DTypePolicy(enable_x64=True),
     )
     np.testing.assert_allclose(mapped["sensible_heat_flux"], -17.5)
-    np.testing.assert_allclose(mapped["land_sensible_heat_flux"], -10.0)
     np.testing.assert_allclose(mapped["latent_heat_flux"], -4375.0)
-    np.testing.assert_allclose(mapped["land_latent_heat_flux"], -2500.0)
+    assert "land_sensible_heat_flux" not in mapped
+    assert "land_latent_heat_flux" not in mapped
     np.testing.assert_allclose(mapped["surface_pressure"], 90000.0)
     np.testing.assert_allclose(mapped["downward_shortwave_radiation_flux"], 200.0)
     np.testing.assert_allclose(mapped["open_water_albedo"], 0.1)
@@ -144,6 +151,28 @@ def test_coupled_land_moisture_and_fraction_reach_native_forcing() -> None:
     assert not hasattr(owner.model, "marine_surface_albedo")
 
 
+def test_ordinary_jcm_receives_independent_surfaces_and_soil() -> None:
+    from vercor.setups._external.jax_gcm_runtime import step_jax_gcm_runtime
+
+    coupler, _, owner = make_native_jcm(seaice_coupling=False)
+    initial = coupler.initial_state()
+    fields = dict(initial.component("SURFACE").fields())
+    payload = cast(Any, initial._component_state("ATM").payload)
+    result, _, applied = step_jax_gcm_runtime(
+        owner, fields, payload, PhysicalConstants(), DTypePolicy(enable_x64=True)
+    )
+    np.testing.assert_allclose(
+        applied.stl_am, np.asarray(fields["land_surface_temperature"]).T
+    )
+    np.testing.assert_allclose(applied.sea_surface_temperature, 290.0)
+    np.testing.assert_allclose(applied.soilw_am, 0.77)
+    np.testing.assert_allclose(payload.forcing.soilw_am, 0.2)
+    np.testing.assert_allclose(
+        result.fields["total_surface_temperature"],
+        0.25 * np.asarray(fields["land_surface_temperature"]) + 0.75 * 290.0,
+    )
+
+
 def test_coupled_factory_uses_fractional_terrain_without_mutating_inputs() -> None:
     config = JAXGCMConfig(seaice_coupling=True)
     from tests.test_jcm_surface_forcing import native_case
@@ -174,8 +203,20 @@ def test_coupled_factory_uses_fractional_terrain_without_mutating_inputs() -> No
         atm_lon=pair.land.grid.longitude,
         ocn_grid=ocean,
     )
+    assert pair.land.spec.masks is not None
+    assert pair.land.spec.masks.fractional_field == "land_fraction"
+    np.testing.assert_allclose(
+        np.asarray(pair.land.spec.initial_fields["land_fraction"]), fraction
+    )
     np.testing.assert_allclose(pair.terrain.fmask, np.asarray(fraction).T)
     assert np.any((np.asarray(fraction) > 0) & (np.asarray(fraction) < 1))
+    np.testing.assert_array_equal(terrain.fmask, original)
+    ordinary = make_jcm_land_atmosphere(
+        ocean,
+        inputs=JCMInputs(coords, terrain, forcing),
+        config=JCMLandAtmosphereConfig(atmosphere=JAXGCMConfig()),
+    )
+    np.testing.assert_allclose(ordinary.terrain.fmask, np.asarray(fraction).T)
     np.testing.assert_array_equal(terrain.fmask, original)
     assert set(pair.atmosphere.spec.inputs) == {
         "land_surface_temperature",
@@ -185,21 +226,14 @@ def test_coupled_factory_uses_fractional_terrain_without_mutating_inputs() -> No
         "open_water_temperature_contribution",
         "ice_fraction",
     }
-    assert "land_sensible_heat_flux" in pair.land.spec.inputs
-    assert "land_latent_heat_flux" in pair.land.spec.inputs
+    assert pair.land.spec.inputs == ()
 
 
-def test_coupled_policy_is_keyword_only_and_specific_land_recipe_is_explicit() -> None:
+def test_coupled_policy_is_keyword_only() -> None:
     assert JAXGCMConfig().seaice_coupling is False
     assert (
         signature(JAXGCMConfig).parameters["seaice_coupling"].kind
         is Parameter.KEYWORD_ONLY
-    )
-    from vercor.recipes import JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS
-
-    assert JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS == (
-        "land_latent_heat_flux",
-        "land_sensible_heat_flux",
     )
 
 

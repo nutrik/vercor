@@ -18,7 +18,6 @@ from vercor.dtypes import DTypePolicy
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.recipes import (
     ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
-    ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
     JCM_LAND_TO_ATMOSPHERE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
@@ -34,14 +33,16 @@ from vercor.setups import (
 from vercor.topology import SurfaceMaskPolicy
 
 
-def _default_clock(*, steps: int = 365 * 100 - 2) -> Clock:
+def _default_clock(
+    *, steps: int = (datetime(2100, 1, 1) - datetime(2000, 1, 3)).days
+) -> Clock:
     """Return the historic noleap clock, optionally with a shorter run."""
 
     return Clock(
         start=datetime(2000, 1, 3, 0, 0, 0),
         dt_seconds=86400.0,
         steps=steps,
-        calendar="noleap",
+        calendar="gregorian",
     )
 
 
@@ -77,27 +78,24 @@ def build_coupler(
         components=[ocn, lnd, atm],
         exchanges=(
             Exchange(
+                quantity="intensive",
                 source=atm.name,
                 target=ocn.name,
                 fields=ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
+                quantity="intensive",
                 source=ocn.name,
                 target=atm.name,
                 fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
+                quantity="intensive",
                 source=lnd.name,
                 target=atm.name,
                 fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
-                regridder_factory=bilinear,
-            ),
-            Exchange(
-                source=atm.name,
-                target=lnd.name,
-                fields=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
                 regridder_factory=bilinear,
             ),
         ),

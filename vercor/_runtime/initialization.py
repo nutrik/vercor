@@ -63,6 +63,7 @@ def initialize_coupler_runtime(
         constants=constants,
         dtype=dtype,
         logger=logger,
+        calendar=clock.calendar,
     )
 
     prepared_components = {

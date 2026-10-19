@@ -17,7 +17,7 @@ typed_factory = accepts_factory(PluginRegridderFactory("typed-route"))
 typed_bilinear: RegridderFactory = bilinear
 typed_conservative: RegridderFactory = conservative
 typed_exchange_factory: RegridderFactory = Exchange(
-    "SOURCE", "TARGET", ("field",)
+    "SOURCE", "TARGET", ("field",), quantity="intensive"
 ).regridder_factory
 
 

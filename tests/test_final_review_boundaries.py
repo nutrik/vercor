@@ -99,7 +99,9 @@ def _diagnostic_component_order(value: object) -> None:
     (
         (
             "Exchange.fields",
-            lambda value: Exchange("ATM", "OCN", cast(Any, value)),
+            lambda value: Exchange(
+                "ATM", "OCN", cast(Any, value), quantity="intensive"
+            ),
         ),
         (
             "WorkflowContext.component_names",

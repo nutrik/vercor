@@ -20,7 +20,7 @@ from jcm.physics.speedy.speedy_terms import speedy_physics
 from jcm.physics_interface import PhysicsState
 from jcm.terrain import TerrainData
 
-from vercor.calendar import DateTime365, ModelDateTime
+from vercor.calendar import ModelDateTime
 from vercor.components import (
     Component,
     SetupContext,
@@ -44,53 +44,41 @@ from vercor.types import RuntimeArray
 @tree_math.struct
 @dataclass
 class JCMState:
-    """JCM gridpoint output, native dycore state, and physics carry."""
+    """JCM output, resumable native state, and its authoritative exact clock."""
 
     dynamics: PhysicsState
     physics: Any
     dycore_state: Any
     physics_carry: Any
+    time: Any
+    step: Any
 
 
 def _bootstrap_jcm_state(model: Model) -> JCMState:
-    """Return the initialized JCM 2 dycore and physics state bundle."""
+    """Return initialized native dynamics, physics carry, and clock."""
 
     model.bootstrap_state()
-    dycore_state = model._final_dycore_state
-    physics_carry = model._final_physics_state
-    if dycore_state is None or physics_carry is None:
+    native = model.run_state
+    if native is None or native.dynamics is None or native.physics is None:
         raise RuntimeError("JCM bootstrap did not initialize dycore and physics state")
     return JCMState(
-        dynamics=model.dycore.to_physics_state(dycore_state),
-        physics=physics_carry,
-        dycore_state=dycore_state,
-        physics_carry=physics_carry,
+        dynamics=model.dycore.to_physics_state(native.dynamics),
+        physics=native.physics,
+        dycore_state=native.dynamics,
+        physics_carry=native.physics,
+        time=native.time,
+        step=native.step,
     )
 
 
-def jax_gcm_noleap_epoch(
-    start: datetime | ModelDateTime, effective_spinup: timedelta
-) -> Any:
-    """Bind JCM's 365-day calendar by ordinal days since its 1970 epoch."""
-    import jax_datetime as jdt
-    from jcm.date import MODEL_EPOCH
+def jax_gcm_epoch(start: datetime | ModelDateTime, effective_spinup: timedelta) -> Any:
+    """Bind the native Gregorian clock before any enabled spinup interval."""
+    from jcm.date import to_datetime
 
-    noleap = DateTime365(
-        start.year,
-        start.month,
-        start.day,
-        start.hour,
-        start.minute,
-        start.second,
-        start.microsecond,
-    )
-    offset = noleap - DateTime365(1970, 1, 1, 0, 0, 0, 0)
-    assert isinstance(offset, timedelta)
-    delta = offset - effective_spinup
-    if delta.microseconds:
-        raise ValueError("JCM epoch requires whole seconds")
+    if not isinstance(start, datetime):
+        raise ValueError("JCM requires a Gregorian datetime start")
     with jax.ensure_compile_time_eval():
-        return MODEL_EPOCH + jdt.Timedelta(days=delta.days, seconds=delta.seconds)
+        return to_datetime(start - effective_spinup, name="JCM epoch")
 
 
 class JAXGCMSetupState:
@@ -178,15 +166,15 @@ class JAXGCMSetupState:
             state: JCMState, forcing: ForcingData
         ) -> tuple[JCMState, ModelPredictions]:
             precision_policy = self._dtype_policy
-            final_dycore_state, final_physics_carry, predictions = (
-                self.model.run_from_state_with_carry(
-                    initial_state=state.dycore_state,
-                    initial_physics_state=state.physics_carry,
-                    save_interval=self.save_interval / timedelta(days=1),
-                    total_time=self.coupling_timestep / timedelta(days=1),
-                    output_averages=False,
-                    forcing=forcing,
-                )
+            native, predictions = self.model.run_from_state_with_carry(
+                initial_state=state.dycore_state,
+                initial_physics_state=state.physics_carry,
+                save_interval=self.save_interval / timedelta(days=1),
+                total_time=self.coupling_timestep / timedelta(days=1),
+                output_averages=False,
+                forcing=forcing,
+                initial_time=state.time,
+                initial_step=state.step,
             )
 
             # JCM currently returns a stacked object; reduce to one runtime state.
@@ -200,8 +188,10 @@ class JAXGCMSetupState:
                         tree_mean(predictions.physics, axis=0),
                         precision_policy,
                     ),
-                    dycore_state=final_dycore_state,
-                    physics_carry=final_physics_carry,
+                    dycore_state=native.dynamics,
+                    physics_carry=native.physics,
+                    time=native.time,
+                    step=native.step,
                 ),
                 predictions,
             )
@@ -225,23 +215,18 @@ class JAXGCMSetupState:
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
 
-        if getattr(self, "seaice_coupling", False):
-            effective_spinup = self.spinup_time if self.do_spinup else timedelta(0)
-            if (
-                effective_spinup < timedelta(0)
-                or effective_spinup % self.coupling_timestep
-            ):
-                raise ValueError("Enabled JCM spinup must align to coupling intervals")
-            epoch_key = (context.start, effective_spinup, self.coupling_timestep)
-            if hasattr(self, "_epoch_key") and self._epoch_key != epoch_key:
-                raise ValueError(
-                    "JCM epoch already bound; construct a new component for another start"
-                )
-            self._epoch_key = epoch_key
-            self.model.calendar = "365_day"
-            self.model.start_date = jax_gcm_noleap_epoch(
-                context.start, effective_spinup
+        if context.calendar != "gregorian":
+            raise ValueError("JCM 3 requires a Gregorian coupler calendar")
+        effective_spinup = self.spinup_time if self.do_spinup else timedelta(0)
+        if effective_spinup < timedelta(0) or effective_spinup % self.coupling_timestep:
+            raise ValueError("Enabled JCM spinup must align to coupling intervals")
+        epoch_key = (context.start, effective_spinup, self.coupling_timestep)
+        if hasattr(self, "_epoch_key") and self._epoch_key != epoch_key:
+            raise ValueError(
+                "JCM epoch already bound; construct a new component for another start"
             )
+        self._epoch_key = epoch_key
+        self.model.start_time = jax_gcm_epoch(context.start, effective_spinup)
 
         self._state = _bootstrap_jcm_state(self.model)
 

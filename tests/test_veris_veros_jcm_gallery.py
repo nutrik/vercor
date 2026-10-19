@@ -64,7 +64,7 @@ def native_coupler(
     )
     coupler = import_module("vercor.setups.gallery.run_veris_veros_jcm").build_coupler(
         jcm_inputs=JCMInputs(coords, terrain, forcing),
-        clock=Clock(datetime(2000, 1, 3, 12), 1800.0, steps, calendar="noleap"),
+        clock=Clock(datetime(2000, 1, 3, 12), 1800.0, steps, calendar="gregorian"),
         veris_config=VerisConfig(
             atmosphere_forcing="model_level",
             model_timestep=timedelta(seconds=300),
@@ -119,14 +119,6 @@ def test_gallery_routes_preserve_surface_ownership(
         ("CICE", "ATM", r.VERIS_TO_JCM_SURFACE_FIELDS, "source_flux", "component", c),
         ("CICE", "ATM", r.VERIS_TO_JCM_COVERAGE_FIELDS, "source_flux", "binary", c),
         ("LND", "ATM", r.JCM_LAND_TO_ATMOSPHERE_FIELDS, "intensive", "component", b),
-        (
-            "ATM",
-            "LND",
-            r.JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-            "intensive",
-            "component",
-            b,
-        ),
     ]
     assert [
         (
@@ -139,7 +131,7 @@ def test_gallery_routes_preserve_surface_ownership(
         )
         for x in coupler.exchanges
     ] == expected
-    assert len({x.route_id for x in coupler.exchanges}) == 10
+    assert len({x.route_id for x in coupler.exchanges}) == 9
     assert coupler.components["CICE"].grid is coupler.components["OCN"].grid
     initial = (
         coupler.initial_state()
@@ -185,7 +177,7 @@ assert not {'jcm','veris','veros'} & sys.modules.keys()
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"clock": Clock(datetime(2000, 1, 3), 86400, 1)},
+        {"clock": Clock(datetime(2000, 1, 3), 86400, 1, calendar="noleap")},
         {"veris_config": VerisConfig()},
         {"ocean_config": VerosConfig(surface_forcing="coupled")},
         {"jcm_config": JCMLandAtmosphereConfig()},
@@ -195,7 +187,9 @@ def test_incompatible_explicit_modes_are_rejected_before_models(
     kwargs: dict[str, Any],
 ) -> None:
     module = import_module("vercor.setups.gallery.run_veris_veros_jcm")
-    with pytest.raises(ValueError, match="noleap|model_level|export|seaice_coupling"):
+    with pytest.raises(
+        ValueError, match="Gregorian|model_level|export|seaice_coupling"
+    ):
         module.build_coupler(**kwargs)
 
 

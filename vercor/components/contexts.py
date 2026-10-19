@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Literal
 
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import DTypePolicy
@@ -22,6 +23,7 @@ class SetupContext:
     logger: LoggerLike
     constants: PhysicalConstants = field(default_factory=PhysicalConstants)
     dtype: DTypePolicy = field(default_factory=DTypePolicy.from_jax_config)
+    calendar: Literal["gregorian", "noleap", "360_day"] = "gregorian"
 
     def __post_init__(self) -> None:
         """Freeze the public run-order sequence without splitting text."""

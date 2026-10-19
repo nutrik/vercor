@@ -18,7 +18,7 @@ from vercor.recipes import (
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
 
-from vercor.regridding import bilinear
+from vercor.regridding import bilinear, conservative
 from vercor.topology import SurfaceMaskPolicy
 
 
@@ -73,24 +73,28 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     # Exchanges
     exchanges = (
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="source_flux",
             source="OCN",
             target="ATM",
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
-            regridder_factory=bilinear,
+            regridder_factory=conservative,
         ),
         Exchange(
+            quantity="source_flux",
             source="LND",
             target="ATM",
             fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
-            regridder_factory=bilinear,
+            regridder_factory=conservative,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="LND",
             fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,

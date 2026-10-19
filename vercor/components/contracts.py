@@ -321,8 +321,6 @@ class ComponentSpec:
                     raise ComponentError(
                         f"Component mask field '{name}' must be declared."
                     )
-            if transfer is not None and transfer.time_selection != "current":
-                raise ComponentError("Component masks require current time selection.")
         object.__setattr__(self, "inputs", normalized_inputs)
         object.__setattr__(self, "outputs", normalized_outputs)
         object.__setattr__(self, "initial_fields", frozen_initial_fields)

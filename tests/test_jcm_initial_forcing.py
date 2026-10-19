@@ -29,23 +29,23 @@ def assert_same_tree(left: Any, right: Any) -> None:
 @pytest.mark.parametrize(
     "start,expected",
     [
-        (datetime(2000, 1, 1), 10950),
-        (datetime(2000, 1, 3), 10952),
-        (datetime(2000, 3, 1), 11009),
-        (datetime(2001, 1, 1), 11315),
+        (datetime(2000, 1, 1), 10957),
+        (datetime(2000, 1, 3), 10959),
+        (datetime(2000, 3, 1), 11017),
+        (datetime(2001, 1, 1), 11323),
     ],
 )
-def test_native_noleap_epoch_matches_coupler(start: datetime, expected: int) -> None:
-    from vercor.setups._external.jax_gcm_state import jax_gcm_noleap_epoch
+def test_native_gregorian_epoch_matches_coupler(start: datetime, expected: int) -> None:
+    from vercor.setups._external.jax_gcm_state import jax_gcm_epoch
     from jcm.date import DateData
 
-    epoch = jax_gcm_noleap_epoch(start, timedelta(0))
+    epoch = jax_gcm_epoch(start, timedelta(0))
     assert int(epoch.delta.days) == expected
     date = DateData.set_date(epoch)
-    model_year = date.model_year("365_day")
+    model_year = date.model_year()
     assert int(model_year) == start.year
     if start.month == 1 and start.day == 3:
-        np.testing.assert_allclose(date.tyear("365_day"), 2 / 365)
+        np.testing.assert_allclose(date.tyear(), 2 / 366)
 
 
 def test_initial_forcing_does_not_advance_native_carry() -> None:
@@ -77,7 +77,7 @@ def test_initial_forcing_does_not_advance_native_carry() -> None:
     )
     current = owner.model.dycore.to_physics_state(original_dycore)
     date = owner.model._date_from_sim_time(owner.model.dycore.sim_time(original_dycore))
-    selected = payload.forcing.select(date, calendar=owner.model.calendar)
+    selected = payload.forcing.select(date)
     _, direct = owner.model.physics.compute_tendencies(
         current, selected, owner.model.terrain, prev_physics_data=original_carry
     )
@@ -102,12 +102,12 @@ def test_two_day_spinup_ends_at_the_native_coupling_epoch() -> None:
     )
     initial = coupler.initial_state()
     payload = cast(Any, initial._component_state("ATM").payload)
-    assert int(owner.model.start_date.delta.days) == 10950
+    assert int(owner.model.start_time.delta.days) == 10957
     date = owner.model._date_from_sim_time(
         owner.model.dycore.sim_time(payload.jcm_state.dycore_state)
     )
-    assert int(date.model_year("365_day")) == 2000
-    np.testing.assert_allclose(date.tyear("365_day"), 2 / 365)
+    assert int(date.model_year()) == 2000
+    np.testing.assert_allclose(date.tyear(), 2 / 366)
 
 
 def test_disabled_spinup_ignores_its_duration_and_conflicting_epoch_is_rejected() -> (
@@ -119,7 +119,7 @@ def test_disabled_spinup_ignores_its_duration_and_conflicting_epoch_is_rejected(
         spinup=Spinup(enabled=False, duration=timedelta(hours=36)),
     )
     coupler.initial_state()
-    assert int(owner.model.start_date.delta.days) == 10952
+    assert int(owner.model.start_time.delta.days) == 10959
     from vercor.components import SetupContext
 
     context = SetupContext(
@@ -153,3 +153,37 @@ def test_repeated_runs_use_the_supplied_payload_independently() -> None:
     )
     assert_same_tree(initial._component_state("ATM").payload, original)
     assert float(owner.model.dycore.sim_time(original.jcm_state.dycore_state)) == 0
+
+
+def test_native_clock_crosses_leap_day_and_continues_from_payload() -> None:
+    """Catch resetting the native exact clock at every coupling interval."""
+    coupler, _, _ = make_native_jcm(start=datetime(2000, 2, 28), coupling_seconds=86400)
+    initial = coupler.initial_state()
+    first = coupler.run(initial)
+    second = coupler.run(first)
+    first_clock = cast(Any, first._component_state("ATM").payload).jcm_state
+    second_clock = cast(Any, second._component_state("ATM").payload).jcm_state
+    np.testing.assert_equal(
+        str(first_clock.time.to_datetime64()), "2000-02-29T00:00:00"
+    )
+    np.testing.assert_equal(
+        str(second_clock.time.to_datetime64()), "2000-03-01T00:00:00"
+    )
+    assert int(first_clock.step) == 48 and int(second_clock.step) == 96
+    assert int(cast(Any, initial._component_state("ATM").payload).jcm_state.step) == 0
+
+
+def test_jcm_rejects_non_gregorian_coupler_calendar() -> None:
+    from dataclasses import replace
+    from vercor import Coupler
+
+    coupler, _, _ = make_native_jcm()
+    incompatible = Coupler(
+        replace(coupler.clock, calendar="noleap"),
+        components=tuple(coupler.components.values()),
+        exchanges=coupler.exchanges,
+        run_order=coupler.run_order,
+        runtime=coupler.runtime,
+    )
+    with pytest.raises(ValueError, match="JCM.*Gregorian"):
+        incompatible.initial_state()

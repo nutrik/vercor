@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import jax
+import jax_datetime as jdt
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -525,12 +526,14 @@ def test_runtime_contracts_include_all_constructor_exchanges() -> None:
         components=(atmosphere, ocean),
         exchanges=(
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
                 fields=("temperature",),
                 route_id="atmosphere-temperature",
             ),
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
                 fields=("humidity",),
@@ -616,25 +619,20 @@ def test_runtime_topology_maps_copying_stays_at_exchange_topology_boundary() -> 
 
     regridders = cast(Any, {"ATM->OCN": object()})
     binary_masks: dict[str, RuntimeArray] = {"ATM->OCN": jnp.ones((2, 2))}
-    fractional_masks: dict[str, RuntimeArray] = {"ATM->OCN": jnp.full((2, 2), 0.5)}
     topology_maps = RuntimeTopologyMaps(
         regridders=regridders,
         binary_masks=binary_masks,
-        fractional_masks=fractional_masks,
     )
 
     copied = RuntimeTopologyMaps(
         regridders=dict(topology_maps.regridders),
         binary_masks=dict(topology_maps.binary_masks),
-        fractional_masks=dict(topology_maps.fractional_masks),
     )
 
     assert copied.regridders == topology_maps.regridders
     assert copied.binary_masks == topology_maps.binary_masks
-    assert copied.fractional_masks == topology_maps.fractional_masks
     assert copied.regridders is not topology_maps.regridders
     assert copied.binary_masks is not topology_maps.binary_masks
-    assert copied.fractional_masks is not topology_maps.fractional_masks
 
 
 def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:
@@ -890,6 +888,8 @@ def test_runtime_coupler_state_restores_component_index_cache_after_pytree_round
 def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
     payload = JAXGCMRuntimePayload(
         jcm_state=JCMState(
+            time=jdt.to_datetime("2000-01-01"),
+            step=jnp.int32(0),
             dynamics={},
             physics={},
             dycore_state={"marker": jnp.asarray(1.0)},
@@ -910,6 +910,8 @@ def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
         return value.with_payload(
             JAXGCMRuntimePayload(
                 jcm_state=JCMState(
+                    time=jdt.to_datetime("2000-01-01"),
+                    step=jnp.int32(0),
                     dynamics=runtime_payload.jcm_state.dynamics,
                     physics=runtime_payload.jcm_state.physics,
                     dycore_state={

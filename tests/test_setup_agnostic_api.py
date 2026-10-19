@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import jax.numpy as jnp
 import numpy as np
@@ -82,7 +82,7 @@ def test_custom_named_components_can_exchange_custom_fields_without_surface_mask
     coupler = Coupler(
         clock=_clock(steps=3),
         components=(source, target),
-        exchanges=(Exchange("SRC", "DST", ("custom_flux",)),),
+        exchanges=(Exchange("SRC", "DST", ("custom_flux",), quantity="intensive"),),
         run_order=("SRC", "DST"),
         runtime=RuntimeOptions(topology=None),
     )
@@ -117,8 +117,8 @@ def test_duplicate_exchange_route_id_requires_explicit_distinct_ids() -> None:
             clock=_clock(),
             components=(source, target),
             exchanges=(
-                Exchange("SRC", "DST", ("temperature",)),
-                Exchange("SRC", "DST", ("humidity",)),
+                Exchange("SRC", "DST", ("temperature",), quantity="intensive"),
+                Exchange("SRC", "DST", ("humidity",), quantity="intensive"),
             ),
             run_order=("SRC", "DST"),
             runtime=RuntimeOptions(topology=None),
@@ -139,11 +139,14 @@ def test_exchange_fan_in_rejects_scalar_conflicts_independent_of_order_and_regri
         spec=ComponentSpec(inputs=("flux",)),
     )
     exchanges = (
-        Exchange("SRC_A", "DST", ("flux",), route_id="alpha route"),
+        Exchange(
+            "SRC_A", "DST", ("flux",), quantity="intensive", route_id="alpha route"
+        ),
         Exchange(
             "SRC_B",
             "DST",
             ("flux",),
+            quantity="intensive",
             regridder_factory=conservative,
             route_id="omega route",
         ),
@@ -193,9 +196,16 @@ def test_exchange_fan_in_flattens_vector_declarations() -> None:
                     "SRC_A",
                     "DST",
                     (vector("u", "v"),),
+                    quantity="intensive",
                     route_id="vector route",
                 ),
-                Exchange("SRC_B", "DST", ("v",), route_id="scalar route"),
+                Exchange(
+                    "SRC_B",
+                    "DST",
+                    ("v",),
+                    quantity="intensive",
+                    route_id="scalar route",
+                ),
             ),
             run_order=("SRC_A", "SRC_B", "DST"),
             runtime=RuntimeOptions(topology=None),
@@ -226,8 +236,8 @@ def test_component_can_receive_step_and_send_the_same_field() -> None:
         clock=_clock(),
         components=(source, middle, target),
         exchanges=(
-            Exchange("SRC", "MID", ("signal",)),
-            Exchange("MID", "DST", ("signal",)),
+            Exchange("SRC", "MID", ("signal",), quantity="intensive"),
+            Exchange("MID", "DST", ("signal",), quantity="intensive"),
         ),
         run_order=("SRC", "MID", "DST"),
         runtime=RuntimeOptions(topology=None),
@@ -282,7 +292,7 @@ def test_exchanged_fields_must_be_declared_by_receiving_component() -> None:
     coupler = Coupler(
         clock=_clock(),
         components=(source, target),
-        exchanges=(Exchange("SRC", "DST", ("custom_flux",)),),
+        exchanges=(Exchange("SRC", "DST", ("custom_flux",), quantity="intensive"),),
         run_order=("SRC", "DST"),
         runtime=RuntimeOptions(topology=None),
     )
@@ -304,7 +314,7 @@ def test_required_surface_mask_policy_preserves_missing_role_errors() -> None:
     coupler = Coupler(
         clock=_clock(),
         components=(source, target),
-        exchanges=(Exchange("SRC", "DST", ("temperature",)),),
+        exchanges=(Exchange("SRC", "DST", ("temperature",), quantity="intensive"),),
         run_order=("SRC", "DST"),
         runtime=RuntimeOptions(topology=SurfaceMaskPolicy(mode="required")),
     )
@@ -414,7 +424,9 @@ def test_make_jcm_land_atmosphere_accepts_jax_gcm_config(
     ocn_grid = make_test_grid(name="ocn")
     jcm_grid = make_test_grid(name="jcm", binary_mask=np.ones((2, 2)))
     coords = SimpleNamespace(horizontal=SimpleNamespace())
-    terrain = SimpleNamespace(fmask=None)
+    terrain = SimpleNamespace(
+        fmask=None, copy=lambda **updates: SimpleNamespace(**updates)
+    )
     forcing = object()
     captured_config: dict[str, JAXGCMConfig] = {}
     captured_land_output: list[OutputSpec | None] = []
@@ -441,7 +453,7 @@ def test_make_jcm_land_atmosphere_accepts_jax_gcm_config(
         return DataComponent(
             name,
             jcm_grid,
-            {"land_surface_temperature": 280.0},
+            {"land_surface_temperature": 280.0, "land_fraction": jnp.ones((2, 2))},
         )
 
     def fake_make_jax_gcm(
@@ -451,7 +463,8 @@ def test_make_jcm_land_atmosphere_accepts_jax_gcm_config(
         config: JAXGCMConfig | None = None,
     ) -> Component:
         assert loaded_coords is coords
-        assert loaded_terrain is terrain
+        assert loaded_terrain is not terrain
+        assert_allclose_compact(cast(Any, loaded_terrain).fmask, np.ones((2, 2)))
         assert config is not None
         captured_config["value"] = config
         return CallableComponent(

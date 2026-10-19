@@ -155,8 +155,8 @@ def build_surface_mask_topology_patch(
     """Return topology patches from temporary derived surface masks."""
 
     (
-        ocn_fmask_on_atm_grid,
-        lnd_fmask_on_atm_grid,
+        _,
+        _,
         lnd_bmask_on_atm_grid,
     ) = create_surface_exchange_masks(
         context.components,
@@ -169,21 +169,14 @@ def build_surface_mask_topology_patch(
         policy=policy,
     )
     binary_masks = {}
-    fractional_masks = {}
     for exchange in context.exchanges:
         source = exchange.source
         destination = exchange.target
         route_id = exchange.route_id
-        if source == policy.ocean and destination == policy.atmosphere:
-            if exchange.quantity == "legacy":
-                fractional_masks[route_id] = ocn_fmask_on_atm_grid
-        elif source == policy.land and destination == policy.atmosphere:
+        if source == policy.land and destination == policy.atmosphere:
             binary_masks[route_id] = lnd_bmask_on_atm_grid
-            if exchange.quantity == "legacy":
-                fractional_masks[route_id] = lnd_fmask_on_atm_grid
     return ExchangeTopologyPatch(
         binary_masks=binary_masks,
-        fractional_masks=fractional_masks,
     )
 
 

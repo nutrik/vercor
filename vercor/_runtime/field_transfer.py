@@ -13,7 +13,7 @@ from vercor._runtime.time import RuntimeStepInfo
 from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
-    from vercor.components.contracts import Component, TransferPolicy
+    from vercor.components.contracts import Component, ComponentMaskSpec, TransferPolicy
 
 
 def receive_runtime_fields(
@@ -36,10 +36,15 @@ def select_runtime_field(
     field: RuntimeArray,
     transfer: "TransferPolicy",
     step_info: RuntimeStepInfo | None,
+    *,
+    field_name: str | None = None,
+    masks: "ComponentMaskSpec | None" = None,
 ) -> RuntimeArray:
-    """Select one current, linearly interpolated, or daily runtime field."""
+    """Select forcing records while keeping declared grid-shaped masks current."""
 
-    if step_info is None:
+    if step_info is None or (
+        masks is not None and field_name in (masks.binary_field, masks.fractional_field)
+    ):
         return field
 
     time_selection = transfer.time_selection
@@ -76,6 +81,8 @@ def send_runtime_fields(
             component_state.fields.get(field_name),
             component.spec.transfer,
             step_info,
+            field_name=field_name,
+            masks=component.spec.masks,
         )
         for field_name in contract.sends
     }

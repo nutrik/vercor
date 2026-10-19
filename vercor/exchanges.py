@@ -15,10 +15,10 @@ from vercor.regridding import bilinear as _bilinear
 class Exchange:
     """Declare one stable route and the area meaning of its transferred fields.
 
-    ``legacy`` preserves static scalar/vector behavior. Explicit ``intensive``
+    ``intensive``
     quantities are covered-source means; ``source_flux`` and ``target_flux``
     are contributions per target grid-cell area using source or target coverage.
-    Routes touching dynamic masks must choose an explicit quantity.
+    Every route must choose its quantity explicitly.
     ``source_coverage="binary"`` selects computational support for total-area
     fluxes that already include component coverage, including ice-free cells.
     """
@@ -28,7 +28,7 @@ class Exchange:
     fields: Sequence[_fields.ExchangeField]
     route_id: str
     regridder_factory: _regridding.RegridderFactory
-    quantity: _typing.Literal["legacy", "intensive", "source_flux", "target_flux"]
+    quantity: _typing.Literal["intensive", "source_flux", "target_flux"]
 
     source_coverage: _typing.Literal["component", "binary"]
 
@@ -40,9 +40,7 @@ class Exchange:
         *,
         route_id: str | None = None,
         regridder_factory: _regridding.RegridderFactory = _bilinear,
-        quantity: _typing.Literal[
-            "legacy", "intensive", "source_flux", "target_flux"
-        ] = "legacy",
+        quantity: _typing.Literal["intensive", "source_flux", "target_flux"],
         source_coverage: _typing.Literal["component", "binary"] = "component",
     ) -> None:
         """Create an exchange with an explicit or endpoint-derived route ID."""
@@ -61,18 +59,15 @@ class Exchange:
             raise TypeError("regridder_factory must be callable")
         if not isinstance(quantity, str):
             raise TypeError("quantity must be a string")
-        if quantity not in ("legacy", "intensive", "source_flux", "target_flux"):
+        if quantity not in ("intensive", "source_flux", "target_flux"):
             raise ValueError(
-                "quantity must be 'legacy', 'intensive', 'source_flux', or 'target_flux'"
+                "quantity must be 'intensive', 'source_flux', or 'target_flux'"
             )
 
         if not isinstance(source_coverage, str):
             raise TypeError("source_coverage must be a string")
         if source_coverage not in ("component", "binary"):
             raise ValueError("source_coverage must be 'component' or 'binary'")
-        if source_coverage == "binary" and quantity == "legacy":
-            raise ValueError("binary source_coverage requires an explicit quantity")
-
         object.__setattr__(self, "source_coverage", source_coverage)
         object.__setattr__(self, "source", source)
         object.__setattr__(self, "target", target)

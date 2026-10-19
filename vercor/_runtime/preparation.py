@@ -25,7 +25,7 @@ def runtime_state_from_components(
     runtime_state = _runtime_state_from_components(
         prepared.components,
         prepared.exchanges,
-        topology_maps.fractional_masks,
+        topology_maps.binary_masks,
         contracts=prepared.contracts,
         prefill_missing=prefill_missing,
     )

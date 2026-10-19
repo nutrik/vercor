@@ -285,7 +285,7 @@ class RecordingTopologyPolicy:
         self.events.append(f"build:{self.route_id}")
         self.patch_routes = (self.route_id,)
         return ExchangeTopologyPatch(
-            fractional_masks={self.route_id: jnp.ones(target_shape)}
+            binary_masks={self.route_id: jnp.ones(target_shape)}
         )
 
 

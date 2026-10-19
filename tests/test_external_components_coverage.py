@@ -12,6 +12,7 @@ from typing import Any, Literal, cast
 
 import h5netcdf
 import jax
+import jax_datetime as jdt
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -362,64 +363,39 @@ def test_jax_gcm_tree_as_real_dtype_converts_tree_leaves() -> None:
     assert_allclose_compact(converted["a"], np.asarray([1.0, 2.0]))
 
 
-def test_cleanup_surface_temperature_fields_supports_jit_and_gradients() -> None:
-    land_surface_temperature = jnp.asarray([[270.0, jnp.nan], [260.0, 240.0]])
-    sea_surface_temperature = jnp.asarray([[jnp.nan, 281.0], [2.0, 3.0]])
+def test_independent_surface_temperatures_support_jit_and_gradients() -> None:
+    land = jnp.array([[300.0, jnp.nan], [310.0, 320.0]])
+    sea = jnp.array([[jnp.nan, 280.0], [285.0, 290.0]])
+    fraction = jnp.array([[1.0, 0.0], [0.25, 0.75]])
+    prepared_land, prepared_sea, total = jax.jit(
+        jax_gcm_fields_module.prepare_surface_temperature_forcing
+    )(land, sea, fraction)
+    assert_allclose_compact(prepared_land, [[300.0, 288.15], [310.0, 320.0]])
+    assert_allclose_compact(prepared_sea, [[288.15, 280.0], [285.0, 290.0]])
+    assert_allclose_compact(total, [[300.0, 280.0], [291.25, 312.5]])
 
-    (
-        clean_land_surface_temperature,
-        clean_sea_surface_temperature,
-        total_surface_temperature,
-        cold_surface_cells,
-    ) = jax.jit(jax_gcm_fields_module.cleanup_surface_temperature_fields)(
-        land_surface_temperature,
-        sea_surface_temperature,
-    )
-
-    assert_allclose_compact(
-        clean_land_surface_temperature,
-        np.asarray([[270.0, 0.0], [260.0, 240.0]]),
-    )
-    assert_allclose_compact(
-        clean_sea_surface_temperature,
-        np.asarray([[0.0, 281.0], [2.0, 3.0]]),
-    )
-    assert_allclose_compact(
-        total_surface_temperature,
-        np.asarray([[270.0, 281.0], [262.0, 243.0]]),
-    )
-    assert_allclose_compact(
-        cold_surface_cells,
-        np.asarray([[False, False], [False, True]]),
-    )
-
-    gradient = jax.grad(
-        lambda land: jnp.sum(
-            jax_gcm_fields_module.cleanup_surface_temperature_fields(
-                land,
-                jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
-            )[2]
+    def objective(a: jax.Array, b: jax.Array) -> jax.Array:
+        return jnp.sum(
+            jax_gcm_fields_module.prepare_surface_temperature_forcing(a, b, fraction)[2]
         )
-    )(jnp.asarray([[270.0, 271.0], [272.0, 273.0]]))
-    assert_allclose_compact(gradient, np.ones((2, 2)))
+
+    dland, dsea = jax.grad(objective, argnums=(0, 1))(land, sea)
+    assert_allclose_compact(dland, [[1.0, 0.0], [0.25, 0.75]])
+    assert_allclose_compact(dsea, [[0.0, 1.0], [0.75, 0.25]])
     assert_finite_jvp_vjp(
-        lambda land: jnp.sum(
-            jax_gcm_fields_module.cleanup_surface_temperature_fields(
-                land,
-                jnp.asarray([[1.0, 2.0], [3.0, 4.0]]),
-            )[2]
-        ),
-        jnp.asarray([[270.0, 271.0], [272.0, 273.0]]),
-        jnp.ones((2, 2)),
+        lambda x: objective(x, sea), land, jnp.array([[1.0, 0.0], [1.0, 1.0]])
     )
 
 
 @pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
-def test_jcm_surface_cleanup_rejects_infinity(bad_value: float) -> None:
+def test_jcm_surface_forcing_rejects_infinity(bad_value: float) -> None:
     with pytest.raises(CouplerError, match="JCM.*surface temperature.*infinity"):
-        cast(Any, jax_gcm_fields_module.cleanup_surface_temperature_fields).__wrapped__(
-            jnp.asarray([[bad_value, jnp.nan]]),
-            jnp.asarray([[jnp.nan, 280.0]]),
+        cast(
+            Any, jax_gcm_fields_module.prepare_surface_temperature_forcing
+        ).__wrapped__(
+            jnp.array([[bad_value, jnp.nan]]),
+            jnp.array([[jnp.nan, 280.0]]),
+            jnp.array([[1.0, 0.0]]),
         )
 
 
@@ -451,63 +427,44 @@ def test_jax_gcm_prefill_uses_physical_bulk_flux_defaults() -> None:
 
 
 @pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
-def test_compiled_jcm_surface_cleanup_rejects_infinity(bad_value: float) -> None:
+def test_compiled_jcm_surface_forcing_rejects_infinity(bad_value: float) -> None:
     with pytest.raises(JaxRuntimeError, match="JCM.*surface temperature.*infinity"):
-        result = jax.jit(jax_gcm_fields_module.cleanup_surface_temperature_fields)(
-            jnp.asarray([[bad_value, jnp.nan]]),
-            jnp.asarray([[jnp.nan, 280.0]]),
+        result = jax.jit(jax_gcm_fields_module.prepare_surface_temperature_forcing)(
+            jnp.array([[bad_value, jnp.nan]]),
+            jnp.array([[jnp.nan, 280.0]]),
+            jnp.array([[1.0, 0.0]]),
         )
         result[0].block_until_ready()
 
 
 def test_prepare_surface_temperature_forcing_supports_jit_and_fill_value() -> None:
-    total_surface_temperature = jnp.asarray([[270.0, 281.0], [282.0, 567.0]])
-    land_fraction_mask = jnp.asarray([[1.0, 0.0], [0.0, 1.0]])
-
-    land_surface_temperature, sea_surface_temperature = jax.jit(
+    land, sea, total = jax.jit(
         jax_gcm_fields_module.prepare_surface_temperature_forcing
-    )(total_surface_temperature, land_fraction_mask)
-
-    assert_allclose_compact(
-        land_surface_temperature,
-        np.asarray([[270.0, 288.15], [288.15, 567.0]]),
+    )(
+        jnp.array([[270.0, jnp.nan], [jnp.nan, 280.0]]),
+        jnp.array([[jnp.nan, 281.0], [282.0, jnp.nan]]),
+        jnp.array([[1.0, 0.0], [0.0, 1.0]]),
     )
-    assert_allclose_compact(
-        sea_surface_temperature,
-        np.asarray([[288.15, 281.0], [282.0, 288.15]]),
-    )
+    assert_allclose_compact(land, [[270.0, 288.15], [288.15, 280.0]])
+    assert_allclose_compact(sea, [[288.15, 281.0], [282.0, 288.15]])
+    assert_allclose_compact(total, [[270.0, 281.0], [282.0, 280.0]])
 
 
 def test_prepare_surface_temperature_forcing_preserves_fractional_cells() -> None:
-    total_surface_temperature = jnp.asarray([[270.0, 281.0], [282.0, 567.0]])
-    land_fraction_mask = jnp.asarray([[1.0, 0.0], [0.25, 0.75]])
+    land = jnp.array([[300.0, 300.0], [310.0, 320.0]])
+    sea = jnp.array([[280.0, 280.0], [285.0, 290.0]])
+    fraction = jnp.array([[1.0, 0.0], [0.25, 0.75]])
 
-    def forcing_sum(temperature: jax.Array) -> jax.Array:
-        land, sea = jax_gcm_fields_module.prepare_surface_temperature_forcing(
-            temperature,
-            land_fraction_mask,
+    def objective(a: jax.Array, b: jax.Array) -> jax.Array:
+        x, y, _ = jax_gcm_fields_module.prepare_surface_temperature_forcing(
+            a, b, fraction
         )
-        return jnp.sum(land + sea)
+        return jnp.sum(x + y)
 
-    land_surface_temperature, sea_surface_temperature = jax.jit(
-        jax_gcm_fields_module.prepare_surface_temperature_forcing
-    )(total_surface_temperature, land_fraction_mask)
-    gradient = jax.grad(forcing_sum)(total_surface_temperature)
-
-    assert_allclose_compact(
-        land_surface_temperature,
-        np.asarray([[270.0, 288.15], [282.0, 567.0]]),
-    )
-    assert_allclose_compact(
-        sea_surface_temperature,
-        np.asarray([[288.15, 281.0], [282.0, 567.0]]),
-    )
-    assert_allclose_compact(gradient, np.asarray([[1.0, 1.0], [2.0, 2.0]]))
-    assert_finite_jvp_vjp(
-        forcing_sum,
-        total_surface_temperature,
-        jnp.ones_like(total_surface_temperature),
-    )
+    dland, dsea = jax.grad(objective, argnums=(0, 1))(land, sea)
+    assert_allclose_compact(dland, [[1.0, 0.0], [1.0, 1.0]])
+    assert_allclose_compact(dsea, [[0.0, 1.0], [1.0, 1.0]])
+    assert_finite_jvp_vjp(lambda x: objective(x, sea), land, jnp.ones_like(land))
 
 
 def _map_uniform_jcm_column(
@@ -531,15 +488,15 @@ def _map_uniform_jcm_column(
             8314.47,
             1.0e5,
             0.286,
-            jnp.zeros((1, 1, 3)),
-            jnp.zeros((1, 1, 3)),
+            jnp.zeros((1, 1)),
+            jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
             jnp.zeros((1, 1)),
             jnp.broadcast_to(jnp.asarray(normalized_surface_pressure), (1, 1)),
             jnp.zeros_like(temperature_profile),
             jnp.zeros_like(temperature_profile),
             temperature_profile,
-            jnp.full_like(temperature_profile, 10.0),
+            jnp.full_like(temperature_profile, 0.01),
             downward_shortwave_radiation_flux=0.0,
             open_water_albedo=0.07,
             large_scale_precipitation=jnp.zeros((1, 1)),
@@ -685,8 +642,8 @@ def test_map_jcm_output_fields_supports_jit(
         8314.47,
         1.0e5,
         0.286,
-        jnp.full((2, 2, 3), 5.0),
-        jnp.full((2, 2, 3), 2.0),
+        jnp.full((2, 2), 5.0),
+        jnp.full((2, 2), 2.0),
         jnp.full((2, 2), 40.0),
         jnp.full((2, 2), 30.0),
         jnp.asarray([[0.9, 1.0], [1.1, 1.2]]),
@@ -710,8 +667,8 @@ def test_map_jcm_output_fields_supports_jit(
         ),
         jnp.asarray(
             [
-                [[10.0, 20.0], [30.0, 40.0]],
-                [[50.0, 60.0], [70.0, 80.0]],
+                [[0.01, 0.02], [0.03, 0.04]],
+                [[0.05, 0.06], [0.07, 0.08]],
             ]
         ),
     )
@@ -772,8 +729,8 @@ def test_map_jcm_output_fields_supports_jit(
             8314.47,
             1.0e5,
             0.286,
-            jnp.full((2, 2, 3), 5.0),
-            jnp.full((2, 2, 3), 2.0),
+            jnp.full((2, 2), 5.0),
+            jnp.full((2, 2), 2.0),
             jnp.full((2, 2), 40.0),
             jnp.full((2, 2), 30.0),
             jnp.asarray([[0.9, 1.0], [1.1, 1.2]]),
@@ -802,7 +759,7 @@ def test_map_jcm_output_fields_supports_jit(
     )
 
 
-def test_generate_step_function_threads_jcm_2_physics_carry() -> None:
+def test_generate_step_function_threads_jcm_3_clock_and_carry() -> None:
     component = jax_gcm_state_module.JAXGCMSetupState.__new__(
         jax_gcm_state_module.JAXGCMSetupState
     )
@@ -821,7 +778,9 @@ def test_generate_step_function_threads_jcm_2_physics_carry() -> None:
             total_time: float,
             output_averages: bool,
             initial_physics_state: Any,
-        ) -> tuple[str, str, Any]:
+            initial_time: Any,
+            initial_step: Any,
+        ) -> tuple[Any, Any]:
             calls["run"] = (
                 initial_state,
                 initial_physics_state,
@@ -834,10 +793,20 @@ def test_generate_step_function_threads_jcm_2_physics_carry() -> None:
                 dynamics={"wind": jnp.asarray([[1.0, 3.0], [5.0, 7.0]])},
                 physics={"heat": jnp.asarray([[2.0, 4.0], [6.0, 8.0]])},
             )
-            return "next-dycore", "next-carry", predictions
+            return (
+                SimpleNamespace(
+                    dynamics="next-dycore",
+                    physics="next-carry",
+                    time=initial_time + jdt.Timedelta(seconds=43200),
+                    step=initial_step + 24,
+                ),
+                predictions,
+            )
 
     component.model = _FakeModel()
     state = jax_gcm_state_module.JCMState(
+        time=jdt.to_datetime("2000-01-01"),
+        step=jnp.int32(0),
         dynamics={},
         physics={},
         dycore_state="initial-dycore",
@@ -858,6 +827,8 @@ def test_generate_step_function_threads_jcm_2_physics_carry() -> None:
     )
     assert next_state.dycore_state == "next-dycore"
     assert next_state.physics_carry == "next-carry"
+    assert int(next_state.time.delta.seconds) == 43200
+    assert int(next_state.step) == 24
     assert_allclose_compact(next_state.dynamics["wind"], np.asarray([3.0, 5.0]))
     assert_allclose_compact(next_state.physics["heat"], np.asarray([4.0, 6.0]))
     assert predictions.physics["heat"].shape == (2, 2)
@@ -875,11 +846,18 @@ def test_bootstrap_jcm_state_captures_native_state_and_physics_carry() -> None:
             self.dycore = _FakeDycore()
             self._final_dycore_state: Any = None
             self._final_physics_state: Any = None
+            self.run_state: Any = None
 
         def bootstrap_state(self) -> None:
             calls["bootstrap"] += 1
             self._final_dycore_state = {"vorticity": jnp.asarray(1.0)}
             self._final_physics_state = {"heating": jnp.asarray(2.0)}
+            self.run_state = SimpleNamespace(
+                dynamics=self._final_dycore_state,
+                physics=self._final_physics_state,
+                time=jdt.to_datetime("2000-01-01"),
+                step=jnp.int32(0),
+            )
 
     model = _FakeModel()
     state = jax_gcm_state_module._bootstrap_jcm_state(cast(Any, model))
@@ -903,6 +881,12 @@ def test_bootstrap_jcm_state_rejects_missing_final_state(
         bootstrap_state=lambda: None,
         _final_dycore_state=dycore_state,
         _final_physics_state=physics_carry,
+        run_state=SimpleNamespace(
+            dynamics=dycore_state,
+            physics=physics_carry,
+            time=jdt.to_datetime("2000-01-01"),
+            step=jnp.int32(0),
+        ),
     )
 
     with pytest.raises(RuntimeError, match="did not initialize"):
@@ -1016,6 +1000,12 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
         dycore=SimpleNamespace(to_physics_state=lambda state: {"converted": state}),
         _final_dycore_state=initial_dycore_state,
         _final_physics_state=initial_physics_carry,
+        run_state=SimpleNamespace(
+            dynamics=initial_dycore_state,
+            physics=initial_physics_carry,
+            time=jdt.to_datetime("2000-01-01"),
+            step=jnp.int32(0),
+        ),
         bootstrap_state=lambda: None,
     )
 
@@ -1023,6 +1013,8 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
         _ = forcing
         return (
             jax_gcm_state_module.JCMState(
+                time=state.time,
+                step=state.step,
                 dynamics=state.dynamics,
                 physics=state.physics,
                 dycore_state={"marker": state.dycore_state["marker"] + 1.0},
@@ -1102,6 +1094,12 @@ def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
         dycore=SimpleNamespace(to_physics_state=lambda state: state),
         _final_dycore_state=initial_dycore_state,
         _final_physics_state=initial_physics_carry,
+        run_state=SimpleNamespace(
+            dynamics=initial_dycore_state,
+            physics=initial_physics_carry,
+            time=jdt.to_datetime("2000-01-01"),
+            step=jnp.int32(0),
+        ),
         bootstrap_state=lambda: None,
     )
 
@@ -1121,6 +1119,8 @@ def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
         )
         return (
             jax_gcm_state_module.JCMState(
+                time=state.time,
+                step=state.step,
                 dynamics=state.dynamics,
                 physics=state.physics,
                 dycore_state={
@@ -1185,6 +1185,12 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
         dycore=SimpleNamespace(to_physics_state=lambda state: {"converted": state}),
         _final_dycore_state=initial_dycore_state,
         _final_physics_state=initial_physics_carry,
+        run_state=SimpleNamespace(
+            dynamics=initial_dycore_state,
+            physics=initial_physics_carry,
+            time=jdt.to_datetime("2000-01-01"),
+            step=jnp.int32(0),
+        ),
         bootstrap_state=lambda: None,
     )
 
@@ -1245,6 +1251,8 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     component.forcing = _FakeForcing()
     cast(Any, component).sigma_levels = np.asarray([0.2, 1.0], dtype=float)
     component._state = jax_gcm_state_module.JCMState(
+        time=jdt.to_datetime("2000-01-01"),
+        step=jnp.int32(0),
         dynamics={},
         physics={},
         dycore_state={"marker": jnp.asarray(0.0)},
@@ -1253,8 +1261,8 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
 
     p = {
         "_surface_flux": SimpleNamespace(
-            shf=np.full((2, 2, 3), 5.0, dtype=float),
-            evap=np.full((2, 2, 3), 2.0, dtype=float),
+            shf=np.full((2, 2), 5.0, dtype=float),
+            evap=np.full((2, 2), 2.0, dtype=float),
             rlds=np.full((2, 2), 40.0, dtype=float),
             t0=np.asarray([[270.0, 275.0], [280.0, 275.0]]),
         ),
@@ -1285,8 +1293,8 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         ),
         specific_humidity=np.asarray(
             [
-                [[10.0, 20.0], [30.0, 40.0]],
-                [[50.0, 60.0], [70.0, 80.0]],
+                [[0.01, 0.02], [0.03, 0.04]],
+                [[0.05, 0.06], [0.07, 0.08]],
             ]
         ),
         normalized_surface_pressure=np.asarray([[0.9, 1.0], [1.1, 1.2]], dtype=float),
@@ -1297,6 +1305,8 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         Any,
         lambda state, forcing: (
             jax_gcm_state_module.JCMState(
+                time=jdt.to_datetime("2000-01-01"),
+                step=jnp.int32(0),
                 dynamics=d,
                 physics=p,
                 dycore_state={"marker": state.dycore_state["marker"] + 1.0},
@@ -1372,7 +1382,7 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     assert isinstance(forcing_call["sea_surface_temperature"], jax.Array)
     assert_allclose_compact(
         forcing_call["stl_am"],
-        np.asarray([[270.0, 288.15], [288.15, 567.0]]),
+        np.asarray([[270.0, 288.15], [288.15, 284.0]]),
     )
     assert_allclose_compact(
         forcing_call["sea_surface_temperature"],
@@ -1381,7 +1391,7 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     data = component_state.fields
     assert_allclose_compact(
         data.get("total_surface_temperature"),
-        np.asarray([[270.0, 281.0], [282.0, 567.0]]),
+        np.asarray([[270.0, 281.0], [282.0, 284.0]]),
     )
     assert_allclose_compact(
         data.get("u_velocity"), np.asarray([[5.0, 7.0], [6.0, 8.0]])

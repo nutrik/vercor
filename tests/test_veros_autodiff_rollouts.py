@@ -17,7 +17,6 @@ from vercor import Clock, Coupler, Exchange, RuntimeOptions
 from vercor.components import Component
 from vercor.dtypes import DTypePolicy
 from vercor.recipes import (
-    ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
     ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
     JCM_LAND_TO_ATMOSPHERE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
@@ -523,32 +522,29 @@ def _fully_coupled_global_model() -> Coupler:
     )
     exchanges = (
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="OCN",
             target="ATM",
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="LND",
             target="ATM",
             fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
             regridder_factory=bilinear,
         ),
-        Exchange(
-            source="ATM",
-            target="LND",
-            fields=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
-            regridder_factory=bilinear,
-        ),
     )
     return Coupler(
-        _clock(5),
+        Clock(datetime(2000, 1, 3), 86400.0, 5, calendar="gregorian"),
         components=(ocean, jcm.land, jcm.atmosphere),
         exchanges=exchanges,
         run_order=("OCN", "LND", "ATM"),

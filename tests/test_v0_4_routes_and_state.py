@@ -84,11 +84,12 @@ def test_exchange_owns_stable_route_id_and_regridder_factory() -> None:
     assert "regrid" not in signature.parameters
     assert "label" not in signature.parameters
 
-    default = Exchange("SRC", "DST", ("scalar",))
+    default = Exchange("SRC", "DST", ("scalar",), quantity="intensive")
     explicit = Exchange(
         "SRC",
         "DST",
         ("scalar",),
+        quantity="intensive",
         route_id="surface-temperature",
         regridder_factory=regridding.bilinear,
     )
@@ -106,7 +107,7 @@ def test_exchange_owns_stable_route_id_and_regridder_factory() -> None:
 def test_exchange_rejects_invalid_route_ids(route_id: object) -> None:
     error = TypeError if not isinstance(route_id, str) else ValueError
     with pytest.raises(error, match="route_id"):
-        Exchange("SRC", "DST", ("scalar",), route_id=route_id)  # type: ignore[arg-type]
+        Exchange("SRC", "DST", ("scalar",), quantity="intensive", route_id=route_id)  # type: ignore[arg-type]
 
 
 @pytest.mark.fast_always
@@ -116,6 +117,7 @@ def test_exchange_rejects_noncallable_factory_immediately() -> None:
             "SRC",
             "DST",
             ("scalar",),
+            quantity="intensive",
             regridder_factory=object(),  # type: ignore[arg-type]
         )
 
@@ -129,8 +131,12 @@ def test_route_id_collisions_fail_before_lifecycle_or_factory_calls() -> None:
         factory_calls.append((source_grid, target_grid))
         return regridding.bilinear(source_grid, target_grid)
 
-    first = Exchange("SRC", "DST", ("scalar",), regridder_factory=factory)
-    second = Exchange("SRC", "DST", ("other",), regridder_factory=factory)
+    first = Exchange(
+        "SRC", "DST", ("scalar",), quantity="intensive", regridder_factory=factory
+    )
+    second = Exchange(
+        "SRC", "DST", ("other",), quantity="intensive", regridder_factory=factory
+    )
 
     with pytest.raises(CouplerError, match=r"route ID 'SRC->DST'.*unique"):
         _coupler(first, second, setup_calls=setup_calls)
@@ -149,8 +155,10 @@ def test_explicit_route_ids_are_globally_unique_across_endpoints() -> None:
         spec=ComponentSpec(inputs=("scalar",)),
     )
     routes = (
-        Exchange("SRC", "DST", ("scalar",), route_id="duplicate"),
-        Exchange("SRC", "THIRD", ("scalar",), route_id="duplicate"),
+        Exchange("SRC", "DST", ("scalar",), quantity="intensive", route_id="duplicate"),
+        Exchange(
+            "SRC", "THIRD", ("scalar",), quantity="intensive", route_id="duplicate"
+        ),
     )
     with pytest.raises(CouplerError, match=r"route ID 'duplicate'.*unique"):
         Coupler(
@@ -184,6 +192,7 @@ def test_parameterized_factories_build_independent_route_entries() -> None:
             "SRC",
             "DST",
             ("scalar",),
+            quantity="intensive",
             route_id="scalar-route",
             regridder_factory=partial(
                 factory,
@@ -195,6 +204,7 @@ def test_parameterized_factories_build_independent_route_entries() -> None:
             "SRC",
             "DST",
             ("other",),
+            quantity="intensive",
             route_id="other-route",
             regridder_factory=partial(
                 factory,
@@ -245,6 +255,7 @@ def test_vector_route_rejects_scalar_only_regridder_during_preparation() -> None
         "SRC",
         "DST",
         (vector("u", "v"),),
+        quantity="intensive",
         route_id="wind",
         regridder_factory=regridding.conservative,
     )
@@ -278,6 +289,7 @@ def test_scalar_declarations_reject_vector_only_regridder_during_preparation(
         "SRC",
         "DST",
         fields,
+        quantity="intensive",
         route_id="scalar-capability",
         regridder_factory=cast(Any, VectorOnly),
     )
@@ -291,6 +303,7 @@ def test_mixed_route_requires_both_scalar_and_vector_capabilities() -> None:
         "SRC",
         "DST",
         ("scalar", vector("u", "v")),
+        quantity="intensive",
         route_id="mixed",
         regridder_factory=regridding.bilinear,
     )
@@ -307,13 +320,14 @@ def test_topology_policy_requires_only_build_and_uses_route_string_keys() -> Non
         def build(self, context: TopologyContext) -> ExchangeTopologyPatch:
             contexts.append(context)
             return ExchangeTopologyPatch(
-                fractional_masks={"temperature-route": jnp.full((2, 2), 0.5)}
+                binary_masks={"temperature-route": jnp.zeros((2, 2))}
             )
 
     route = Exchange(
         "SRC",
         "DST",
         ("scalar",),
+        quantity="intensive",
         route_id="temperature-route",
     )
     final = _coupler(route, topology=BuildOnlyPolicy()).run()
@@ -322,19 +336,16 @@ def test_topology_policy_requires_only_build_and_uses_route_string_keys() -> Non
     assert tuple(exchange.route_id for exchange in contexts[0].exchanges) == (
         "temperature-route",
     )
-    assert jnp.allclose(final.component("DST").field("scalar"), 0.5)
+    assert jnp.allclose(final.component("DST").field("scalar"), 0.0)
 
 
 @pytest.mark.fast_always
 def test_topology_patch_mappings_are_route_keyed_and_frozen() -> None:
     patch = ExchangeTopologyPatch(
         binary_masks={"route": jnp.ones((2, 2))},
-        fractional_masks={"route": jnp.full((2, 2), 0.25)},
     )
     assert isinstance(patch.binary_masks, MappingProxyType)
-    assert isinstance(patch.fractional_masks, MappingProxyType)
     assert tuple(patch.binary_masks) == ("route",)
-    assert tuple(patch.fractional_masks) == ("route",)
 
 
 @pytest.mark.fast_always
@@ -344,7 +355,9 @@ def test_topology_policy_must_return_exchange_topology_patch() -> None:
             _ = context
             return None
 
-    route = Exchange("SRC", "DST", ("scalar",), route_id="scalar-route")
+    route = Exchange(
+        "SRC", "DST", ("scalar",), quantity="intensive", route_id="scalar-route"
+    )
     with pytest.raises(CouplerError, match="must return ExchangeTopologyPatch"):
         _coupler(route, topology=InvalidPolicy()).initial_state()
 
@@ -352,8 +365,8 @@ def test_topology_policy_must_return_exchange_topology_patch() -> None:
 @pytest.mark.fast_always
 def test_fan_in_error_reports_sorted_route_ids_not_factory_names() -> None:
     routes = (
-        Exchange("SRC", "DST", ("scalar",), route_id="z-route"),
-        Exchange("SRC", "DST", ("scalar",), route_id="a-route"),
+        Exchange("SRC", "DST", ("scalar",), quantity="intensive", route_id="z-route"),
+        Exchange("SRC", "DST", ("scalar",), quantity="intensive", route_id="a-route"),
     )
     with pytest.raises(
         CouplerError,
@@ -691,7 +704,9 @@ _INCOMING_STATE_INVARIANTS = (
 
 
 def _state_coupler(*, backend: Any | None = None) -> Coupler:
-    route = Exchange("SRC", "DST", ("scalar",), route_id="scalar-route")
+    route = Exchange(
+        "SRC", "DST", ("scalar",), quantity="intensive", route_id="scalar-route"
+    )
     runtime = RuntimeOptions(backend=backend) if backend is not None else None
     source, target = _components()
     return Coupler(
@@ -840,9 +855,15 @@ def _interleaved_route_coupler(backend: Any) -> Coupler:
         _clock(),
         components=(source, first_target, second_target),
         exchanges=(
-            Exchange("SRC", "FIRST", ("scalar",), route_id="route-1"),
-            Exchange("SRC", "SECOND", ("other",), route_id="route-2"),
-            Exchange("SRC", "FIRST", ("other",), route_id="route-3"),
+            Exchange(
+                "SRC", "FIRST", ("scalar",), quantity="intensive", route_id="route-1"
+            ),
+            Exchange(
+                "SRC", "SECOND", ("other",), quantity="intensive", route_id="route-2"
+            ),
+            Exchange(
+                "SRC", "FIRST", ("other",), quantity="intensive", route_id="route-3"
+            ),
         ),
         run_order=("SRC", "FIRST", "SECOND"),
         runtime=RuntimeOptions(backend=backend),

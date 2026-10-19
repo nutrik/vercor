@@ -179,9 +179,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     coupler = cast(Coupler, captured["coupler"])
     topology = coupler._ensure_prepared().topology_maps
     assert_allclose_compact(topology.binary_masks["ATM->OCN"], ocean_mask)
-    assert_allclose_compact(topology.fractional_masks["ATM->OCN"], ocean_mask)
     assert_allclose_compact(topology.binary_masks["ATM->LND"], land_mask)
-    assert_allclose_compact(topology.fractional_masks["ATM->LND"], land_mask)
 
     final_state = captured["final_state"]
     views = final_state.components(("OCN", "LND", "ATM"))

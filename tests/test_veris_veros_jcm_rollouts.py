@@ -88,9 +88,9 @@ def test_native_rollout_composes_current_surfaces_and_shared_output(
         )
         > 0
     )
-    # LND runs first and therefore receives the preceding ATM interval.
-    land = final.component("LND")
-    active = np.asarray(land.grid.binary_mask) > 0
+    # Prescribed land consumes no atmospheric fluxes in JCM 3. Its delivered
+    # surface flux diagnostics are grid means, not separate land tiles.
+    assert coupler.components["LND"].spec.inputs == ()
     files = sorted(tmp_path.glob("**/*.nc"))
     assert files
     atm_files = [path for path in files if path.name.startswith("atm.averages.")]
@@ -107,17 +107,16 @@ def test_native_rollout_composes_current_surfaces_and_shared_output(
         np.testing.assert_allclose(ds.lon, atm.grid.longitude)
         np.testing.assert_allclose(ds.lat, atm.grid.latitude)
 
-    with xr.open_dataset(atm_files[0]) as first:
+    with xr.open_dataset(atm_files[-1]) as last:
         for name, native, factor in [
-            ("land_sensible_heat_flux", "surface_flux.shf.0", -1.0),
+            ("sensible_heat_flux", "surface_flux.shf", -1.0),
             (
-                "land_latent_heat_flux",
-                "surface_flux.evap.0",
+                "latent_heat_flux",
+                "surface_flux.evap",
                 -coupler.constants.latent_heat_of_vaporization / 1000,
             ),
         ]:
-            expected = first[native].isel(time=0) * factor
+            expected = last[native].isel(time=-1) * factor
             np.testing.assert_allclose(
-                np.asarray(land.field(name, scope="received"))[active],
-                np.asarray(expected)[active],
+                atm.field(name), np.asarray(expected.transpose("lat", "lon"))
             )

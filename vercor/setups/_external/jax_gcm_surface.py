@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import jax
-from jcm.date import DEFAULT_CALENDAR
 from jcm.forcing import ForcingData
 from jcm.physics.speedy.speedy_terms import SpeedyForcing
 
@@ -42,11 +41,9 @@ class CoupledJCMForcing:
             ),
         )
 
-    def select(self, date: Any, calendar: str = DEFAULT_CALENDAR) -> CoupledJCMForcing:
+    def select(self, date: Any) -> CoupledJCMForcing:
         """Select native time series/solar geometry and retain current albedo."""
-        return CoupledJCMForcing(
-            self.base.select(date, calendar=calendar), self.marine_surface_albedo
-        )
+        return CoupledJCMForcing(self.base.select(date), self.marine_surface_albedo)
 
 
 class CoupledSpeedyForcing(SpeedyForcing):

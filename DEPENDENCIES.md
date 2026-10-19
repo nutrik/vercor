@@ -89,3 +89,12 @@ native SST extraction. Imported ice concentration never replaces ocean support.
 The JCM marine forcing extension in layer 3 delegates native ForcingData
 selection/copying and SPEEDY forcing. Layer 4 composes independently weighted
 surface fields; lifecycle/runtime layers install the term and carry arrays.
+
+28. `tools/install_coupled_models.py` reads released JCM wheel metadata and
+    resolves all non-JAX native requirements normally. Only JCM 3.0.0's JAX
+    upper bound is overridden for the released Veris 0.2.1 combined lane.
+    `tests/test_native_dependency_install.py` guards the exact exception.
+
+The existing component declaration layer owns fractional coverage, topology owns
+only binary route restrictions, and the runtime mask resolver feeds the single
+scalar/vector quantity dispatcher. No parallel mask framework is introduced.

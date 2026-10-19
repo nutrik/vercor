@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 JCM_REFERENCE_PRESSURE = 1.0e5
 JAXGCM_PHYSICAL_FIELD_DEFAULTS = {
+    "land_surface_temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
     "temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
     "potential_temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
     "density": _jax_gcm_fields.REFERENCE_AIR_DENSITY,
@@ -325,10 +326,14 @@ def diagnose_jax_gcm_initial_fields(
     first scheduled atmosphere step receives coupled component fields.
     """
     current = state.model.dycore.to_physics_state(payload.jcm_state.dycore_state)
-    date = state.model._date_from_sim_time(
-        state.model.dycore.sim_time(payload.jcm_state.dycore_state)
+    from jcm.date import DateData
+
+    date = DateData.set_date(
+        payload.jcm_state.time,
+        model_step=payload.jcm_state.step,
+        dt_seconds=state.model_timestep.total_seconds(),
     )
-    selected = payload.forcing.select(date, calendar=state.model.calendar)
+    selected = payload.forcing.select(date)
     _, diagnostics = state.model.physics.compute_tendencies(
         current,
         selected,
@@ -416,25 +421,23 @@ def step_jax_gcm_runtime(
             )
         }
     else:
-        (
-            land_surface_temperature,
-            sea_surface_temperature,
-            total_surface_temperature,
-            _,
-        ) = _jax_gcm_fields.cleanup_surface_temperature_fields(
-            fields.get("land_surface_temperature"),
-            fields.get("sea_surface_temperature"),
-        )
-
-        land_surface_temperature_forcing, sea_surface_temperature_forcing = (
+        land_fraction = as_jax_real_array(state.model.terrain.fmask, dtype).T
+        land_surface_temperature, sea_surface_temperature, total_surface_temperature = (
             _jax_gcm_fields.prepare_surface_temperature_forcing(
-                total_surface_temperature,
-                as_jax_real_array(state.model.terrain.fmask, dtype).T,
+                fields["land_surface_temperature"],
+                fields["sea_surface_temperature"],
+                land_fraction,
             )
         )
+        soil_moisture = as_jax_real_array(fields["soil_moisture"], dtype)
+        require_active_finite(
+            soil_moisture, active_mask=land_fraction > 0, owner="JCM land soil moisture"
+        )
+        soil_moisture = jnp.where(land_fraction > 0, soil_moisture, 0.0)
         applied_forcing = payload.forcing.copy(
-            stl_am=land_surface_temperature_forcing.T,
-            sea_surface_temperature=sea_surface_temperature_forcing.T,
+            stl_am=land_surface_temperature.T,
+            sea_surface_temperature=sea_surface_temperature.T,
+            soilw_am=soil_moisture.T,
         )
         surface_fields = {
             "land_surface_temperature": land_surface_temperature,
