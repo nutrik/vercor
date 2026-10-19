@@ -130,7 +130,7 @@ Every row was recorded before deletion. Test filenames are relative to `tests/`;
 
 | Deleted test or assertion | Exact assertion | Surviving owner | Preserved distinctions |
 | --- | --- | --- | --- |
-| `test_api_boundaries.py::test_root_api_is_core_only_after_boundary_redesign` | Exact six root exports; advanced names absent from root exports/attributes. | `test_v0_4_public_api.py::test_root_exports_exactly_the_six_primary_symbols; test_manifested_symbols_are_absent_from_every_non_owner_public_module` | No precision/backend/artifact parameter; canonical owner checks also reject aliases. |
+| `test_api_boundaries.py::test_root_api_is_core_only_after_boundary_redesign` | Exact six root exports; advanced names absent from root exports; actual lookup rejects bilinear, conservative, Regridder and RegridderFactory. | `test_v0_4_public_api.py::test_root_exports_exactly_the_six_primary_symbols` (exact manifest and both protocol/factory lookup checks); `test_manifested_symbols_are_absent_from_every_non_owner_public_module` (bound names); `test_api_boundaries.py::test_public_facades_hide_private_implementation_modules` (bilinear/conservative lookup) | No precision/backend/artifact parameter. Actual `hasattr` checks reject lazy aliases; `vars(module)` alone does not. |
 | `test_api_boundaries.py::test_top_level_exports_public_orchestration_and_component_author_api` | Exact root/component manifests and identity of Component, ComponentSpec, SetupContext, StepContext, StepResult, SetupResult, TransferPolicy, DataComponent and CallableComponent. | `test_v0_4_public_api.py::test_supported_public_module_has_exact_manifest; test_root_exports_exactly_the_six_primary_symbols; test_api_boundaries.py::test_components_package_exports_only_component_author_contracts` | Private implementation identities remain in the latter test; no protocol, lazy-import or artifact check is removed. |
 | `test_coupler_coverage.py::test_run_api_does_not_expose_state_donation_option` | Coupler.run signature excludes donate_state. | `test_api_architecture_review.py::test_static_public_signature_contract_is_complete_and_matches_source` | Exact complete signature; profiling CLI argument absence is retained separately. |
 | `test_runtime_run.py::test_run_api_does_not_expose_state_donation` | Coupler.run signature excludes donate_state. | `test_api_architecture_review.py::test_static_public_signature_contract_is_complete_and_matches_source` | Exact complete signature; real scanned rollout and treedef assertions retained. |
@@ -440,3 +440,26 @@ and whitespace. Repository lint remains 200 findings confined to ignored
 historical test_logs snippets. No additional native-fork run is required for
 this test/documentation-only consolidation; the recorded Task 7 fifteen-case
 exact-fork evidence remains unchanged and final unified acceptance is Task 9.
+
+### Task 8 review correction I1
+
+The review demonstrated that the original surviving-owner map missed lazy
+root aliases: `vars(module)` does not invoke `__getattr__`. Before the fix,
+separate temporary aliases for `Regridder` and `RegridderFactory` passed both
+mapped canonical tests while `hasattr` returned true. Two direct lookup
+assertions are restored inside `test_root_exports_exactly_the_six_primary_symbols`;
+no extra test function or production code is added. The table above now names
+the actual lookup owners separately from the bound-name manifest owner.
+The temporary mutation is restored in `finally`; each alias is independently
+rejected after the change, while the unmodified root passes.
+
+Review-fix final fast passed 1365/1365 in 274.018 s; full stock with branch coverage passed 2292/2292 in 325.962 s. Both have zero failures/errors/skips. Focus207/207 and Black300/mypy300/maintained lint0/compileall/whitespace pass. Native JCM/xarray warnings remain explicitly tracked (M1), with no warning suppression.
+
+Review-fix logs/XML are `/private/tmp/vercor-task8-fix1-{focus,fast,full}`.
+The full command adds `COVERAGE_FILE=/private/tmp/vercor-cleanup-final.coverage.stock`
+and `--cov=vercor --cov-branch --cov-report= --cov-fail-under=0` to the unchanged
+stock selection, with `--basetemp=/private/tmp/vercor-task8-fix1-full`. This raw
+stock branch dataset is for Task 9 combination with isolated exact-fork data;
+the final combined 90% gate is unchanged. Code/test state is `1f679cf` plus
+exactly the two restored root lookup assertions; no source/test changes
+followed collection.
