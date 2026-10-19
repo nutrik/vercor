@@ -126,8 +126,19 @@ def map_camulator_prediction_arrays(
     net_shortwave_radiation_flux_accumulated: object,
     net_longwave_radiation_flux_accumulated: object,
     surface_pressure: object,
+    *,
+    native_step_seconds: float,
 ) -> dict[str, jax.Array]:
-    """Map CAMulator tensor outputs into VerCOR runtime exchange fields."""
+    """Map native arrays to runtime fields, converting step energies to W/m².
+
+    Radiation inputs are downward-positive J/m² accumulated over one native
+    forecast step. The duration is independent of the coupling interval;
+    downward longwave includes surface emission exactly once.
+    """
+
+    require_strictly_positive(
+        native_step_seconds, owner="CAMulator native step duration"
+    )
 
     hyai_array = as_jax_real_array(hyai).reshape(-1)
     hybi_array = as_jax_real_array(hybi).reshape(-1)
@@ -143,10 +154,12 @@ def map_camulator_prediction_arrays(
     specific_humidity = specific_humidity_3d_array[-1, ...]
 
     net_shortwave_radiation_flux = (
-        as_jax_real_array(net_shortwave_radiation_flux_accumulated).squeeze() / 21600.0
+        as_jax_real_array(net_shortwave_radiation_flux_accumulated).squeeze()
+        / native_step_seconds
     )
     net_longwave_radiation_flux = (
-        as_jax_real_array(net_longwave_radiation_flux_accumulated).squeeze() / -21600.0
+        as_jax_real_array(net_longwave_radiation_flux_accumulated).squeeze()
+        / -native_step_seconds
     )
     downward_longwave_radiation_flux = (
         stef_boltz * surface_temperature_array**4 - net_longwave_radiation_flux
@@ -215,6 +228,7 @@ def map_camulator_prediction_to_runtime_fields(
     constants: PhysicalConstants,
     *,
     camulator_reference_pressure: float,
+    native_step_seconds: float,
     hyai: torch.Tensor,
     hybi: torch.Tensor,
     hyam: torch.Tensor,
@@ -223,8 +237,11 @@ def map_camulator_prediction_to_runtime_fields(
     state_transformer: Any,
     prediction: torch.Tensor,
 ) -> dict[str, jax.Array]:
-    """Convert one CAMulator prediction into VerCOR runtime exchange fields."""
+    """Map a native prediction using its forecast-step duration in seconds."""
 
+    require_strictly_positive(
+        native_step_seconds, owner="CAMulator native step duration"
+    )
     prediction_out = state_transformer.inverse_transform(prediction)
     return cast(
         dict[str, jax.Array],
@@ -251,6 +268,7 @@ def map_camulator_prediction_to_runtime_fields(
             _camulator_output_array(accessor_output, prediction_out, "FSNS"),
             _camulator_output_array(accessor_output, prediction_out, "FLNS"),
             _camulator_output_array(accessor_output, prediction_out, "PS"),
+            native_step_seconds=native_step_seconds,
         ),
     )
 

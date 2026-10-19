@@ -117,7 +117,24 @@ fluxes warm the mixed layer; the independent ocean restoring tendency is
 latent heat (evaporation) dries soil and positive latent heat wets it.
 The latent and moisture coefficients remain toy closures and do not certify
 a physical water budget.
-CAMulator's existing ML land-mask branch is retained.
+CAMulator's existing ML land-mask branch is retained. Its inverse-transformed
+``FSNS`` and ``FLNS`` are downward-positive energies in J/m² accumulated over
+one native forecast step. The mapper requires ``native_step_seconds`` from the
+existing model timestep (``3600 * data.lead_time_periods``), independently of
+how many native steps fit in a coupling interval. It rejects non-positive and
+non-finite durations, divides each energy by that native duration once, and
+recovers downward longwave as ``sigma * TS**4 + FLNS / native_step_seconds``.
+Surface emission is added exactly once. The adapter does not infer rate units
+or guess a different training contract.
+
+This follows CREDIT revision
+``bc078d7a39300fb8c8fe867a22ec218a5e02da11``:
+`native energy conversion <https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/credit/postblock/gen1.py>`_,
+`energy units and signs <https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/credit/postblock/conservation.py>`_,
+and `CAMulator timing <https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/climate/camulator_config.yml>`_.
+The 1-, 3-, and 6-hour mapper checks and two-substep host runtime test use
+stand-in predictions. CREDIT and its checkpoint are unavailable locally;
+these checks certify conversion and adapter behavior, not native climate skill.
 
 Released models and the dependency exception
 --------------------------------------------
