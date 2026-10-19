@@ -482,20 +482,6 @@ def _make_initialized_slab_coupler(steps: int) -> Coupler:
         ),
         Exchange(
             quantity="intensive",
-            source="LND",
-            target="ATM",
-            fields=["land_surface_temperature"],
-            regridder_factory=bilinear,
-        ),
-        Exchange(
-            quantity="intensive",
-            source="ICE",
-            target="ATM",
-            fields=["ice_fraction"],
-            regridder_factory=bilinear,
-        ),
-        Exchange(
-            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=["sensible_heat_flux", "latent_heat_flux"],
@@ -595,20 +581,6 @@ def _make_initialized_mixed_grid_slab_coupler(steps: int) -> Coupler:
             target="ATM",
             fields=["sea_surface_temperature"],
             regridder_factory=conservative,
-        ),
-        Exchange(
-            quantity="intensive",
-            source="LND",
-            target="ATM",
-            fields=["land_surface_temperature"],
-            regridder_factory=bilinear,
-        ),
-        Exchange(
-            quantity="intensive",
-            source="ICE",
-            target="ATM",
-            fields=["ice_fraction"],
-            regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
@@ -879,8 +851,8 @@ def test_initialized_slab_coupler_run_prefills_missing_imports() -> None:
 
 def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None:
     from vercor.recipes import (
-        ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
-        JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS,
+        SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+        SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
         JCM_LAND_TO_ATMOSPHERE_FIELDS,
         OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
     )
@@ -910,8 +882,8 @@ def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None
     atmosphere_exports = tuple(
         _flatten_field_items(
             (
-                *JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS,
-                *ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
+                *SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
+                *SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
             )
         )
     )
@@ -942,7 +914,7 @@ def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None
                 quantity="intensive",
                 source="ATM",
                 target="OCN",
-                fields=JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS,
+                fields=SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
@@ -963,7 +935,7 @@ def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None
                 quantity="intensive",
                 source="ATM",
                 target="LND",
-                fields=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
+                fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
                 regridder_factory=bilinear,
             ),
         ),
@@ -977,8 +949,6 @@ def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None
     for field_name in (
         "sensible_heat_flux",
         "latent_heat_flux",
-        "u_velocity",
-        "v_velocity",
     ):
         assert ocean_state.received.get(field_name).shape == ocean_grid.shape
         assert ocean_state.fields.get(field_name).shape == ocean_grid.shape

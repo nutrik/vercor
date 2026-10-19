@@ -17,35 +17,12 @@ from vercor.output import OutputSpec
 from vercor.setups._output import resolve_output
 
 _REFERENCE_SEA_SURFACE_TEMPERATURE = 273.15 + 15.0
-_OCEAN_INPUTS = (
-    "sensible_heat_flux",
-    "latent_heat_flux",
-    "u_velocity_10m",
-    "v_velocity_10m",
-    "u_velocity",
-    "v_velocity",
-    "specific_humidity",
-    "temperature",
-    "model_level_height",
-    "net_shortwave_radiation_flux",
-    "downward_longwave_radiation_flux",
-    "ice_fraction",
-)
+_OCEAN_INPUTS = ("sensible_heat_flux", "latent_heat_flux")
 _OCEAN_OUTPUTS = ("sea_surface_temperature",)
 _OCEAN_DEFAULT_FIELDS = {
     "sea_surface_temperature": _REFERENCE_SEA_SURFACE_TEMPERATURE,
     "sensible_heat_flux": 0.0,
     "latent_heat_flux": 0.0,
-    "u_velocity_10m": 0.0,
-    "v_velocity_10m": 0.0,
-    "u_velocity": 0.0,
-    "v_velocity": 0.0,
-    "specific_humidity": 0.0,
-    "temperature": 0.0,
-    "model_level_height": 0.0,
-    "net_shortwave_radiation_flux": 0.0,
-    "downward_longwave_radiation_flux": 0.0,
-    "ice_fraction": 0.0,
 }
 
 

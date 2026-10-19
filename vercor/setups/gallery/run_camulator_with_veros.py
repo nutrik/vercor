@@ -16,7 +16,6 @@ from vercor.setups import CAMulatorConfig, Spinup, VerosConfig, make_camulator_g
 from vercor.setups import make_camulator_land
 from vercor.setups import make_veros_gcm
 from vercor.recipes import (
-    ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
     ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
     LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
@@ -133,13 +132,6 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             target="ATM",
             fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=conservative,
-        ),
-        Exchange(
-            quantity="intensive",
-            source="ATM",
-            target="LND",
-            fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
-            regridder_factory=bilinear,
         ),
     )
     components = [ocn, lnd, atm]

@@ -17,17 +17,6 @@ from vercor.setups._data._field_helpers import (
     positive_binary_mask,
 )
 
-_ERAINTERIM_OCEAN_INPUT_NAMES = (
-    "u_velocity",
-    "v_velocity",
-    "specific_humidity",
-    "model_level_height",
-    "density",
-    "potential_temperature",
-    "temperature",
-    "net_shortwave_radiation_flux",
-    "downward_longwave_radiation_flux",
-)
 _ERAINTERIM_OCEAN_FIELD_NAMES = ("sea_surface_temperature",)
 
 
@@ -81,7 +70,7 @@ def make_erainterim_ocean(
     *,
     output: OutputSpec | None = None,
 ) -> DataComponent:
-    """Return an ERA-Interim ocean forcing component."""
+    """Return an ERA-Interim ocean prescribed forcing component with no physical feedback inputs."""
 
     if model_level_file is None:
         model_level_file = get_forcing_data(f"erainterim_ocean_{resolution}")
@@ -139,11 +128,7 @@ def make_erainterim_ocean(
         name=name,
         grid=grid,
         fields={"sea_surface_temperature": sst},
-        inputs=_ERAINTERIM_OCEAN_INPUT_NAMES,
         outputs=_ERAINTERIM_OCEAN_FIELD_NAMES,
-        initial_fields={
-            field_name: 0.0 for field_name in _ERAINTERIM_OCEAN_INPUT_NAMES
-        },
         output=output,
     )
     return component

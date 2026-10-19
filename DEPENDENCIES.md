@@ -116,3 +116,11 @@ Layer 3 data helpers retain production masking; explicit layer 2 layout owners
 handle time-last arrays. Layer 6 Veris forcing packs provide native forcing and
 face stresses from one bulk solution. Layer 14 JCM output consumes final runtime
 payloads exclusively; setup resources cannot substitute mutable snapshot state.
+
+Prescribed-contract cleanup (2026-10-19) retains these owners. Layer 3 data
+factories and CAMulator land export prescribed fields only; gallery-owned
+DataComponent declarations explicitly add diagnostic imports where displayed.
+Slab factories declare only fields read by their existing kernels. Layer 6
+recipes and galleries retain physical routes and explicit diagnostic routes.
+The test-only coastal case data is shared by dispatch and substitution tests;
+no production field registry or new runtime layer is introduced.

@@ -90,6 +90,62 @@ Bundled field audit
 No bundled consumer needs ``target_flux``. Scalar/vector tests cover all three
 semantics, fractional coasts, evolving and zero coverage, conservation and AD.
 
+Input use and component substitution
+------------------------------------
+
+Prescribed ERA5 atmosphere/land/ocean, ERA-Interim ocean and CAMulator land
+factories have no physical feedback inputs. Their outputs follow the prescribed
+records, even when another component changes. The data gallery explicitly wraps
+its factory declarations in ``DataComponent`` declarations with diagnostic
+imports: those received fields feed its tables and comparison plots, not a
+prognostic tendency. General data imports and forwarding remain supported.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 36 38
+
+   * - Producer -> consumer
+     - Fields / units
+     - Input use and sign
+   * - Slab atmosphere -> slab ocean
+     - sensible/latent heat, W/m²
+     - Both enter the mixed-layer heat tendency; positive warms ocean.
+   * - Slab atmosphere -> slab land
+     - latent heat, W/m²
+     - Positive increases soil moisture; negative dries it.
+   * - Ocean -> slab atmosphere / sea ice
+     - SST, K
+     - Air heat exchange / ice-fraction diagnosis; neither imports land soil
+       moisture or unused ice feedback.
+   * - ERA5 / JCM / supported custom atmosphere -> Veros / Veris
+     - T and theta, K; q, kg/kg; density, kg/m³; height, m; winds, m/s
+     - Colocated air feeds the same CESM bulk closure. A colder, drier air
+       column gives negative downward sensible and latent heat over warm water.
+   * - Atmosphere -> Veros / Veris
+     - shortwave/longwave, W/m²; rain/snow, kg/m²/s
+     - Radiation and precipitation are downward positive. CESM evaporation
+       is downward negative. Veros virtual salt is
+       ``-34.7 * (rain + snow + evap) / 1000`` in m (g/kg)/s;
+       net freshwater input freshens the ocean.
+   * - Prescribed / prognostic Veros -> Veris
+     - SST, K; SSS, g/kg; native face currents, m/s; SSH, m
+     - Shared native geometry and explicit face conversion; prognostic
+       velocities and free surface replace prescribed proxies without
+       changing physical field meaning.
+
+The substitution matrix independently constructs data, callable JAX, structural
+JAX and host producers with identical physical exports, exercises their steps,
+and checks received fields and CESM heat/mass signs. Shared independent coastal
+expectations cover three quantities, nonuniform fractions, rotated vectors,
+inactive NaNs, disappearance/reactivation and retained received support.
+Preweighted Veris exports use binary source coverage and receive one area
+factor. Continuous JAX fields and fractions retain analytic JVP/VJP and finite
+difference checks; binary transitions are discrete. Host components retain
+physical parity on the host path and fail early on the differentiable backend.
+Native ERA5/JCM conversions, Veros/Veris face geometry and CAMulator vapor-species
+capability checks remain separate regressions. No native CAMulator execution is
+certified by synthetic substitution.
+
 Intentional numerical and API changes
 -------------------------------------
 

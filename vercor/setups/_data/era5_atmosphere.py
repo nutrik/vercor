@@ -27,11 +27,6 @@ from vercor.physics import PhysicalConstants
 from vercor.setups._data.assets import get_forcing_data
 from vercor.setups._data._component_helpers import time_interpolated_data_component
 
-_REFERENCE_SURFACE_TEMPERATURE = 273.15 + 15.0
-_ERA5_ATMOSPHERE_INPUT_NAMES = (
-    "sea_surface_temperature",
-    "land_surface_temperature",
-)
 _ERA5_ATMOSPHERE_FIELD_NAMES = (
     "surface_pressure",
     "specific_humidity_3d",
@@ -109,7 +104,7 @@ def make_era5_atmosphere(
     *,
     output: OutputSpec | None = None,
 ) -> DataComponent:
-    """Return an ERA5 atmosphere forcing component."""
+    """Return an ERA5 atmosphere prescribed forcing component with no physical feedback inputs."""
 
     if model_level_file is None:
         model_level_file = get_forcing_data("era5_model_levels")
@@ -236,12 +231,7 @@ def make_era5_atmosphere(
         name=name,
         grid=grid,
         fields=fields,
-        inputs=_ERA5_ATMOSPHERE_INPUT_NAMES,
         outputs=_ERA5_ATMOSPHERE_FIELD_NAMES,
-        initial_fields={
-            field_name: _REFERENCE_SURFACE_TEMPERATURE
-            for field_name in _ERA5_ATMOSPHERE_INPUT_NAMES
-        },
         lifecycle=LifecycleHooks(setup=setup),
         output=output,
     )

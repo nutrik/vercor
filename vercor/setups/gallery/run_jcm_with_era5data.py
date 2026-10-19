@@ -17,7 +17,6 @@ from vercor.components import DataComponent
 from vercor.dtypes import DTypePolicy
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.recipes import (
-    ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
     JCM_LAND_TO_ATMOSPHERE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
@@ -77,13 +76,6 @@ def build_coupler(
         _default_clock() if clock is None else clock,
         components=[ocn, lnd, atm],
         exchanges=(
-            Exchange(
-                quantity="intensive",
-                source=atm.name,
-                target=ocn.name,
-                fields=ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
-                regridder_factory=bilinear,
-            ),
             Exchange(
                 quantity="intensive",
                 source=ocn.name,

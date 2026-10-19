@@ -11,12 +11,7 @@ from vercor.output import OutputSpec
 from vercor.setups._output import resolve_output
 
 _REFERENCE_SURFACE_TEMPERATURE = 273.15 + 15.0
-_ATMOSPHERE_INPUTS = (
-    "sea_surface_temperature",
-    "land_surface_temperature",
-    "soil_moisture",
-    "ice_fraction",
-)
+_ATMOSPHERE_INPUTS = ("sea_surface_temperature",)
 _ATMOSPHERE_OUTPUTS = (
     "temperature_2m",
     "sensible_heat_flux",
@@ -26,9 +21,6 @@ _ATMOSPHERE_OUTPUTS = (
 )
 _ATMOSPHERE_DEFAULT_FIELDS = {
     "sea_surface_temperature": _REFERENCE_SURFACE_TEMPERATURE,
-    "land_surface_temperature": _REFERENCE_SURFACE_TEMPERATURE,
-    "soil_moisture": 0.0,
-    "ice_fraction": 0.0,
     "temperature_2m": _REFERENCE_SURFACE_TEMPERATURE,
     "sensible_heat_flux": 0.0,
     "latent_heat_flux": 0.0,

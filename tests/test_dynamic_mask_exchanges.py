@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from tests._exchange_case_data import QUANTITY_CASES, COVERAGE_GRADIENT_CASES
 from tests._runtime_helpers import prepared_coupling
 from vercor import Clock, Coupler, Exchange, RectilinearGrid, RuntimeOptions
 from vercor.components import CallableComponent, ComponentMaskSpec, ComponentSpec
@@ -133,7 +134,7 @@ def _dispatch(
 
 @pytest.mark.parametrize(
     "quantity,expected",
-    [("intensive", 8.0), ("source_flux", 4.0), ("target_flux", 2.0)],
+    QUANTITY_CASES,
 )
 def test_quantity_weights_before_remapping(quantity: str, expected: float) -> None:
     state, exchange, context = _scenario(quantity)
@@ -146,9 +147,7 @@ def test_quantity_weights_before_remapping(quantity: str, expected: float) -> No
     )
 
 
-@pytest.mark.parametrize(
-    "quantity,scale", [("intensive", 8.0), ("source_flux", 4.0), ("target_flux", 2.0)]
-)
+@pytest.mark.parametrize("quantity,scale", QUANTITY_CASES)
 def test_vector_quantities_preserve_rotation_and_weights(
     quantity: str, scale: float
 ) -> None:
@@ -161,11 +160,7 @@ def test_vector_quantities_preserve_rotation_and_weights(
 @pytest.mark.parametrize("vectors", [False, True])
 @pytest.mark.parametrize(
     "quantity,area_gradient,target_gradient",
-    [
-        ("intensive", [-3.0, 1.0], 0.0),
-        ("source_flux", [0.5, 2.5], 0.0),
-        ("target_flux", [-0.75, 0.25], 2.0),
-    ],
+    COVERAGE_GRADIENT_CASES,
 )
 def test_nonuniform_coverage_normalization_and_rotation_gradients(
     quantity: str, area_gradient: list[float], target_gradient: float, vectors: bool

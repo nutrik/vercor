@@ -21,8 +21,8 @@ from vercor.dtypes import DTypePolicy, as_jax_real_array
 from vercor.output import OutputTarget
 from vercor.regridding import bilinear, conservative
 from vercor.recipes import (
-    ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
-    JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS,
+    SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+    SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
     JCM_LAND_TO_ATMOSPHERE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
@@ -96,7 +96,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             quantity="intensive",
             source="ATM",
             target="OCN",
-            fields=JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS,
+            fields=SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
@@ -117,7 +117,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             quantity="intensive",
             source="ATM",
             target="LND",
-            fields=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
+            fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
             regridder_factory=conservative,
         ),
     )
@@ -155,13 +155,6 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             (
                 "ATM",
                 views["ATM"],
-                "sea_surface_temperature",
-                "u_velocity",
-                "v_velocity",
-            ),
-            (
-                "OCN",
-                views["OCN"],
                 "sea_surface_temperature",
                 "u_velocity",
                 "v_velocity",

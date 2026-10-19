@@ -12,10 +12,7 @@ from vercor.setups import make_era5_atmosphere
 from vercor.setups import make_era5_land
 from vercor.setups import VerosConfig, make_veros_gcm
 from vercor.recipes import (
-    ATMOSPHERE_TO_LAND_BASIC_FIELDS,
     ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
-    LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
-    OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
 from vercor.regridding import bilinear
 from vercor.topology import SurfaceMaskPolicy
@@ -88,27 +85,6 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             source="ATM",
             target="OCN",
             fields=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
-            regridder_factory=bilinear,
-        ),
-        Exchange(
-            quantity="intensive",
-            source="OCN",
-            target="ATM",
-            fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
-            regridder_factory=bilinear,
-        ),
-        Exchange(
-            quantity="intensive",
-            source="ATM",
-            target="LND",
-            fields=ATMOSPHERE_TO_LAND_BASIC_FIELDS,
-            regridder_factory=bilinear,
-        ),
-        Exchange(
-            quantity="intensive",
-            source="LND",
-            target="ATM",
-            fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
     )
