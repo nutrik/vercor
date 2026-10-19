@@ -297,6 +297,8 @@ def _clock(*, steps: int = 1) -> Clock:
 def test_root_exports_exactly_the_six_primary_symbols() -> None:
     assert tuple(vercor.__all__) == ROOT_EXPORTS
     assert all(hasattr(vercor, name) for name in ROOT_EXPORTS)
+    assert not hasattr(vercor, "Regridder")
+    assert not hasattr(vercor, "RegridderFactory")
 
 
 def test_public_module_inventory_exactly_matches_the_manifest() -> None:
