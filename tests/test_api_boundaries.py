@@ -1160,10 +1160,8 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert callable(vertical_module.compute_hybrid_pressure_levels)
     assert callable(vertical_module.compute_hybrid_sigma_full_level_altitudes)
     assert callable(vertical_module.get_altitudes_sigma_levels)
-    assert callable(jax_gcm_pytree_module.tree_as_real_dtype)
+    assert callable(jax_gcm_pytree_module.tree_as_runtime_dtype)
     assert callable(jax_gcm_pytree_module.tree_mean)
-    assert callable(jax_gcm_pytree_module.tree_stack)
-    assert callable(jax_gcm_pytree_module.tree_unwrap_leading_dims)
     assert callable(time_selection_module.datetime_to_seconds_in_year)
     assert callable(time_selection_module.get_periodic_interval)
     assert "gravity" in physics_module.PhysicalConstants.__dataclass_fields__

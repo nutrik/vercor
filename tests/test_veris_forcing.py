@@ -18,7 +18,7 @@ pytestmark = pytest.mark.fast_always
 
 
 def test_model_level_mode_uses_actual_reference_winds_and_water_albedo() -> None:
-    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
     from vercor.recipes import JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS
     from vercor.fields import _flatten_field_items
 
@@ -28,13 +28,13 @@ def test_model_level_mode_uses_actual_reference_winds_and_water_albedo() -> None
         assert name not in _flatten_field_items(JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS)
     fields["downward_shortwave_radiation_flux"] = jnp.full((2, 3), 200.0)
     fields["open_water_albedo"] = jnp.full((2, 3), 0.1)
-    result = prepare_veris_forcing(
+    result = prepare_veris_forcing_pack(
         fields,
         ocean_mask=jnp.ones((2, 3)),
         constants=PhysicalConstants(),
         dtype=DTypePolicy(enable_x64=True),
         atmosphere_forcing="model_level",
-    )
+    ).native_forcing
     np.testing.assert_allclose(result["SWdown"], 200)
     np.testing.assert_allclose(result["Qsw"], -180)
     np.testing.assert_allclose(result["uWind"], fields["u_velocity"].T)
@@ -51,18 +51,18 @@ def test_veris_atmospheric_mode_is_validated(mode: Any) -> None:
 
 @pytest.mark.parametrize("albedo", [-0.01, 1.01])
 def test_model_level_mode_rejects_invalid_open_water_albedo(albedo: float) -> None:
-    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
 
     fields = surface_fields()
     fields["open_water_albedo"] = jnp.full((2, 3), albedo)
     with pytest.raises(Exception, match="albedo"):
-        result = prepare_veris_forcing(
+        result = prepare_veris_forcing_pack(
             fields,
             ocean_mask=jnp.ones((2, 3)),
             constants=PhysicalConstants(),
             dtype=DTypePolicy(enable_x64=True),
             atmosphere_forcing="model_level",
-        )
+        ).native_forcing
         jax.block_until_ready(result)
 
 
@@ -109,7 +109,7 @@ def _fixed_bulk(monkeypatch: pytest.MonkeyPatch, captured: dict[str, Any]) -> No
 def test_native_forcing_signs_sources_units_and_transpose(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
 
     jax.config.update("jax_enable_x64", True)
     captured: dict[str, Any] = {}
@@ -117,12 +117,12 @@ def test_native_forcing_signs_sources_units_and_transpose(
     f = surface_fields()
     f["u_velocity_10m"] = jnp.arange(6.0).reshape(2, 3)
     with jax.disable_jit():
-        result = prepare_veris_forcing(
+        result = prepare_veris_forcing_pack(
             f,
             ocean_mask=jnp.ones((2, 3)),
             constants=PhysicalConstants(),
             dtype=DTypePolicy(enable_x64=True),
-        )
+        ).native_forcing
     expected = {
         "Qnet": -45.0,
         "Qsw": -120.0,
@@ -155,7 +155,7 @@ def test_native_forcing_signs_sources_units_and_transpose(
 def test_current_centering_is_periodic_x_and_closed_y(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
 
     captured: dict[str, Any] = {}
     _fixed_bulk(monkeypatch, captured)
@@ -163,12 +163,12 @@ def test_current_centering_is_periodic_x_and_closed_y(
     f["ocean_u_velocity"] = jnp.array([[1.0, 3.0, 7.0], [2.0, 6.0, 14.0]])
     f["ocean_v_velocity"] = jnp.array([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]])
     with jax.disable_jit():
-        result = prepare_veris_forcing(
+        result = prepare_veris_forcing_pack(
             f,
             ocean_mask=jnp.ones((2, 3)),
             constants=PhysicalConstants(),
             dtype=DTypePolicy.from_jax_config(),
-        )
+        ).native_forcing
     np.testing.assert_array_equal(
         captured["u_ocean"], [[4.0, 2.0, 5.0], [8.0, 4.0, 10.0]]
     )
@@ -183,7 +183,7 @@ def test_current_centering_is_periodic_x_and_closed_y(
 def test_prescribed_face_currents_cannot_cross_coasts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
 
     captured: dict[str, Any] = {}
     _fixed_bulk(monkeypatch, captured)
@@ -192,12 +192,12 @@ def test_prescribed_face_currents_cannot_cross_coasts(
     f["ocean_v_velocity"] = jnp.array([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]])
     mask = jnp.array([[0.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
     with jax.disable_jit():
-        result = prepare_veris_forcing(
+        result = prepare_veris_forcing_pack(
             f,
             ocean_mask=mask,
             constants=PhysicalConstants(),
             dtype=DTypePolicy.from_jax_config(),
-        )
+        ).native_forcing
     np.testing.assert_array_equal(result["uOcean"].T, [[0, 0, 3], [14, 2, 6]])
     np.testing.assert_array_equal(result["vOcean"].T, [[0, 0, 0], [0, 20, 30]])
     np.testing.assert_array_equal(captured["u_ocean"], [[0, 1.5, 1.5], [8, 4, 10]])
@@ -209,7 +209,7 @@ def test_prescribed_face_currents_cannot_cross_coasts(
 def test_dry_operands_are_safe_and_forcing_gradients_match(
     enable_x64: bool, dry_value: float
 ) -> None:
-    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
 
     jax.config.update("jax_enable_x64", enable_x64)
     dtype = DTypePolicy(enable_x64=enable_x64)
@@ -225,15 +225,15 @@ def test_dry_operands_are_safe_and_forcing_gradients_match(
             "temperature": f["temperature"] + delta,
             "potential_temperature": f["potential_temperature"] + delta,
         }
-        result = prepare_veris_forcing(
+        result = prepare_veris_forcing_pack(
             fields, ocean_mask=mask, constants=PhysicalConstants(), dtype=dtype
-        )
+        ).native_forcing
         return jnp.mean(result["Qnet"] + result["ATemp"])
 
     x = jnp.array(0.0)
-    result = prepare_veris_forcing(
+    result = prepare_veris_forcing_pack(
         f, ocean_mask=mask, constants=PhysicalConstants(), dtype=dtype
-    )
+    ).native_forcing
     for name, value in result.items():
         assert np.isfinite(value).all(), name
         expected = (
@@ -257,19 +257,19 @@ def test_dry_operands_are_safe_and_forcing_gradients_match(
 def test_mass_conversion_uses_traced_freshwater_density(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from vercor.setups._external.veris_forcing import prepare_veris_forcing
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
 
     jax.config.update("jax_enable_x64", True)
     _fixed_bulk(monkeypatch, {})
     f = surface_fields()
 
     def objective(rho: jax.Array) -> jax.Array:
-        result = prepare_veris_forcing(
+        result = prepare_veris_forcing_pack(
             f,
             ocean_mask=jnp.ones((2, 3)),
             constants=replace(PhysicalConstants(), freshwater_density=rho),
             dtype=DTypePolicy(enable_x64=True),
-        )
+        ).native_forcing
         return jnp.mean(result["precip"])
 
     with jax.disable_jit():

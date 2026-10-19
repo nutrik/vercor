@@ -42,7 +42,7 @@ from vercor.jax_logging import (
     normalize_log_level,
     setup_logger,
 )
-from vercor._regridders.bilinear import bilinear
+from vercor.regridding import bilinear
 from vercor._runtime.contracts import ExchangeContract
 from vercor._runtime.exchange_dispatch import dispatch_component_exchanges
 from vercor.output._runtime import output_masks_for_component

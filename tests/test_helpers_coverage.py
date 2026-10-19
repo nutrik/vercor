@@ -16,7 +16,7 @@ from vercor.grids import RectilinearGrid
 from vercor.grid_geometry import centers_to_edges
 from vercor.grid_masks import compute_land_mask
 from vercor._interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
-from vercor._regridders.bilinear import bilinear
+from vercor.regridding import bilinear
 
 
 @pytest.mark.fast_always

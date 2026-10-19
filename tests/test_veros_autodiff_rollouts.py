@@ -230,6 +230,8 @@ def test_coupled_precipitation_reaches_native_salt_with_matching_jvp_vjp() -> No
     resources = SimpleNamespace(
         execution="jax",
         uses_atmosphere_forcing=True,
+        surface_forcing="atmosphere",
+        export_open_water_surface=False,
         model_substeps=2,
         _step_function=native_tracer_step,
     )

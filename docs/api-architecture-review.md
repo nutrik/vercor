@@ -49,11 +49,24 @@ each step, never retained as hidden adapter state.
 | Backend/native output sessions | `vercor.output._session` | One immutable accumulator and one run-level output lifecycle. |
 | Public and internal state mutation helpers | `RunState.replace_fields` | One immutable public replacement operation; alignment remains private. |
 | Setup import registries | `vercor.setups` | One lazy public facade; implementation imports occur at factory invocation. |
+| Regridder construction helpers | `vercor.regridding` | Public factories construct concrete private regridders directly; `radius_km` remains the public conservative radius argument. |
+| Forcing year metadata | `vercor.calendar.YearType` | Import the canonical enum from `vercor.calendar`; the duplicate `forcing_index.ForcingYearType` alias is removed. |
+| JCM final native output | `SnapshotContext.payload` | Providers and snapshots consume runtime state only; absent final payload raises a component-scoped error before writing output. |
 
 These consolidations are intentionally narrow. Scalar and vector regridding
 remain separate capabilities. Provider sampling and file writing remain
 separate boundaries. Physics values and static precision policy remain
 separate because JAX traces the former and uses the latter to control arrays.
+
+Migrate `from vercor.forcing_index import ForcingYearType` to
+`from vercor.calendar import YearType` and use `YearType` at call sites. Native
+Veris consumers use `prepare_veris_forcing_pack(...).native_forcing`; the pack
+also owns open-water face stresses from the same bulk calculation. JCM runtime
+normalization uses `tree_as_runtime_dtype`, retaining integer and categorical
+leaves and selecting complex precision consistently. Native layout preparation
+uses the explicit time-last surface/level functions, or transposes static
+longitude/latitude arrays at its owning setup. Removed test-only stack, unwrap,
+all-real dtype and prediction-output conveniences have no alternate runtime path.
 
 ## 3. Bad design decisions
 
@@ -106,7 +119,7 @@ signatures from installed artifacts.
   "vercor.fields": ["COMMON_FIELD_NAMES", "ExchangeField", "VectorField", "vector"],
   "vercor.fluxes": ["cdn", "compute_air_density", "compute_hybrid_pressure_levels", "compute_hybrid_sigma_full_level_altitudes", "compute_ocean_surface_fluxes", "compute_potential_temperature", "compute_sigma_pressure_levels", "get_altitudes_hybrid_sigma_levels", "get_altitudes_sigma_levels", "psimhu", "psixhu", "qsat", "qsat_august_eqn", "shr_flux_atmIce"],
   "vercor.forcing_data": ["read_forcing"],
-  "vercor.forcing_index": ["ForcingYearType", "daily_forcing_day_of_year", "daily_forcing_index", "day_of_year_360_to_gregorian", "gregorian_month_lengths", "noleap_day_of_year"],
+  "vercor.forcing_index": ["daily_forcing_day_of_year", "daily_forcing_index", "day_of_year_360_to_gregorian", "gregorian_month_lengths", "noleap_day_of_year"],
   "vercor.grid_geometry": ["centers_to_edges", "grids_identical"],
   "vercor.grid_masks": ["check_remap_conservation", "check_total_lnd_ocn_mask_sum", "compute_land_mask", "compute_ocn_lnd_masks_on_atm_grid", "create_lnd_mask_from_ocn"],
   "vercor.grids": ["RectilinearGrid"],

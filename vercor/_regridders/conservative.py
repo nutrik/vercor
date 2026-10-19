@@ -58,20 +58,3 @@ class ConservativeRectilinearRegridder(_BaseRegridder):
             interpolator=interpolator,
             has_identical_grids=has_identical_grids,
         )
-
-
-def conservative(
-    source_grid: RectilinearGrid,
-    target_grid: RectilinearGrid,
-    *,
-    source_mask: Optional[RuntimeArray] = None,
-    normalize: str = "conservation",
-    radius: float = 6371.0,
-) -> ConservativeRectilinearRegridder:
-    return ConservativeRectilinearRegridder(
-        source_grid,
-        target_grid,
-        source_mask=source_mask,
-        normalize=normalize,
-        radius=radius,
-    )

@@ -15,8 +15,8 @@ from vercor._interpolators.conservative_remap_rectilinear import (
 from vercor._regridders.base import _BaseRegridder
 from vercor._regridders.conservative import (
     ConservativeRectilinearRegridder,
-    conservative,
 )
+from vercor.regridding import conservative
 from vercor.regridding import conservative as public_conservative
 
 
@@ -86,6 +86,7 @@ def test_regridder_constructor_uses_provided_edges_when_available() -> None:
     regridder = ConservativeRectilinearRegridder(
         src, dst, normalize="fracarea", radius=10.0
     )
+    assert isinstance(regridder, ConservativeRectilinearRegridder)
     interp = regridder.interpolator
     assert interp is not None
 
@@ -197,9 +198,10 @@ def test_regridder_identical_grid_skips_remapper_construction(
     src = _grid("src", lon.copy(), lat.copy())
     dst = _grid("dst", lon.copy(), lat.copy())
 
-    regridder = ConservativeRectilinearRegridder(src, dst)
+    regridder = conservative(src, dst)
 
     assert regridder.has_identical_grids is True
+    assert isinstance(regridder, ConservativeRectilinearRegridder)
     assert regridder.interpolator is None
 
 
@@ -353,9 +355,10 @@ def test_conservative_factory_forwards_remapper_options() -> None:
         dst,
         source_mask=source_mask,
         normalize="fracarea",
-        radius=10.0,
+        radius_km=10.0,
     )
 
+    assert isinstance(regridder, ConservativeRectilinearRegridder)
     interp = regridder.interpolator
     assert isinstance(interp, ConservativeRectilinearRemapper)
     assert interp.normalize == "fracarea"

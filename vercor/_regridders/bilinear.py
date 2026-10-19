@@ -57,26 +57,3 @@ class BilinearRectilinearRegridder(_BaseRegridder):
         if interpolator is None:
             raise RegridderError("Regridder not properly set up")
         return cast(tuple[Any, Any], interpolator.apply_vector(u, v))
-
-
-def bilinear(
-    source_grid: RectilinearGrid,
-    target_grid: RectilinearGrid,
-    *,
-    periodic_longitude: bool = True,
-    nan_renorm: bool = True,
-    extrapolation_mode: str | None = None,
-    idw_k: int = 8,
-    idw_eps: float = 1e-12,
-    fill_value: float = float("nan"),
-) -> BilinearRectilinearRegridder:
-    return BilinearRectilinearRegridder(
-        source_grid,
-        target_grid,
-        periodic_longitude=periodic_longitude,
-        nan_renorm=nan_renorm,
-        extrapolation_mode=extrapolation_mode,
-        idw_k=idw_k,
-        idw_eps=idw_eps,
-        fill_value=fill_value,
-    )

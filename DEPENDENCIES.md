@@ -105,3 +105,14 @@ policy contexts expose the original author objects retained by bindings.
 The existing component declaration layer owns fractional coverage, topology owns
 only binary route restrictions, and the runtime mask resolver feeds the single
 scalar/vector quantity dispatcher. No parallel mask framework is introduced.
+
+Canonical-helper cleanup (2026-10-19) preserves these layers: layer 6 public
+regridding factories construct layer 5 concrete regridders directly, without
+private factory forwarders; conservative's public radius remains `radius_km`.
+Layer 1 `calendar.YearType` is the sole enum owner, consumed directly by layer 2
+forcing lookup. Layer 2 JCM PyTree normalization/reduction owns inexact precision
+and categorical semantics; unused stack/unwrap/all-real helpers are removed.
+Layer 3 data helpers retain production masking; explicit layer 2 layout owners
+handle time-last arrays. Layer 6 Veris forcing packs provide native forcing and
+face stresses from one bulk solution. Layer 14 JCM output consumes final runtime
+payloads exclusively; setup resources cannot substitute mutable snapshot state.

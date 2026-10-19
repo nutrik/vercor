@@ -21,6 +21,7 @@ from vercor.output._netcdf import write_netcdf_dataset
 from vercor.output._period import TIME_NAME
 from vercor.output import OutputVariable
 from vercor.types import RuntimeArray
+from vercor.exceptions import ComponentError
 
 JAX_GCM_TIME_DIM = TIME_NAME
 _LEVEL_NAME = "level"
@@ -243,23 +244,6 @@ def _default_physics_module() -> _PhysicsModuleLike:
     return cast(_PhysicsModuleLike, speedy_physics())
 
 
-def jax_gcm_prediction_output_variables(
-    prediction: Any,
-    *,
-    coords: Any,
-    physics_module: _PhysicsModuleLike | None = None,
-) -> dict[str, OutputVariable]:
-    """Return JAXGCM prediction variables ready for period accumulation."""
-
-    selected_physics_module = physics_module or _default_physics_module()
-    selected_physics_module.cache_coords(coords)
-    return _jax_gcm_prediction_output_variables(
-        prediction,
-        coords=coords,
-        physics_module=selected_physics_module,
-    )
-
-
 def _jax_gcm_prediction_output_variables(
     prediction: Any,
     *,
@@ -412,13 +396,10 @@ class _JAXGCMOutputProvider:
     """Ordinary provider adapting the runtime JCM payload into a native frame."""
 
     def __init__(self, state: Any) -> None:
-        self._coupled = getattr(state, "seaice_coupling", False)
+        self._coupled = state.seaice_coupling
         self._coords = state.model.coords
-        self._physics = (
-            getattr(state.model, "physics", None) or _default_physics_module()
-        )
-        if hasattr(self._coords, "nodal_shape"):
-            self._physics.cache_coords(self._coords)
+        self._physics = state.model.physics
+        self._physics.cache_coords(self._coords)
         self._unit_metadata = jax_gcm_unit_metadata(self._physics)
 
     def sample(self, context: OutputContext) -> OutputFrame:
@@ -473,11 +454,12 @@ def write_jax_gcm_snapshot_output(
     payload = context.payload
     jcm_state = getattr(payload, "jcm_state", None)
     if jcm_state is None:
-        jcm_state = getattr(state, "_state", None)
-    if jcm_state is None:
-        raise ValueError("JAXGCM snapshot output requires a final JCM state.")
+        raise ComponentError(
+            f"JAXGCM component '{context.state.name}' snapshot output requires "
+            "a final native runtime payload."
+        )
 
-    physics_module = getattr(state.model, "physics", None)
+    physics_module = state.model.physics
     variables = jax_gcm_state_snapshot_output_variables(
         jcm_state,
         coords=state.model.coords,
@@ -522,7 +504,6 @@ __all__ = [
     "JAX_GCM_TIME_DIM",
     "jax_gcm_coordinate_variables",
     "jax_gcm_data_variables_with_unit_metadata",
-    "jax_gcm_prediction_output_variables",
     "jax_gcm_output_provider",
     "jax_gcm_state_snapshot_output_variables",
     "jax_gcm_unit_metadata",
