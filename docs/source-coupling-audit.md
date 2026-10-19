@@ -1,11 +1,11 @@
 # Source and coupling audit
 
 This is the durable audit of the approved 2026-10-19 source and coupling
-cleanup on `feat/veris-seaice`, from baseline `e1d417a` through Tasks 1–8.
+cleanup on `feat/veris-seaice`, from baseline `e1d417a` through Tasks 1–9.
 Task 8 changes tests and documentation only. It records completed changes,
 retained owners, exact assertion migrations, failures and validation limits.
-The final combined coverage, fresh artifacts and native gallery acceptance
-are a separate Task 9 gate; their results must be recorded here on completion.
+Final combined coverage, fresh artifacts and native gallery acceptance
+are recorded in the Task 9 receipt below.
 Historical archives are unchanged.
 
 The source inventory remains 179 Python modules. There are 104 `test_*.py`
@@ -463,3 +463,162 @@ stock branch dataset is for Task 9 combination with isolated exact-fork data;
 the final combined 90% gate is unchanged. Code/test state is `1f679cf` plus
 exactly the two restored root lookup assertions; no source/test changes
 followed collection.
+
+## Task 9 final acceptance and local delivery
+
+The final production/test state is commit `6b60622`; this delivery adds only
+verification prose. The full stock receipt is reused exactly as authorized:
+2292/2292, zero failures/errors/skips, 325.962 s, actual Veros 1.7.0. Its raw
+branch coverage SHA256 is
+`5a3fb83b8355e91d9f802d09bc36f0bcbd5529be966c795ebe512ac2a8916831`,
+745472 bytes, 164 files with arcs; the restored root-lookup test SHA256 is
+`dc342fcda203dc6c6ec42602a64ec51db7ff32df65d4d8065d0ddaf4d7f1de6b`.
+Clean base and unchanged source/tests were independently checked before reuse.
+The final full command is the Task 8 review-fix command above, not an older
+source run. A fresh Task 9 stock fast gate also passes 1365/1365, no skips.
+
+Final environment: isolated Python 3.12 scipy, stock Veros 1.7.0, Veris 0.2.1
+(tag `v0.2.1`, immutable `6e3b56ee14922f4bae760d57772f610078aa1886`),
+JCM 3.0.0, JAX/jaxlib 0.11.2, Dinosaur 1.5.1 and Flax 0.12.10. JCM's installed
+wheel SHA256 is `1ae0408e53ce9c581f84a55279f7bc2efc8d2d54ed1087189b0bb89d1ac4cd62`.
+`pip check` still reports exactly the approved JCM JAX upper-bound mismatch;
+no dependency override or installer policy changed. The fork is selected only
+by process-local PYTHONPATH; PEP 610 repository, requested revision, immutable
+commit and import path are verified before its fresh unified AD run.
+
+Black passes with 300 unchanged files, strict flake8 over maintained
+`vercor tests tools benchmarks` reports zero, mypy passes 300 files, and
+compileall/whitespace pass. The requested whole-repository flake8 command still
+reports 200 diagnostics, entirely in preserved ignored historical `test_logs`
+snippets. Strict Sphinx `python -m sphinx -b html -W --keep-going docs ...`
+passes with zero warnings. An extra exploratory `-n` attempt enabled the
+unrequested nitpicky reference policy and found 387 existing unresolved API
+references; it is recorded as a failed extra check, without changing the
+prescribed strict gate or adding exclusions/configuration. No production
+failure or numerical baseline regeneration occurred in Task 9.
+
+Fresh wheel-from-sdist build and Twine pass. Supplied-artifact outside-checkout
+checks pass 4/4, zero failures/errors/skips, 29.447 s: wheel and sdist installed
+imports, exact public manifests/signatures and `py.typed`, external extension
+runtime and strict mypy, dependency-free slab and console version. The wheel's
+179 Python modules match the final tested checkout byte for byte. Artifacts:
+
+| Artifact | Bytes | SHA256 |
+| --- | ---: | --- |
+| `vercor-0.4.6-py3-none-any.whl` | 289271 | `c017041e052279e4c8126371ceb5266916fd7894848bf3f1cf9c67fdeee2eeb5` |
+| `vercor-0.4.6.tar.gz` | 208667 | `b4f192d82299d3ff5594d6868c19242e19878a57eb33e57fba04de7297d7c600` |
+
+The actual final wheel at `/private/tmp/vercor-task9-dist/` is installed under
+`/private/tmp/vercor-task9-wheel/`; its independent CLI-copy native run imports
+`/private/tmp/vercor-task9-wheel/vercor/__init__.py`, loads the copied gallery
+outside checkout, and runs two Gregorian daily intervals from 2000-01-03.
+Actual stock Veros 1.7.0 global4deg, Veris 0.2.1 and JCM 3.0.0 complete in order
+`LND -> CICE -> OCN -> ATM`: 2319 wet cells, exactly 48 checked native ice steps,
+nine routes and exactly 13 shared-output NetCDF files. All 486 numeric saved
+variable instances are finite; seven selected final state arrays are finite
+on support. No output directory exists after setup/initial-state creation;
+explicit `run(output=...)` owns every file. Albedo's saved unit is `1` and SST
+has canonical lat/lon coordinates; temperatures are checked in K, humidity in
+kg/kg, and precipitation/downward radiation are finite and nonnegative.
+Heat/evaporation/salt directions are independently checked in the retained
+slab, swap and native conversion regressions, since different native cells can
+have different physical turbulent-flux signs.
+
+Ice surface support evolves from zero to sum 1.2220427113878587 across 13
+fractional cells; fixed coastal binary-source route support contains 1555
+fractional target cells. Every checked mask remains finite and bounded.
+Final ice fraction reaches 0.18495306531914493, SST spans
+270.7364529105436–302.956108601832 K, ice temperature spans
+265.6293064389419–273.15000000000003 K, and salinity reaches
+37.798401334857076 g/kg. These are fresh artifact observations under stock
+1.7.0, not replacements for historical 1.6.2 snapshots or long-term skill.
+The short run uses native defaults and disabled JCM spinup; it is separate
+from the explicitly configured Veris refinement certification.
+
+Native warnings are preserved without suppression: JCM/xarray compat defaults
+at upstream `jcm/data/bc/interpolate.py:53` and `:105`; fork AD JAX scatter
+cast warnings when present; the existing gallery warning that skips the
+whole-grid ocean-mask conservation comparison for differing latitude bounds.
+This does not certify the skipped comparison. Independent conservative-route
+and support regressions remain separate. CREDIT/checkpoints/native tracing
+side effects and performance, host/binary-transition/higher derivatives,
+arbitrary unsupported geometry and long-term climate skill remain uncertified.
+CAMulator boundary stand-ins are never represented as native execution.
+
+Original requirement closure is explicit: (0) actual stock >=1.7.0 and unchanged
+fork pin/cache ownership; (1) complete 179-module inventory and retired/retained
+caller/owner map, canonical preparation/factories/payload output; (2) corrected
+slab directions, native-duration energy, native bootstrap/vapor capability,
+honest declarations, units/signs/coastal/current-versus-received coverage and
+four producer kinds through the same receiving physics; (3) exact surviving
+assertion map, 12 duplicate cases removed while all 8 run-order/15 corruption
+cases and distinct numerical/AD/ownership/artifact guarantees survive. The
+whole branch diff and active public/dependency/architecture documents were
+checked against these requirements. No additional production discrepancy was
+found in final self-review; independent controller review follows delivery.
+
+Read-only GitHub CLI confirms repository `nutrik/vercor`, origin
+`https://github.com/nutrik/vercor.git`, branch `feat/veris-seaice`, and remote
+feature SHA `f6418d61199ccb8f441ee4ecfd4fbe3857171d75`. Local cleanup commits
+are intentionally unpublished; baseline `e1d417a` remains an ancestor.
+No push, merge, tag, release, publication or Git configuration change occurred.
+Detailed raw logs, XML, coverage and artifact/native receipts are retained
+under `test_logs/source-coupling-cleanup/`; commands use the isolated scipy
+interpreter, writable `/private/tmp/vercor-cleanup-assets` and private basetemps.
+Final AD/combined coverage receipts are recorded below.
+
+Fresh unified fork AD passes 15/15, zero failures/errors/skips, 542.723 s,
+using serial `-n0 -m veros_autodiff` across
+`test_veros_autodiff_rollouts.py`, `test_veris_prognostic_autodiff.py` and
+`test_veris_veros_jcm_autodiff.py`, with x64 enabled. Actual warnings are one
+upstream JAX int64-to-int32 scatter FutureWarning plus the two upstream
+JCM/xarray compat-default sites. These are existing native dependency warnings,
+not silently suppressed warnings or waived VerCOR failures.
+
+The isolated stock/fork branch datasets combine with `coverage combine --keep`;
+`coverage report --fail-under=90` exits 0. Exact aggregate is
+`(8406 + 1605) / (8885 + 1930) * 100 = 92.56588072122052%`.
+Statements are 8406/8885 = 94.60889138998311%; branches are 1605/1930 =
+83.16062176165804% (269 partial branches, 325 missing branches, 479 missing
+statements, 126 excluded lines). The unchanged project gate is aggregate
+statement-plus-branch coverage, not a new branch-only threshold. The only
+configured coverage omission remains `vercor/setups/gallery/*`.
+
+Final AD command (full stock and fast use the interpreter/assets policy above):
+
+```bash
+JAX_ENABLE_X64=true PYTHONPATH=/private/tmp/vercor-cleanup-ad.BvXQyJ COVERAGE_FILE=/private/tmp/vercor-cleanup-final.coverage.ad VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets /private/tmp/vercor-time-ci/envs/scipy/bin/python -m pytest tests/test_veros_autodiff_rollouts.py tests/test_veris_prognostic_autodiff.py tests/test_veris_veros_jcm_autodiff.py -q -n0 -m veros_autodiff --cov=vercor --cov-branch --cov-report= --cov-fail-under=0 --tb=short --basetemp=/private/tmp/vercor-task9-ad --junitxml=/private/tmp/vercor-task9-ad.xml
+COVERAGE_FILE=/private/tmp/vercor-cleanup-final.coverage python -m coverage combine --keep /private/tmp/vercor-cleanup-final.coverage.stock /private/tmp/vercor-cleanup-final.coverage.ad
+COVERAGE_FILE=/private/tmp/vercor-cleanup-final.coverage python -m coverage report --fail-under=90
+```
+
+The fresh final fast command uses `--fast -m 'not veros_autodiff' --tb=short
+--basetemp=/private/tmp/vercor-task9-fast --junitxml=/private/tmp/vercor-task9-fast.xml`
+on `tests/`, with native writable assets and authorized loopback access. Its
+1365/1365 receipt takes 231.102 s. Full stock remains the exact-source 2292/2292
+receipt above. Raw XML/logs, combined branch data and JSON/XML,
+artifact hashes and native report are copied to ignored
+`test_logs/source-coupling-cleanup/`. The original partial stock/fork files were
+unexpectedly absent after successful combination despite explicit `--keep`.
+The stock hash/arcs and both lane provenance were verified before combination;
+combined raw arcs/reports were preserved and verified. No native lane was
+repeated solely to reconstruct partial files. Final documentation-only edits retain the
+exact source/test state; controller task and whole-branch review follow the
+local evidence commit.
+
+
+The updated-documents focus initially caught one short RST heading underline
+(52 pass/1 strict-Sphinx failure of53); correcting the underline preserves the
+same gate and final rerun. Combined raw data remains164files with branch arcs,
+720896bytes, SHA256 `e80b9a7efe9e463b026bf2a33254308c18f308b1d3da49f6b2b304dcaacd25fb`. Partial raw `.stock`/`.ad` files were
+unexpectedly absent after explicit `combine --keep`; the stock hash/arcs were
+verified before combination. Combined raw/JSON/XML and all lane XML/logs are
+preserved; no successful native lane was repeated to reconstruct partial data.
+
+
+Final corrected documentation/architecture focus passes53/53, zero failures,
+errors or skips,12.539s. A fresh prescribed strict Sphinx build after the final
+receipt prose also exits0 without warnings; final whitespace is clean,
+PROGRESS remains180lines, and every source/test SHA256 matches the artifact
+receipt. The current fast gate and exact-source full gate therefore apply to
+this documentation-only local delivery state.

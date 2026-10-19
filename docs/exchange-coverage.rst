@@ -225,7 +225,8 @@ exact-fork Veros test processes. This establishes the tested functional coupling
 it does not certify long-term climate behavior or remove the upstream metadata
 conflict. Final commands and results are recorded in ``PROGRESS.md``.
 
-Validation on 2026-10-19 passed 2,209 full stock tests, 1,284 fast tests and
+Earlier exchange-mask acceptance on 2026-10-19 passed 2,209 full stock tests,
+1,284 fast tests and
 15 exact-fork native AD tests, with no skips. Combined statement/branch coverage
 is 92.48% (94.60% statements, 82.69% branches). The source and isolated wheel
 CLI-copy global two-day runs match exactly across seven saved fields: 2,319 wet
@@ -235,3 +236,36 @@ all native gradient assertions remain. Black, maintained-source flake8, mypy,
 compileall, strict Sphinx, wheel/sdist metadata and installed extension/CLI
 boundaries pass. Validation used Python 3.12.15 in the isolated conda scipy
 environment with Dinosaur 1.5.1 and Flax 0.12.10.
+
+
+Final source and coupling cleanup acceptance
+--------------------------------------------
+
+The final cleanup uses actual stock Veros 1.7.0 with the same Veris/JCM/JAX
+provenance above. Full stock 2,292, fresh fast 1,365 and fresh exact-fork native
+AD 15 tests pass without failures, errors or skips. Combined aggregate coverage
+passes the unchanged 90% gate at 92.56588072122052%: statements 8,406/8,885
+(94.60889138998311%) and branches 1,605/1,930 (83.16062176165804%).
+These are separate native backend processes; the exact full stock branch
+receipt is reused only after confirming unchanged final source/test identity.
+
+Fresh final wheel/sdist build, Twine, outside-checkout installed extension
+runtime/strict typing, slab and CLI probes pass. The actual final wheel imports
+from ``/private/tmp/vercor-task9-wheel/vercor/__init__.py``. Its independent
+CLI-copied real two-day JCM/Veris/Veros gallery completes 2,319 wet ocean cells,
+48 checked native ice steps, nine explicit routes and 13 shared NetCDF files;
+all 486 numeric saved variable instances are finite. Ice support evolves on
+13 fractional cells; fixed coastal target support has 1,555 fractional cells.
+All 179 packaged Python modules match the final tested source byte for byte.
+
+Black, maintained-source lint, mypy, compileall, whitespace and prescribed
+strict Sphinx pass. The whole-tree lint report retains 200 diagnostics solely
+in ignored historical snippets; it is not a whole-tree zero claim. Native
+JCM/xarray and JAX scatter FutureWarnings, and the latitude-bound warning for
+the skipped whole-grid ocean-mask integral comparison, remain unsuppressed.
+The durable ``docs/source-coupling-audit.md`` records every source retention,
+removal, surviving test assertion, original requirement, exact receipt and
+failed approach. Native CREDIT/checkpoint execution remains unavailable;
+CAMulator boundary stand-ins do not certify native model skill. The short
+coupled run does not certify long-term climate or binary-transition/host AD.
+All cleanup delivery is local, with no push, merge or publication.
