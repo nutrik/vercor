@@ -14,7 +14,6 @@ class RuntimeTopologyMaps:
 
     regridders: Mapping[str, Any]
     binary_masks: Mapping[str, RuntimeArray]
-    fractional_masks: Mapping[str, RuntimeArray]
 
     def __post_init__(self) -> None:
         """Copy and freeze topology mappings at the runtime boundary."""
@@ -28,11 +27,6 @@ class RuntimeTopologyMaps:
             self,
             "binary_masks",
             MappingProxyType(dict(self.binary_masks)),
-        )
-        object.__setattr__(
-            self,
-            "fractional_masks",
-            MappingProxyType(dict(self.fractional_masks)),
         )
 
 

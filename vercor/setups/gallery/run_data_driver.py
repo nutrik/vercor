@@ -51,6 +51,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     # ["qbot", "zbot", ("ubot", "vbot")]
     exchanges = (
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
@@ -58,6 +59,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
@@ -65,6 +67,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             regridder_factory=conservative,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="LND",
             fields=ATMOSPHERE_TO_LAND_STATE_FIELDS,
@@ -72,6 +75,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="LND",
             fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
@@ -79,12 +83,14 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             regridder_factory=conservative,
         ),
         Exchange(
+            quantity="intensive",
             source="OCN",
             target="ATM",
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="LND",
             target="ATM",
             fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,

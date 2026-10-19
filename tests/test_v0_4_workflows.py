@@ -397,7 +397,7 @@ def test_workflow_can_schedule_and_prime_a_registered_host_component_omitted_fro
     coupler = Coupler(
         _clock(steps=1),
         components=(source, target),
-        exchanges=(Exchange("SOURCE", "TARGET", ("signal",)),),
+        exchanges=(Exchange("SOURCE", "TARGET", ("signal",), quantity="intensive"),),
         run_order=("TARGET",),
         runtime=runtime.RuntimeOptions(workflow=workflow),
     )

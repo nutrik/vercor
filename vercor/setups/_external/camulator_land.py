@@ -7,6 +7,7 @@ from vercor.components import (
     CallableComponent,
     Component,
     ComponentSpec,
+    ComponentMaskSpec,
     SetupResult,
     SetupContext,
     StepResult,
@@ -27,7 +28,7 @@ _CAMULATOR_LAND_INPUTS = (
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
 )
-_CAMULATOR_LAND_OUTPUTS = ("land_surface_temperature",)
+_CAMULATOR_LAND_OUTPUTS = ("land_surface_temperature", "land_fraction")
 _CAMULATOR_LAND_DEFAULT_FIELDS = {
     "land_surface_temperature": 283.0,
     **{field_name: 0.0 for field_name in _CAMULATOR_LAND_INPUTS},
@@ -59,7 +60,7 @@ def make_camulator_land(
 
     longitude = camulator_grid.longitude
     latitude = camulator_grid.latitude
-    lnd_bmask, _ = create_lnd_mask_from_ocn(
+    lnd_bmask, land_fraction = create_lnd_mask_from_ocn(
         atm_lat=latitude,
         atm_lon=longitude,
         ocn_grid=ocn_grid,
@@ -142,7 +143,11 @@ def make_camulator_land(
         spec=ComponentSpec(
             inputs=_CAMULATOR_LAND_INPUTS,
             outputs=_CAMULATOR_LAND_OUTPUTS,
-            initial_fields=_CAMULATOR_LAND_DEFAULT_FIELDS,
+            initial_fields={
+                **_CAMULATOR_LAND_DEFAULT_FIELDS,
+                "land_fraction": land_fraction,
+            },
+            masks=ComponentMaskSpec(fractional_field="land_fraction"),
             execution="host",
             lifecycle=LifecycleHooks(setup=setup),
         ),

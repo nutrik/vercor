@@ -72,12 +72,13 @@ def test_mask_spec_references_declared_current_fields() -> None:
         api.ComponentSpec(
             outputs=("temperature",), masks=_mask_spec(fractional_field="area")
         )
-    with pytest.raises(ComponentError, match="mask.*current"):
-        api.ComponentSpec(
-            outputs=("area",),
-            masks=_mask_spec(fractional_field="area"),
-            transfer=api.TransferPolicy(time_selection="linear"),
-        )
+    declaration = api.ComponentSpec(
+        outputs=("area",),
+        masks=_mask_spec(fractional_field="area"),
+        transfer=api.TransferPolicy(time_selection="linear"),
+    )
+    assert declaration.masks is not None
+    assert declaration.masks.fractional_field == "area"
     with pytest.raises(TypeError, match="masks"):
         api.ComponentSpec(masks="area")  # type: ignore[arg-type]
 

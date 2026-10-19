@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from vercor.components import (
+    ComponentMaskSpec,
     ComponentSpec,
     DataComponent,
     TransferPolicy,
@@ -21,13 +22,8 @@ else:
     _CoordinateSystem = Any
     _ForcingData = Any
 
-_JCM_LAND_INPUT_NAMES = (
-    "latent_heat_flux",
-    "sensible_heat_flux",
-    "land_latent_heat_flux",
-    "land_sensible_heat_flux",
-)
-_JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture")
+_JCM_LAND_INPUT_NAMES: tuple[str, ...] = ()
+_JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture", "land_fraction")
 
 
 def _canonicalize_jcm_forcing_field(
@@ -90,7 +86,7 @@ def make_jcm_land(
         shape = (records, *land_surface_temperature.shape[-2:])
         land_surface_temperature = jnp.broadcast_to(land_surface_temperature, shape)
         soil_moisture = jnp.broadcast_to(soil_moisture, shape)
-    lnd_bmask, _ = create_lnd_mask_from_ocn(
+    lnd_bmask, land_fraction = create_lnd_mask_from_ocn(
         atm_lat=latitude,
         atm_lon=longitude,
         ocn_grid=ocn_grid,
@@ -109,12 +105,14 @@ def make_jcm_land(
         {
             "land_surface_temperature": land_surface_temperature,
             "soil_moisture": soil_moisture,
+            "land_fraction": land_fraction,
         },
         spec=ComponentSpec(
             inputs=_JCM_LAND_INPUT_NAMES,
             outputs=_JCM_LAND_FIELD_NAMES,
             initial_fields={field_name: 0.0 for field_name in _JCM_LAND_INPUT_NAMES},
             transfer=TransferPolicy(time_selection="daily" if daily else "current"),
+            masks=ComponentMaskSpec(fractional_field="land_fraction"),
             output=resolve_output(output),
         ),
     )

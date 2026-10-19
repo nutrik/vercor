@@ -1443,6 +1443,8 @@ def test_camulator_land_stores_jax_runtime_arrays(
         camulator_grid=camulator_grid,
         ocn_grid=ocean_grid,
     )
+    assert component.spec.masks is not None
+    assert component.spec.masks.fractional_field == "land_fraction"
 
     component = prepare_component(
         normalize_component(component),
@@ -1453,9 +1455,10 @@ def test_camulator_land_stores_jax_runtime_arrays(
         "net_shortwave_radiation_flux",
         "downward_longwave_radiation_flux",
     )
-    assert component.spec.outputs == ("land_surface_temperature",)
+    assert component.spec.outputs == ("land_surface_temperature", "land_fraction")
     assert set(component.spec.initial_fields) == {
         "land_surface_temperature",
+        "land_fraction",
         "net_shortwave_radiation_flux",
         "downward_longwave_radiation_flux",
     }
@@ -1567,6 +1570,7 @@ def test_camulator_land_declares_radiation_exchange_inputs(
         tuple(components),
         (
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="LND",
                 fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,

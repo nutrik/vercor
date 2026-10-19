@@ -172,7 +172,10 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
     runtime_dependencies = tuple(project["dependencies"])
     extras = project["optional-dependencies"]
 
-    assert extras["jcm"] == ["dinosaur>=1.3.6", "jcm==2.0.1"]
+    assert extras["jcm"] == ["dinosaur>=1.5.0", "jcm==3.0.0"]
+    assert extras["veris"] == [
+        "veris @ git+https://github.com/team-ocean/veris.git@v0.2.1"
+    ]
     assert extras["veros_ad"] == [
         f"veros @ git+{VEROS_AD_REPOSITORY}@{VEROS_AD_COMMIT}"
     ]
@@ -318,7 +321,7 @@ def test_current_external_extension_fixture_uses_canonical_owners_and_v0_4_workf
         "SetupResult(",
         "Exchange(",
         "ExchangeTopologyPatch(",
-        "fractional_masks=",
+        "binary_masks=",
         "PeriodOutput(",
         "StepResult(",
         ".replace_fields(",
@@ -1185,7 +1188,7 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
         "VERIS_COMMIT": jobs["quality"]["env"]["VERIS_COMMIT"],
     }
     assert install_index < verify_index < rollout_index
-    assert 'python -m pip install ".[dev,jcm,veros,veris]"' in install["run"]
+    assert "python tools/install_coupled_models.py" in install["run"]
     assert "ipdb==0.13.13" in install["run"]
     assert f'"git+{VEROS_AD_REPOSITORY}@${{VEROS_AD_COMMIT}}"' in install["run"]
     assert "--no-deps" in install["run"]
@@ -1201,7 +1204,7 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
         "-q -n0 -m veros_autodiff --tb=short "
         "--cov=vercor --cov-branch --cov-report= --cov-fail-under=0"
     )
-    assert 'python -m pip install ".[dev,jcm,veros,veris]"' in quality_commands
+    assert "python tools/install_coupled_models.py" in quality_commands
     for stock_step in (stock_full, stock_coverage):
         assert '-m "not veros_autodiff"' in stock_step["run"]
     assert "combined-coverage" in jobs["publish-release"]["needs"]
@@ -1359,7 +1362,7 @@ def test_ci_quality_job_enforces_static_gates_and_collects_stock_coverage() -> N
 
     assert checkout.get("with", {}).get("fetch-depth") == 0
     assert setup["with"]["python-version"] == "3.12"
-    assert 'pip install ".[dev,jcm,veros,veris]"' in commands
+    assert "python tools/install_coupled_models.py" in commands
     assert "black --check vercor tests" in commands
     assert "flake8 ." in commands
     assert "--exit-zero" not in commands

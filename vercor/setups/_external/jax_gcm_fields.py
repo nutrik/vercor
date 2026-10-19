@@ -11,7 +11,6 @@ import jax.numpy as jnp
 
 from vercor._numerical_safety import (
     _require_zero,
-    replace_missing_nan,
     require_active_finite,
 )
 from vercor.dtypes import DTypePolicy, as_jax_real_array
@@ -165,8 +164,6 @@ JAXGCM_OUTPUT_GRID_FIELD_NAMES = (
     "downward_shortwave_radiation_flux",
     "surface_pressure",
     "open_water_albedo",
-    "land_sensible_heat_flux",
-    "land_latent_heat_flux",
     "u_velocity",
     "v_velocity",
     "temperature",
@@ -189,60 +186,30 @@ JAXGCM_REQUIRED_GRID_FIELD_NAMES = (
 
 
 @jax.jit
-def cleanup_surface_temperature_fields(
+def prepare_surface_temperature_forcing(
     land_surface_temperature: object,
     sea_surface_temperature: object,
-) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
-    land_surface_temperature_array = replace_missing_nan(
-        as_jax_real_array(land_surface_temperature),
-        owner="JCM land surface temperature",
-    )
-    sea_surface_temperature_array = replace_missing_nan(
-        as_jax_real_array(sea_surface_temperature),
-        owner="JCM sea surface temperature",
-    )
-    total_surface_temperature = (
-        land_surface_temperature_array + sea_surface_temperature_array
-    )
-    cold_surface_cells = total_surface_temperature < COLD_SURFACE_TEMPERATURE_THRESHOLD
-    return (
-        land_surface_temperature_array,
-        sea_surface_temperature_array,
-        total_surface_temperature,
-        cold_surface_cells,
-    )
-
-
-@jax.jit
-def prepare_surface_temperature_forcing(
-    total_surface_temperature: object,
     land_fraction_mask: object,
-) -> tuple[jax.Array, jax.Array]:
-    """Build finite JCM land and sea temperatures from one surface field.
+) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """Keep intensive land/SST separate and form the native area-mean diagnostic.
 
-    JCM applies ``land_fraction_mask`` when combining its land and sea fluxes,
-    so fractional coastal cells require the complete temperature in both
-    forcing arrays. Scaling a temperature by its surface fraction is
-    physically invalid and can make JCM's reverse-mode surface-flux derivative
-    non-finite. A reference value fills only cells where the corresponding
-    surface is absent.
+    Only absent tiles receive the reference temperature. Inactive NaNs are
+    neutralized before arithmetic; infinity and active missing values remain
+    errors. JCM owns the physical land/ocean blending in its flux closure.
     """
-
-    total_surface_temperature_array = as_jax_real_array(total_surface_temperature)
-    land_fraction_mask_array = as_jax_real_array(land_fraction_mask)
-
-    land_surface_temperature = jnp.where(
-        land_fraction_mask_array > 0.0,
-        total_surface_temperature_array,
-        REFERENCE_SURFACE_TEMPERATURE,
+    land = as_jax_real_array(land_surface_temperature)
+    sea = as_jax_real_array(sea_surface_temperature)
+    fraction = as_jax_real_array(land_fraction_mask)
+    land_active, sea_active = fraction > 0, fraction < 1
+    require_active_finite(
+        land, active_mask=land_active, owner="JCM land surface temperature"
     )
-    sea_surface_temperature = jnp.where(
-        land_fraction_mask_array < 1.0,
-        total_surface_temperature_array,
-        REFERENCE_SURFACE_TEMPERATURE,
+    require_active_finite(
+        sea, active_mask=sea_active, owner="JCM sea surface temperature"
     )
-
-    return land_surface_temperature, sea_surface_temperature
+    land = jnp.where(land_active, land, REFERENCE_SURFACE_TEMPERATURE)
+    sea = jnp.where(sea_active, sea, REFERENCE_SURFACE_TEMPERATURE)
+    return land, sea, fraction * land + (1 - fraction) * sea
 
 
 @partial(jax.jit, static_argnames=("dtype",))
@@ -310,7 +277,7 @@ def map_jcm_output_fields(
     u_velocity_bottom = as_jax_real_array(u_wind, dtype)[-1, :, :].T
     v_velocity_bottom = as_jax_real_array(v_wind, dtype)[-1, :, :].T
     temperature_bottom = temperature_array[-1, :, :].T
-    specific_humidity_bottom = specific_humidity_array[-1, :, :].T / 1000.0
+    specific_humidity_bottom = specific_humidity_array[-1, :, :].T
     temperature_2m = as_jax_real_array(temperature_2m, dtype)
     snow_temperature_array = as_jax_real_array(snow_temperature, dtype)
     rain_temperature_array = as_jax_real_array(rain_temperature, dtype)
@@ -326,13 +293,11 @@ def map_jcm_output_fields(
     rain_rate = (total_precipitation - snow_precipitation).T
     snow_rate = snow_precipitation.T
 
-    # SPEEDY stores land, marine, then the area-combined channel.
-    sensible_channels = as_jax_real_array(surface_sensible_heat_flux, dtype)
-    latent_channels = as_jax_real_array(surface_evaporation, dtype) * (
+    # JCM 3 publishes delivered grid means, with evaporation still in g/m2/s.
+    sensible_heat_flux = -as_jax_real_array(surface_sensible_heat_flux, dtype).T
+    latent_heat_flux = -as_jax_real_array(surface_evaporation, dtype).T * (
         latvap_array / 1000
     )
-    sensible_heat_flux = -sensible_channels[:, :, 2].T
-    latent_heat_flux = -latent_channels[:, :, 2].T
     net_shortwave_radiation_flux_surface = as_jax_real_array(
         net_shortwave_radiation_flux, dtype
     ).T
@@ -362,8 +327,6 @@ def map_jcm_output_fields(
     )
 
     return {
-        "land_sensible_heat_flux": -sensible_channels[:, :, 0].T,
-        "land_latent_heat_flux": -latent_channels[:, :, 0].T,
         "downward_shortwave_radiation_flux": jnp.broadcast_to(
             as_jax_real_array(downward_shortwave_radiation_flux, dtype),
             temperature_bottom.T.shape,
@@ -398,7 +361,6 @@ __all__ = [
     "REFERENCE_AIR_DENSITY",
     "REFERENCE_MODEL_LEVEL_HEIGHT",
     "REFERENCE_SURFACE_TEMPERATURE",
-    "cleanup_surface_temperature_fields",
     "map_jcm_output_fields",
     "prepare_surface_temperature_forcing",
 ]

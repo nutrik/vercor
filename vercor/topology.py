@@ -24,21 +24,19 @@ class TopologyContext:
 
 @dataclass(frozen=True)
 class ExchangeTopologyPatch:
-    """Topology mask updates keyed by stable exchange route IDs."""
+    """Static binary route restrictions keyed by stable exchange route IDs.
+
+    Fractional coverage belongs to component declarations and is resolved by
+    the runtime; topology can only restrict target computational support.
+    """
 
     binary_masks: Mapping[str, _RuntimeArray] = field(default_factory=dict)
-    fractional_masks: Mapping[str, _RuntimeArray] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Freeze caller-provided patch mappings."""
 
         object.__setattr__(
             self, "binary_masks", MappingProxyType(dict(self.binary_masks))
-        )
-        object.__setattr__(
-            self,
-            "fractional_masks",
-            MappingProxyType(dict(self.fractional_masks)),
         )
 
 

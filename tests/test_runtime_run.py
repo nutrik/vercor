@@ -93,24 +93,28 @@ def _make_coupler(steps: int) -> Coupler:
         ),
         exchanges=(
             Exchange(
+                quantity="intensive",
                 source="OCN",
                 target="ATM",
                 fields=["sea_surface_temperature"],
                 regridder_factory=cast(Any, _identity_factory),
             ),
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
                 fields=["sensible_heat_flux", "latent_heat_flux"],
                 regridder_factory=cast(Any, _identity_factory),
             ),
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="LND",
                 fields=["latent_heat_flux"],
                 regridder_factory=cast(Any, _identity_factory),
             ),
             Exchange(
+                quantity="intensive",
                 source="OCN",
                 target="ICE",
                 fields=["sea_surface_temperature"],
@@ -136,9 +140,6 @@ def _make_coupler(steps: int) -> Coupler:
     replace_runtime_topology_maps(
         coupler,
         regridders=regridders,
-        fractional_masks={
-            key: jnp.ones((2, 2), dtype=jnp.float64) for key in regridders
-        },
     )
     return coupler
 

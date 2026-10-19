@@ -27,9 +27,6 @@ def build_exchange_topology_maps(
 
     regridders = {} if topology_maps is None else dict(topology_maps.regridders)
     binary_masks = {} if topology_maps is None else dict(topology_maps.binary_masks)
-    fractional_masks = (
-        {} if topology_maps is None else dict(topology_maps.fractional_masks)
-    )
     configured_route_ids: set[str] = set()
 
     for exchange in exchanges:
@@ -39,13 +36,6 @@ def build_exchange_topology_maps(
                 f"Duplicate exchange route ID {route_id!r}; route IDs must be unique."
             )
         configured_route_ids.add(route_id)
-        if exchange.quantity == "legacy" and any(
-            components[name].spec.masks is not None
-            for name in (exchange.source, exchange.target)
-        ):
-            raise CouplerError(
-                f"Exchange '{route_id}' touches dynamic component masks; select an explicit quantity."
-            )
         if route_id not in regridders:
             regridder = exchange.regridder_factory(
                 components[exchange.source].grid, components[exchange.target].grid
@@ -70,12 +60,10 @@ def build_exchange_topology_maps(
                 else as_jax_real_array(target_grid.binary_mask, dtype)
             )
             binary_masks[route_id] = target_active_mask
-            fractional_masks[route_id] = target_active_mask
 
     return RuntimeTopologyMaps(
         regridders=regridders,
         binary_masks=binary_masks,
-        fractional_masks=fractional_masks,
     )
 
 

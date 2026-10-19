@@ -30,7 +30,6 @@ from vercor.diagnostics import (
     plot_component_scalar_vector_comparison,
     print_component_field_means_table,
 )
-from vercor.topology import SurfaceMaskPolicy
 
 
 def run_setup(*, loglevel: str, float_type: str) -> None:
@@ -52,7 +51,8 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     )
 
     ocn_binary_mask = jnp.where(as_jax_real_array(terrain.fmask) < 1, 1, 0).T
-    lnd_binary_mask = 1 - ocn_binary_mask
+    land_fraction = as_jax_real_array(terrain.fmask).T
+    lnd_binary_mask = jnp.where(land_fraction > 0, 1, 0)
 
     hgrid = coords.horizontal
     lnd_grid = RectilinearGrid.from_coordinates(
@@ -69,8 +69,8 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         binary_mask=ocn_binary_mask,
     )
 
-    ocn = make_slab_ocean(ocn_grid)
-    lnd = make_slab_land(lnd_grid)
+    ocn = make_slab_ocean(ocn_grid, fractional_coverage=1 - land_fraction)
+    lnd = make_slab_land(lnd_grid, fractional_coverage=land_fraction)
 
     if atm.grid.binary_mask is not None:
         print("Total number of grids = ", atm.grid.binary_mask.size)
@@ -86,29 +86,35 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=86400.0, steps=10)
     run_order = ["OCN", "LND", "ATM"]
 
+    # JCM 3 supplies grid-mean turbulent fluxes. This toy slab example uses
+    # those densities on both tiles; it does not resolve tile-specific budgets.
     # Exchanges
     # scalar fields (vector field))
     # ["SHF", "LHF", ("u10m", "v10m")]
     exchanges = (
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="OCN",
             target="ATM",
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="LND",
             target="ATM",
             fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="LND",
             fields=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
@@ -121,7 +127,9 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         components=components,
         exchanges=exchanges,
         run_order=run_order,
-        runtime=RuntimeOptions(dtype=dtype, topology=SurfaceMaskPolicy()),
+        # Shared native grid: each component owns the native tile fraction.
+        # The ocean-binary-derived SurfaceMaskPolicy is for disjoint wet grids.
+        runtime=RuntimeOptions(dtype=dtype, topology=None),
         log_level=loglevel,
     )
 

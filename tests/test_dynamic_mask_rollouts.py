@@ -24,11 +24,107 @@ from vercor.components import (
 )
 from vercor.dtypes import DTypePolicy
 from vercor.exceptions import CouplerError
-from vercor.output import OutputTarget
+from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.regridding import bilinear
 from vercor.runtime import SequentialWorkflow, StepPlan
 
 pytestmark = pytest.mark.fast_always
+
+
+@pytest.mark.parametrize("selection", ["daily", "linear"])
+def test_current_masks_coexist_with_record_forcing_and_period_output(
+    selection: str, tmp_path: Path
+) -> None:
+    """Catch indexing a current coverage field as if it had a record axis."""
+    grid = RectilinearGrid(
+        "forcing", longitude=jnp.array([0.0, 1.0]), latitude=jnp.array([0.0, 1.0])
+    )
+    coverage = np.array([[0.25, 0.75], [0.25, 0.75]])
+    records = (
+        np.broadcast_to(np.array([2.0, 4.0, 6.0])[:, None, None], (3, 2, 2))
+        if selection == "daily"
+        else np.full((12, 2, 2), 7.0)
+    )
+    source = DataComponent(
+        "SRC",
+        grid,
+        {"area": coverage, "value": records},
+        spec=ComponentSpec(
+            outputs=("area", "value"),
+            masks=ComponentMaskSpec(fractional_field="area"),
+            transfer=TransferPolicy(time_selection=cast(Any, selection)),
+            output=OutputSpec(
+                period=PeriodOutput(frequency="day", variables=("area", "value"))
+            ),
+        ),
+    )
+    target = CallableComponent(
+        "DST", grid, lambda f: {}, spec=ComponentSpec(inputs=("value", "area"))
+    )
+    coupler = Coupler(
+        Clock(datetime(2000, 1, 1), 86400, 2, calendar="noleap"),
+        components=(source, target),
+        run_order=("SRC", "DST"),
+        exchanges=(
+            Exchange("SRC", "DST", ("value",), quantity="source_flux"),
+            Exchange(
+                "SRC",
+                "DST",
+                ("area",),
+                quantity="intensive",
+                source_coverage="binary",
+                route_id="area",
+            ),
+        ),
+        runtime=RuntimeOptions(dtype=DTypePolicy(enable_x64=True)),
+        log_level="error",
+    )
+    initial = coupler.initial_state()
+    np.testing.assert_array_equal(
+        initial._component_state("SRC").sent.get("area"), coverage
+    )
+    np.testing.assert_array_equal(
+        initial._component_state("SRC").sent.get("value"),
+        2.0 if selection == "daily" else 7.0,
+    )
+    final = coupler.run(initial, output=OutputTarget(tmp_path))
+    np.testing.assert_allclose(
+        final.component("DST").field("value"),
+        coverage * (4.0 if selection == "daily" else 7.0),
+    )
+    samples = []
+    for path in sorted(tmp_path.rglob("*.nc")):
+        with xr.open_dataset(path, engine="h5netcdf") as dataset:
+            if "area" in dataset and "value" in dataset:
+                np.testing.assert_allclose(dataset["area"].values.squeeze(), coverage)
+                assert dataset["value"].shape[-2:] == (2, 2)
+                samples.append(float(dataset["value"].values.mean()))
+    assert samples == ([2.0, 4.0] if selection == "daily" else [7.0, 7.0])
+
+
+@pytest.mark.parametrize("selection", ["daily", "linear"])
+def test_record_shaped_component_mask_is_rejected(selection: str) -> None:
+    grid = RectilinearGrid(
+        "bad-mask", longitude=jnp.array([0.0, 1.0]), latitude=jnp.array([0.0, 1.0])
+    )
+    source = DataComponent(
+        "SRC",
+        grid,
+        {"area": np.ones((12, 2, 2))},
+        spec=ComponentSpec(
+            outputs=("area",),
+            masks=ComponentMaskSpec(fractional_field="area"),
+            transfer=TransferPolicy(time_selection=cast(Any, selection)),
+        ),
+    )
+    coupler = Coupler(
+        Clock(datetime(2000, 1, 1), 60, 1),
+        components=(source,),
+        exchanges=(),
+        run_order=("SRC",),
+    )
+    with pytest.raises(CouplerError, match="mask field 'area'.*shape"):
+        coupler.initial_state()
 
 
 def _coupler(
@@ -185,7 +281,15 @@ def test_replacing_monthly_records_preserves_outgoing_selection_shape() -> None:
         Clock(datetime(2000, 1, 1), 60.0, 1, calendar="noleap"),
         components=(source, target),
         run_order=("SRC", "DST"),
-        exchanges=(Exchange("SRC", "DST", ("value",), regridder_factory=bilinear),),
+        exchanges=(
+            Exchange(
+                "SRC",
+                "DST",
+                ("value",),
+                quantity="intensive",
+                regridder_factory=bilinear,
+            ),
+        ),
     )
     initial = coupler.initial_state()
     updated = initial.replace_fields("SRC", {"value": jnp.full((12, 2, 2), 3.0)})

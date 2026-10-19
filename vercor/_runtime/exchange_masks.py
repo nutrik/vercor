@@ -56,8 +56,6 @@ def exchange_coverage(
     state: RunState, exchange: Exchange, *, context: RuntimeDispatchContext
 ) -> RuntimeArray:
     """Resolve diagnostic overlap without attenuating intensive field values."""
-    if exchange.quantity == "legacy":
-        return state._fractional_mask(exchange.route_id)
     _, binary, fraction, overlap = exchange_mask_operands(
         state, exchange, context=context
     )
@@ -73,7 +71,6 @@ def refresh_runtime_masks(
     updates = {
         route.route_id: exchange_coverage(state, route, context=context)
         for route in context.exchanges
-        if route.quantity != "legacy"
     }
     if not updates:
         return state
@@ -88,14 +85,9 @@ def runtime_exchange_masks(
         route.route_id: exchange_coverage(state, route, context=context)
         for route in context.exchanges
     }
-    binary = {
-        route.route_id: (
-            context.topology_binary_masks[route.route_id]
-            if route.quantity == "legacy"
-            and route.route_id in context.topology_binary_masks
-            else jnp.asarray(
-                fractions[route.route_id] > 0, dtype=context.dtype.jax_real
-            )
+    binary: dict[str, RuntimeArray] = {
+        route.route_id: jnp.asarray(
+            fractions[route.route_id] > 0, dtype=context.dtype.jax_real
         )
         for route in context.exchanges
     }

@@ -39,6 +39,7 @@ JAX components and connect them with exchanges.
    cli
    setup-gallery
    veris-validation
+   exchange-coverage
    veris-veros-jcm-validation
    troubleshooting
    api/index

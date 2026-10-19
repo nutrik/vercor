@@ -188,7 +188,9 @@ def make_custom_coupler(
     return Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=3),
         components=(source, model),
-        exchanges=(Exchange("FORCING", "MODEL", ("custom_flux",)),),
+        exchanges=(
+            Exchange("FORCING", "MODEL", ("custom_flux",), quantity="intensive"),
+        ),
         run_order=("FORCING", "MODEL"),
         runtime=RuntimeOptions(
             backend=SequentialBackend(),

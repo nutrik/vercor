@@ -79,9 +79,7 @@ def test_runtime_module_owns_public_runtime_contracts() -> None:
 @pytest.mark.fast_always
 def test_topology_module_owns_public_topology_contracts() -> None:
     policy = topology.SurfaceMaskPolicy(mode="disabled")
-    patch = topology.ExchangeTopologyPatch(
-        fractional_masks={"custom": jnp.asarray(1.0)}
-    )
+    patch = topology.ExchangeTopologyPatch(binary_masks={"custom": jnp.asarray(1.0)})
 
     assert topology.__all__ == [
         "ExchangeTopologyPatch",
@@ -90,7 +88,7 @@ def test_topology_module_owns_public_topology_contracts() -> None:
         "TopologyPolicy",
     ]
     assert policy.mode == "disabled"
-    assert patch.fractional_masks["custom"].shape == ()
+    assert patch.binary_masks["custom"].shape == ()
     assert "TopologyPolicy" not in vercor.__all__
     assert "SurfaceMaskPolicy" not in vercor.__all__
 
@@ -208,7 +206,7 @@ def test_custom_backend_runs_complete_host_exchange_order_from_supplied_state() 
     coupler = Coupler(
         _clock(steps=2),
         components=(source, target),
-        exchanges=(Exchange("SRC", "DST", ("flux",)),),
+        exchanges=(Exchange("SRC", "DST", ("flux",), quantity="intensive"),),
         run_order=("SRC", "DST"),
         runtime=RuntimeOptions(backend=backend),
     )
@@ -219,7 +217,9 @@ def test_custom_backend_runs_complete_host_exchange_order_from_supplied_state() 
 
     final_state = coupler.run(initial_state)
 
-    assert backend.received_state is initial_state
+    assert backend.received_state is not None
+    assert_allclose_compact(backend.received_state.component("SRC").field("flux"), 10.0)
+    assert_allclose_compact(initial_state.component("SRC").field("flux"), 10.0)
     assert backend.driver_calls == [
         (0, ("SRC", "DST")),
         (1, ("SRC", "DST")),

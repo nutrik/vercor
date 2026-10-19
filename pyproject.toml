@@ -38,9 +38,9 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-jcm = ["dinosaur>=1.3.6", "jcm==2.0.1"]
+jcm = ["dinosaur>=1.5.0", "jcm==3.0.0"]
 veros = ["veros>=1.6.2,<1.7"]
-veris = ["veris @ git+https://github.com/team-ocean/veris.git@225aa34c4f12c337c7198f67927ca098afae3f9c"]
+veris = ["veris @ git+https://github.com/team-ocean/veris.git@v0.2.1"]
 veros_ad = ["veros @ git+https://github.com/Etienne-Meunier/veros.git@7a8c964cf00b5aa0713c995edd760643a431b3c9"]
 test = [
   "PyYAML",

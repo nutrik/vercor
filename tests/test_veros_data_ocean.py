@@ -153,7 +153,11 @@ def test_data_ocean_reuses_grid_and_monthly_selection(native: Any) -> None:
         components=(ocean, target),
         exchanges=(
             Exchange(
-                "OCN", "DST", ("sea_surface_temperature",), regridder_factory=bilinear
+                "OCN",
+                "DST",
+                ("sea_surface_temperature",),
+                quantity="intensive",
+                regridder_factory=bilinear,
             ),
         ),
         run_order=("OCN", "DST"),

@@ -318,6 +318,8 @@ class _RuntimeFieldProvider:
                 context.state.field(name, scope="state"),
                 self._component.spec.transfer,
                 step_info,
+                field_name=name,
+                masks=self._component.spec.masks,
             )
             variables[name] = OutputVariable(
                 grid_field_dims(

@@ -8,6 +8,7 @@ from vercor.components import (
     CallableComponent,
     Component,
     ComponentSpec,
+    ComponentMaskSpec,
     StepContext,
 )
 from vercor.dtypes import as_jax_real_array
@@ -76,8 +77,14 @@ def make_slab_ocean(
     mixed_layer_depth: float = 30.0,
     *,
     output: OutputSpec | None = None,
+    fractional_coverage: object | None = None,
 ) -> Component:
-    """Return a toy slab ocean component factory instance."""
+    """Return a toy ocean component with optional grid-shaped surface coverage.
+
+    Coverage is dimensionless, in [0, 1], within the grid's static support.
+    The runtime validates and applies it to exchanges; local temperatures and
+    flux-driven tendencies remain per unit surface area.
+    """
 
     rho = 1025.0
     cp = 3990.0
@@ -111,14 +118,21 @@ def make_slab_ocean(
         )
         return {"sea_surface_temperature": updated_sst}
 
+    initial_fields: dict[str, object] = dict(_OCEAN_DEFAULT_FIELDS)
+    masks = None
+    if fractional_coverage is not None:
+        initial_fields["surface_fraction"] = fractional_coverage
+        masks = ComponentMaskSpec(fractional_field="surface_fraction")
+
     return CallableComponent(
         name,
         grid,
         step,
         spec=ComponentSpec(
             inputs=_OCEAN_INPUTS,
-            outputs=_OCEAN_OUTPUTS,
-            initial_fields=_OCEAN_DEFAULT_FIELDS,
+            outputs=_OCEAN_OUTPUTS + (("surface_fraction",) if masks else ()),
+            initial_fields=initial_fields,
+            masks=masks,
             output=resolve_output(output),
         ),
     )

@@ -198,7 +198,7 @@ def _topology_policy_coupler(policy: _RecordingTopologyPolicy) -> Coupler:
     return Coupler(
         Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
         components=(source, target),
-        exchanges=(Exchange("SRC", "DST", ("custom_flux",)),),
+        exchanges=(Exchange("SRC", "DST", ("custom_flux",), quantity="intensive"),),
         run_order=("SRC", "DST"),
         runtime=RuntimeOptions(topology=policy),
     )
@@ -207,119 +207,48 @@ def _topology_policy_coupler(policy: _RecordingTopologyPolicy) -> Coupler:
 @pytest.mark.fast_always
 def test_custom_topology_policy_builds_once_and_patches_route_maps() -> None:
     key = "SRC->DST"
-    skipped = _RecordingTopologyPolicy()
-    skipped_coupler = _topology_policy_coupler(skipped)
-
-    skipped_coupler.initial_state()
-
-    assert [event for event, _ in skipped.events] == ["build"]
-    assert skipped_coupler._prepared is not None
-    assert_allclose_compact(
-        skipped_coupler._prepared.topology_maps.fractional_masks[key],
-        jnp.ones((2, 2)),
-    )
-
-    applied = _RecordingTopologyPolicy(
-        patch=ExchangeTopologyPatch(
-            fractional_masks={key: jnp.full((2, 2), 0.25)},
-        ),
-    )
-    applied_coupler = _topology_policy_coupler(applied)
-
-    applied_coupler.initial_state()
-
-    assert [event for event, _ in applied.events] == ["build"]
-    assert applied_coupler._prepared is not None
-    assert_allclose_compact(
-        applied_coupler._prepared.topology_maps.fractional_masks[key],
-        jnp.full((2, 2), 0.25),
-    )
+    for restriction in (None, jnp.array([[0.0, 1.0], [1.0, 0.0]])):
+        policy = _RecordingTopologyPolicy(
+            patch=ExchangeTopologyPatch(
+                binary_masks={} if restriction is None else {key: restriction}
+            )
+        )
+        coupler = _topology_policy_coupler(policy)
+        initial = coupler.initial_state()
+        assert [event for event, _ in policy.events] == ["build"]
+        expected = jnp.ones((2, 2)) if restriction is None else restriction
+        assert_allclose_compact(initial._fractional_mask(key), expected)
+        final = coupler.run(initial)
+        assert_allclose_compact(
+            final.component("DST").field("custom_flux", scope="received"), expected
+        )
 
 
 @pytest.mark.fast_always
 @pytest.mark.parametrize(
-    ("patch", "message"),
-    (
+    "key,value,message",
+    [
+        ("UNKNOWN", jnp.ones((2, 2)), "UNKNOWN.*configured route ID"),
+        ("SRC->DST", jnp.ones((1, 2)), r"SRC->DST.*shape \(1, 2\).*expected \(2, 2\)"),
+        ("SRC->DST", np.full((2, 2), "land"), "binary.*concrete numeric or bool"),
         (
-            ExchangeTopologyPatch(binary_masks={"UNKNOWN": jnp.ones((2, 2))}),
-            "UNKNOWN.*configured route ID",
-        ),
-        (
-            ExchangeTopologyPatch(fractional_masks={"SRC->DST": jnp.ones((1, 2))}),
-            r"SRC->DST.*shape \(1, 2\).*expected \(2, 2\)",
-        ),
-    ),
-)
-def test_topology_policy_patch_rejects_unknown_keys_and_wrong_shapes(
-    patch: ExchangeTopologyPatch,
-    message: str,
-) -> None:
-    coupler = _topology_policy_coupler(_RecordingTopologyPolicy(patch=patch))
-
-    with pytest.raises(CouplerError, match=message):
-        coupler.initial_state()
-
-
-@pytest.mark.fast_always
-@pytest.mark.parametrize(
-    ("mask_kind", "value", "message"),
-    (
-        pytest.param(
-            "binary",
-            np.full((2, 2), "land"),
-            "binary.*concrete numeric or bool",
-            id="binary-nonnumeric",
-        ),
-        pytest.param(
-            "fractional",
+            "SRC->DST",
             np.full((2, 2), object(), dtype=object),
-            "fractional.*concrete numeric or bool",
-            id="fractional-nonconcrete-object",
+            "binary.*concrete numeric or bool",
         ),
-        pytest.param(
-            "binary",
-            np.asarray([[0.0, 1.0], [np.nan, 0.0]]),
-            "binary.*finite",
-            id="binary-nonfinite",
-        ),
-        pytest.param(
-            "fractional",
-            np.asarray([[0.0, 1.0], [np.inf, 0.5]]),
-            "fractional.*finite",
-            id="fractional-nonfinite",
-        ),
-        pytest.param(
-            "binary",
-            np.asarray([[0.0, 1.0], [0.5, 0.0]]),
-            r"binary.*\{0, 1\}",
-            id="binary-nonbinary",
-        ),
-        pytest.param(
-            "fractional",
-            np.asarray([[0.0, 1.0], [-0.01, 0.5]]),
-            r"fractional.*\[0, 1\]",
-            id="fractional-below-range",
-        ),
-        pytest.param(
-            "fractional",
-            np.asarray([[0.0, 1.01], [0.25, 0.5]]),
-            r"fractional.*\[0, 1\]",
-            id="fractional-above-range",
-        ),
-    ),
+        ("SRC->DST", np.array([[0.0, 1.0], [np.nan, 0.0]]), "binary.*finite"),
+        ("SRC->DST", np.array([[0.0, 1.0], [np.inf, 0.5]]), "binary.*finite"),
+        ("SRC->DST", np.array([[0.0, 1.0], [0.5, 0.0]]), r"binary.*\{0, 1\}"),
+        ("SRC->DST", np.array([[0.0, 1.0], [-0.01, 0.5]]), r"binary.*\{0, 1\}"),
+        ("SRC->DST", np.array([[0.0, 1.01], [0.25, 0.5]]), r"binary.*\{0, 1\}"),
+    ],
 )
-def test_topology_policy_patch_rejects_invalid_mask_values(
-    mask_kind: str,
-    value: Any,
-    message: str,
+def test_topology_policy_patch_rejects_invalid_restrictions(
+    key: str, value: Any, message: str
 ) -> None:
-    key = "SRC->DST"
-    patch = ExchangeTopologyPatch(
-        binary_masks={key: value} if mask_kind == "binary" else {},
-        fractional_masks={key: value} if mask_kind == "fractional" else {},
+    coupler = _topology_policy_coupler(
+        _RecordingTopologyPolicy(patch=ExchangeTopologyPatch(binary_masks={key: value}))
     )
-    coupler = _topology_policy_coupler(_RecordingTopologyPolicy(patch=patch))
-
     with pytest.raises(CouplerError, match=message):
         coupler.initial_state()
 
@@ -327,42 +256,21 @@ def test_topology_policy_patch_rejects_invalid_mask_values(
 @pytest.mark.fast_always
 @pytest.mark.parametrize(
     "binary_mask",
-    (
-        pytest.param(
-            np.asarray([[False, True], [True, False]]),
-            id="bool",
-        ),
-        pytest.param(
-            np.asarray([[0, 1], [1, 0]], dtype=np.int32),
-            id="zero-one",
-        ),
-    ),
+    [
+        np.array([[False, True], [True, False]]),
+        np.array([[0, 1], [1, 0]], dtype=np.int32),
+    ],
 )
-def test_topology_policy_patch_accepts_valid_binary_and_fractional_masks(
+def test_topology_policy_patch_accepts_binary_restriction_types(
     binary_mask: np.ndarray,
 ) -> None:
-    key = "SRC->DST"
-    fractional_mask = np.asarray([[0.0, 0.25], [0.75, 1.0]])
     coupler = _topology_policy_coupler(
         _RecordingTopologyPolicy(
-            patch=ExchangeTopologyPatch(
-                binary_masks={key: binary_mask},
-                fractional_masks={key: fractional_mask},
-            ),
+            patch=ExchangeTopologyPatch(binary_masks={"SRC->DST": binary_mask})
         )
     )
-
-    coupler.initial_state()
-
-    assert coupler._prepared is not None
-    assert_allclose_compact(
-        coupler._prepared.topology_maps.binary_masks[key],
-        binary_mask,
-    )
-    assert_allclose_compact(
-        coupler._prepared.topology_maps.fractional_masks[key],
-        fractional_mask,
-    )
+    state = coupler.initial_state()
+    assert_allclose_compact(state._fractional_mask("SRC->DST"), binary_mask)
 
 
 @pytest.mark.fast_always
@@ -724,7 +632,7 @@ def test_constructor_builds_coupler_from_plain_recipe() -> None:
     coupler = Coupler(
         Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
         components=(forcing, model),
-        exchanges=(Exchange("SRC", "DST", ("flux",)),),
+        exchanges=(Exchange("SRC", "DST", ("flux",), quantity="intensive"),),
         run_order=("SRC", "DST"),
         runtime=RuntimeOptions(topology=None),
     )

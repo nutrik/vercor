@@ -80,7 +80,6 @@ def prepare_coupling(
         constants=runtime_constants,
         dtype=runtime.dtype,
         topology_binary_masks=topology_maps.binary_masks,
-        topology_fractional_masks=topology_maps.fractional_masks,
     )
     return PreparedCoupling(
         components=immutable_components,

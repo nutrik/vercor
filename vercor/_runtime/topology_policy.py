@@ -89,7 +89,6 @@ def _apply_exchange_topology_patch(
     """Apply public topology mask patches to runtime topology maps."""
 
     binary_masks = dict(topology_maps.binary_masks)
-    fractional_masks = dict(topology_maps.fractional_masks)
     route_targets = {exchange.route_id: exchange.target for exchange in exchanges}
     for key, value in patch.binary_masks.items():
         binary_masks[key] = _validate_patch_item(
@@ -98,28 +97,10 @@ def _apply_exchange_topology_patch(
             route_targets,
             key,
             value,
-            "binary",
         )
-    for key, value in patch.fractional_masks.items():
-        fractional_masks[key] = _validate_patch_item(
-            topology_maps,
-            components,
-            route_targets,
-            key,
-            value,
-            "fractional",
-        )
-    for exchange in exchanges:
-        key = exchange.route_id
-        if exchange.quantity != "legacy" and key in patch.fractional_masks:
-            if not bool(jnp.all(fractional_masks[key] == binary_masks[key])):
-                raise CouplerError(
-                    f"Exchange '{key}' explicit quantity conflicts with its fractional topology patch."
-                )
     return RuntimeTopologyMaps(
         regridders=topology_maps.regridders,
         binary_masks=binary_masks,
-        fractional_masks=fractional_masks,
     )
 
 
@@ -129,20 +110,19 @@ def _validate_patch_item(
     route_targets: Mapping[str, str],
     key: str,
     value: object,
-    mask_kind: str,
 ) -> RuntimeArray:
     """Validate one public topology patch item before map replacement."""
 
     if key not in topology_maps.regridders:
         raise CouplerError(
-            f"Topology policy {mask_kind} mask route ID {key!r} does not match a "
+            f"Topology policy binary mask route ID {key!r} does not match a "
             "configured route ID."
         )
     try:
         mask_array = jnp.asarray(value)
     except (TypeError, ValueError) as exc:
         raise CouplerError(
-            f"Topology policy {mask_kind} mask for key {key!r} must be a "
+            f"Topology policy binary mask for key {key!r} must be a "
             "concrete numeric or bool array."
         ) from exc
     is_real_numeric = (
@@ -152,7 +132,7 @@ def _validate_patch_item(
     )
     if not is_real_numeric:
         raise CouplerError(
-            f"Topology policy {mask_kind} mask for key {key!r} must be a "
+            f"Topology policy binary mask for key {key!r} must be a "
             "concrete numeric or bool array."
         )
     target_name = route_targets[key]
@@ -160,41 +140,36 @@ def _validate_patch_item(
     mask_shape = mask_array.shape
     if mask_shape != target_shape:
         raise CouplerError(
-            f"Topology policy {mask_kind} mask for key {key!r} has shape "
+            f"Topology policy binary mask for key {key!r} has shape "
             f"{mask_shape}, expected {target_shape} for target component "
             f"{target_name!r}."
         )
     try:
         all_finite = bool(jnp.all(jnp.isfinite(mask_array)))
         all_binary = bool(jnp.all(jnp.logical_or(mask_array == 0, mask_array == 1)))
-        all_fractional = bool(
-            jnp.all(jnp.logical_and(mask_array >= 0, mask_array <= 1))
-        )
     except TracerBoolConversionError as exc:
         raise CouplerError(
-            f"Topology policy {mask_kind} mask for key {key!r} must be a "
+            f"Topology policy binary mask for key {key!r} must be a "
             "concrete numeric or bool array."
         ) from exc
     if not all_finite:
         raise CouplerError(
-            f"Topology policy {mask_kind} mask for key {key!r} must contain "
+            f"Topology policy binary mask for key {key!r} must contain "
             "only finite values."
         )
-    if mask_kind == "binary" and not all_binary:
+    if not all_binary:
         raise CouplerError(
             f"Topology policy binary mask for key {key!r} must contain only "
             "values in {0, 1}."
         )
-    if mask_kind == "fractional" and not all_fractional:
+    target_support = components[target_name].grid.binary_mask
+    if target_support is not None and bool(
+        jnp.any((mask_array > 0) & (jnp.asarray(target_support) == 0))
+    ):
         raise CouplerError(
-            f"Topology policy fractional mask for key {key!r} must contain "
-            "values in [0, 1]."
+            f"Topology policy binary mask for route {key!r} expands target computational support."
         )
-    reference = (
-        topology_maps.binary_masks[key]
-        if mask_kind == "binary"
-        else topology_maps.fractional_masks[key]
-    )
+    reference = topology_maps.binary_masks[key]
     return jnp.asarray(mask_array, dtype=jnp.asarray(reference).dtype)
 
 

@@ -287,11 +287,11 @@ def test_paired_factory_initializes_once_and_shares_grid(
     assert calls == [True]
 
 
-def test_optional_dependency_is_immutable_and_preserves_veros_extras() -> None:
+def test_optional_dependency_pins_release_and_preserves_veros_extras() -> None:
     metadata = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
     extras = metadata["project"]["optional-dependencies"]
     assert extras["veris"] == [
-        "veris @ git+https://github.com/team-ocean/veris.git@225aa34c4f12c337c7198f67927ca098afae3f9c"
+        "veris @ git+https://github.com/team-ocean/veris.git@v0.2.1"
     ]
     assert extras["veros"] == ["veros>=1.6.2,<1.7"]
 

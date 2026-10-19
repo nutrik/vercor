@@ -1,6 +1,12 @@
 Veris–Veros–JCM coupling validation
 ===================================
 
+Current release integration (2026-10-19) uses Veris v0.2.1 and JCM 3.0.0,
+Gregorian clocks and nine routes. JCM 3 removed separate land turbulent channels;
+the unused prescribed-land import route is removed. The record below describes
+the preceding integration; :doc:`exchange-coverage` documents current contracts
+and the reviewed dependency exception.
+
 This record concerns the functional coupling in ``run_veris_veros_jcm.py``.
 The execution order is LND, CICE (native Veris), OCN (prognostic Veros), ATM
 (JCM). Source code, tests, native data and the shared output coordinator are

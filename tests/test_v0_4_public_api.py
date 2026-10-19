@@ -197,7 +197,6 @@ PUBLIC_MODULE_EXPORTS = {
         "ATMOSPHERE_TO_OCEAN_STATE_FIELDS",
         "ATMOSPHERE_TO_VEROS_FORCING_FIELDS",
         "ATMOSPHERE_TO_VERIS_FORCING_FIELDS",
-        "JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS",
         "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS",
         "JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS",
         "JCM_LAND_TO_ATMOSPHERE_FIELDS",
@@ -563,8 +562,8 @@ def test_constructor_rejects_invalid_component_and_exchange_iterables(
 
 def test_constructor_rejects_duplicate_exchanges_and_unknown_endpoints() -> None:
     component = _component()
-    exchange = Exchange("MODEL", "MODEL", ("value",))
-    equal_exchange = Exchange("MODEL", "MODEL", ("value",))
+    exchange = Exchange("MODEL", "MODEL", ("value",), quantity="intensive")
+    equal_exchange = Exchange("MODEL", "MODEL", ("value",), quantity="intensive")
     assert equal_exchange is not exchange
     assert equal_exchange == exchange
     with pytest.raises(
@@ -579,13 +578,13 @@ def test_constructor_rejects_duplicate_exchanges_and_unknown_endpoints() -> None
         Coupler(
             _clock(),
             components=(component,),
-            exchanges=(Exchange("UNKNOWN", "MODEL", ("value",)),),
+            exchanges=(Exchange("UNKNOWN", "MODEL", ("value",), quantity="intensive"),),
         )
     with pytest.raises(CouplerError, match="unknown target component.*UNKNOWN"):
         Coupler(
             _clock(),
             components=(component,),
-            exchanges=(Exchange("MODEL", "UNKNOWN", ("value",)),),
+            exchanges=(Exchange("MODEL", "UNKNOWN", ("value",), quantity="intensive"),),
         )
 
 
@@ -607,8 +606,12 @@ def test_constructor_rejects_exchange_fan_in_before_component_setup() -> None:
                 _component("DST", setup=setup),
             ),
             exchanges=(
-                Exchange("SRC_A", "DST", ("value",), route_id="route-a"),
-                Exchange("SRC_B", "DST", ("value",), route_id="route-b"),
+                Exchange(
+                    "SRC_A", "DST", ("value",), quantity="intensive", route_id="route-a"
+                ),
+                Exchange(
+                    "SRC_B", "DST", ("value",), quantity="intensive", route_id="route-b"
+                ),
             ),
             run_order=("SRC_A", "SRC_B", "DST"),
         )
@@ -635,8 +638,8 @@ def test_constructor_rejects_duplicate_route_id_before_component_setup() -> None
                 _component("DST", setup=setup),
             ),
             exchanges=(
-                Exchange("SRC", "DST", ("value",)),
-                Exchange("SRC", "DST", ("other",)),
+                Exchange("SRC", "DST", ("value",), quantity="intensive"),
+                Exchange("SRC", "DST", ("other",), quantity="intensive"),
             ),
             run_order=("SRC", "DST"),
         )
@@ -658,6 +661,7 @@ def test_exchange_rejects_noncallable_factory_before_component_setup() -> None:
             "SRC",
             "DST",
             ("value",),
+            quantity="intensive",
             regridder_factory=object(),  # type: ignore[arg-type]
         )
 
@@ -684,7 +688,7 @@ def test_constructor_validates_runtime_constants_and_logger(
 
 def test_public_configuration_views_are_stable_immutable_snapshots() -> None:
     component = _component()
-    exchange = Exchange("MODEL", "MODEL", ("value",))
+    exchange = Exchange("MODEL", "MODEL", ("value",), quantity="intensive")
     components = [component]
     exchanges = [exchange]
     run_order = ["MODEL"]
@@ -909,7 +913,10 @@ def test_regridder_factory_is_one_runtime_protocol_with_public_hints(
     assert hints["return"] is Regridder
     assert isinstance(bilinear, RegridderFactory)
     assert isinstance(conservative, RegridderFactory)
-    assert Exchange("SOURCE", "TARGET", ("field",)).regridder_factory is bilinear
+    assert (
+        Exchange("SOURCE", "TARGET", ("field",), quantity="intensive").regridder_factory
+        is bilinear
+    )
 
 
 def test_prepared_runtime_has_no_reflective_configuration_snapshot() -> None:

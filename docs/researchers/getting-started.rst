@@ -42,6 +42,12 @@ provides the setup-only global ocean geometry and climatology. The gallery
 ``run_veris_dataveros_era5`` supplies ERA5 forcing and uses the standard
 ``vercor copy-setup`` and ``vercor run`` commands (see :doc:`../setup-gallery`).
 
+The combined JCM/Veris lane uses released JCM 3.0.0 and Veris v0.2.1.
+Their upstream JAX requirements conflict. From this checkout, use
+``python tools/install_coupled_models.py`` for the reviewed JAX 0.11.2 override;
+normal installation of the combined extras cannot resolve. See
+:doc:`../exchange-coverage` for the exact exception and validation scope.
+
 If you want to install a specific release version execute:
 
 .. code-block:: console

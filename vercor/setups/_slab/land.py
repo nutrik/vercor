@@ -8,6 +8,7 @@ from vercor.components import (
     CallableComponent,
     Component,
     ComponentSpec,
+    ComponentMaskSpec,
     StepContext,
 )
 from vercor.dtypes import as_jax_real_array
@@ -42,8 +43,14 @@ def make_slab_land(
     name: str = "LND",
     *,
     output: OutputSpec | None = None,
+    fractional_coverage: object | None = None,
 ) -> Component:
-    """Return a toy bucket land component factory instance."""
+    """Return a toy land component with optional grid-shaped surface coverage.
+
+    Coverage is dimensionless, in [0, 1], within the grid's static support.
+    The runtime validates and applies it to exchanges; local temperatures and
+    flux-driven tendencies remain per unit surface area.
+    """
 
     def step(
         fields: Mapping[str, Any],
@@ -62,14 +69,21 @@ def make_slab_land(
         )
         return {"soil_moisture": updated_soil_moisture}
 
+    initial_fields: dict[str, object] = dict(_LAND_DEFAULT_FIELDS)
+    masks = None
+    if fractional_coverage is not None:
+        initial_fields["surface_fraction"] = fractional_coverage
+        masks = ComponentMaskSpec(fractional_field="surface_fraction")
+
     return CallableComponent(
         name,
         grid,
         step,
         spec=ComponentSpec(
             inputs=_LAND_INPUTS,
-            outputs=_LAND_OUTPUTS,
-            initial_fields=_LAND_DEFAULT_FIELDS,
+            outputs=_LAND_OUTPUTS + (("surface_fraction",) if masks else ()),
+            initial_fields=initial_fields,
+            masks=masks,
             output=resolve_output(output),
         ),
     )

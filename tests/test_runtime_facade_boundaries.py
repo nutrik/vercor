@@ -778,7 +778,6 @@ def test_runtime_topology_maps_are_frozen_read_only_views() -> None:
     maps = RuntimeTopologyMaps(
         regridders={key: object()},
         binary_masks={key: jnp.ones((2, 2))},
-        fractional_masks={key: jnp.ones((2, 2))},
     )
 
     assert getattr(RuntimeTopologyMaps, "__dataclass_params__").frozen is True
@@ -786,8 +785,6 @@ def test_runtime_topology_maps_are_frozen_read_only_views() -> None:
         maps.regridders[key] = object()  # type: ignore[index]
     with pytest.raises(TypeError):
         maps.binary_masks[key] = jnp.zeros((2, 2))  # type: ignore[index]
-    with pytest.raises(TypeError):
-        maps.fractional_masks[key] = jnp.zeros((2, 2))  # type: ignore[index]
     with pytest.raises(FrozenInstanceError):
         maps.regridders = {}  # type: ignore[misc]
 
@@ -900,7 +897,6 @@ def test_runtime_topology_state_groups_read_only_maps() -> None:
     assert [field.name for field in fields(RuntimeTopologyMaps)] == [
         "regridders",
         "binary_masks",
-        "fractional_masks",
     ]
     assert "class RuntimeTopologyMaps" in topology_state_source
     assert "class ExchangeTopologyState" not in topology_state_source

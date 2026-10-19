@@ -14,7 +14,7 @@ from tests._runtime_helpers import prepared_coupling
 from vercor import Clock, Coupler, Exchange, RectilinearGrid, RuntimeOptions
 from vercor.components import CallableComponent, ComponentMaskSpec, ComponentSpec
 from vercor.dtypes import DTypePolicy
-from vercor.exceptions import CouplerError, ExchangeError
+from vercor.exceptions import CouplerError
 from vercor.fields import vector
 from vercor.regridding import bilinear, conservative
 from vercor.state import RunState
@@ -127,7 +127,6 @@ def _dispatch(
         state,
         "DST",
         (exchange,),
-        context.regridders,
         context=context,
     )
 
@@ -159,6 +158,53 @@ def test_vector_quantities_preserve_rotation_and_weights(
     np.testing.assert_allclose(view.field("v", scope="received"), scale)
 
 
+@pytest.mark.parametrize("vectors", [False, True])
+@pytest.mark.parametrize(
+    "quantity,area_gradient,target_gradient",
+    [
+        ("intensive", [-3.0, 1.0], 0.0),
+        ("source_flux", [0.5, 2.5], 0.0),
+        ("target_flux", [-0.75, 0.25], 2.0),
+    ],
+)
+def test_nonuniform_coverage_normalization_and_rotation_gradients(
+    quantity: str, area_gradient: list[float], target_gradient: float, vectors: bool
+) -> None:
+    """Check derivatives independently of the runtime's mask implementation."""
+    state, route, context = _scenario(quantity, vectors=vectors)
+    area = jnp.array([[0.25, 0.75], [0.25, 0.75]])
+    target = jnp.full((2, 2), 0.25)
+
+    def objective(a: jax.Array, t: jax.Array) -> jax.Array:
+        current = state.replace_fields("SRC", {"area": a}).replace_fields(
+            "DST", {"area": t}
+        )
+        return jnp.mean(
+            _dispatch(current, route, context)
+            .component("DST")
+            .field("u" if vectors else "flux", scope="received")
+        )
+
+    compiled = jax.jit(objective)
+    actual_a, actual_t = jax.grad(compiled, argnums=(0, 1))(area, target)
+    factor = 2.0 if vectors else 1.0
+    np.testing.assert_allclose(
+        actual_a, factor * np.tile(area_gradient, (2, 1)), rtol=1e-12, atol=1e-12
+    )
+    np.testing.assert_allclose(
+        actual_t, factor * target_gradient, rtol=1e-12, atol=1e-12
+    )
+    direction = (jnp.ones_like(area), jnp.full_like(target, 0.5))
+    _, forward = jax.jvp(compiled, (area, target), direction)
+    reverse = jnp.sum(actual_a) + 0.5 * jnp.sum(actual_t)
+    np.testing.assert_allclose(forward, reverse, rtol=1e-12, atol=1e-12)
+    h = 1e-5
+    finite_difference = (
+        compiled(area + h, target + 0.5 * h) - compiled(area - h, target - 0.5 * h)
+    ) / (2 * h)
+    np.testing.assert_allclose(forward, finite_difference, rtol=1e-8, atol=1e-8)
+
+
 def test_intensive_forcing_does_not_vanish_on_ice_free_target() -> None:
     state, exchange, context = _scenario("intensive", target_area=0.0)
     np.testing.assert_allclose(
@@ -170,19 +216,44 @@ def test_intensive_forcing_does_not_vanish_on_ice_free_target() -> None:
 
 
 @pytest.mark.parametrize("quantity", ["intensive", "source_flux", "target_flux"])
-def test_empty_source_coverage_returns_finite_zero(quantity: str) -> None:
-    state, exchange, context = _scenario(quantity, source_area=jnp.zeros((2, 2)))
+@pytest.mark.parametrize("vectors", [False, True])
+def test_empty_source_coverage_returns_finite_zero(
+    quantity: str, vectors: bool
+) -> None:
+    state, exchange, context = _scenario(
+        quantity, source_area=jnp.zeros((2, 2)), vectors=vectors
+    )
+    names = ("u", "v") if vectors else ("flux",)
     source = state._component_state("SRC")
     state = state._with_component_state(
         "SRC",
-        source.with_sent(source.sent.replace_many({"flux": jnp.full((2, 2), jnp.nan)})),
+        source.with_sent(
+            source.sent.replace_many(
+                {name: jnp.full((2, 2), jnp.nan) for name in names}
+            )
+        ),
     )
     value = (
         _dispatch(state, exchange, context)
         .component("DST")
-        .field("flux", scope="received")
+        .field(names[0], scope="received")
     )
     np.testing.assert_array_equal(value, 0.0)
+
+    def objective(area: jax.Array) -> jax.Array:
+        current = state.replace_fields("SRC", {"area": area})
+        return jnp.sum(
+            _dispatch(current, exchange, context)
+            .component("DST")
+            .field(names[0], scope="received")
+        )
+
+    compiled = jax.jit(objective)
+    zero = jnp.zeros((2, 2))
+    output, forward = jax.jvp(compiled, (zero,), (jnp.ones_like(zero),))
+    np.testing.assert_array_equal(output, 0.0)
+    np.testing.assert_array_equal(forward, 0.0)
+    np.testing.assert_array_equal(jax.grad(compiled)(zero), 0.0)
 
 
 def test_inactive_nan_is_neutralized_before_remapping_and_ad() -> None:
@@ -271,7 +342,7 @@ class _Patch:
 
     def build(self, context: Any) -> ExchangeTopologyPatch:
         if self.fractional:
-            return ExchangeTopologyPatch(
+            return ExchangeTopologyPatch(  # type: ignore[call-arg]
                 fractional_masks={"SRC->DST": jnp.full((2, 2), 0.5)}
             )
         return ExchangeTopologyPatch(
@@ -290,24 +361,38 @@ def test_binary_topology_patch_restricts_explicit_route() -> None:
 
 
 def test_conflicting_fractional_topology_patch_is_rejected() -> None:
-    with pytest.raises(CouplerError, match="SRC->DST.*fractional"):
+    with pytest.raises(TypeError, match="fractional_masks"):
         _scenario("intensive", topology=_Patch(fractional=True))
 
 
-def test_dynamic_masks_require_explicit_quantity() -> None:
-    with pytest.raises(CouplerError, match="SRC->DST.*quantity"):
-        _scenario("legacy")
+def test_all_routes_require_explicit_quantity() -> None:
+    with pytest.raises(TypeError, match="quantity"):
+        Exchange("SRC", "DST", ("flux",))  # type: ignore[call-arg]
+
+
+def test_topology_cannot_expand_target_computational_support() -> None:
+    class ExpandingPatch:
+        def build(self, context: Any) -> ExchangeTopologyPatch:
+            return ExchangeTopologyPatch(binary_masks={"SRC->DST": jnp.ones((2, 2))})
+
+    with pytest.raises(CouplerError, match="SRC->DST.*support"):
+        _scenario(
+            "intensive",
+            target_wet=jnp.array([[0.0, 1.0], [0.0, 1.0]]),
+            topology=ExpandingPatch(),
+        )
 
 
 def test_explicit_dispatch_requires_its_runtime_context() -> None:
     state, exchange, context = _scenario("intensive")
-    with pytest.raises(ExchangeError, match="context"):
-        dispatch_component_exchanges(state, "DST", (exchange,), context.regridders)
+    with pytest.raises(TypeError, match="context"):
+        dispatch_component_exchanges(state, "DST", (exchange,))  # type: ignore[call-arg]
 
 
-def test_unknown_exchange_quantity_is_rejected() -> None:
+@pytest.mark.parametrize("quantity", ["mystery", "legacy"])
+def test_unknown_exchange_quantity_is_rejected(quantity: str) -> None:
     with pytest.raises(ValueError, match="quantity"):
-        _scenario("mystery")
+        _scenario(quantity)
 
 
 @pytest.mark.parametrize("quantity", [None, 0, True])
@@ -384,9 +469,7 @@ def test_source_coverage_must_be_text(value: Any) -> None:
         _scenario("source_flux", source_coverage=value)
 
 
-@pytest.mark.parametrize(
-    "quantity,coverage", [("legacy", "binary"), ("source_flux", "ice")]
-)
+@pytest.mark.parametrize("quantity,coverage", [("source_flux", "ice")])
 def test_invalid_source_coverage_is_rejected(quantity: str, coverage: str) -> None:
     with pytest.raises(ValueError, match="source_coverage"):
         _scenario(quantity, source_coverage=coverage)

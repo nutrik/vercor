@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import pytest
 
 from vercor.calendar import DateTime360, DateTime365
+from vercor.components import ComponentSpec
 from vercor.setups._time_helpers import (
     align_model_timestep,
     assign_model_timestep_alignment,
@@ -184,11 +185,16 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
 
     coords = object()
     forcing = object()
-    terrain = SimpleNamespace(fmask="original-mask")
+    terrain = SimpleNamespace(
+        fmask="original-mask", copy=lambda **updates: SimpleNamespace(**updates)
+    )
     inputs = setups.JCMInputs(coords=coords, terrain=terrain, forcing=forcing)
     ocean_grid = make_test_grid(name="ocn-grid")
     land_mask = jnp.asarray([[1.0, 0.0], [0.0, 1.0]])
-    land: Any = SimpleNamespace(grid=SimpleNamespace(binary_mask=land_mask))
+    land: Any = SimpleNamespace(
+        grid=SimpleNamespace(binary_mask=land_mask),
+        spec=SimpleNamespace(initial_fields={"land_fraction": land_mask}),
+    )
     atmosphere: Any = object()
     calls: dict[str, Any] = {}
 
@@ -246,9 +252,10 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
     assert result.land is land
     assert result.atmosphere is atmosphere
     assert result.coords is coords
-    assert result.terrain is terrain
+    assert result.terrain is not terrain
+    assert result.terrain.fmask == "patched-mask"
     assert result.forcing is forcing
-    assert terrain.fmask == "patched-mask"
+    assert terrain.fmask == "original-mask"
     assert calls["mask"] is land_mask
     assert calls["land_args"] == (
         coords,
@@ -259,7 +266,7 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
     )
     assert calls["atmosphere_args"] == (
         coords,
-        terrain,
+        result.terrain,
         {
             "config": JAXGCMConfig(
                 forcing_data=forcing,
@@ -288,12 +295,18 @@ def test_make_jcm_land_atmosphere_replaces_only_missing_forcing(
     )
     inputs = helper.JCMInputs(
         coords=object(),
-        terrain=SimpleNamespace(fmask=None),
+        terrain=SimpleNamespace(
+            fmask=None, copy=lambda **kwargs: SimpleNamespace(**kwargs)
+        ),
         forcing=object(),
     )
     ocean_grid = make_test_grid(name="jcm-replace-ocean")
     land = SimpleNamespace(
         grid=SimpleNamespace(binary_mask=jnp.ones(ocean_grid.shape)),
+        spec=ComponentSpec(
+            initial_fields={"land_fraction": jnp.ones(ocean_grid.shape)},
+            outputs=("land_fraction",),
+        ),
     )
     captured: dict[str, JAXGCMConfig] = {}
 
@@ -441,10 +454,15 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
 
     coords = object()
     forcing = object()
-    terrain = SimpleNamespace(fmask="original-mask")
+    terrain = SimpleNamespace(
+        fmask="original-mask", copy=lambda **updates: SimpleNamespace(**updates)
+    )
     ocean_grid = make_test_grid(name="ocn-grid")
     land_mask = jnp.asarray([[1.0, 0.0], [0.0, 1.0]])
-    land: Any = SimpleNamespace(grid=SimpleNamespace(binary_mask=land_mask))
+    land: Any = SimpleNamespace(
+        grid=SimpleNamespace(binary_mask=land_mask),
+        spec=SimpleNamespace(initial_fields={"land_fraction": land_mask}),
+    )
     atmosphere: Any = object()
     calls: dict[str, Any] = {}
 
@@ -504,9 +522,10 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
     assert result.land is land
     assert result.atmosphere is atmosphere
     assert result.coords is coords
-    assert result.terrain is terrain
+    assert result.terrain is not terrain
+    assert result.terrain.fmask == "patched-mask"
     assert result.forcing is forcing
-    assert terrain.fmask == "patched-mask"
+    assert terrain.fmask == "original-mask"
     assert calls["load_inputs"] is True
     assert calls["mask"] is land_mask
     assert calls["land_args"] == (
@@ -518,7 +537,7 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
     )
     assert calls["atmosphere_args"] == (
         coords,
-        terrain,
+        result.terrain,
         {
             "config": JAXGCMConfig(
                 custom_parameters={"surface_flux.vgust": 5.01},

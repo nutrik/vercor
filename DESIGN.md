@@ -492,13 +492,20 @@ SPEEDY forcing subclass replaces only marine and combined albedo diagnostics.
 Native concentration remains the real marine ice fraction. All evolving values
 are payload/field leaves, with no model or physics-term ice-state mutation.
 
-Coupled JCM binds a 365-day ordinal epoch, evaluates physical initial diagnostics
-without advancing native carry, and retains explicit lagged air feedback.
-`SurfaceMaskPolicy` still validates static land/ocean geometry and patches binary
-land support, while fractional patches apply only to legacy routes. Explicit
-quantity routes own their coverage, so the generic custom topology conflict
-check remains unchanged. Static/daily JCM land fields share a compatible time
-layout; no generic transfer-selection behavior changes.
+JCM 3 uses Gregorian native time/step leaves in its immutable payload. Initial
+physical diagnostics do not advance the native carry. Humidity is already kg/kg;
+evaporation and precipitation diagnostics retain native gram conversions.
+`SurfaceMaskPolicy` validates static geometry and restricts binary land support.
+Components own fractions; the runtime resolves current overlap and separately
+retains last-dispatch coverage for imports. Declared mask fields bypass record
+selection in static/daily/monthly data components.
+
+All exchanges require `intensive`, `source_flux`, or `target_flux`. One scalar/
+vector dispatcher forms covered source products before remapping. Intensive
+values divide by remapped source coverage; source fluxes retain that numerator;
+target fluxes multiply the normalized value by target coverage. Preweighted
+Veris rates and open-water products use binary source coverage to avoid a second
+area factor. See `docs/exchange-coverage.rst` for formulas and the field audit.
 
 JCM's single marine channel uses the area-composed effective temperature;
 separate ice/water turbulent channels and long-term climate validation remain

@@ -52,6 +52,7 @@ coupler = Coupler(
             "FORCING",
             "MODEL",
             ("heat_flux",),
+            quantity="intensive",
             route_id="forcing-to-model",
             regridder_factory=bilinear,
         ),

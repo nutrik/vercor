@@ -142,7 +142,7 @@ class GuideTopology:
         )
         shape = context.components[exchange.target].grid.shape
         return ExchangeTopologyPatch(
-            fractional_masks={self.route_id: jnp.ones(shape)}
+            binary_masks={self.route_id: jnp.ones(shape)}
         )
 ```
 
@@ -292,6 +292,7 @@ class GuideFactory:
                     "FORCING",
                     "MODEL",
                     ("forcing",),
+                    quantity="intensive",
                     route_id=self.route_id,
                     regridder_factory=self.regridder_factory,
                 ),

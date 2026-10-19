@@ -20,17 +20,16 @@ def hooks() -> Any:
     return import_module("vercor.setups._external.jax_gcm_surface")
 
 
-@pytest.mark.parametrize("calendar", ["gregorian", "365_day"])
-def test_copy_and_time_selection_preserve_extension_and_native_fields(
-    calendar: str,
-) -> None:
+def test_copy_and_time_selection_preserve_extension_and_native_fields() -> None:
     module = hooks()
     from jcm.forcing import ForcingData, make_time_series
-    from jcm.date import DateData, MODEL_EPOCH
+    from jcm.date import DateData
     import jax_datetime as jdt
 
     shape = (3, 2)
-    seconds = jnp.array([10951.0, 10952.0, 10953.0]) * 86400
+    seconds = jdt.to_datetime("1970-01-01") + jdt.Timedelta(
+        days=jnp.array([10951, 10952, 10953])
+    )
     temperatures = jnp.stack(
         [jnp.full(shape, value) for value in (280.0, 290.0, 300.0)]
     )
@@ -41,9 +40,11 @@ def test_copy_and_time_selection_preserve_extension_and_native_fields(
     )
     alpha = jnp.full(shape, 0.34)
     wrapped = module.CoupledJCMForcing(base, alpha)
-    date = DateData.set_date(MODEL_EPOCH + jdt.Timedelta(days=10952), dt_seconds=1800.0)
-    actual = wrapped.select(date, calendar=calendar)
-    expected = base.select(date, calendar=calendar)
+    date = DateData.set_date(
+        jdt.to_datetime("1970-01-01") + jdt.Timedelta(days=10952), dt_seconds=1800.0
+    )
+    actual = wrapped.select(date)
+    expected = base.select(date)
     assert isinstance(actual, module.CoupledJCMForcing)
     np.testing.assert_allclose(actual.stl_am, expected.stl_am)
     np.testing.assert_allclose(actual.co2_vmr, expected.co2_vmr)
@@ -59,9 +60,7 @@ def test_copy_and_time_selection_preserve_extension_and_native_fields(
     assert changed.nudging_target is None
     np.testing.assert_array_equal(base.stl_am.values, temperatures)
     np.testing.assert_allclose(wrapped.marine_surface_albedo, 0.34)
-    np.testing.assert_allclose(
-        wrapped.copy().select(date, calendar=calendar).marine_surface_albedo, 0.34
-    )
+    np.testing.assert_allclose(wrapped.copy().select(date).marine_surface_albedo, 0.34)
     with pytest.raises(FrozenInstanceError):
         wrapped.marine_surface_albedo = alpha + 1
 

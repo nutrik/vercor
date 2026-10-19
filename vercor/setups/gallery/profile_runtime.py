@@ -121,36 +121,42 @@ def build_slab_coupler(
 
     exchanges = (
         Exchange(
+            quantity="intensive",
             source="OCN",
             target="ATM",
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="LND",
             fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
             regridder_factory=conservative,
         ),
         Exchange(
+            quantity="intensive",
             source="LND",
             target="ATM",
             fields=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="OCN",
             target="ICE",
             fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ICE",
             target="OCN",
             fields=SEAICE_TO_OCEAN_FIELDS,

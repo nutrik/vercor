@@ -27,7 +27,6 @@ def replace_runtime_topology_maps(
     *,
     regridders: Mapping[str, Any],
     binary_masks: Mapping[str, RuntimeArray] | None = None,
-    fractional_masks: Mapping[str, RuntimeArray] | None = None,
 ) -> None:
     """Install synthetic topology maps for focused runtime tests."""
 
@@ -36,19 +35,11 @@ def replace_runtime_topology_maps(
     topology_maps = RuntimeTopologyMaps(
         regridders=dict(regridders),
         binary_masks=(
-            {}
+            dict(prepared.topology_maps.binary_masks)
             if binary_masks is None
             else {
                 route_id: jnp.asarray(mask, dtype=runtime_dtype)
                 for route_id, mask in binary_masks.items()
-            }
-        ),
-        fractional_masks=(
-            {}
-            if fractional_masks is None
-            else {
-                route_id: jnp.asarray(mask, dtype=runtime_dtype)
-                for route_id, mask in fractional_masks.items()
             }
         ),
     )
@@ -61,7 +52,6 @@ def replace_runtime_topology_maps(
         constants=prepared.constants,
         dtype=prepared.runtime.dtype,
         topology_binary_masks=topology_maps.binary_masks,
-        topology_fractional_masks=topology_maps.fractional_masks,
     )
     coupler._prepared = replace(
         prepared,
