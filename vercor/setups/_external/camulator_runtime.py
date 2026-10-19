@@ -209,6 +209,7 @@ def step_camulator_runtime(
     mapped_fields = _camulator_fields.map_camulator_prediction_to_runtime_fields(
         context.constants,
         camulator_reference_pressure=resources.P0,
+        native_step_seconds=resources.model_timestep.total_seconds(),
         hyai=resources.hyai,
         hybi=resources.hybi,
         hyam=resources.hyam,

@@ -39,7 +39,11 @@ class CAMulatorRuntimePayload:
 
 
 class CAMulatorGCMSetupState:
-    """Mutable setup-time owner for a host-backed CAMulator atmosphere adapter."""
+    """Setup owner for a host-backed atmosphere and its native forecast duration.
+
+    ``model_timestep`` comes from configured ``lead_time_periods`` and also
+    normalizes each prediction's accumulated radiation energies to rates.
+    """
 
     coupling_timestep: timedelta
     model_timestep: timedelta
