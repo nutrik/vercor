@@ -317,7 +317,7 @@ copying, differentiable operators, and traced `c_k`/`c_eps` variables.
 `execution` is the sole Veros copy and compilation policy; there is no separate
 `jitted` option. Runtime settings lock on first Veros use, so conflicting
 host/JAX components must run in separate Python processes. The packaged
-optional requirement remains `veros>=1.6.2,<1.7`; fork selection is
+optional requirement remains `veros>=1.7.0`; fork selection is
 capability-gated rather than globally pinned.
 
 Both global Veros execution lanes receive zero-seeded `rain_rate` and
@@ -425,7 +425,7 @@ macOS smoke, and `git diff --check`.
 
 CI keeps stock-Veros compatibility separate from differentiable-fork
 acceptance. The ordinary quality job and installed-artifact Veros matrix lane
-resolve the packaged `veros>=1.6.2,<1.7` requirement. A dedicated serial job
+resolve the packaged `veros>=1.7.0` requirement. A dedicated serial job
 installs the public differentiable fork without dependencies at immutable commit
 `7a8c964cf00b5aa0713c995edd760643a431b3c9`, verifies its PEP 610 commit record
 and required runtime capabilities, and runs the multi-step rollout module.

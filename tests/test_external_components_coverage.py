@@ -2218,7 +2218,7 @@ def test_veros_component_solver_cache_requires_supported_native_interface(
 
     with pytest.raises(
         RuntimeError,
-        match="component-scoped Veros solver caching requires Veros >=1.6.2,<1.7",
+        match="component-scoped Veros solver caching requires a mutable cache mapping",
     ):
         veros_state_module.get_component_linear_solver(state)
 
