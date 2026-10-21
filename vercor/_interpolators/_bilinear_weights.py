@@ -73,7 +73,9 @@ def compute_bilinear_cell_weights(
 
     lon_src_rad = jnp.deg2rad(lon_src_deg)
     lat_src_rad = jnp.deg2rad(lat_src_deg)
-    lon_tgt_rad = jnp.deg2rad(lon_tgt_deg)
+    # Cell lookup and fractional position must use the same wrapped/clipped
+    # longitude, including whole turns and nonperiodic domain endpoints.
+    lon_tgt_rad = jnp.deg2rad(lon_tgt_mapped)
     lat_tgt_rad = jnp.deg2rad(lat_tgt_deg)
 
     lon0 = lon_src_rad[i0]
