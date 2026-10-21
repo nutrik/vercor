@@ -7,8 +7,11 @@ Bundled setups
 Use the lightweight slab factories directly; model-specific factories require
 their documented optional packages or input data.
 
+See :doc:`../coupling-fields` for the physical field contracts and migration
+of setup, recipe and forcing-mode names.
+
 .. automodule:: vercor.setups
-   :members: CAMulatorConfig, JAXGCMConfig, JCMLandAtmosphereConfig, JCMLandAtmosphereSetup, JCMInputs, Spinup, VerosConfig, VerisConfig, VerisVerosDataSetup, VerisVerosSetup, load_jcm_inputs, make_slab_atmosphere, make_slab_land, make_slab_ocean, make_slab_seaice, make_jcm_land_atmosphere, make_camulator_gcm, make_camulator_land, make_era5_atmosphere, make_era5_land, make_era5_ocean, make_erainterim_ocean, make_jax_gcm, make_jcm_land, make_veros_gcm, make_veris, make_veris_verosdata, make_veris_veros
+   :members: CAMulatorConfig, JCMAtmosphereConfig, JCMLandAtmosphereConfig, JCMLandAtmosphereSetup, JCMInputs, Spinup, VerosConfig, VerisConfig, VerisVerosDataSetup, VerisVerosSetup, load_jcm_inputs, make_slab_atmosphere, make_slab_land, make_slab_ocean, make_slab_seaice, make_jcm_land_atmosphere, make_camulator_gcm, make_camulator_land, make_era5_atmosphere, make_era5_land, make_era5_ocean, make_erainterim_ocean, make_jcm_atmosphere, make_jcm_land, make_veros_gcm, make_veris, make_veris_verosdata, make_veris_veros
    :show-inheritance:
 
 
@@ -33,21 +36,22 @@ Veris exports current ``ice_surface_temperature`` in kelvin and
 ``ice_surface_albedo`` per ice area, diagnosed with native snow thickness,
 surface temperature, hemisphere and thickness categories. Both exports follow
 the current payload; the five ocean boundary fluxes remain interval means.
-``VERIS_TO_JCM_SURFACE_FIELDS`` requires source ice coverage, while
-``VERIS_TO_JCM_COVERAGE_FIELDS`` uses binary wet support to transfer concentration
+``SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS`` requires source ice coverage, while
+``SEAICE_COVERAGE_FIELDS`` uses binary wet support to transfer concentration
 without multiplying it by itself.
 
 ``VerisConfig.atmosphere_forcing`` defaults to ``"observed_10m"``. The
-``"model_level"`` mode uses ``JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS`` and
+``"model_level"`` mode uses ``MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS`` and
 diagnoses actual 10 m winds from the same converged CESM solve used for air
 temperature, humidity and open-water fluxes. It retains the moving-ocean
 reference frame and uses ``(1 - open_water_albedo) * SW_down`` for open water.
 Raw downward shortwave remains the separate native ice forcing.
 
-``VerosConfig.export_open_water_surface=True`` requires coupled ocean forcing.
+``VerosConfig.export_open_water_surface=True`` requires
+``surface_forcing="surface_fluxes"``.
 It adds a binary-supported concentration import and exports
 ``open_water_temperature_contribution = (1 - A) * SST`` after the native ocean
-step. ``OCEAN_TO_JCM_OPEN_WATER_FIELDS`` transfers this contribution with binary
+step. ``OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS`` transfers this contribution with binary
 source-flux support and conservative remapping. Full SST and the ocean wet mask
 remain available beneath ice; no second concentration factor is applied.
 
@@ -97,7 +101,7 @@ derived ratios at setup and every step; direct helper overrides are rejected.
 Veris ocean feedback
 --------------------
 
-``VERIS_TO_OCEAN_FLUX_FIELDS`` contains downward heat (W/m2), total bulk mass
+``SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS`` contains downward heat (W/m2), total bulk mass
 (kg/m2/s), actual salt mass (kg salt/m2/s), and east/north total stress (Pa).
 These are interval means over all native substeps on the ocean's shared grid.
 Ice traction uses the momentum-time face concentration and complementary
@@ -109,12 +113,13 @@ instantaneous native diagnostics remain separate from the canonical means.
 Total feedback into Veros
 -------------------------
 
-``VerosConfig(surface_forcing="coupled")`` selects total ocean boundary inputs
-from ``VERIS_TO_OCEAN_FLUX_FIELDS`` for the global setup. It requires pressure/
+``VerosConfig(surface_forcing="surface_fluxes")`` selects total ocean boundary inputs
+from ``SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS`` for the global setup. It requires pressure/
 free-surface execution (``enable_streamfunction=False``) to export actual native
-SSH; ACC retains internal forcing and rejects this mode. The default atmosphere
-mode preserves existing behavior. Coupled mode exports SST in K, SSS in native
-g/kg, actual east/north surface currents in m/s and native SSH in m. Streamfunction
+SSH; ACC retains internal forcing and rejects this mode. The default
+``surface_forcing="bulk_meteorology"`` computes the existing CESM forcing from
+colocated air, radiation and precipitation. Surface-flux mode exports SST in K,
+SSS in native g/kg, actual east/north surface currents in m/s and native SSH in m. Streamfunction
 or surface pressure is never used as SSH.
 
 Native ocean kernels apply timestep, layer depth, ocean density and heat capacity
@@ -133,30 +138,36 @@ proxy cannot discard heat or salt already diagnosed by the sea-ice model.
 Shared prognostic setup
 ------------------------
 
-``make_veris_veros(config=VerisConfig(...), ocean_config=VerosConfig(surface_forcing="coupled"))``
+``make_veris_veros(config=VerisConfig(...), ocean_config=VerosConfig(surface_forcing="surface_fluxes"))``
 returns frozen ``VerisVerosSetup(seaice, ocean)``. It initializes one native ocean,
 extracts its authoritative edges, areas, radius and masks once, and shares the
 exact grid object with sea ice. The ocean retains the existing setup/runtime
 owner; no second ocean or prescribed current/height proxy is created. The default
-ocean configuration is global coupled mode; incompatible explicit modes fail
-before initialization. The prescribed ``make_veris_verosdata`` workflow remains
+ocean configuration is global ``surface_fluxes`` mode; incompatible explicit
+modes fail before initialization. The prescribed ``make_veris_verosdata`` workflow remains
 available for experiments without ocean feedback.
 
 Coupled JCM surface contracts
 -----------------------------
 
-``JAXGCMConfig.seaice_coupling`` is keyword-only and defaults to false.
+``JCMAtmosphereConfig.seaice_coupling`` is keyword-only and defaults to false.
 Enabled ATM inputs are land temperature, soil moisture, preweighted open-water
 temperature, preweighted ice temperature/albedo and atmosphere-grid ice
 coverage. The paired factory copies terrain with the ocean-derived fractional
 land mask. Static land fields retain both spatial axes; mixed static/daily
 inputs broadcast the static companion before daily selection.
 
-``JCM_ATMOSPHERE_TO_LAND_FLUX_FIELDS`` selects per-land-area latent and sensible
-heat; the legacy land recipe is retained. All JCM modes export raw downward
-shortwave, surface pressure, configured open-water albedo and separate land
-heat fluxes. Native flux channels zero and two supply land and combined heat,
-respectively; evaporation converts g/m2/s to kg/m2/s once.
+All JCM modes export raw downward shortwave, surface pressure, configured
+open-water albedo and downward-positive grid-mean sensible/latent heat fluxes.
+JCM 3 has no separate land/marine turbulent channels. Prescribed JCM land
+declares no heat-flux feedback input. Evaporation converts g/m2/s to kg/m2/s
+once, while native specific humidity is already kg/kg.
+
+The six ``air_*`` fields describe the bottom sigma-center state at
+``model_level_height``. ``air_pressure_3d`` retains the full
+``(sigma_level, latitude, longitude)`` pressure field in Pa. Native
+``surface_flux.t0`` enters precipitation phase diagnosis only, through the
+``near_surface_air_temperature`` mapper keyword.
 
 The runnable ``run_veris_veros_jcm.build_coupler`` uses the public paired
 factories and explicit quantity/coverage recipes. See :doc:`../setup-gallery`

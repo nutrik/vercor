@@ -18,9 +18,9 @@ from tests.assertions import (
 from vercor.exceptions import RegridderError
 from vercor.grid_masks import (
     check_remap_conservation,
-    check_total_lnd_ocn_mask_sum,
-    compute_ocn_lnd_masks_on_atm_grid,
-    create_lnd_mask_from_ocn,
+    check_land_ocean_fraction_sum,
+    compute_ocean_land_masks_on_atmosphere_grid,
+    create_land_mask_from_ocean,
     compute_land_mask,
 )
 from vercor.grids import RectilinearGrid
@@ -33,7 +33,7 @@ def test_compute_ocn_lnd_masks_on_atm_grid_clips_and_builds_binary_land_mask() -
             return jnp.asarray([[1.2, -0.2], [0.4, 0.0]])
 
     ocean_binary_mask = jnp.asarray([[1.0, 0.0], [1.0, 0.0]])
-    ocn_fmask, lnd_fmask, lnd_bmask = compute_ocn_lnd_masks_on_atm_grid(
+    ocn_fmask, lnd_fmask, lnd_bmask = compute_ocean_land_masks_on_atmosphere_grid(
         ocean_binary_mask,
         cast(Any, DummyRegridder()),
     )
@@ -50,7 +50,9 @@ def test_compute_ocn_lnd_masks_on_atm_grid_clips_and_builds_binary_land_mask() -
     representative_mask = jnp.asarray([[0.2, 0.8], [0.4, 0.6]])
 
     def mask_objective(mask: jax.Array) -> jax.Array:
-        ocean, land, binary_land = compute_ocn_lnd_masks_on_atm_grid(mask, identity)
+        ocean, land, binary_land = compute_ocean_land_masks_on_atmosphere_grid(
+            mask, identity
+        )
         return (
             2.0 * jnp.sum(ocean)
             + 0.5 * jnp.sum(land)
@@ -91,7 +93,7 @@ def test_compute_ocn_lnd_masks_snaps_subthreshold_remap_residuals() -> None:
             )
 
     ocean_binary_mask = jnp.asarray([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
-    ocn_fmask, lnd_fmask, lnd_bmask = compute_ocn_lnd_masks_on_atm_grid(
+    ocn_fmask, lnd_fmask, lnd_bmask = compute_ocean_land_masks_on_atmosphere_grid(
         ocean_binary_mask,
         cast(Any, DummyRegridder()),
     )
@@ -130,12 +132,12 @@ def test_mask_and_area_weighted_mean_kernels_have_finite_transforms() -> None:
 def test_check_total_lnd_ocn_mask_sum_success_and_failure() -> None:
     lnd_good = jnp.asarray([[0.3, 1.0], [0.0, 0.8]])
     ocn_good = jnp.asarray([[0.7, 0.0], [1.0, 0.2]])
-    check_total_lnd_ocn_mask_sum(lnd_good, ocn_good)
+    check_land_ocean_fraction_sum(lnd_good, ocn_good)
 
     lnd_bad = jnp.asarray([[0.3, 1.0], [0.0, 0.8]])
     ocn_bad = jnp.asarray([[0.7, 0.0], [1.0, 0.0]])
     with pytest.raises(RegridderError, match="must sum to approx. 1"):
-        check_total_lnd_ocn_mask_sum(lnd_bad, ocn_bad)
+        check_land_ocean_fraction_sum(lnd_bad, ocn_bad)
 
 
 @pytest.mark.fast_always
@@ -218,10 +220,10 @@ def test_create_lnd_mask_from_ocn_accepts_jax_backed_masks(
         binary_mask=jnp.asarray([[1.0, 0.0], [1.0, 0.0]]),
     )
 
-    lnd_bmask, lnd_fmask = create_lnd_mask_from_ocn(
-        atm_lat=jnp.asarray([0.0, 1.0]),
-        atm_lon=jnp.asarray([0.0, 1.0]),
-        ocn_grid=ocn_grid,
+    lnd_bmask, lnd_fmask = create_land_mask_from_ocean(
+        atmosphere_latitude=jnp.asarray([0.0, 1.0]),
+        atmosphere_longitude=jnp.asarray([0.0, 1.0]),
+        ocean_grid=ocn_grid,
     )
 
     assert_array_equal_compact(lnd_bmask, np.asarray([[1, 1], [1, 1]]))

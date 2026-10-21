@@ -22,10 +22,10 @@ from vercor.types import RuntimeArray as _RuntimeArray
 
 __all__ = [
     "check_remap_conservation",
-    "check_total_lnd_ocn_mask_sum",
+    "check_land_ocean_fraction_sum",
     "compute_land_mask",
-    "compute_ocn_lnd_masks_on_atm_grid",
-    "create_lnd_mask_from_ocn",
+    "compute_ocean_land_masks_on_atmosphere_grid",
+    "create_land_mask_from_ocean",
 ]
 
 _FRACTIONAL_MASK_MINIMUM = 0.001
@@ -34,9 +34,11 @@ _FRACTIONAL_MASK_MINIMUM = 0.001
 def compute_land_mask(ocean_fractional_mask: Any) -> Any:
     """Compute land binary mask from an ocean fractional mask."""
 
-    fmaxval = 1.0
+    maximum_fraction = 1.0
     land_binary_mask = 1.0 - _as_jax_real_array(ocean_fractional_mask)
-    land_binary_mask = jnp.where(land_binary_mask > fmaxval, 1.0, land_binary_mask)
+    land_binary_mask = jnp.where(
+        land_binary_mask > maximum_fraction, 1.0, land_binary_mask
+    )
     land_binary_mask = jnp.where(
         land_binary_mask < _FRACTIONAL_MASK_MINIMUM,
         0.0,
@@ -45,49 +47,57 @@ def compute_land_mask(ocean_fractional_mask: Any) -> Any:
     return cast(Any, jnp.where(land_binary_mask != 0.0, 1, 0))
 
 
-def compute_ocn_lnd_masks_on_atm_grid(
+def compute_ocean_land_masks_on_atmosphere_grid(
     ocean_binary_mask: _RuntimeArray, regridder: _Regridder
 ) -> tuple[_RuntimeArray, _RuntimeArray, _RuntimeArray]:
     """Compute ocean and land fractional and binary masks on the atmosphere grid."""
 
-    ocean_bmask = _as_jax_real_array(ocean_binary_mask)
+    ocean_binary_mask_array = _as_jax_real_array(ocean_binary_mask)
     remapped_ocean_fraction = jnp.clip(
-        _as_jax_real_array(regridder.regrid(ocean_bmask)),
+        _as_jax_real_array(regridder.regrid(ocean_binary_mask_array)),
         0.0,
         1.0,
     )
-    ocn_fmask_on_atm_grid = jnp.where(
+    ocean_fraction_on_atmosphere_grid = jnp.where(
         remapped_ocean_fraction < _FRACTIONAL_MASK_MINIMUM,
         0.0,
         remapped_ocean_fraction,
     )
-    ocn_fmask_on_atm_grid = jnp.where(
-        ocn_fmask_on_atm_grid > 1.0 - _FRACTIONAL_MASK_MINIMUM,
+    ocean_fraction_on_atmosphere_grid = jnp.where(
+        ocean_fraction_on_atmosphere_grid > 1.0 - _FRACTIONAL_MASK_MINIMUM,
         1.0,
-        ocn_fmask_on_atm_grid,
+        ocean_fraction_on_atmosphere_grid,
     )
-    lnd_fmask_on_atm_grid = 1.0 - ocn_fmask_on_atm_grid
-    lnd_bmask_on_atm_grid = compute_land_mask(ocn_fmask_on_atm_grid)
+    land_fraction_on_atmosphere_grid = 1.0 - ocean_fraction_on_atmosphere_grid
+    land_binary_mask_on_atmosphere_grid = compute_land_mask(
+        ocean_fraction_on_atmosphere_grid
+    )
 
-    return ocn_fmask_on_atm_grid, lnd_fmask_on_atm_grid, lnd_bmask_on_atm_grid
+    return (
+        ocean_fraction_on_atmosphere_grid,
+        land_fraction_on_atmosphere_grid,
+        land_binary_mask_on_atmosphere_grid,
+    )
 
 
-def check_total_lnd_ocn_mask_sum(
-    lnd_fmask_on_atm_grid: _RuntimeArray, ocn_fmask_on_atm_grid: _RuntimeArray
+def check_land_ocean_fraction_sum(
+    land_fraction_on_atmosphere_grid: _RuntimeArray,
+    ocean_fraction_on_atmosphere_grid: _RuntimeArray,
 ) -> None:
     """Validate that land and ocean fractional masks sum to one."""
 
-    fmask_sum = _as_jax_real_array(lnd_fmask_on_atm_grid) + _as_jax_real_array(
-        ocn_fmask_on_atm_grid
-    )
-    min_fsum = float(jnp.min(fmask_sum))
-    max_fsum = float(jnp.max(fmask_sum))
+    fraction_sum = _as_jax_real_array(
+        land_fraction_on_atmosphere_grid
+    ) + _as_jax_real_array(ocean_fraction_on_atmosphere_grid)
+    minimum_fraction_sum = float(jnp.min(fraction_sum))
+    maximum_fraction_sum = float(jnp.max(fraction_sum))
     if not bool(
-        jnp.isclose(min_fsum, 1.0, atol=1e-3) & jnp.isclose(max_fsum, 1.0, atol=1e-3)
+        jnp.isclose(minimum_fraction_sum, 1.0, atol=1e-3)
+        & jnp.isclose(maximum_fraction_sum, 1.0, atol=1e-3)
     ):
         raise _RegridderError(
             "Fractional land and ocean masks on atmospheric grid must sum to approx. 1 everywhere "
-            f"(minimum sum {min_fsum}, maximum sum {max_fsum})"
+            f"(minimum sum {minimum_fraction_sum}, maximum sum {maximum_fraction_sum})"
         )
 
 
@@ -128,8 +138,8 @@ def _total_mass_on_rectilinear_bounds(
 
 def check_remap_conservation(
     regridder: _Regridder,
-    ocean_binary_mask_on_ocn_grid: _RuntimeArray,
-    ocn_fmask_on_atm_grid: _RuntimeArray,
+    ocean_binary_mask_on_ocean_grid: _RuntimeArray,
+    ocean_fraction_on_atmosphere_grid: _RuntimeArray,
     logger: _LoggerLike | None = None,
 ) -> None:
     """Validate conservative ocean-mask remapping mass conservation when grids are comparable."""
@@ -151,14 +161,14 @@ def check_remap_conservation(
             )
 
         src_total_mass = _total_mass_on_rectilinear_bounds(
-            ocean_binary_mask_on_ocn_grid,
+            ocean_binary_mask_on_ocean_grid,
             conservative_regridder.interpolator.src_lon_b,
             conservative_regridder.interpolator.src_lat_b,
             radius=conservative_regridder.interpolator.radius,
             flip_lat=conservative_regridder.interpolator._s_lat_flip,
         )
         dst_total_mass = _total_mass_on_rectilinear_bounds(
-            ocn_fmask_on_atm_grid,
+            ocean_fraction_on_atmosphere_grid,
             conservative_regridder.interpolator.dst_lon_b,
             conservative_regridder.interpolator.dst_lat_b,
             radius=conservative_regridder.interpolator.radius,
@@ -174,31 +184,37 @@ def check_remap_conservation(
             )
 
 
-def create_lnd_mask_from_ocn(
-    atm_lat: _RuntimeArray, atm_lon: _RuntimeArray, ocn_grid: _RectilinearGrid
+def create_land_mask_from_ocean(
+    atmosphere_latitude: _RuntimeArray,
+    atmosphere_longitude: _RuntimeArray,
+    ocean_grid: _RectilinearGrid,
 ) -> tuple[_RuntimeArray, _RuntimeArray]:
     """Create land binary and fractional masks from an ocean-grid binary mask."""
 
     atmosphere_grid = _RectilinearGrid(
-        name="ATM",
-        longitude=atm_lon,
-        latitude=atm_lat,
+        name="atmosphere-mask-grid",
+        longitude=atmosphere_longitude,
+        latitude=atmosphere_latitude,
     )
 
     regridder = _ConservativeRectilinearRegridder(
-        ocn_grid,
+        ocean_grid,
         atmosphere_grid,
     )
 
-    ocean_binary_mask = _as_jax_real_array(ocn_grid.binary_mask)
+    ocean_binary_mask = _as_jax_real_array(ocean_grid.binary_mask)
 
     (
-        ocn_fmask_on_atm_grid,
-        lnd_fmask_on_atm_grid,
-        lnd_bmask_on_atm_grid,
-    ) = compute_ocn_lnd_masks_on_atm_grid(ocean_binary_mask, regridder)
+        ocean_fraction_on_atmosphere_grid,
+        land_fraction_on_atmosphere_grid,
+        land_binary_mask_on_atmosphere_grid,
+    ) = compute_ocean_land_masks_on_atmosphere_grid(ocean_binary_mask, regridder)
 
-    check_remap_conservation(regridder, ocean_binary_mask, ocn_fmask_on_atm_grid)
-    check_total_lnd_ocn_mask_sum(lnd_fmask_on_atm_grid, ocn_fmask_on_atm_grid)
+    check_remap_conservation(
+        regridder, ocean_binary_mask, ocean_fraction_on_atmosphere_grid
+    )
+    check_land_ocean_fraction_sum(
+        land_fraction_on_atmosphere_grid, ocean_fraction_on_atmosphere_grid
+    )
 
-    return lnd_bmask_on_atm_grid, lnd_fmask_on_atm_grid
+    return land_binary_mask_on_atmosphere_grid, land_fraction_on_atmosphere_grid

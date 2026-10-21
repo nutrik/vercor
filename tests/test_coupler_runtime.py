@@ -233,8 +233,8 @@ def _fake_jcm_step(
 
 
 def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
-    state = jax_gcm_state_module.JAXGCMSetupState.__new__(
-        jax_gcm_state_module.JAXGCMSetupState
+    state = jax_gcm_state_module.JCMAtmosphereSetupState.__new__(
+        jax_gcm_state_module.JCMAtmosphereSetupState
     )
     state.seaice_coupling = False
     state.open_water_albedo = jnp.asarray(0.07)
@@ -313,7 +313,7 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
                 "sea_surface_temperature",
                 "total_surface_temperature",
                 *JAXGCM_OUTPUT_GRID_FIELD_NAMES,
-                "pressure",
+                "air_pressure_3d",
             ),
             initial_fields={
                 **{
@@ -325,7 +325,7 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
                     )
                 },
                 **state.data,
-                "pressure": jnp.zeros((state.sigma_levels.size, *grid.shape)),
+                "air_pressure_3d": jnp.zeros((state.sigma_levels.size, *grid.shape)),
             },
             lifecycle=LifecycleHooks(
                 setup=(
@@ -851,9 +851,9 @@ def test_initialized_slab_coupler_run_prefills_missing_imports() -> None:
 
 def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None:
     from vercor.recipes import (
-        SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-        SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
-        JCM_LAND_TO_ATMOSPHERE_FIELDS,
+        ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
+        ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
+        LAND_TO_ATMOSPHERE_STATE_FIELDS,
         OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
     )
 
@@ -882,8 +882,8 @@ def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None
     atmosphere_exports = tuple(
         _flatten_field_items(
             (
-                *SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
-                *SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+                *ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
+                *ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
             )
         )
     )
@@ -896,7 +896,7 @@ def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None
             _flatten_field_items(
                 (
                     *OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
-                    *JCM_LAND_TO_ATMOSPHERE_FIELDS,
+                    *LAND_TO_ATMOSPHERE_STATE_FIELDS,
                 )
             )
         ),
@@ -914,7 +914,7 @@ def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None
                 quantity="intensive",
                 source="ATM",
                 target="OCN",
-                fields=SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
+                fields=ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
@@ -928,14 +928,14 @@ def test_jcm_slab_ocean_exchange_recipe_prefills_required_flux_imports() -> None
                 quantity="intensive",
                 source="LND",
                 target="ATM",
-                fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
+                fields=LAND_TO_ATMOSPHERE_STATE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
                 quantity="intensive",
                 source="ATM",
                 target="LND",
-                fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+                fields=ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
                 regridder_factory=bilinear,
             ),
         ),
@@ -1746,7 +1746,7 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
         initial_state
     )
     atmosphere_state = final_state._component_state("ATM")
-    temperature = atmosphere_state.fields.get("temperature")
+    temperature = atmosphere_state.fields.get("air_temperature")
     sensible_heat_flux = atmosphere_state.fields.get("sensible_heat_flux")
 
     assert fixture.state._state is original_state
@@ -1759,7 +1759,7 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
     assert np.all(np.isfinite(np.asarray(sensible_heat_flux)))
     mapped_float_dtypes = {
         atmosphere_state.fields.get(field_name).dtype
-        for field_name in (*JAXGCM_OUTPUT_GRID_FIELD_NAMES, "pressure")
+        for field_name in (*JAXGCM_OUTPUT_GRID_FIELD_NAMES, "air_pressure_3d")
     }
     assert mapped_float_dtypes == {jnp.dtype(jnp.float32)}
     assert atmosphere_state.payload is not None
@@ -1794,7 +1794,7 @@ def test_jax_gcm_runs_inside_runtime_under_jit_and_grad() -> None:
             ),
         )
         result = run_scanned_coupler(coupler, state)
-        return jnp.sum(result._component_state("ATM").fields.get("temperature"))
+        return jnp.sum(result._component_state("ATM").fields.get("air_temperature"))
 
     sea_surface_temperature = jnp.full(grid.shape, 281.0, dtype=jnp.float32)
     tangent_seed = jnp.ones_like(sea_surface_temperature)
@@ -1842,7 +1842,7 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
     atmosphere_state = final_state._component_state("ATM")
     payload = atmosphere_state.payload
 
-    assert atmosphere_state.fields.get("temperature").shape == grid.shape
+    assert atmosphere_state.fields.get("air_temperature").shape == grid.shape
     assert payload is not None
     assert payload.forcing.stl_am.shape == forcing_template.stl_am.shape
     assert (
@@ -1855,7 +1855,7 @@ def _jax_gcm_payload_with_carry_marker(payload: Any, marker: jax.Array) -> Any:
     """Return one fake JCM payload with a replaced physics-carry marker."""
 
     jcm_state = payload.jcm_state
-    return jax_gcm_runtime_module.JAXGCMRuntimePayload(
+    return jax_gcm_runtime_module.JCMAtmosphereRuntimePayload(
         jcm_state=JCMState(
             time=jcm_state.time,
             step=jcm_state.step,
@@ -1992,13 +1992,13 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_3_carry(
     if fast_mode:
         pytest.skip("Real JCM carry regression runs outside --fast")
 
-    from vercor.setups import JAXGCMConfig, load_jcm_inputs, make_jax_gcm
+    from vercor.setups import JCMAtmosphereConfig, load_jcm_inputs, make_jcm_atmosphere
 
     inputs = load_jcm_inputs()
-    component = make_jax_gcm(
+    component = make_jcm_atmosphere(
         inputs.coords,
         inputs.terrain,
-        config=JAXGCMConfig(forcing_data=inputs.forcing, jitted=True),
+        config=JCMAtmosphereConfig(forcing_data=inputs.forcing, jitted=True),
     )
     coupler = Coupler(
         Clock(datetime(2000, 1, 1), 86400.0, 2),
@@ -2048,7 +2048,7 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_3_carry(
         not np.allclose(initial, final)
         for initial, final in zip(initial_float_leaves, final_float_leaves)
     )
-    temperature = final_state._component_state("ATM").fields.get("temperature")
+    temperature = final_state._component_state("ATM").fields.get("air_temperature")
     assert np.all(np.isfinite(np.asarray(temperature)))
 
     native_surface_temperature = jnp.full(
@@ -2103,7 +2103,7 @@ def test_real_jax_gcm_runtime_seeds_and_advances_jcm_3_carry(
             },
         )
         result = coupler.run(state)
-        return jnp.mean(result.component("ATM").field("temperature"))
+        return jnp.mean(result.component("ATM").field("air_temperature"))
 
     coupled_surface_temperature = jnp.asarray(288.0, dtype=jnp.float64)
     coupled_loss, coupled_reverse = jax.value_and_grad(full_coupler_loss)(
@@ -2180,7 +2180,7 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
         initial_state
     )
     atmosphere_state = final_state._component_state("ATM")
-    temperature = atmosphere_state.fields.get("temperature")
+    temperature = atmosphere_state.fields.get("air_temperature")
     received_sst = atmosphere_state.received.get("sea_surface_temperature")
 
     assert temperature.shape == grid.shape
@@ -2199,7 +2199,7 @@ def test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp() -> N
             ),
         )
         result = run_scanned_coupler(coupler, state)
-        return jnp.sum(result._component_state("ATM").fields.get("temperature"))
+        return jnp.sum(result._component_state("ATM").fields.get("air_temperature"))
 
     tangent_seed = jnp.ones_like(sea_surface_temperature)
     gradient = jax.grad(loss)(sea_surface_temperature)
@@ -2464,7 +2464,7 @@ def test_run_validates_missing_jax_gcm_preseed_before_scan() -> None:
     state = coupler.initial_state()
     atmosphere = state._component_state("ATM")
     atmosphere = atmosphere.with_fields(
-        _without_store_field(atmosphere.fields, "pressure")
+        _without_store_field(atmosphere.fields, "air_pressure_3d")
     )
     state = state._with_component_state("ATM", atmosphere)
 

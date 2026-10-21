@@ -212,7 +212,7 @@ Differentiated and outer-jitted callers use this path.
 An `OutputProvider.sample(OutputContext)` returns an immutable `OutputFrame` of
 named `OutputVariable` values, coordinates, dimensions, attributes, and
 metadata. `PeriodOutput.variables` uses identical empty/subset/unknown behavior
-for runtime, JAXGCM, Veros, CAMulator, and third-party providers.
+for runtime, JCM, Veros, CAMulator, and third-party providers.
 Bundled slab and data factories default to `OutputSpec()` with no period
 policy, matching bundled external configuration defaults. They accept a
 complete keyword-only `OutputSpec`, allowing cadence, variable selection,
@@ -241,7 +241,7 @@ absolute-step, and schema discriminators where needed.
 
 Enabled output rejects traced runtime leaves before provider or writer calls.
 Execution backends and model steps never receive an output session and never
-choose cadence or paths. JAXGCM, Veros, and CAMulator retain only native state
+choose cadence or paths. JCM, Veros, and CAMulator retain only native state
 needed for sampling and final snapshots.
 
 ## 9. Bundled setups and plugins
@@ -280,7 +280,7 @@ those choices to the Coupler log level and ``DTypePolicy``/``RuntimeOptions``
 dtype policy.
 
 Bundled slab, data, JCM, Veros, Veris, and CAMulator factories return the same
-structural components used by external plugins. JAXGCM/Veros spinup is
+structural components used by external plugins. JCM/Veros spinup is
 controlled only by `Spinup.enabled`. CAMulator enabled spinup is rejected
 because it is not implemented. CAMulator forcing alignment is explicitly
 `strict` or `forcing_start`; both policies require a standard-library
@@ -326,7 +326,7 @@ Both global Veros execution lanes receive zero-seeded `rain_rate` and
 `snow_rate` in kg/m²/s. ERA5 aggregates `crr + lsrr` and `csfr + lssfr` before
 monthly interpolation; JCM aggregates `precls + precnv` before remapping and
 converts g/m²/s to kg/m²/s. JCM diagnoses phases on its native grid using
-SPEEDY `surface_flux.t0`, locally named `temperature_2m`. This near-surface
+SPEEDY `surface_flux.t0`, passed as `near_surface_air_temperature`. This near-surface
 diagnostic has no specified 2 m height; it is distinct from bottom-level air.
 The snow fraction is `sigmoid(4 * (T_mid - t0) / (T_rain - T_snow))`, with
 `T_mid = (T_snow + T_rain) / 2`. The traced `PhysicalConstants` thresholds
@@ -340,8 +340,11 @@ eastern Canadian land stations, not global ocean or SPEEDY validation.
 Native snow is total precipitation times its fraction; native rain is the
 remainder. Both rates are transposed and then independently interpolated.
 Bottom sigma-center temperature, humidity, winds, density, and potential
-temperature keep their canonical exchange keys and their common
-`model_level_height`; only the phase diagnosis uses t0.
+temperature use `air_temperature`, `air_specific_humidity`, `air_u_velocity`,
+`air_v_velocity`, `air_density` and `air_potential_temperature`, with their common
+`model_level_height`; only the phase diagnosis uses t0. JCM's `air_pressure_3d`
+retains `(sigma_level, latitude, longitude)` pressure in Pa; CAMulator's
+`model_level_air_pressure` is the horizontal lowest-level pressure in Pa.
 VerCOR computes the rigid-lid virtual salt flux on the ocean grid as
 `-S_ref * (rain + snow - E) / rho_fw`, with upward-positive evaporation `E`
 from the existing bulk calculation. `PhysicalConstants` owns traced
@@ -364,12 +367,12 @@ The JAX global adapter consumes external atmospheric forcing, disables
 streamfunction and diagnostics that would change the payload PyTree, and uses
 the fork's finite-derivative calm-stress norm. The JAX ACC adapter retains its
 native internal forcing and topology while leaving variable-owned turbulence
-parameters at their fork defaults. JAXGCM uses one physical default mapping
+parameters at their fork defaults. JCM uses one physical default mapping
 everywhere fields are declared, initialized, or prefilled: temperature and
 potential temperature are 288.15 K, density is 1.2 kg/m³, and model-level
 height is 50 m. These defaults prevent a not-yet-stepped atmosphere from
 feeding valid-looking zero divisors and logarithm inputs into the ocean.
-After a JAXGCM step, model-level height is the surface-nearest sigma-center
+After a JCM step, model-level height is the surface-nearest sigma-center
 altitude above ground. The adapter anchors the pressure ratio at the surface
 and uses the lowest model-level virtual temperature for the unresolved
 surface-to-center layer.
@@ -462,8 +465,9 @@ boundary guard, including accumulation overflow. Stress combines retained
 momentum AreaW/AreaS with ice traction and complementary shared-bulk open-water
 traction before shifting west/south to east/north faces.
 
-Global Veros selects atmosphere or total sea-ice surface forcing explicitly.
-Total mode consumes the five canonical rates once, preserves independent native
+Global Veros selects `surface_forcing="bulk_meteorology"` (default) or
+`surface_forcing="surface_fluxes"` explicitly. Surface-flux mode consumes the
+five canonical rates once, preserves independent native
 restoring, and activates a scalar native flag after climatological spinup. The
 cold-water proxy applies only while total feedback is inactive. Native pressure/
 free-surface execution provides actual SSH, with canonical native surface
@@ -487,11 +491,20 @@ alternative integrator or mutable model state. See docs/veris-validation.rst.
 
 ## Coupled Veris–Veros–JCM surface assembly
 
+Reusable field recipes use physical atmosphere/ocean/sea-ice names. The concrete
+JCM entry points are `make_jcm_atmosphere` and `JCMAtmosphereConfig`; private
+`JCMAtmosphereSetupState` and `JCMAtmosphereRuntimePayload` retain their existing
+module paths and lifecycle. There are no former-name aliases. The field,
+recipe, mask-helper and forcing-mode migration is documented in
+`docs/coupling-fields.rst`.
+
 `run_veris_veros_jcm.py` reuses the paired native factories and the sequential
 LND → CICE → OCN → ATM workflow. Ice exports current per-ice temperature and
 native category/snow albedo, plus current concentration. Ocean exports current
 `(1-A)*SST` after its native advance; full SST/SSS/currents/SSH remain available
-under ice. Total ocean boundary rates pass through Veris once.
+under ice. Total ocean boundary rates pass through Veris once. Routes, run order,
+diagnostic state lookup and topology roles use actual component names, preserving
+configurable instance identities.
 
 Explicit routes form source products before conservative remapping:
 `R(W*A*Tice)`, `R(W*A*alpha_ice)`, `R(W*A)` and `R(W*(1-A)*SST)`.

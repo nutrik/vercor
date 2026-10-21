@@ -11,7 +11,7 @@ from vercor.components import (
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grids import RectilinearGrid
-from vercor.grid_masks import create_lnd_mask_from_ocn
+from vercor.grid_masks import create_land_mask_from_ocean
 from vercor.output import OutputSpec
 from vercor.setups._output import resolve_output
 
@@ -86,17 +86,17 @@ def make_jcm_land(
         shape = (records, *land_surface_temperature.shape[-2:])
         land_surface_temperature = jnp.broadcast_to(land_surface_temperature, shape)
         soil_moisture = jnp.broadcast_to(soil_moisture, shape)
-    lnd_bmask, land_fraction = create_lnd_mask_from_ocn(
-        atm_lat=latitude,
-        atm_lon=longitude,
-        ocn_grid=ocn_grid,
+    land_binary_mask, land_fraction = create_land_mask_from_ocean(
+        atmosphere_latitude=latitude,
+        atmosphere_longitude=longitude,
+        ocean_grid=ocn_grid,
     )
 
     grid = RectilinearGrid(
         name=f"{name.lower()}-grid",
         longitude=longitude,
         latitude=latitude,
-        binary_mask=lnd_bmask,
+        binary_mask=land_binary_mask,
     )
 
     component = DataComponent(

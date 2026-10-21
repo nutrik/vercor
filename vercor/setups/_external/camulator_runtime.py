@@ -121,7 +121,9 @@ def run_camulator_prediction_block(
             model_input,
             "SST",
             _camulator_tensors.torch_tensor_from_jax_array(
-                _camulator_fields.prepare_camulator_sst_input(rescaled_total_ts),
+                _camulator_fields.prepare_camulator_surface_temperature_input(
+                    rescaled_total_ts
+                ),
                 resources.device,
             ),
         )

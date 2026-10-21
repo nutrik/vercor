@@ -13,7 +13,7 @@ from vercor import Clock, Coupler, Exchange, RectilinearGrid, RuntimeOptions
 from vercor.components import DataComponent
 from vercor.dtypes import DTypePolicy
 from vercor.physics import PhysicalConstants
-from vercor.setups import JAXGCMConfig, Spinup
+from vercor.setups import JCMAtmosphereConfig, Spinup
 
 pytestmark = pytest.mark.fast_always
 
@@ -27,7 +27,7 @@ def make_native_jcm(
     seaice_coupling: bool = True,
 ) -> tuple[Coupler, Any, Any]:
     """Build actual flat native JCM with prescribed covered surface contributions."""
-    config = JAXGCMConfig(
+    config = JCMAtmosphereConfig(
         seaice_coupling=seaice_coupling,
         spinup=spinup,
         model_timestep=timedelta(minutes=30),
@@ -35,7 +35,7 @@ def make_native_jcm(
         custom_parameters={"mod_radcon.albsea": water_albedo},
     )
     from tests.test_jcm_surface_forcing import native_case
-    from vercor.setups import make_jax_gcm
+    from vercor.setups import make_jcm_atmosphere
     from dataclasses import replace
 
     jax.config.update("jax_enable_x64", True)
@@ -47,7 +47,7 @@ def make_native_jcm(
         sea_surface_temperature=jnp.full(shape, 278.0),
         snowc_am=jnp.zeros(shape),
     )
-    atmosphere = make_jax_gcm(
+    atmosphere = make_jcm_atmosphere(
         coords, terrain, config=replace(config, forcing_data=forcing)
     )
     canonical = atmosphere.grid.shape
@@ -108,7 +108,7 @@ def test_native_flux_channels_are_selected_once() -> None:
         open_water_albedo=jnp.array(0.1),
         large_scale_precipitation=jnp.zeros(shape),
         convective_precipitation=jnp.zeros(shape),
-        temperature_2m=jnp.full(shape, 280.0),
+        near_surface_air_temperature=jnp.full(shape, 280.0),
         snow_temperature=jnp.array(273.0),
         rain_temperature=jnp.array(278.0),
         dtype=DTypePolicy(enable_x64=True),
@@ -174,14 +174,14 @@ def test_ordinary_jcm_receives_independent_surfaces_and_soil() -> None:
 
 
 def test_coupled_factory_uses_fractional_terrain_without_mutating_inputs() -> None:
-    config = JAXGCMConfig(seaice_coupling=True)
+    config = JCMAtmosphereConfig(seaice_coupling=True)
     from tests.test_jcm_surface_forcing import native_case
     from vercor.setups import (
         JCMInputs,
         JCMLandAtmosphereConfig,
         make_jcm_land_atmosphere,
     )
-    from vercor.grid_masks import create_lnd_mask_from_ocn
+    from vercor.grid_masks import create_land_mask_from_ocean
 
     coords, terrain, _, forcing = native_case()
     original = np.asarray(terrain.fmask).copy()
@@ -198,10 +198,10 @@ def test_coupled_factory_uses_fractional_terrain_without_mutating_inputs() -> No
         inputs=JCMInputs(coords, terrain, forcing),
         config=JCMLandAtmosphereConfig(atmosphere=config),
     )
-    _, fraction = create_lnd_mask_from_ocn(
-        atm_lat=pair.land.grid.latitude,
-        atm_lon=pair.land.grid.longitude,
-        ocn_grid=ocean,
+    _, fraction = create_land_mask_from_ocean(
+        atmosphere_latitude=pair.land.grid.latitude,
+        atmosphere_longitude=pair.land.grid.longitude,
+        ocean_grid=ocean,
     )
     assert pair.land.spec.masks is not None
     assert pair.land.spec.masks.fractional_field == "land_fraction"
@@ -214,7 +214,7 @@ def test_coupled_factory_uses_fractional_terrain_without_mutating_inputs() -> No
     ordinary = make_jcm_land_atmosphere(
         ocean,
         inputs=JCMInputs(coords, terrain, forcing),
-        config=JCMLandAtmosphereConfig(atmosphere=JAXGCMConfig()),
+        config=JCMLandAtmosphereConfig(atmosphere=JCMAtmosphereConfig()),
     )
     np.testing.assert_allclose(ordinary.terrain.fmask, np.asarray(fraction).T)
     np.testing.assert_array_equal(terrain.fmask, original)
@@ -230,9 +230,9 @@ def test_coupled_factory_uses_fractional_terrain_without_mutating_inputs() -> No
 
 
 def test_coupled_policy_is_keyword_only() -> None:
-    assert JAXGCMConfig().seaice_coupling is False
+    assert JCMAtmosphereConfig().seaice_coupling is False
     assert (
-        signature(JAXGCMConfig).parameters["seaice_coupling"].kind
+        signature(JCMAtmosphereConfig).parameters["seaice_coupling"].kind
         is Parameter.KEYWORD_ONLY
     )
 

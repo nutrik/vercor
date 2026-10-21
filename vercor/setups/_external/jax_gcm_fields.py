@@ -164,16 +164,16 @@ JAXGCM_OUTPUT_GRID_FIELD_NAMES = (
     "downward_shortwave_radiation_flux",
     "surface_pressure",
     "open_water_albedo",
-    "u_velocity",
-    "v_velocity",
-    "temperature",
-    "specific_humidity",
+    "air_u_velocity",
+    "air_v_velocity",
+    "air_temperature",
+    "air_specific_humidity",
     "sensible_heat_flux",
     "latent_heat_flux",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
-    "density",
-    "potential_temperature",
+    "air_density",
+    "air_potential_temperature",
     "model_level_height",
     "rain_rate",
     "snow_rate",
@@ -235,7 +235,7 @@ def map_jcm_output_fields(
     open_water_albedo: object,
     large_scale_precipitation: object,
     convective_precipitation: object,
-    temperature_2m: object,
+    near_surface_air_temperature: object,
     snow_temperature: object,
     rain_temperature: object,
     dtype: DTypePolicy,
@@ -245,7 +245,7 @@ def map_jcm_output_fields(
     ``precls`` and ``precnv`` are downward-positive g/m²/s. Sum them before
     regridding and convert once to kg/m²/s. On the native (longitude,
     latitude) grid, partition the sum using near-surface ``surface_flux.t0``
-    (``temperature_2m``, K), then transpose both phases for exchange. The
+    (``near_surface_air_temperature``, K), then transpose both phases for exchange. The
     snow fraction is sigmoid(4 * (midpoint - T) / threshold_span), matching
     the midpoint and midpoint slope of the calibrated linear-transition
     model in Bedard-Therrien et al. (2025), doi:10.5194/hess-29-1135-2025,
@@ -278,7 +278,9 @@ def map_jcm_output_fields(
     v_velocity_bottom = as_jax_real_array(v_wind, dtype)[-1, :, :].T
     temperature_bottom = temperature_array[-1, :, :].T
     specific_humidity_bottom = specific_humidity_array[-1, :, :].T
-    temperature_2m = as_jax_real_array(temperature_2m, dtype)
+    near_surface_air_temperature = as_jax_real_array(
+        near_surface_air_temperature, dtype
+    )
     snow_temperature_array = as_jax_real_array(snow_temperature, dtype)
     rain_temperature_array = as_jax_real_array(rain_temperature, dtype)
     total_precipitation = (
@@ -288,7 +290,9 @@ def map_jcm_output_fields(
     threshold_span = rain_temperature_array - snow_temperature_array
     midpoint = 0.5 * (rain_temperature_array + snow_temperature_array)
     # A logistic has midpoint derivative -k/4; LT has derivative -1/span.
-    snow_fraction = jax.nn.sigmoid(4.0 * (midpoint - temperature_2m) / threshold_span)
+    snow_fraction = jax.nn.sigmoid(
+        4.0 * (midpoint - near_surface_air_temperature) / threshold_span
+    )
     snow_precipitation = total_precipitation * snow_fraction
     rain_rate = (total_precipitation - snow_precipitation).T
     snow_rate = snow_precipitation.T
@@ -336,17 +340,17 @@ def map_jcm_output_fields(
         "open_water_albedo": jnp.broadcast_to(
             as_jax_real_array(open_water_albedo, dtype), temperature_bottom.shape
         ),
-        "u_velocity": u_velocity_bottom,
-        "v_velocity": v_velocity_bottom,
-        "temperature": temperature_bottom,
-        "specific_humidity": specific_humidity_bottom,
+        "air_u_velocity": u_velocity_bottom,
+        "air_v_velocity": v_velocity_bottom,
+        "air_temperature": temperature_bottom,
+        "air_specific_humidity": specific_humidity_bottom,
         "sensible_heat_flux": sensible_heat_flux,
         "latent_heat_flux": latent_heat_flux,
         "net_shortwave_radiation_flux": net_shortwave_radiation_flux_surface,
         "downward_longwave_radiation_flux": downward_longwave_radiation_flux_surface,
-        "pressure": pressure,
-        "density": density_bottom,
-        "potential_temperature": potential_temperature_bottom,
+        "air_pressure_3d": pressure,
+        "air_density": density_bottom,
+        "air_potential_temperature": potential_temperature_bottom,
         "model_level_height": model_level_height,
         "rain_rate": rain_rate,
         "snow_rate": snow_rate,

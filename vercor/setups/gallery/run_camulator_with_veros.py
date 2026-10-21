@@ -16,7 +16,7 @@ from vercor.setups import CAMulatorConfig, Spinup, VerosConfig, make_camulator_g
 from vercor.setups import make_camulator_land
 from vercor.setups import make_veros_gcm
 from vercor.recipes import (
-    ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
+    ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
     LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
@@ -108,28 +108,28 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         steps=365 - 2 * 4,
         calendar="gregorian",
     )
-    run_order = ["OCN", "LND", "ATM"]
+    run_order = [ocn.name, lnd.name, atm.name]
 
     # Exchanges
     exchanges = (
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="OCN",
-            fields=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
+            source=atm.name,
+            target=ocn.name,
+            fields=ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="source_flux",
-            source="OCN",
-            target="ATM",
+            source=ocn.name,
+            target=atm.name,
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=conservative,
         ),
         Exchange(
             quantity="source_flux",
-            source="LND",
-            target="ATM",
+            source=lnd.name,
+            target=atm.name,
             fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=conservative,
         ),
@@ -140,7 +140,12 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         components=components,
         exchanges=exchanges,
         run_order=run_order,
-        runtime=RuntimeOptions(dtype=dtype, topology=SurfaceMaskPolicy()),
+        runtime=RuntimeOptions(
+            dtype=dtype,
+            topology=SurfaceMaskPolicy(
+                atmosphere=atm.name, ocean=ocn.name, land=lnd.name
+            ),
+        ),
         log_level=loglevel,
     )
 

@@ -17,13 +17,13 @@ from vercor import Clock, Coupler, Exchange, RuntimeOptions
 from vercor.components import Component
 from vercor.dtypes import DTypePolicy
 from vercor.recipes import (
-    ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
-    JCM_LAND_TO_ATMOSPHERE_FIELDS,
+    ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
+    LAND_TO_ATMOSPHERE_STATE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
 from vercor.regridding import bilinear
 from vercor.setups import (
-    JAXGCMConfig,
+    JCMAtmosphereConfig,
     JCMLandAtmosphereConfig,
     Spinup,
     VerosConfig,
@@ -229,8 +229,8 @@ def test_coupled_precipitation_reaches_native_salt_with_matching_jvp_vjp() -> No
 
     resources = SimpleNamespace(
         execution="jax",
-        uses_atmosphere_forcing=True,
-        surface_forcing="atmosphere",
+        uses_bulk_meteorology=True,
+        surface_forcing="bulk_meteorology",
         export_open_water_surface=False,
         model_substeps=2,
         _step_function=native_tracer_step,
@@ -239,12 +239,12 @@ def test_coupled_precipitation_reaches_native_salt_with_matching_jvp_vjp() -> No
         name: jnp.full((2, 3), value)
         for name, value in {
             "model_level_height": 50.0,
-            "u_velocity": 2.0,
-            "v_velocity": 3.0,
-            "potential_temperature": 283.15,
-            "specific_humidity": 0.005,
-            "density": 1.2,
-            "temperature": 283.15,
+            "air_u_velocity": 2.0,
+            "air_v_velocity": 3.0,
+            "air_potential_temperature": 283.15,
+            "air_specific_humidity": 0.005,
+            "air_density": 1.2,
+            "air_temperature": 283.15,
             "net_shortwave_radiation_flux": 0.0,
             "downward_longwave_radiation_flux": 300.0,
             "snow_rate": 0.0,
@@ -516,7 +516,7 @@ def _fully_coupled_global_model() -> Coupler:
     jcm = make_jcm_land_atmosphere(
         ocean.grid,
         config=JCMLandAtmosphereConfig(
-            atmosphere=JAXGCMConfig(
+            atmosphere=JCMAtmosphereConfig(
                 spinup=Spinup(enabled=False),
                 jitted=True,
             )
@@ -527,7 +527,7 @@ def _fully_coupled_global_model() -> Coupler:
             quantity="intensive",
             source="ATM",
             target="OCN",
-            fields=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
+            fields=ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
@@ -541,7 +541,7 @@ def _fully_coupled_global_model() -> Coupler:
             quantity="intensive",
             source="LND",
             target="ATM",
-            fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
+            fields=LAND_TO_ATMOSPHERE_STATE_FIELDS,
             regridder_factory=bilinear,
         ),
     )
@@ -661,7 +661,7 @@ def test_total_feedback_native_velocity_and_ssh_derivatives(
     configure_veros_runtime("jax")
     from tests._veros_surface_support import surface_setup_class, feedback_fields
     from vercor.components import DataComponent
-    from vercor.recipes import VERIS_TO_OCEAN_FLUX_FIELDS
+    from vercor.recipes import SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS
     from vercor.setups._external import veros_gcm_state
 
     setup = surface_setup_class(execution="jax")
@@ -669,7 +669,7 @@ def test_total_feedback_native_velocity_and_ssh_derivatives(
         veros_gcm_state, "_select_veros_setup_class", lambda *args: setup
     )
     ocean = make_veros_gcm(
-        config=VerosConfig(execution="jax", surface_forcing="coupled")
+        config=VerosConfig(execution="jax", surface_forcing="surface_fluxes")
     )
     wet = jnp.asarray(ocean.grid.binary_mask)
     east = wet * jnp.roll(wet, -1, axis=1)
@@ -687,7 +687,7 @@ def test_total_feedback_native_velocity_and_ssh_derivatives(
             Exchange(
                 "CICE",
                 "OCN",
-                VERIS_TO_OCEAN_FLUX_FIELDS,
+                SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS,
                 quantity="source_flux",
                 source_coverage="binary",
             ),

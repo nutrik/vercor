@@ -11,9 +11,9 @@ from vercor import (
     RuntimeOptions,
 )
 from vercor.setups import (
-    JAXGCMConfig,
+    JCMAtmosphereConfig,
     load_jcm_inputs,
-    make_jax_gcm,
+    make_jcm_atmosphere,
     make_slab_land,
     make_slab_ocean,
 )
@@ -21,9 +21,9 @@ from vercor.dtypes import DTypePolicy, as_jax_real_array
 from vercor.output import OutputTarget
 from vercor.regridding import bilinear, conservative
 from vercor.recipes import (
-    SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-    SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
-    JCM_LAND_TO_ATMOSPHERE_FIELDS,
+    ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
+    ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
+    LAND_TO_ATMOSPHERE_STATE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
 from vercor.diagnostics import (
@@ -44,13 +44,13 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     forcing = inputs.forcing
 
     # Build components
-    atm = make_jax_gcm(
+    atm = make_jcm_atmosphere(
         coords,
         terrain,
-        config=JAXGCMConfig(forcing_data=forcing, jitted=True),
+        config=JCMAtmosphereConfig(forcing_data=forcing, jitted=True),
     )
 
-    ocn_binary_mask = jnp.where(as_jax_real_array(terrain.fmask) < 1, 1, 0).T
+    ocean_binary_mask = jnp.where(as_jax_real_array(terrain.fmask) < 1, 1, 0).T
     land_fraction = as_jax_real_array(terrain.fmask).T
     lnd_binary_mask = jnp.where(land_fraction > 0, 1, 0)
 
@@ -66,7 +66,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         "OCN",
         longitude=jnp.rad2deg(as_jax_real_array(hgrid.longitudes)),
         latitude=jnp.rad2deg(as_jax_real_array(hgrid.latitudes)),
-        binary_mask=ocn_binary_mask,
+        binary_mask=ocean_binary_mask,
     )
 
     ocn = make_slab_ocean(ocn_grid, fractional_coverage=1 - land_fraction)
@@ -84,7 +84,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
 
     # Clock and sequence
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=86400.0, steps=10)
-    run_order = ["OCN", "LND", "ATM"]
+    run_order = [ocn.name, lnd.name, atm.name]
 
     # JCM 3 supplies grid-mean turbulent fluxes. This toy slab example uses
     # those densities on both tiles; it does not resolve tile-specific budgets.
@@ -94,30 +94,30 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     exchanges = (
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="OCN",
-            fields=SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
+            source=atm.name,
+            target=ocn.name,
+            fields=ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="OCN",
-            target="ATM",
+            source=ocn.name,
+            target=atm.name,
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="LND",
-            target="ATM",
-            fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
+            source=lnd.name,
+            target=atm.name,
+            fields=LAND_TO_ATMOSPHERE_STATE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="LND",
-            fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+            source=atm.name,
+            target=lnd.name,
+            fields=ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
             regridder_factory=conservative,
         ),
     )
@@ -134,30 +134,30 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     )
 
     final_state = cpl.run(output=OutputTarget("."))
-    views = final_state.components(("ATM", "OCN", "LND"))
+    views = final_state.components((atm.name, ocn.name, lnd.name))
 
     # Inspect a few fields in a component-wise table.
     print_component_field_means_table(
         components=views,
         fields=[
             ("sea_surface_temperature", "sst"),
-            ("temperature", "temp"),
-            ("u_velocity", "u_velocity"),
-            ("v_velocity", "v_velocity"),
+            ("air_temperature", "temp"),
+            ("air_u_velocity", "air_u_velocity"),
+            ("air_v_velocity", "air_v_velocity"),
             ("soil_moisture", "soil_moisture"),
             ("sensible_heat_flux", "sensible_heat_flux"),
         ],
-        component_order=["ATM", "OCN", "LND"],
+        component_order=[atm.name, ocn.name, lnd.name],
     )
 
     fig, axs, scalar_mappable = plot_component_scalar_vector_comparison(
         rows=[
             (
-                "ATM",
-                views["ATM"],
+                atm.name,
+                views[atm.name],
                 "sea_surface_temperature",
-                "u_velocity",
-                "v_velocity",
+                "air_u_velocity",
+                "air_v_velocity",
             ),
         ],
         figsize=(15, 10),

@@ -50,7 +50,7 @@ def test_pair_rejects_incompatible_ocean_before_initialization(
 ) -> None:
     from vercor.setups import make_veris_veros
 
-    with pytest.raises(ValueError, match="coupled|global"):
+    with pytest.raises(ValueError, match="surface_fluxes|global"):
         make_veris_veros(ocean_config=config)
 
 
@@ -72,9 +72,9 @@ def test_prognostic_gallery_assembles_bidirectional_total_feedback(
     )
     from vercor.fields import _flatten_field_items
     from vercor.recipes import (
-        ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-        OCEAN_TO_VERIS_FORCING_FIELDS,
-        VERIS_TO_OCEAN_FLUX_FIELDS,
+        OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+        OCEAN_TO_SEAICE_FORCING_FIELDS,
+        SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS,
     )
     from vercor.regridding import conservative
 
@@ -87,12 +87,15 @@ def test_prognostic_gallery_assembles_bidirectional_total_feedback(
         lambda f: {},
         spec=ComponentSpec(
             inputs=tuple(fields),
-            outputs=("ice_fraction", *_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS)),
+            outputs=(
+                "ice_fraction",
+                *_flatten_field_items(SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS),
+            ),
             initial_fields={
                 "ice_fraction": 0.0,
                 **{
                     name: 0.0
-                    for name in _flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS)
+                    for name in _flatten_field_items(SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS)
                 },
             },
             masks=ComponentMaskSpec(fractional_field="ice_fraction"),
@@ -103,7 +106,7 @@ def test_prognostic_gallery_assembles_bidirectional_total_feedback(
         grid,
         {
             name: fields[name]
-            for name in _flatten_field_items(OCEAN_TO_VERIS_FORCING_FIELDS)
+            for name in _flatten_field_items(OCEAN_TO_SEAICE_FORCING_FIELDS)
         },
     )
     atmosphere = DataComponent(
@@ -111,7 +114,9 @@ def test_prognostic_gallery_assembles_bidirectional_total_feedback(
         grid,
         {
             name: fields[name]
-            for name in _flatten_field_items(ATMOSPHERE_TO_VERIS_FORCING_FIELDS)
+            for name in _flatten_field_items(
+                OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
+            )
         },
     )
     land = DataComponent("LND", grid, {"land_surface_temperature": 273.15})
@@ -133,8 +138,8 @@ def test_prognostic_gallery_assembles_bidirectional_total_feedback(
         ("CICE", "OCN", "source_flux", "binary"),
         ("CICE", "OCN", "source_flux", "binary"),
     ]
-    assert coupler.exchanges[-2].fields == VERIS_TO_OCEAN_FLUX_FIELDS[:-1]
-    assert coupler.exchanges[-1].fields == VERIS_TO_OCEAN_FLUX_FIELDS[-1:]
+    assert coupler.exchanges[-2].fields == SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[:-1]
+    assert coupler.exchanges[-1].fields == SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[-1:]
     assert coupler.exchanges[-2].regridder_factory is conservative
     assert coupler.exchanges[-2].route_id != coupler.exchanges[-1].route_id
 
@@ -188,9 +193,9 @@ def _prognostic_coupler(
     from vercor.dtypes import DTypePolicy
     from vercor.fields import _flatten_field_items
     from vercor.recipes import (
-        ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-        OCEAN_TO_VERIS_FORCING_FIELDS,
-        VERIS_TO_OCEAN_FLUX_FIELDS,
+        OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+        OCEAN_TO_SEAICE_FORCING_FIELDS,
+        SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS,
     )
     from vercor.regridding import conservative
     from vercor.setups import make_veris_veros
@@ -209,7 +214,7 @@ def _prognostic_coupler(
         ),
         ocean_config=VerosConfig(
             execution=execution,
-            surface_forcing="coupled",
+            surface_forcing="surface_fluxes",
             export_open_water_surface=export_open_water_surface,
         ),
     )
@@ -221,7 +226,9 @@ def _prognostic_coupler(
         pair.ocean.grid,
         {
             name: fields[name]
-            for name in _flatten_field_items(ATMOSPHERE_TO_VERIS_FORCING_FIELDS)
+            for name in _flatten_field_items(
+                OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
+            )
         },
     )
     return Coupler(
@@ -229,15 +236,18 @@ def _prognostic_coupler(
         components=(atmosphere, pair.seaice, pair.ocean),
         exchanges=(
             Exchange(
-                "ATM", "CICE", ATMOSPHERE_TO_VERIS_FORCING_FIELDS, quantity="intensive"
+                "ATM",
+                "CICE",
+                OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+                quantity="intensive",
             ),
             Exchange(
-                "OCN", "CICE", OCEAN_TO_VERIS_FORCING_FIELDS, quantity="intensive"
+                "OCN", "CICE", OCEAN_TO_SEAICE_FORCING_FIELDS, quantity="intensive"
             ),
             Exchange(
                 "CICE",
                 "OCN",
-                VERIS_TO_OCEAN_FLUX_FIELDS[:-1],
+                SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[:-1],
                 route_id="CICE->OCN.scalars",
                 quantity="source_flux",
                 source_coverage="binary",
@@ -246,7 +256,7 @@ def _prognostic_coupler(
             Exchange(
                 "CICE",
                 "OCN",
-                VERIS_TO_OCEAN_FLUX_FIELDS[-1:],
+                SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[-1:],
                 route_id="CICE->OCN.stress",
                 quantity="source_flux",
                 source_coverage="binary",

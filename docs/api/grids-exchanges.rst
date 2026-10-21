@@ -22,8 +22,8 @@ Use exchanges to route declared source fields to declared target fields.
 Dynamic masks and quantities
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Routes touching a component with ``ComponentSpec.masks`` must explicitly select
-``Exchange(quantity=...)``. Each route applies one quantity meaning to all of its
+Every route must explicitly select ``Exchange(quantity=...)``. Each route
+applies one quantity meaning to all of its
 scalar and vector fields; use separate route IDs for quantities with different
 meanings.
 
@@ -54,14 +54,14 @@ are bounded to [0, 1] without changing the physical field numerator/denominator.
 Prepared binary topology restrictions intersect these explicit modes. A
 conflicting fractional topology patch is rejected to prevent double weighting.
 
-The default ``quantity="legacy"`` preserves existing static scalar/vector
-behavior for components without a dynamic mask declaration.
+See :doc:`../exchange-coverage` for the complete coverage contract.
 
 Fields
 ------
 
 Use scalar names or explicit vector declarations to describe an exchange's
-field capabilities.
+field capabilities. :doc:`../coupling-fields` lists the bundled physical names,
+units, vertical levels and migration from former names.
 
 .. automodule:: vercor.fields
    :members: COMMON_FIELD_NAMES, ExchangeField, VectorField, vector

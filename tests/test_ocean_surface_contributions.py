@@ -33,7 +33,7 @@ def ocean_coupler(
     """Build one real native column ocean with prescribed total boundary inputs."""
     from vercor.setups import make_veros_gcm
     from vercor.setups._external import veros_gcm_state
-    from vercor.recipes import VERIS_TO_OCEAN_FLUX_FIELDS
+    from vercor.recipes import SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS
 
     jax.config.update("jax_enable_x64", True)
     setup = surface_setup_class()
@@ -42,7 +42,7 @@ def ocean_coupler(
     )
     ocean = make_veros_gcm(
         config=VerosConfig(
-            surface_forcing="coupled",
+            surface_forcing="surface_fluxes",
             export_open_water_surface=enabled,
         )
     )
@@ -63,7 +63,7 @@ def ocean_coupler(
         Exchange(
             "CICE",
             "OCN",
-            VERIS_TO_OCEAN_FLUX_FIELDS[:-1],
+            SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[:-1],
             route_id="scalars",
             quantity="source_flux",
             source_coverage="binary",
@@ -72,7 +72,7 @@ def ocean_coupler(
         Exchange(
             "CICE",
             "OCN",
-            VERIS_TO_OCEAN_FLUX_FIELDS[-1:],
+            SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[-1:],
             route_id="stress",
             quantity="source_flux",
             source_coverage="binary",
@@ -106,17 +106,17 @@ def test_open_water_flag_is_explicit_keyword_only_and_requires_coupled_fluxes() 
         signature(VerosConfig).parameters["export_open_water_surface"].kind
         is Parameter.KEYWORD_ONLY
     )
-    with pytest.raises(ValueError, match="coupled"):
+    with pytest.raises(ValueError, match="surface_fluxes"):
         VerosConfig(export_open_water_surface=True)
     assert VerosConfig(
-        surface_forcing="coupled", export_open_water_surface=True
+        surface_forcing="surface_fluxes", export_open_water_surface=True
     ).export_open_water_surface
 
 
 @pytest.mark.parametrize("value", [1, "yes", None])
 def test_open_water_flag_requires_bool(value: Any) -> None:
     with pytest.raises(TypeError, match="export_open_water_surface"):
-        VerosConfig(surface_forcing="coupled", export_open_water_surface=value)
+        VerosConfig(surface_forcing="surface_fluxes", export_open_water_surface=value)
 
 
 def test_correlated_open_water_temperature_is_weighted_before_averaging() -> None:

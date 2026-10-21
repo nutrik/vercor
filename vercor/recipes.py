@@ -4,29 +4,29 @@ from __future__ import annotations
 
 from vercor.fields import ExchangeField as _ExchangeField, vector as _vector
 
-ATMOSPHERE_TO_VEROS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
-    _vector("u_velocity", "v_velocity"),
-    "specific_humidity",
+ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
+    _vector("air_u_velocity", "air_v_velocity"),
+    "air_specific_humidity",
     "model_level_height",
-    "density",
-    "potential_temperature",
-    "temperature",
+    "air_density",
+    "air_potential_temperature",
+    "air_temperature",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
     "rain_rate",
     "snow_rate",
 )
-"""Stable atmosphere-to-Veros forcing fields used by coupled setup scripts."""
+"""Colocated atmospheric state, radiation and precipitation for ocean bulk fluxes."""
 
 
-ATMOSPHERE_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
-    _vector("u_velocity", "v_velocity"),
+OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
+    _vector("air_u_velocity", "air_v_velocity"),
     _vector("u_velocity_10m", "v_velocity_10m"),
-    "specific_humidity",
+    "air_specific_humidity",
     "model_level_height",
-    "density",
-    "potential_temperature",
-    "temperature",
+    "air_density",
+    "air_potential_temperature",
+    "air_temperature",
     "surface_pressure",
     "net_shortwave_radiation_flux",
     "downward_shortwave_radiation_flux",
@@ -34,15 +34,15 @@ ATMOSPHERE_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
     "rain_rate",
     "snow_rate",
 )
-"""Colocated bulk inputs and separate observed 10 m winds for native Veris."""
+"""Colocated bulk inputs and separate observed 10 m winds for sea-ice forcing."""
 
-JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
-    _vector("u_velocity", "v_velocity"),
-    "specific_humidity",
+MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
+    _vector("air_u_velocity", "air_v_velocity"),
+    "air_specific_humidity",
     "model_level_height",
-    "density",
-    "potential_temperature",
-    "temperature",
+    "air_density",
+    "air_potential_temperature",
+    "air_temperature",
     "surface_pressure",
     "downward_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
@@ -50,19 +50,19 @@ JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
     "snow_rate",
     "open_water_albedo",
 )
-"""Model-level JCM air and raw radiation; derive actual 10 m winds with the bulk solve."""
+"""Model-level air and raw radiation; derive actual 10 m winds with the bulk solve."""
 
 
-OCEAN_TO_VERIS_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
+OCEAN_TO_SEAICE_FORCING_FIELDS: tuple[_ExchangeField, ...] = (
     "sea_surface_temperature",
     "sea_surface_salinity",
     _vector("ocean_u_velocity", "ocean_v_velocity"),
     "sea_surface_height",
 )
-"""Prescribed tracer surfaces and native face velocities on the shared ocean grid."""
+"""Tracer surfaces and canonical east/north face velocities on the shared ocean grid."""
 
 
-VERIS_TO_OCEAN_FLUX_FIELDS: tuple[_ExchangeField, ...] = (
+SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS: tuple[_ExchangeField, ...] = (
     "sea_surface_heat_flux",
     "sea_surface_mass_flux",
     "sea_surface_salt_mass_flux",
@@ -70,28 +70,28 @@ VERIS_TO_OCEAN_FLUX_FIELDS: tuple[_ExchangeField, ...] = (
 )
 """Total-area interval means: downward W/m2, kg/m2/s, kg salt/m2/s and Pa."""
 
-VERIS_TO_JCM_SURFACE_FIELDS: tuple[_ExchangeField, ...] = (
+SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS: tuple[_ExchangeField, ...] = (
     "ice_surface_temperature",
     "ice_surface_albedo",
 )
 """Current per-ice-area properties; weight by source ice coverage before remapping."""
 
-VERIS_TO_JCM_COVERAGE_FIELDS: tuple[_ExchangeField, ...] = ("ice_fraction",)
+SEAICE_COVERAGE_FIELDS: tuple[_ExchangeField, ...] = ("ice_fraction",)
 """Ice concentration; use binary wet support to avoid a second concentration factor."""
 
-OCEAN_TO_JCM_OPEN_WATER_FIELDS: tuple[_ExchangeField, ...] = (
+OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS: tuple[_ExchangeField, ...] = (
     "open_water_temperature_contribution",
 )
 """Post-ocean (1-A)*SST; use binary source-flux support before conservative remapping."""
 
 
 ATMOSPHERE_TO_OCEAN_STATE_FIELDS: tuple[_ExchangeField, ...] = (
-    _vector("u_velocity", "v_velocity"),
-    "specific_humidity",
+    _vector("air_u_velocity", "air_v_velocity"),
+    "air_specific_humidity",
     "model_level_height",
-    "density",
-    "potential_temperature",
-    "temperature",
+    "air_density",
+    "air_potential_temperature",
+    "air_temperature",
 )
 """Atmosphere state displayed through explicit data-gallery diagnostic imports."""
 
@@ -104,9 +104,9 @@ ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS: tuple[_ExchangeField, ...] = (
 
 
 ATMOSPHERE_TO_LAND_STATE_FIELDS: tuple[_ExchangeField, ...] = (
-    "specific_humidity",
+    "air_specific_humidity",
     "model_level_height",
-    "potential_temperature",
+    "air_potential_temperature",
 )
 """Atmosphere state displayed by the land data-gallery diagnostics."""
 
@@ -118,11 +118,11 @@ ATMOSPHERE_TO_LAND_RADIATION_FIELDS: tuple[_ExchangeField, ...] = (
 """Atmosphere radiation displayed by the land data-gallery diagnostics."""
 
 
-JCM_LAND_TO_ATMOSPHERE_FIELDS: tuple[_ExchangeField, ...] = (
+LAND_TO_ATMOSPHERE_STATE_FIELDS: tuple[_ExchangeField, ...] = (
     "soil_moisture",
     "land_surface_temperature",
 )
-"""JCM land fields imported by the atmosphere adapter."""
+"""Land temperature and soil moisture imported by atmosphere adapters."""
 
 
 LAND_TO_ATMOSPHERE_SURFACE_FIELDS: tuple[_ExchangeField, ...] = (
@@ -137,15 +137,17 @@ OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS: tuple[_ExchangeField, ...] = (
 """Ocean surface fields imported by atmosphere adapters."""
 
 
-SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS: tuple[_ExchangeField, ...] = (
+ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS: tuple[_ExchangeField, ...] = (
     "latent_heat_flux",
     "sensible_heat_flux",
 )
-"""Atmosphere flux fields imported by slab ocean components."""
+"""Atmospheric turbulent heat fluxes consumed by ocean surface components."""
 
 
-SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS: tuple[_ExchangeField, ...] = ("latent_heat_flux",)
-"""Atmosphere flux fields imported by slab land components."""
+ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS: tuple[_ExchangeField, ...] = (
+    "latent_heat_flux",
+)
+"""Atmospheric latent heat flux consumed by land surface components."""
 
 
 OCEAN_TO_SEAICE_SURFACE_FIELDS: tuple[_ExchangeField, ...] = (
@@ -159,18 +161,18 @@ __all__ = [
     "ATMOSPHERE_TO_LAND_STATE_FIELDS",
     "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS",
     "ATMOSPHERE_TO_OCEAN_STATE_FIELDS",
-    "ATMOSPHERE_TO_VEROS_FORCING_FIELDS",
-    "ATMOSPHERE_TO_VERIS_FORCING_FIELDS",
-    "JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS",
-    "JCM_LAND_TO_ATMOSPHERE_FIELDS",
+    "ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS",
+    "OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS",
+    "MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS",
+    "LAND_TO_ATMOSPHERE_STATE_FIELDS",
     "LAND_TO_ATMOSPHERE_SURFACE_FIELDS",
     "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS",
-    "OCEAN_TO_JCM_OPEN_WATER_FIELDS",
+    "OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS",
     "OCEAN_TO_SEAICE_SURFACE_FIELDS",
-    "OCEAN_TO_VERIS_FORCING_FIELDS",
-    "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS",
-    "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS",
-    "VERIS_TO_OCEAN_FLUX_FIELDS",
-    "VERIS_TO_JCM_SURFACE_FIELDS",
-    "VERIS_TO_JCM_COVERAGE_FIELDS",
+    "OCEAN_TO_SEAICE_FORCING_FIELDS",
+    "ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS",
+    "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS",
+    "SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS",
+    "SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS",
+    "SEAICE_COVERAGE_FIELDS",
 ]

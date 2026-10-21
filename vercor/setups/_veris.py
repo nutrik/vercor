@@ -62,9 +62,14 @@ def make_veris_veros(
     """
     config = VerisConfig() if config is None else config
     ocean_config = (
-        VerosConfig(surface_forcing="coupled") if ocean_config is None else ocean_config
+        VerosConfig(surface_forcing="surface_fluxes")
+        if ocean_config is None
+        else ocean_config
     )
-    if ocean_config.surface_forcing != "coupled" or ocean_config.setup != "global_4deg":
+    if (
+        ocean_config.surface_forcing != "surface_fluxes"
+        or ocean_config.setup != "global_4deg"
+    ):
         raise ValueError("prognostic Veris requires coupled global_4deg Veros")
     if ocean_config.name == config.name:
         raise ValueError("sea-ice and ocean names must be distinct")

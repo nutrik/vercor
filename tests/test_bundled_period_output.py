@@ -95,9 +95,9 @@ def test_shared_data_factory_disables_output_by_default() -> None:
     component = time_interpolated_data_component(
         name="DATA",
         grid=grid,
-        fields={"temperature": jnp.full(grid.shape, 280.0)},
+        fields={"air_temperature": jnp.full(grid.shape, 280.0)},
         inputs=("forcing",),
-        outputs=("temperature",),
+        outputs=("air_temperature",),
         initial_fields={"forcing": 1.0},
     )
 
@@ -111,8 +111,8 @@ def test_shared_data_factory_accepts_output_spec() -> None:
     component = time_interpolated_data_component(
         name="DATA",
         grid=grid,
-        fields={"temperature": jnp.full(grid.shape, 280.0)},
-        outputs=("temperature",),
+        fields={"air_temperature": jnp.full(grid.shape, 280.0)},
+        outputs=("air_temperature",),
         output=custom_output,
     )
 
@@ -145,7 +145,7 @@ def _make_test_jcm_land(
     grid = make_test_grid(name="jcm-land-output")
     monkeypatch.setattr(
         jcm_land_module,
-        "create_lnd_mask_from_ocn",
+        "create_land_mask_from_ocean",
         lambda **kwargs: (
             jnp.ones(grid.shape),
             jnp.zeros(grid.shape),
@@ -322,9 +322,9 @@ def test_data_period_file_contains_declared_outputs_only(tmp_path: Path) -> None
     component = time_interpolated_data_component(
         name="DATA",
         grid=grid,
-        fields={"temperature": jnp.full((12, *grid.shape), 280.0)},
+        fields={"air_temperature": jnp.full((12, *grid.shape), 280.0)},
         inputs=("forcing",),
-        outputs=("temperature",),
+        outputs=("air_temperature",),
         initial_fields={"forcing": 1.0},
         output=OutputSpec(period=PeriodOutput(frequency="step")),
     )
@@ -344,8 +344,8 @@ def test_data_period_file_contains_declared_outputs_only(tmp_path: Path) -> None
     )
 
     with h5netcdf.File(tmp_path / "data.averages.2000-01-01.nc", "r") as dataset:
-        assert dataset.variables["temperature"].shape == (1, *grid.shape)
-        np.testing.assert_allclose(dataset.variables["temperature"][0], 280.0)
+        assert dataset.variables["air_temperature"].shape == (1, *grid.shape)
+        np.testing.assert_allclose(dataset.variables["air_temperature"][0], 280.0)
         assert "forcing" not in dataset.variables
 
 
@@ -361,12 +361,12 @@ def test_linear_data_month_output_averages_exact_exported_slices(
     component = time_interpolated_data_component(
         name="DATA",
         grid=grid,
-        fields={"temperature": forcing},
-        outputs=("temperature",),
+        fields={"air_temperature": forcing},
+        outputs=("air_temperature",),
         output=OutputSpec(
             period=PeriodOutput(
                 frequency="month",
-                variables=("temperature",),
+                variables=("air_temperature",),
             )
         ),
     )
@@ -405,7 +405,7 @@ def test_linear_data_month_output_averages_exact_exported_slices(
     actual = []
     for path in paths:
         with h5netcdf.File(path, "r") as dataset:
-            values = np.asarray(dataset.variables["temperature"])
+            values = np.asarray(dataset.variables["air_temperature"])
             assert values.shape == (1, *grid.shape)
             actual.append(float(np.mean(values)))
 
@@ -427,14 +427,14 @@ def test_daily_data_month_output_averages_exact_exported_slices(
     component = DataComponent(
         "DATA",
         grid,
-        {"temperature": forcing},
+        {"air_temperature": forcing},
         spec=ComponentSpec(
-            outputs=("temperature",),
+            outputs=("air_temperature",),
             transfer=TransferPolicy("daily"),
             output=OutputSpec(
                 period=PeriodOutput(
                     frequency="month",
-                    variables=("temperature",),
+                    variables=("air_temperature",),
                 )
             ),
         ),
@@ -464,7 +464,7 @@ def test_daily_data_month_output_averages_exact_exported_slices(
     actual = []
     for path in paths:
         with h5netcdf.File(path, "r") as dataset:
-            values = np.asarray(dataset.variables["temperature"])
+            values = np.asarray(dataset.variables["air_temperature"])
             assert values.shape == (1, *grid.shape)
             actual.append(float(np.mean(values)))
 
@@ -480,10 +480,10 @@ def test_custom_components_remain_period_output_opt_in(tmp_path: Path) -> None:
     component = CallableComponent(
         "CUSTOM",
         grid,
-        lambda fields: {"temperature": fields["temperature"] + 1.0},
+        lambda fields: {"air_temperature": fields["air_temperature"] + 1.0},
         spec=ComponentSpec(
-            outputs=("temperature",),
-            initial_fields={"temperature": 280.0},
+            outputs=("air_temperature",),
+            initial_fields={"air_temperature": 280.0},
         ),
     )
     coupler = Coupler(

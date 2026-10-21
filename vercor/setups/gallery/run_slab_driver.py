@@ -23,8 +23,8 @@ from vercor.setups import (
 from vercor.recipes import (
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_SEAICE_SURFACE_FIELDS,
-    SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-    SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
+    ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
+    ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
 )
 from vercor.diagnostics import (
     plot_component_scalar_vector_comparison,
@@ -80,7 +80,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
 
     # Clock and sequence
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=3600, steps=24)
-    run_order = ["OCN", "ATM", "ICE", "LND"]
+    run_order = [ocn.name, atm.name, ice.name, lnd.name]
 
     # Exchanges
     # scalar fields (vector field))
@@ -88,30 +88,30 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     exchanges = (
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="OCN",
-            fields=SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
+            source=atm.name,
+            target=ocn.name,
+            fields=ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="OCN",
-            target="ATM",
+            source=ocn.name,
+            target=atm.name,
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="OCN",
-            target="ICE",
+            source=ocn.name,
+            target=ice.name,
             fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="LND",
-            fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+            source=atm.name,
+            target=lnd.name,
+            fields=ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
             regridder_factory=conservative,
         ),
     )
@@ -121,12 +121,17 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         components=components,
         exchanges=exchanges,
         run_order=run_order,
-        runtime=RuntimeOptions(dtype=dtype, topology=SurfaceMaskPolicy()),
+        runtime=RuntimeOptions(
+            dtype=dtype,
+            topology=SurfaceMaskPolicy(
+                atmosphere=atm.name, ocean=ocn.name, land=lnd.name
+            ),
+        ),
         log_level=loglevel,
     )
 
     final_state = cpl.run(output=OutputTarget("."))
-    views = final_state.components(("ATM", "OCN", "LND", "ICE"))
+    views = final_state.components((atm.name, ocn.name, lnd.name, ice.name))
 
     # Inspect a few fields in a component-wise table.
     print_component_field_means_table(
@@ -139,18 +144,18 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
             ("soil_moisture", "soil_moisture"),
             ("sensible_heat_flux", "sensible_heat_flux"),
         ],
-        component_order=["ATM", "OCN", "LND"],
+        component_order=[atm.name, ocn.name, lnd.name],
     )
     print(
         "ICE ice_fraction mean:",
-        float(jnp.nanmean(jnp.asarray(views["ICE"].field("ice_fraction")))),
+        float(jnp.nanmean(jnp.asarray(views[ice.name].field("ice_fraction")))),
     )
 
     fig, axs, scalar_mappable = plot_component_scalar_vector_comparison(
         rows=[
             (
-                "ATM",
-                views["ATM"],
+                atm.name,
+                views[atm.name],
                 "sea_surface_temperature",
                 "u_velocity_10m",
                 "v_velocity_10m",

@@ -15,6 +15,21 @@ versioning; pre-releases may still refine new contracts.
   before remapping, using a sigmoid matched to the calibrated LT midpoint and
   slope, with traced phase-temperature thresholds.
 
+### Changed
+
+- Name bundled lowest-model-level meteorology with six explicit `air_*` keys.
+  Distinguish JCM's `air_pressure_3d` from CAMulator's
+  `model_level_air_pressure`, and name JCM's phase-only `t0` input
+  `near_surface_air_temperature` without asserting a 2 m height.
+- Rename shared recipes by physical contract, the JCM-backed factory/config to
+  `make_jcm_atmosphere` / `JCMAtmosphereConfig`, and Veros surface-forcing modes
+  to `bulk_meteorology` / `surface_fluxes`. Spell out public mask helpers and
+  identify CAMulator's combined surface-temperature packer. Former names have
+  no compatibility aliases; units, signs, staggering and coverage are retained.
+- Derive gallery routes, execution order and topology roles from component
+  names. Document the migration and physical contracts in
+  `docs/coupling-fields.rst`.
+
 ### Fixed
 
 - Distinguish JCM bottom-level air variables from near-surface temperature and

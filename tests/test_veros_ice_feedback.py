@@ -28,8 +28,14 @@ def host_backend() -> None:
 
 def test_coupled_mode_is_explicit_and_preserves_legacy_positionals() -> None:
     config = VerosConfig("SEA", "global_4deg", "host", None, True, False)
-    assert config.restore_to_climatology_temp and config.surface_forcing == "atmosphere"
-    assert VerosConfig(surface_forcing="coupled").surface_forcing == "coupled"
+    assert (
+        config.restore_to_climatology_temp
+        and config.surface_forcing == "bulk_meteorology"
+    )
+    assert (
+        VerosConfig(surface_forcing="surface_fluxes").surface_forcing
+        == "surface_fluxes"
+    )
 
 
 @pytest.mark.parametrize(
@@ -49,8 +55,8 @@ def test_invalid_surface_forcing_mode_is_rejected(
 def test_coupled_mode_rejects_incompatible_native_execution(
     kwargs: dict[str, Any],
 ) -> None:
-    with pytest.raises(ValueError, match="coupled|streamfunction"):
-        VerosConfig(surface_forcing="coupled", **kwargs)
+    with pytest.raises(ValueError, match="surface_fluxes|streamfunction"):
+        VerosConfig(surface_forcing="surface_fluxes", **kwargs)
 
 
 @pytest.mark.parametrize("enable_x64", [False, True])
@@ -216,7 +222,10 @@ def test_public_coupled_runtime_uses_only_total_fluxes(
     from tests._veros_surface_support import surface_setup_class
     from vercor import Coupler, Clock, Exchange, RuntimeOptions
     from vercor.components import DataComponent
-    from vercor.recipes import VERIS_TO_OCEAN_FLUX_FIELDS, OCEAN_TO_VERIS_FORCING_FIELDS
+    from vercor.recipes import (
+        SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS,
+        OCEAN_TO_SEAICE_FORCING_FIELDS,
+    )
     from vercor.fields import _flatten_field_items
     from vercor.setups import make_veros_gcm
     from vercor.setups._external import veros_gcm_state, veros_fluxes
@@ -230,12 +239,12 @@ def test_public_coupled_runtime_uses_only_total_fluxes(
         raise AssertionError("atmospheric bulk must not run in total-feedback mode")
 
     monkeypatch.setattr(veros_fluxes, "compute_fluxes", forbidden_bulk)
-    ocean = make_veros_gcm(config=VerosConfig(surface_forcing="coupled"))
+    ocean = make_veros_gcm(config=VerosConfig(surface_forcing="surface_fluxes"))
     assert tuple(ocean.spec.inputs) == tuple(
-        _flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS)
+        _flatten_field_items(SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS)
     )
     assert tuple(ocean.spec.outputs) == tuple(
-        _flatten_field_items(OCEAN_TO_VERIS_FORCING_FIELDS)
+        _flatten_field_items(OCEAN_TO_SEAICE_FORCING_FIELDS)
     )
     source = DataComponent("CICE", ocean.grid, feedback_fields())
     coupler = Coupler(
@@ -245,7 +254,7 @@ def test_public_coupled_runtime_uses_only_total_fluxes(
             Exchange(
                 "CICE",
                 "OCN",
-                VERIS_TO_OCEAN_FLUX_FIELDS,
+                SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS,
                 quantity="source_flux",
                 source_coverage="binary",
             ),

@@ -62,10 +62,10 @@ def cold_fields() -> dict[str, jax.Array]:
     """Return smooth freezing conditions with separate prescribed water phases."""
     result = surface_fields()
     for name, value in {
-        "temperature": 260.0,
-        "potential_temperature": 260.0,
-        "specific_humidity": 0.001,
-        "density": 1.3,
+        "air_temperature": 260.0,
+        "air_potential_temperature": 260.0,
+        "air_specific_humidity": 0.001,
+        "air_density": 1.3,
         "sea_surface_temperature": 271.15,
         "ocean_u_velocity": 0.0,
         "net_shortwave_radiation_flux": 20.0,
@@ -84,8 +84,8 @@ def small_coupler(
     """Assemble real Veris with a prescribed callable-runtime forcing source."""
     from vercor.setups import VerisConfig, make_veris
     from vercor.recipes import (
-        ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-        OCEAN_TO_VERIS_FORCING_FIELDS,
+        OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+        OCEAN_TO_SEAICE_FORCING_FIELDS,
     )
 
     grid, geometry = small_ocean()
@@ -103,7 +103,10 @@ def small_coupler(
     route = Exchange(
         "FORCING",
         config.name,
-        (*ATMOSPHERE_TO_VERIS_FORCING_FIELDS, *OCEAN_TO_VERIS_FORCING_FIELDS),
+        (
+            *OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+            *OCEAN_TO_SEAICE_FORCING_FIELDS,
+        ),
         quantity="intensive",
         regridder_factory=bilinear,
     )

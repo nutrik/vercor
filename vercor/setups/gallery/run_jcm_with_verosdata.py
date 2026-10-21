@@ -10,10 +10,10 @@ from vercor.dtypes import DTypePolicy
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.setups import make_erainterim_ocean
 from vercor.recipes import (
-    JCM_LAND_TO_ATMOSPHERE_FIELDS,
+    LAND_TO_ATMOSPHERE_STATE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
-from vercor.setups import JAXGCMConfig, JCMLandAtmosphereConfig, Spinup
+from vercor.setups import JCMAtmosphereConfig, JCMLandAtmosphereConfig, Spinup
 from vercor.setups import make_jcm_land_atmosphere
 from vercor.regridding import bilinear
 from vercor.topology import SurfaceMaskPolicy
@@ -30,7 +30,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     jcm_setup = make_jcm_land_atmosphere(
         ocn.grid,
         config=JCMLandAtmosphereConfig(
-            atmosphere=JAXGCMConfig(
+            atmosphere=JCMAtmosphereConfig(
                 spinup=Spinup(enabled=True),
                 output=OutputSpec(period=PeriodOutput(frequency="month")),
                 jitted=True,
@@ -48,22 +48,22 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         steps=(datetime(2100, 1, 1) - datetime(2000, 1, 3)).days,
         calendar="gregorian",
     )
-    run_order = ["OCN", "LND", "ATM"]
+    run_order = [ocn.name, lnd.name, atm.name]
 
     # Exchanges
     exchanges = (
         Exchange(
             quantity="intensive",
-            source="OCN",
-            target="ATM",
+            source=ocn.name,
+            target=atm.name,
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="LND",
-            target="ATM",
-            fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
+            source=lnd.name,
+            target=atm.name,
+            fields=LAND_TO_ATMOSPHERE_STATE_FIELDS,
             regridder_factory=bilinear,
         ),
     )
@@ -73,7 +73,12 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         components=components,
         exchanges=exchanges,
         run_order=run_order,
-        runtime=RuntimeOptions(dtype=dtype, topology=SurfaceMaskPolicy()),
+        runtime=RuntimeOptions(
+            dtype=dtype,
+            topology=SurfaceMaskPolicy(
+                atmosphere=atm.name, ocean=ocn.name, land=lnd.name
+            ),
+        ),
         log_level=loglevel,
     )
 

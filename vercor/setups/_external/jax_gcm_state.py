@@ -81,7 +81,7 @@ def jax_gcm_epoch(start: datetime | ModelDateTime, effective_spinup: timedelta) 
         return to_datetime(start - effective_spinup, name="JCM epoch")
 
 
-class JAXGCMSetupState:
+class JCMAtmosphereSetupState:
     """Mutable setup-time owner for a JAXGCM/JCM atmosphere adapter."""
 
     _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, ModelPredictions]]
@@ -272,6 +272,6 @@ class JAXGCMSetupState:
 
 
 __all__ = [
-    "JAXGCMSetupState",
+    "JCMAtmosphereSetupState",
     "JCMState",
 ]

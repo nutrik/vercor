@@ -24,7 +24,7 @@ from vercor.setups._external.camulator_forcing import (
 )
 from tests._coverage_support import make_test_grid
 from vercor.output import OutputSpec, PeriodOutput
-from vercor.setups import JAXGCMConfig, JCMLandAtmosphereConfig, Spinup
+from vercor.setups import JCMAtmosphereConfig, JCMLandAtmosphereConfig, Spinup
 
 
 class _RecordingLogger:
@@ -131,11 +131,11 @@ def test_run_logged_spinup_logs_each_step_and_returns_callback_result() -> None:
 
 def test_grid_field_defaults_returns_defaults_with_overrides() -> None:
     fields = grid_field_defaults(
-        ("temperature", "humidity"),
-        overrides={"temperature": 280.0},
+        ("air_temperature", "humidity"),
+        overrides={"air_temperature": 280.0},
     )
 
-    assert fields == {"temperature": 280.0, "humidity": 0.0}
+    assert fields == {"air_temperature": 280.0, "humidity": 0.0}
 
 
 def test_load_jcm_inputs_facade_returns_named_payload(
@@ -245,7 +245,7 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
         ocean_grid,
         inputs=inputs,
         config=JCMLandAtmosphereConfig(
-            atmosphere=JAXGCMConfig(spinup=Spinup(enabled=False)),
+            atmosphere=JCMAtmosphereConfig(spinup=Spinup(enabled=False)),
         ),
     )
 
@@ -268,7 +268,7 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
         coords,
         result.terrain,
         {
-            "config": JAXGCMConfig(
+            "config": JCMAtmosphereConfig(
                 forcing_data=forcing,
                 spinup=Spinup(enabled=False),
                 jitted=True,
@@ -286,7 +286,7 @@ def test_make_jcm_land_atmosphere_replaces_only_missing_forcing(
     caller_forcing = object()
 
     @dataclass(frozen=True)
-    class ExtendedJAXGCMConfig(JAXGCMConfig):
+    class ExtendedJAXGCMConfig(JCMAtmosphereConfig):
         extension: object = extension_token
 
     atmosphere_config = ExtendedJAXGCMConfig(
@@ -308,7 +308,7 @@ def test_make_jcm_land_atmosphere_replaces_only_missing_forcing(
             outputs=("land_fraction",),
         ),
     )
-    captured: dict[str, JAXGCMConfig] = {}
+    captured: dict[str, JCMAtmosphereConfig] = {}
 
     def fake_make_jcm_land(*args: object, **kwargs: object) -> object:
         _ = args, kwargs
@@ -318,7 +318,7 @@ def test_make_jcm_land_atmosphere_replaces_only_missing_forcing(
         coords: object,
         terrain: object,
         *,
-        config: JAXGCMConfig,
+        config: JCMAtmosphereConfig,
     ) -> object:
         _ = coords, terrain
         captured["config"] = config
@@ -509,7 +509,7 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
     result = helper.make_jcm_land_atmosphere(
         ocean_grid,
         config=JCMLandAtmosphereConfig(
-            atmosphere=JAXGCMConfig(
+            atmosphere=JCMAtmosphereConfig(
                 custom_parameters={"surface_flux.vgust": 5.01},
                 spinup=Spinup(enabled=False),
                 output=OutputSpec(period=PeriodOutput(frequency="year")),
@@ -539,7 +539,7 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
         coords,
         result.terrain,
         {
-            "config": JAXGCMConfig(
+            "config": JCMAtmosphereConfig(
                 custom_parameters={"surface_flux.vgust": 5.01},
                 forcing_data=forcing,
                 spinup=Spinup(enabled=False),

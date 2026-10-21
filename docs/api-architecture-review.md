@@ -121,15 +121,15 @@ signatures from installed artifacts.
   "vercor.forcing_data": ["read_forcing"],
   "vercor.forcing_index": ["daily_forcing_day_of_year", "daily_forcing_index", "day_of_year_360_to_gregorian", "gregorian_month_lengths", "noleap_day_of_year"],
   "vercor.grid_geometry": ["centers_to_edges", "grids_identical"],
-  "vercor.grid_masks": ["check_remap_conservation", "check_total_lnd_ocn_mask_sum", "compute_land_mask", "compute_ocn_lnd_masks_on_atm_grid", "create_lnd_mask_from_ocn"],
+  "vercor.grid_masks": ["check_remap_conservation", "check_land_ocean_fraction_sum", "compute_land_mask", "compute_ocean_land_masks_on_atmosphere_grid", "create_land_mask_from_ocean"],
   "vercor.grids": ["RectilinearGrid"],
   "vercor.jax_logging": ["CANONICAL_LOG_DATE_FORMAT", "CANONICAL_LOG_FORMAT", "DEFAULT_LOGGER_NAME", "JaxCallbackLogger", "LoggerLike", "configure_python_logger", "effective_log_level", "emit_host_log", "get_default_logger", "logger_enabled_for", "normalize_log_level", "setup_logger"],
   "vercor.output": ["OutputContext", "OutputFrame", "OutputProvider", "OutputSpec", "OutputTarget", "OutputVariable", "PeriodOutput", "SnapshotContext", "SnapshotWriter"],
   "vercor.physics": ["PhysicalConstants"],
-  "vercor.recipes": ["ATMOSPHERE_TO_LAND_RADIATION_FIELDS", "ATMOSPHERE_TO_LAND_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS", "ATMOSPHERE_TO_OCEAN_STATE_FIELDS", "ATMOSPHERE_TO_VEROS_FORCING_FIELDS", "ATMOSPHERE_TO_VERIS_FORCING_FIELDS", "JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS", "JCM_LAND_TO_ATMOSPHERE_FIELDS", "LAND_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_JCM_OPEN_WATER_FIELDS", "OCEAN_TO_SEAICE_SURFACE_FIELDS", "OCEAN_TO_VERIS_FORCING_FIELDS", "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS", "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS", "VERIS_TO_OCEAN_FLUX_FIELDS", "VERIS_TO_JCM_SURFACE_FIELDS", "VERIS_TO_JCM_COVERAGE_FIELDS"],
+  "vercor.recipes": ["ATMOSPHERE_TO_LAND_RADIATION_FIELDS", "ATMOSPHERE_TO_LAND_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS", "ATMOSPHERE_TO_OCEAN_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS", "OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS", "MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS", "LAND_TO_ATMOSPHERE_STATE_FIELDS", "LAND_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS", "OCEAN_TO_SEAICE_SURFACE_FIELDS", "OCEAN_TO_SEAICE_FORCING_FIELDS", "ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS", "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS", "SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS", "SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS", "SEAICE_COVERAGE_FIELDS"],
   "vercor.regridding": ["Regridder", "RegridderFactory", "VectorRegridder", "bilinear", "conservative"],
   "vercor.runtime": ["ExecutionBackend", "ExecutionChunk", "ExecutionContext", "ExecutionPlan", "RuntimeDriver", "RuntimeOptions", "SequentialWorkflow", "StepPlan", "Workflow", "WorkflowContext"],
-  "vercor.setups": ["CAMulatorConfig", "JAXGCMConfig", "JCMLandAtmosphereConfig", "JCMLandAtmosphereSetup", "JCMInputs", "Spinup", "VerosConfig", "VerisConfig", "load_jcm_inputs", "make_slab_atmosphere", "make_slab_land", "make_slab_ocean", "make_slab_seaice", "make_jcm_land_atmosphere", "VerisVerosDataSetup", "VerisVerosSetup", "make_camulator_gcm", "make_camulator_land", "make_era5_atmosphere", "make_era5_land", "make_era5_ocean", "make_erainterim_ocean", "make_jax_gcm", "make_jcm_land", "make_veris", "make_veris_veros", "make_veris_verosdata", "make_veros_gcm", "replace_veris_parameters"],
+  "vercor.setups": ["CAMulatorConfig", "JCMAtmosphereConfig", "JCMLandAtmosphereConfig", "JCMLandAtmosphereSetup", "JCMInputs", "Spinup", "VerosConfig", "VerisConfig", "load_jcm_inputs", "make_slab_atmosphere", "make_slab_land", "make_slab_ocean", "make_slab_seaice", "make_jcm_land_atmosphere", "VerisVerosDataSetup", "VerisVerosSetup", "make_camulator_gcm", "make_camulator_land", "make_era5_atmosphere", "make_era5_land", "make_era5_ocean", "make_erainterim_ocean", "make_jcm_atmosphere", "make_jcm_land", "make_veris", "make_veris_veros", "make_veris_verosdata", "make_veros_gcm", "replace_veris_parameters"],
   "vercor.state": ["ComponentState", "FieldLookupScope", "FieldScope", "RunState"],
   "vercor.time_selection": ["datetime_to_seconds_in_year", "get_periodic_interval"],
   "vercor.topology": ["ExchangeTopologyPatch", "SurfaceMaskPolicy", "TopologyContext", "TopologyPolicy"],
@@ -415,7 +415,7 @@ second component adapter, duplicate accumulator, or native period-file path.
 
 Public setup access is always through `vercor.setups`. Private factories defer
 JCM/Dinosaur, Veros, CREDIT, Torch, and TensorFlow imports until invocation.
-JAXGCM, Veros, and CAMulator expose ordinary output providers and snapshot
+JCM, Veros, and CAMulator expose ordinary output providers and snapshot
 writers; they do not own cadence, paths, period accumulation, or writes.
 
 ## 6. Setup-agnostic plugin architecture

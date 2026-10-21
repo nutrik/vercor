@@ -46,6 +46,11 @@ field. Combine values in an explicit component step instead.
 It is not a general policy for ordinary setup-agnostic component graphs; use
 plain exchanges for those graphs.
 
+Use :doc:`../coupling-fields` when connecting bundled atmosphere, ocean and
+sea-ice components. Its field and recipe names preserve explicit units,
+vertical levels and native staggering. :doc:`../exchange-coverage` explains
+the required quantity and source-coverage declarations.
+
 Next steps
 ----------
 

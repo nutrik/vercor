@@ -58,13 +58,13 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         spec=replace(
             ocn.spec,
             inputs=(
-                "u_velocity",
-                "v_velocity",
-                "specific_humidity",
+                "air_u_velocity",
+                "air_v_velocity",
+                "air_specific_humidity",
                 "model_level_height",
-                "density",
-                "potential_temperature",
-                "temperature",
+                "air_density",
+                "air_potential_temperature",
+                "air_temperature",
                 "net_shortwave_radiation_flux",
                 "downward_longwave_radiation_flux",
             ),
@@ -76,9 +76,9 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         spec=replace(
             lnd.spec,
             inputs=(
-                "specific_humidity",
+                "air_specific_humidity",
                 "model_level_height",
-                "potential_temperature",
+                "air_potential_temperature",
                 "net_shortwave_radiation_flux",
                 "downward_longwave_radiation_flux",
             ),
@@ -87,7 +87,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
 
     # Clock and sequence
     clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=3600, steps=10)
-    run_order = ["OCN", "ATM", "LND"]
+    run_order = [ocn.name, atm.name, lnd.name]
 
     # Exchanges
     # scalar fields (vector field))
@@ -95,47 +95,47 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     exchanges = (
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="OCN",
+            source=atm.name,
+            target=ocn.name,
             fields=ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
             route_id="atmosphere-ocean-state",
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="OCN",
+            source=atm.name,
+            target=ocn.name,
             fields=ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
             route_id="atmosphere-ocean-radiation",
             regridder_factory=conservative,
         ),
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="LND",
+            source=atm.name,
+            target=lnd.name,
             fields=ATMOSPHERE_TO_LAND_STATE_FIELDS,
             route_id="atmosphere-land-state",
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="LND",
+            source=atm.name,
+            target=lnd.name,
             fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
             route_id="atmosphere-land-radiation",
             regridder_factory=conservative,
         ),
         Exchange(
             quantity="intensive",
-            source="OCN",
-            target="ATM",
+            source=ocn.name,
+            target=atm.name,
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="LND",
-            target="ATM",
+            source=lnd.name,
+            target=atm.name,
             fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
@@ -146,20 +146,25 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         components=components,
         exchanges=exchanges,
         run_order=run_order,
-        runtime=RuntimeOptions(dtype=dtype, topology=SurfaceMaskPolicy()),
+        runtime=RuntimeOptions(
+            dtype=dtype,
+            topology=SurfaceMaskPolicy(
+                atmosphere=atm.name, ocean=ocn.name, land=lnd.name
+            ),
+        ),
         log_level=loglevel,
     )
 
     final_state = cpl.run(output=OutputTarget("."))
-    views = final_state.components(("ATM", "OCN", "LND"))
+    views = final_state.components((atm.name, ocn.name, lnd.name))
 
     variables: list[tuple[ComponentMetric, str]] = [
         ("sea_surface_temperature", "sst"),
-        ("specific_humidity", "qbot"),
-        ("potential_temperature", "tbot"),
+        ("air_specific_humidity", "qbot"),
+        ("air_potential_temperature", "tbot"),
         ("model_level_height", "zbot"),
-        ("temperature", "air_temperature"),
-        ("density", "air_density"),
+        ("air_temperature", "air_temperature"),
+        ("air_density", "air_density"),
         ("net_shortwave_radiation_flux", "net_shortwave"),
         ("downward_longwave_radiation_flux", "downward_longwave"),
         (component_vector_speed, "speed"),
@@ -168,24 +173,24 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     print_component_field_means_table(
         components=views,
         fields=variables,
-        component_order=["ATM", "OCN", "LND"],
+        component_order=[atm.name, ocn.name, lnd.name],
     )
 
     fig, axs, scalar_mappable = plot_component_scalar_vector_comparison(
         rows=[
             (
-                "ATM",
-                views["ATM"],
+                atm.name,
+                views[atm.name],
                 total_surface_temperature,
-                "u_velocity",
-                "v_velocity",
+                "air_u_velocity",
+                "air_v_velocity",
             ),
             (
-                "OCN",
-                views["OCN"],
+                ocn.name,
+                views[ocn.name],
                 "sea_surface_temperature",
-                "u_velocity",
-                "v_velocity",
+                "air_u_velocity",
+                "air_v_velocity",
             ),
         ],
         figsize=(15, 10),

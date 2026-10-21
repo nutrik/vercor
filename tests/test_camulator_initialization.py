@@ -157,23 +157,23 @@ def test_native_bootstrap_maps_latest_input_without_advancing(native_case: Any) 
     mapped = result.fields
     assert all(isinstance(value, jax.Array) for value in mapped.values())
     for key, expected in {
-        "temperature": 280.0,
-        "specific_humidity": 0.004,
-        "u_velocity": 4.0,
-        "v_velocity": 2.0,
+        "air_temperature": 280.0,
+        "air_specific_humidity": 0.004,
+        "air_u_velocity": 4.0,
+        "air_v_velocity": 2.0,
         "surface_pressure": 100000.0,
-        "pressure": 90000.0,
+        "model_level_air_pressure": 90000.0,
         "net_shortwave_radiation_flux": 200.0,
         "total_surface_temperature": 290.0,
     }.items():
         assert_allclose_compact(mapped[key], np.full((2, 3), expected))
     constants = context.constants
     assert_allclose_compact(
-        mapped["potential_temperature"],
+        mapped["air_potential_temperature"],
         280 * (100000 / 90000) ** constants.dry_air_kappa,
     )
     assert_allclose_compact(
-        mapped["density"],
+        mapped["air_density"],
         constants.dry_air_molecular_weight
         / constants.universal_gas_constant
         * 90000
@@ -239,10 +239,10 @@ def test_bootstrap_uses_native_diagnostics_and_only_missing_supplements(
     assert result.payload.cursor.timestep_counter == 0
     assert result.payload.output_prediction is None
     for name, expected in {
-        "temperature": 280.0,
-        "specific_humidity": 0.004,
-        "u_velocity": 4.0,
-        "v_velocity": 2.0,
+        "air_temperature": 280.0,
+        "air_specific_humidity": 0.004,
+        "air_u_velocity": 4.0,
+        "air_v_velocity": 2.0,
         "surface_pressure": 100000.0,
         "total_surface_temperature": 290.0,
         "net_shortwave_radiation_flux": 200.0,
@@ -324,7 +324,7 @@ def test_forcing_start_diagnostics_use_effective_cursor_time(native_case: Any) -
     )
     result = resources.setup(cast(Any, None), context)
     assert result.payload.cursor.init_datetime == resources.initial_diagnostics["time"]
-    assert_allclose_compact(result.fields["temperature"], 280.0)
+    assert_allclose_compact(result.fields["air_temperature"], 280.0)
 
 
 def test_bootstrap_exports_drive_physical_bulk_forcing(native_case: Any) -> None:
@@ -336,12 +336,12 @@ def test_bootstrap_exports_drive_physical_bulk_forcing(native_case: Any) -> None
         context.constants,
         jnp.ones((2, 3)),
         mapped["model_level_height"],
-        mapped["u_velocity"],
-        mapped["v_velocity"],
-        mapped["potential_temperature"],
-        mapped["specific_humidity"],
-        mapped["density"],
-        mapped["temperature"],
+        mapped["air_u_velocity"],
+        mapped["air_v_velocity"],
+        mapped["air_potential_temperature"],
+        mapped["air_specific_humidity"],
+        mapped["air_density"],
+        mapped["air_temperature"],
         jnp.zeros((2, 3)),
         jnp.zeros((2, 3)),
         jnp.full((2, 3), 290.0),
@@ -490,7 +490,7 @@ def test_initial_noise_is_sampled_once_and_payload_owns_same_sample(
     assert len(samples) == 1
     assert result.payload.model_state is samples[0]
     assert result.payload.model_state is not resources.initial_model_state
-    assert_allclose_compact(result.fields["temperature"], 280.02)
+    assert_allclose_compact(result.fields["air_temperature"], 280.02)
     assert result.payload.cursor.timestep_counter == 0
 
 
@@ -504,7 +504,7 @@ def test_initial_mapper_does_not_call_stepper_or_modify_cursor(
     mapped = fields_module.map_camulator_initial_runtime_fields(
         resources, resources.initial_model_state, cursor, context.constants
     )
-    assert_allclose_compact(mapped["temperature"], result.fields["temperature"])
+    assert_allclose_compact(mapped["air_temperature"], result.fields["air_temperature"])
     assert result.payload.cursor is cursor
     assert cursor.timestep_counter == 0
     assert calls["model"] == 0
@@ -653,4 +653,4 @@ def test_bootstrap_matches_native_numpy_timestamp_exactly(
     resources, context, _ = native_case
     resources.initial_diagnostics["time"] = timestamp
     result = resources.setup(cast(Any, None), context)
-    assert_allclose_compact(result.fields["temperature"], 280.0)
+    assert_allclose_compact(result.fields["air_temperature"], 280.0)

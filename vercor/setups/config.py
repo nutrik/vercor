@@ -20,7 +20,7 @@ class Spinup:
 
 
 @dataclass(frozen=True)
-class JAXGCMConfig:
+class JCMAtmosphereConfig:
     """Configuration for the bundled JAXGCM/JCM atmosphere setup factory."""
 
     name: str = "ATM"
@@ -54,7 +54,7 @@ class VerosConfig:
     correction and ``restore_to_climatology_salt`` independently adds 30-day
     SSS restoring to the coupled virtual salt flux. Both default to False
     and apply during spinup and coupled stepping in either execution lane.
-    The ACC setup retains its native internal forcing. Explicit ``surface_forcing="coupled"``
+    The ACC setup retains its native internal forcing. Explicit ``surface_forcing="surface_fluxes"``
     accepts only total sea-ice ocean fluxes on the global grid, keeps independent
     restoring, and requires native pressure/free-surface execution for real SSH.
     """
@@ -67,8 +67,8 @@ class VerosConfig:
     restore_to_climatology_salt: bool = False
     spinup: Spinup = field(default_factory=Spinup)
     output: OutputSpec = field(default_factory=OutputSpec)
-    surface_forcing: Literal["atmosphere", "coupled"] = field(
-        default="atmosphere", kw_only=True
+    surface_forcing: Literal["bulk_meteorology", "surface_fluxes"] = field(
+        default="bulk_meteorology", kw_only=True
     )
 
     export_open_water_surface: bool = field(default=False, kw_only=True)
@@ -78,9 +78,9 @@ class VerosConfig:
 
         if not isinstance(self.export_open_water_surface, bool):
             raise TypeError("export_open_water_surface must be bool")
-        if self.export_open_water_surface and self.surface_forcing != "coupled":
+        if self.export_open_water_surface and self.surface_forcing != "surface_fluxes":
             raise ValueError(
-                "export_open_water_surface requires coupled surface_forcing"
+                "export_open_water_surface requires surface_fluxes surface_forcing"
             )
         if self.setup not in ("global_4deg", "acc"):
             raise ValueError("setup must be 'global_4deg' or 'acc'")
@@ -89,14 +89,16 @@ class VerosConfig:
 
         if not isinstance(self.surface_forcing, str):
             raise TypeError("surface_forcing must be a string")
-        if self.surface_forcing not in ("atmosphere", "coupled"):
-            raise ValueError("surface_forcing must be 'atmosphere' or 'coupled'")
-        if self.surface_forcing == "coupled":
+        if self.surface_forcing not in ("bulk_meteorology", "surface_fluxes"):
+            raise ValueError(
+                "surface_forcing must be 'bulk_meteorology' or 'surface_fluxes'"
+            )
+        if self.surface_forcing == "surface_fluxes":
             if self.setup != "global_4deg":
-                raise ValueError("coupled surface_forcing requires global_4deg")
+                raise ValueError("surface_fluxes surface_forcing requires global_4deg")
             if (self.custom_parameters or {}).get("enable_streamfunction", False):
                 raise ValueError(
-                    "coupled surface_forcing requires enable_streamfunction=False for native SSH"
+                    "surface_fluxes surface_forcing requires enable_streamfunction=False for native SSH"
                 )
 
         if self.custom_parameters is not None:
@@ -191,10 +193,10 @@ class CAMulatorConfig:
             raise ValueError("time_alignment must be 'strict' or 'forcing_start'")
 
 
-def _default_jcm_atmosphere_config() -> JAXGCMConfig:
+def _default_jcm_atmosphere_config() -> JCMAtmosphereConfig:
     """Return the historic defaults for the paired JCM setup factory."""
 
-    return JAXGCMConfig(
+    return JCMAtmosphereConfig(
         spinup=Spinup(enabled=True),
         output=OutputSpec(period=PeriodOutput(frequency="month")),
         jitted=True,
@@ -205,7 +207,9 @@ def _default_jcm_atmosphere_config() -> JAXGCMConfig:
 class JCMLandAtmosphereConfig:
     """Configuration for the bundled paired JCM land/atmosphere setup."""
 
-    atmosphere: JAXGCMConfig = field(default_factory=_default_jcm_atmosphere_config)
+    atmosphere: JCMAtmosphereConfig = field(
+        default_factory=_default_jcm_atmosphere_config
+    )
     land_name: str = "LND"
     land_output: OutputSpec = field(default_factory=OutputSpec)
 
@@ -218,7 +222,7 @@ class JCMLandAtmosphereConfig:
 
 __all__ = [
     "CAMulatorConfig",
-    "JAXGCMConfig",
+    "JCMAtmosphereConfig",
     "JCMLandAtmosphereConfig",
     "Spinup",
     "VerosConfig",

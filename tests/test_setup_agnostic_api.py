@@ -34,7 +34,7 @@ from vercor.fields import vector
 from vercor.output import OutputSpec, PeriodOutput
 from vercor.regridding import conservative
 from vercor.runtime import RuntimeOptions
-from vercor.setups import JAXGCMConfig, JCMLandAtmosphereConfig, Spinup
+from vercor.setups import JCMAtmosphereConfig, JCMLandAtmosphereConfig, Spinup
 from vercor.topology import SurfaceMaskPolicy
 
 
@@ -428,7 +428,7 @@ def test_make_jcm_land_atmosphere_accepts_jax_gcm_config(
         fmask=None, copy=lambda **updates: SimpleNamespace(**updates)
     )
     forcing = object()
-    captured_config: dict[str, JAXGCMConfig] = {}
+    captured_config: dict[str, JCMAtmosphereConfig] = {}
     captured_land_output: list[OutputSpec | None] = []
 
     def fake_load_inputs() -> jcm_setup_module.JCMInputs:
@@ -460,7 +460,7 @@ def test_make_jcm_land_atmosphere_accepts_jax_gcm_config(
         loaded_coords: object,
         loaded_terrain: object,
         *,
-        config: JAXGCMConfig | None = None,
+        config: JCMAtmosphereConfig | None = None,
     ) -> Component:
         assert loaded_coords is coords
         assert loaded_terrain is not terrain
@@ -481,7 +481,7 @@ def test_make_jcm_land_atmosphere_accepts_jax_gcm_config(
         lambda: (fake_make_jcm_land, fake_make_jax_gcm),
     )
 
-    config = JAXGCMConfig(
+    config = JCMAtmosphereConfig(
         name="CUSTOM_ATM",
         custom_parameters={"surface_flux.vgust": 5.01},
         spinup=Spinup(enabled=False),

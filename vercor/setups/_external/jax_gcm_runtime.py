@@ -25,21 +25,21 @@ from vercor.setups._external._jax_gcm_pytree import tree_as_runtime_dtype
 import vercor.setups._external.jax_gcm_fields as _jax_gcm_fields
 
 if TYPE_CHECKING:
-    from vercor.setups._external.jax_gcm_state import JAXGCMSetupState
+    from vercor.setups._external.jax_gcm_state import JCMAtmosphereSetupState
 
 JCM_REFERENCE_PRESSURE = 1.0e5
 JAXGCM_PHYSICAL_FIELD_DEFAULTS = {
     "land_surface_temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
-    "temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
-    "potential_temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
-    "density": _jax_gcm_fields.REFERENCE_AIR_DENSITY,
+    "air_temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
+    "air_potential_temperature": _jax_gcm_fields.REFERENCE_SURFACE_TEMPERATURE,
+    "air_density": _jax_gcm_fields.REFERENCE_AIR_DENSITY,
     "model_level_height": _jax_gcm_fields.REFERENCE_MODEL_LEVEL_HEIGHT,
 }
 
 
 @jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class JAXGCMRuntimePayload(PyTreeNodeMixin):
+class JCMAtmosphereRuntimePayload(PyTreeNodeMixin):
     """Immutable JAXGCM model state carried by runtime component state."""
 
     pytree_children = ("jcm_state", "forcing")
@@ -85,7 +85,7 @@ def _require_finite_jax_gcm_state(
 
 
 def _require_finite_jax_gcm_payload(
-    payload: JAXGCMRuntimePayload,
+    payload: JCMAtmosphereRuntimePayload,
     *,
     component_name: str,
     stage: str,
@@ -136,9 +136,9 @@ def jax_gcm_default_fields(
 
 
 def create_jax_gcm_runtime_payload(
-    state: "JAXGCMSetupState",
+    state: "JCMAtmosphereSetupState",
     component: Component | None = None,
-) -> JAXGCMRuntimePayload:
+) -> JCMAtmosphereRuntimePayload:
     """Return immutable JCM state and forcing for runtime execution."""
 
     _ = component
@@ -156,7 +156,7 @@ def create_jax_gcm_runtime_payload(
 
     jcm_state = tree_as_runtime_dtype(state._state, state._dtype_policy)
     forcing = tree_as_runtime_dtype(state.forcing, state._dtype_policy)
-    payload = JAXGCMRuntimePayload(
+    payload = JCMAtmosphereRuntimePayload(
         jcm_state=jcm_state,
         forcing=forcing,
     )
@@ -169,7 +169,7 @@ def create_jax_gcm_runtime_payload(
 
 
 def prefill_jax_gcm_runtime_fields(
-    state: "JAXGCMSetupState",
+    state: "JCMAtmosphereSetupState",
     component: Component,
     context: PrefillContext,
 ) -> PrefillResult:
@@ -188,20 +188,20 @@ def prefill_jax_gcm_runtime_fields(
             data.setdefault(name, jax_zeros(component.grid.shape, state._dtype_policy))
     sigma_levels = jnp.asarray(state.sigma_levels)
     data.setdefault(
-        "pressure",
+        "air_pressure_3d",
         jax_zeros((sigma_levels.shape[0], *component.grid.shape), state._dtype_policy),
     )
     return PrefillResult(fields=data)
 
 
 def validate_jax_gcm_runtime_state(
-    state: "JAXGCMSetupState",
+    state: "JCMAtmosphereSetupState",
     component: Component,
     context: ValidationContext,
 ) -> None:
     """Validate JAXGCM runtime payload and pre-seeded output fields."""
 
-    if not isinstance(context.payload, JAXGCMRuntimePayload):
+    if not isinstance(context.payload, JCMAtmosphereRuntimePayload):
         raise ComponentError(
             "JAXGCM runtime requires an initialized immutable runtime payload "
             f"for component '{component.name}'"
@@ -231,17 +231,19 @@ def validate_jax_gcm_runtime_state(
         except ValueError as exc:
             raise CouplerError(str(exc)) from exc
 
-    if "pressure" not in context.state.fields():
+    if "air_pressure_3d" not in context.state.fields():
         raise CouplerError(
             "Runtime missing required data field "
-            f"'pressure' for component '{component.name}'"
+            f"'air_pressure_3d' for component '{component.name}'"
         )
-    pressure_shape = jnp.asarray(context.state.field("pressure", scope="state")).shape
+    pressure_shape = jnp.asarray(
+        context.state.field("air_pressure_3d", scope="state")
+    ).shape
     sigma_levels = jnp.asarray(state.sigma_levels)
     expected_pressure_shape = (sigma_levels.shape[0], *component.grid.shape)
     if pressure_shape != expected_pressure_shape:
         raise CouplerError(
-            "Runtime required data field 'pressure' "
+            "Runtime required data field 'air_pressure_3d' "
             f"for component '{component.name}' has shape {pressure_shape}, "
             f"expected {expected_pressure_shape}"
         )
@@ -270,7 +272,7 @@ def _required_speedy_diagnostics(
 
 
 def _map_jax_gcm_state_fields(
-    state: "JAXGCMSetupState",
+    state: "JCMAtmosphereSetupState",
     jcm_state: Any,
     constants: PhysicalConstants,
     dtype: DTypePolicy,
@@ -306,7 +308,7 @@ def _map_jax_gcm_state_fields(
             open_water_albedo=state.open_water_albedo,
             large_scale_precipitation=condensation.precls,
             convective_precipitation=convection.precnv,
-            temperature_2m=surface_flux.t0,
+            near_surface_air_temperature=surface_flux.t0,
             snow_temperature=constants.precipitation_snow_temperature,
             rain_temperature=constants.precipitation_rain_temperature,
             dtype=dtype,
@@ -315,11 +317,11 @@ def _map_jax_gcm_state_fields(
 
 
 def diagnose_jax_gcm_initial_fields(
-    state: "JAXGCMSetupState",
-    payload: JAXGCMRuntimePayload,
+    state: "JCMAtmosphereSetupState",
+    payload: JCMAtmosphereRuntimePayload,
     constants: PhysicalConstants,
     dtype: DTypePolicy,
-) -> tuple[dict[str, Any], JAXGCMRuntimePayload]:
+) -> tuple[dict[str, Any], JCMAtmosphereRuntimePayload]:
     """Evaluate current native physics without advancing dycore or cross-step carry.
 
     The diagnostic snapshot uses the original climatological surface until the
@@ -364,11 +366,11 @@ def diagnose_jax_gcm_initial_fields(
             "marine_ice_fraction": as_jax_real_array(selected.sice_am, dtype).T,
         }
     )
-    return fields, JAXGCMRuntimePayload(snapshot, payload.forcing)
+    return fields, JCMAtmosphereRuntimePayload(snapshot, payload.forcing)
 
 
 def step_jax_gcm_runtime(
-    state: "JAXGCMSetupState",
+    state: "JCMAtmosphereSetupState",
     fields: Mapping[str, Any],
     payload: Any | None,
     constants: PhysicalConstants,
@@ -376,7 +378,7 @@ def step_jax_gcm_runtime(
 ) -> tuple[StepResult, Any, Any]:
     """Advance JAXGCM runtime state and return raw prediction details."""
 
-    if not isinstance(payload, JAXGCMRuntimePayload):
+    if not isinstance(payload, JCMAtmosphereRuntimePayload):
         raise ComponentError(
             "JAXGCM runtime requires an initialized immutable runtime payload "
             f"for component '{state.name}'"
@@ -460,7 +462,7 @@ def step_jax_gcm_runtime(
             **surface_fields,
             **mapped_fields,
         },
-        payload=JAXGCMRuntimePayload(
+        payload=JCMAtmosphereRuntimePayload(
             jcm_state=jcm_state,
             forcing=payload.forcing,
         ),
@@ -474,7 +476,7 @@ def step_jax_gcm_runtime(
 
 
 def record_jax_gcm_host_step(
-    state: "JAXGCMSetupState",
+    state: "JCMAtmosphereSetupState",
     *,
     step_result: StepResult,
     prediction: Any,
@@ -483,7 +485,7 @@ def record_jax_gcm_host_step(
 ) -> None:
     """Record host-side JAXGCM mirrors."""
 
-    if isinstance(step_result.payload, JAXGCMRuntimePayload):
+    if isinstance(step_result.payload, JCMAtmosphereRuntimePayload):
         state._state = step_result.payload.jcm_state
         state.forcing = applied_forcing
 
@@ -491,7 +493,7 @@ def record_jax_gcm_host_step(
 
 
 def step_jax_gcm_component(
-    state: "JAXGCMSetupState",
+    state: "JCMAtmosphereSetupState",
     fields: Mapping[str, Any],
     context: StepContext,
     payload: Any | None,
@@ -524,7 +526,7 @@ def step_jax_gcm_component(
 
 
 __all__ = [
-    "JAXGCMRuntimePayload",
+    "JCMAtmosphereRuntimePayload",
     "create_jax_gcm_runtime_payload",
     "jax_gcm_default_field_names",
     "jax_gcm_default_fields",

@@ -55,9 +55,9 @@ def _load_jcm_factories() -> tuple[
     """Return optional JCM setup factories from their owning modules."""
 
     from vercor.setups._data.jcm_land import make_jcm_land
-    from vercor.setups._external.jax_gcm import make_jax_gcm
+    from vercor.setups._external.jax_gcm import make_jcm_atmosphere
 
-    return make_jcm_land, make_jax_gcm
+    return make_jcm_land, make_jcm_atmosphere
 
 
 def make_jcm_land_atmosphere(
@@ -68,7 +68,7 @@ def make_jcm_land_atmosphere(
 ) -> JCMLandAtmosphereSetup:
     """Create paired JCM land and atmosphere setup components for an ocean grid."""
 
-    make_jcm_land, make_jax_gcm = _load_jcm_factories()
+    make_jcm_land, make_jcm_atmosphere = _load_jcm_factories()
     if config is None:
         config = JCMLandAtmosphereConfig()
     atmosphere_config = config.atmosphere
@@ -93,7 +93,7 @@ def make_jcm_land_atmosphere(
         )
     )
 
-    atmosphere = make_jax_gcm(
+    atmosphere = make_jcm_atmosphere(
         coords,
         terrain,
         config=replace(

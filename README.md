@@ -136,6 +136,7 @@ Read the canonical documentation at
 - [Researcher guide](https://vercor.readthedocs.io/en/latest/researchers/)
 - [Developer guide](https://vercor.readthedocs.io/en/latest/developers/)
 - [Python API](https://vercor.readthedocs.io/en/latest/api/)
+- [Coupling fields and naming migration](docs/coupling-fields.rst)
 - [Plugin authoring](https://vercor.readthedocs.io/en/latest/plugin-authoring.html)
 
 Repository resources:

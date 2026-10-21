@@ -28,8 +28,8 @@ from vercor.components import (
 from vercor.fields import _flatten_field_items
 from vercor.output import OutputTarget
 from vercor.recipes import (
-    ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-    OCEAN_TO_VERIS_FORCING_FIELDS,
+    OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+    OCEAN_TO_SEAICE_FORCING_FIELDS,
 )
 
 
@@ -46,7 +46,7 @@ def test_gallery_assembles_exact_sequence_and_prescribed_forcing(
         grid,
         {
             name: all_fields[name]
-            for name in _flatten_field_items(OCEAN_TO_VERIS_FORCING_FIELDS)
+            for name in _flatten_field_items(OCEAN_TO_SEAICE_FORCING_FIELDS)
         },
     )
     atmosphere = DataComponent(
@@ -54,7 +54,9 @@ def test_gallery_assembles_exact_sequence_and_prescribed_forcing(
         grid,
         {
             name: all_fields[name]
-            for name in _flatten_field_items(ATMOSPHERE_TO_VERIS_FORCING_FIELDS)
+            for name in _flatten_field_items(
+                OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
+            )
         },
     )
     land = DataComponent("LND", grid, {"land_surface_temperature": 273.15})
@@ -96,8 +98,10 @@ def test_gallery_assembles_exact_sequence_and_prescribed_forcing(
     assert tuple(
         (route.source, route.target, route.quantity) for route in result.exchanges
     ) == (("ATM", "CICE", "intensive"), ("OCN", "CICE", "intensive"))
-    assert result.exchanges[0].fields == ATMOSPHERE_TO_VERIS_FORCING_FIELDS
-    assert result.exchanges[1].fields == OCEAN_TO_VERIS_FORCING_FIELDS
+    assert (
+        result.exchanges[0].fields == OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
+    )
+    assert result.exchanges[1].fields == OCEAN_TO_SEAICE_FORCING_FIELDS
 
 
 @pytest.mark.fast_always

@@ -63,7 +63,7 @@ def _map_camulator_air_fields(
     ):
         raise ComponentError("CAMulator meteorology shapes do not match.")
     for name, value in (
-        ("temperature", temperature),
+        ("air_temperature", temperature),
         ("water vapor", vapor),
         ("surface pressure", ps),
         ("U", u),
@@ -90,22 +90,22 @@ def _map_camulator_air_fields(
         zvir=constants.water_vapor_mass_ratio_correction,
     )[..., 0].T
     return {
-        "u_velocity": u[-1],
-        "v_velocity": v[-1],
+        "air_u_velocity": u[-1],
+        "air_v_velocity": v[-1],
         "temperature_3d": temperature,
         "specific_humidity_3d": vapor,
-        "temperature": temperature[-1],
-        "specific_humidity": vapor[-1],
+        "air_temperature": temperature[-1],
+        "air_specific_humidity": vapor[-1],
         "surface_pressure": ps,
-        "pressure": mid[-1],
+        "model_level_air_pressure": mid[-1],
         "model_level_height": height,
-        "density": as_jax_real_array(
+        "air_density": as_jax_real_array(
             constants.dry_air_molecular_weight
             / constants.universal_gas_constant
             * mid[-1]
             / temperature[-1]
         ),
-        "potential_temperature": as_jax_real_array(
+        "air_potential_temperature": as_jax_real_array(
             temperature[-1]
             * (constants.reference_pressure / mid[-1]) ** constants.dry_air_kappa
         ),
@@ -175,10 +175,10 @@ def prepare_camulator_dynamic_forcing_chunk(
 
 
 @jax.jit
-def prepare_camulator_sst_input(
+def prepare_camulator_surface_temperature_input(
     rescaled_total_surface_temperature: object,
 ) -> jax.Array:
-    """Expand a rescaled SST field to CAMulator's input tensor layout."""
+    """Expand rescaled combined surface temperature to the native tensor layout."""
 
     return as_jax_real_array(rescaled_total_surface_temperature)[
         jnp.newaxis, jnp.newaxis, jnp.newaxis, ...
@@ -475,6 +475,6 @@ __all__ = [
     "map_camulator_prediction_arrays",
     "map_camulator_prediction_to_runtime_fields",
     "prepare_camulator_dynamic_forcing_chunk",
-    "prepare_camulator_sst_input",
+    "prepare_camulator_surface_temperature_input",
     "prepare_camulator_surface_forcing",
 ]

@@ -6,11 +6,13 @@ from vercor.setups._external import camulator_contracts
 
 
 def test_camulator_runtime_field_names_have_lightweight_contract_owner() -> None:
-    assert "temperature" in camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES
+    assert "air_temperature" in camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES
     assert "total_surface_temperature" in (
         camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES
     )
-    assert camulator_contracts.camulator_runtime_field_defaults()["temperature"] == 0.0
+    assert (
+        camulator_contracts.camulator_runtime_field_defaults()["air_temperature"] == 0.0
+    )
 
 
 def test_camulator_factory_uses_contract_owner_for_runtime_fields() -> None:
