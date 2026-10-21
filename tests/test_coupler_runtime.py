@@ -1935,7 +1935,7 @@ def test_jax_gcm_rejects_nonfinite_output_carry_before_next_substep() -> None:
         ),
     ):
         for _ in range(2):
-            result, _, _ = jax_gcm_runtime_module.step_jax_gcm_runtime(
+            result = jax_gcm_runtime_module.step_jax_gcm_runtime(
                 fixture.state,
                 fixture.state.data,
                 payload,
@@ -1967,7 +1967,7 @@ def test_jax_gcm_reports_compiled_nonfinite_input_carry_path() -> None:
 
     def carry_after_step(marker: jax.Array) -> jax.Array:
         invalid_payload = _jax_gcm_payload_with_carry_marker(payload, marker)
-        result, _, _ = jax_gcm_runtime_module.step_jax_gcm_runtime(
+        result = jax_gcm_runtime_module.step_jax_gcm_runtime(
             fixture.state,
             fixture.state.data,
             invalid_payload,
