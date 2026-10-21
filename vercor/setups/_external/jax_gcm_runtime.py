@@ -375,8 +375,8 @@ def step_jax_gcm_runtime(
     payload: Any | None,
     constants: PhysicalConstants,
     dtype: DTypePolicy,
-) -> tuple[StepResult, Any, Any]:
-    """Advance JAXGCM runtime state and return raw prediction details."""
+) -> StepResult:
+    """Advance JAXGCM runtime state and replace its payload functionally."""
 
     if not isinstance(payload, JCMAtmosphereRuntimePayload):
         raise ComponentError(
@@ -446,7 +446,7 @@ def step_jax_gcm_runtime(
             "sea_surface_temperature": sea_surface_temperature,
             "total_surface_temperature": total_surface_temperature,
         }
-    jcm_state, prediction = state._step_function(
+    jcm_state, _ = state._step_function(
         payload.jcm_state,
         applied_forcing,
     )
@@ -457,7 +457,7 @@ def step_jax_gcm_runtime(
     )
     mapped_fields = _map_jax_gcm_state_fields(state, jcm_state, constants, dtype)
 
-    step_result = StepResult(
+    return StepResult(
         fields={
             **surface_fields,
             **mapped_fields,
@@ -468,29 +468,6 @@ def step_jax_gcm_runtime(
         ),
     )
 
-    return (
-        step_result,
-        prediction,
-        applied_forcing,
-    )
-
-
-def record_jax_gcm_host_step(
-    state: "JCMAtmosphereSetupState",
-    *,
-    step_result: StepResult,
-    prediction: Any,
-    applied_forcing: Any,
-    context: StepContext,
-) -> None:
-    """Record host-side JAXGCM mirrors."""
-
-    if isinstance(step_result.payload, JCMAtmosphereRuntimePayload):
-        state._state = step_result.payload.jcm_state
-        state.forcing = applied_forcing
-
-    _ = prediction, context
-
 
 def step_jax_gcm_component(
     state: "JCMAtmosphereSetupState",
@@ -500,29 +477,13 @@ def step_jax_gcm_component(
 ) -> StepResult:
     """Advance JAXGCM on immutable runtime state."""
 
-    time = context.time
-
-    (
-        step_result,
-        prediction,
-        applied_forcing,
-    ) = step_jax_gcm_runtime(
+    return step_jax_gcm_runtime(
         state,
         fields,
         payload,
         context.constants,
         context.dtype,
     )
-
-    if time is not None:
-        record_jax_gcm_host_step(
-            state,
-            step_result=step_result,
-            prediction=prediction,
-            applied_forcing=applied_forcing,
-            context=context,
-        )
-    return step_result
 
 
 __all__ = [
@@ -531,7 +492,6 @@ __all__ = [
     "jax_gcm_default_field_names",
     "jax_gcm_default_fields",
     "prefill_jax_gcm_runtime_fields",
-    "record_jax_gcm_host_step",
     "step_jax_gcm_component",
     "step_jax_gcm_runtime",
     "validate_jax_gcm_runtime_state",

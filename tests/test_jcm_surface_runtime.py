@@ -122,20 +122,37 @@ def test_native_flux_channels_are_selected_once() -> None:
     np.testing.assert_allclose(mapped["open_water_albedo"], 0.1)
 
 
-def test_coupled_land_moisture_and_fraction_reach_native_forcing() -> None:
+def _capture_native_forcing(monkeypatch: pytest.MonkeyPatch, owner: Any) -> list[Any]:
+    """Observe native inputs while retaining actual JCM state transitions."""
+    received: list[Any] = []
+    native_step = owner._step_function
+
+    def step(state: Any, forcing: Any) -> Any:
+        received.append(forcing)
+        return native_step(state, forcing)
+
+    monkeypatch.setattr(owner, "_step_function", step)
+    return received
+
+
+def test_coupled_land_moisture_and_fraction_reach_native_forcing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from vercor.setups._external.jax_gcm_runtime import step_jax_gcm_runtime
 
     coupler, _, owner = make_native_jcm()
     initial = coupler.initial_state()
     source = initial.component("SURFACE")
     payload = cast(Any, initial._component_state("ATM").payload)
-    result, _, applied = step_jax_gcm_runtime(
+    received = _capture_native_forcing(monkeypatch, owner)
+    result = step_jax_gcm_runtime(
         owner,
         {**source.fields(), **source.fields(scope="received")},
         payload,
         PhysicalConstants(),
         DTypePolicy(enable_x64=True),
     )
+    applied = received[0]
     np.testing.assert_allclose(
         applied.stl_am, np.asarray(source.field("land_surface_temperature")).T
     )
@@ -151,16 +168,20 @@ def test_coupled_land_moisture_and_fraction_reach_native_forcing() -> None:
     assert not hasattr(owner.model, "marine_surface_albedo")
 
 
-def test_ordinary_jcm_receives_independent_surfaces_and_soil() -> None:
+def test_ordinary_jcm_receives_independent_surfaces_and_soil(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from vercor.setups._external.jax_gcm_runtime import step_jax_gcm_runtime
 
     coupler, _, owner = make_native_jcm(seaice_coupling=False)
     initial = coupler.initial_state()
     fields = dict(initial.component("SURFACE").fields())
     payload = cast(Any, initial._component_state("ATM").payload)
-    result, _, applied = step_jax_gcm_runtime(
+    received = _capture_native_forcing(monkeypatch, owner)
+    result = step_jax_gcm_runtime(
         owner, fields, payload, PhysicalConstants(), DTypePolicy(enable_x64=True)
     )
+    applied = received[0]
     np.testing.assert_allclose(
         applied.stl_am, np.asarray(fields["land_surface_temperature"]).T
     )

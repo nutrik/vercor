@@ -1292,7 +1292,13 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         physics=SimpleNamespace(),
     )
     component.open_water_albedo = jnp.asarray(0.07)
-    component.forcing = _FakeForcing()
+
+    class _FunctionalForcing(_FakeForcing):
+        def copy(self, **kwargs: Any) -> _FakeForcing:
+            super().copy(**kwargs)
+            return _FakeForcing()
+
+    component.forcing = _FunctionalForcing()
     cast(Any, component).sigma_levels = np.asarray([0.2, 1.0], dtype=float)
     component._state = jax_gcm_state_module.JCMState(
         time=jdt.to_datetime("2000-01-01"),
@@ -1412,6 +1418,9 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
             precipitation_rain_temperature=280.0,
         ),
     )
+    original_owner_state = component._state
+    original_owner_forcing = component.forcing
+    initial_payload = component_state.payload
     step_result = jax_gcm_runtime_module.step_jax_gcm_component(
         component,
         component_state.fields.to_mapping(),
@@ -1490,7 +1499,19 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     )
     assert float(step_result.payload.jcm_state.dycore_state["marker"]) == 1.0
     assert float(step_result.payload.jcm_state.physics_carry["marker"]) == 12.0
-    assert component._state is step_result.payload.jcm_state
+    repeated = jax_gcm_runtime_module.step_jax_gcm_component(
+        component,
+        runtime_data,
+        step_context,
+        initial_payload,
+    )
+    assert component._state is original_owner_state
+    assert component.forcing is original_owner_forcing
+    assert float(original_owner_state.dycore_state["marker"]) == 0.0
+    assert float(repeated.payload.jcm_state.dycore_state["marker"]) == 1.0
+    assert float(repeated.payload.jcm_state.physics_carry["marker"]) == 12.0
+    for name, value in step_result.fields.items():
+        assert_allclose_compact(repeated.fields[name], value)
     assert step_logger.messages == []
 
 
