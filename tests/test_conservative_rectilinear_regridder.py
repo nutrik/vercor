@@ -2,6 +2,7 @@ import importlib
 from inspect import signature
 from typing import Any
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -339,3 +340,120 @@ def test_conservative_factory_forwards_remapper_options() -> None:
     out = np.asarray(regridder.regrid(np.array([[1.0, 2.0], [3.0, 4.0]])))
     assert np.all(np.isnan(out[0:2, 0:2]))
     assert_allclose_compact(out[0:2, 2:4], 2.0, rtol=0.0, atol=1e-14)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+@pytest.mark.parametrize("axis", ["longitude", "latitude"])
+def test_same_centers_with_different_edges_remap_actual_cell_areas(
+    enable_x64: bool, axis: str
+) -> None:
+    """A point-coordinate identity must not bypass unequal conservative cells."""
+    with jax.enable_x64(enable_x64):
+        longitude = np.array([0.0, 2.0])
+        latitude = np.array([-1.0, 1.0])
+        source = _grid(
+            "source", longitude, latitude, [-1.0, 1.0, 3.0], [-2.0, 0.0, 2.0]
+        )
+        target = _grid(
+            "target",
+            longitude,
+            latitude,
+            [-1.0, 0.5, 3.0] if axis == "longitude" else [-1.0, 1.0, 3.0],
+            [-2.0, -0.5, 2.0] if axis == "latitude" else [-2.0, 0.0, 2.0],
+        )
+        source_field = jnp.asarray([[0.0, 10.0], [0.0, 10.0]])
+        expected = np.array([[0.0, 8.0], [0.0, 8.0]])
+        if axis == "latitude":
+            source_field = source_field.T
+            # The upper target spans [-0.5, 2] degrees and receives nonzero
+            # flux only over [0, 2], whose spherical area scales with sin(lat).
+            upper = (
+                10.0
+                * np.sin(np.deg2rad(2.0))
+                / (np.sin(np.deg2rad(2.0)) + np.sin(np.deg2rad(0.5)))
+            )
+            expected = np.array([[0.0, 0.0], [upper, upper]])
+
+        regridder = conservative(source, target)
+        assert_allclose_compact(
+            regridder.regrid(source_field), expected, rtol=2e-6, atol=1e-7
+        )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+@pytest.mark.parametrize("partial_grid", ["source", "target"])
+@pytest.mark.parametrize("axis", ["longitude", "latitude"])
+def test_single_explicit_edge_axis_is_retained(
+    enable_x64: bool, partial_grid: str, axis: str
+) -> None:
+    """Only infer a missing axis instead of discarding the declared other axis."""
+    with jax.enable_x64(enable_x64):
+        partial = _grid(
+            "partial",
+            [0.0, 2.0],
+            [-1.0, 1.0],
+            [-1.0, 0.5, 3.0] if axis == "longitude" else None,
+            [-2.0, -0.5, 2.0] if axis == "latitude" else None,
+        )
+        complete = _grid(
+            "complete",
+            [-0.25, 1.75] if axis == "longitude" else [0.0, 2.0],
+            [-1.25, 0.75] if axis == "latitude" else [-1.0, 1.0],
+            [-1.0, 0.5, 3.0] if axis == "longitude" else [-1.0, 1.0, 3.0],
+            [-2.0, -0.5, 2.0] if axis == "latitude" else [-2.0, 0.0, 2.0],
+        )
+        source, target = (
+            (partial, complete) if partial_grid == "source" else (complete, partial)
+        )
+        field = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
+        # Both declared geometries have identical effective cell boundaries.
+        assert_allclose_compact(
+            conservative(source, target).regrid(field), field, rtol=2e-6, atol=1e-7
+        )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+@pytest.mark.parametrize("normalize", ["conservation", "fracarea"])
+def test_identical_grid_applies_explicit_source_exclusion_mask(
+    enable_x64: bool, normalize: str
+) -> None:
+    """The conservative identity path must not expose excluded source values."""
+    with jax.enable_x64(enable_x64):
+        grid = _grid("grid", [0.0, 2.0], [-1.0, 1.0])
+        regridder = conservative(
+            grid,
+            grid,
+            source_mask=np.array([[True, False], [False, False]]),
+            normalize=normalize,
+        )
+        excluded = 0.0 if normalize == "conservation" else np.nan
+        assert_allclose_compact(
+            regridder.regrid(jnp.asarray([[1.0, 2.0], [3.0, 4.0]])),
+            np.array([[excluded, 2.0], [3.0, 4.0]]),
+            rtol=2e-6,
+            atol=1e-7,
+        )
+
+
+@pytest.mark.fast_always
+def test_identical_grid_rejects_invalid_conservative_normalization() -> None:
+    grid = _grid("grid", [0.0, 2.0], [-1.0, 1.0])
+    with pytest.raises(ValueError, match="normalize must be"):
+        conservative(grid, grid, normalize="unsupported")
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+def test_equivalent_explicit_and_inferred_edges_preserve_identity(
+    enable_x64: bool,
+) -> None:
+    with jax.enable_x64(enable_x64):
+        source = _grid("source", [0.0, 2.0], [-1.0, 1.0])
+        target = _grid(
+            "target", [0.0, 2.0], [-1.0, 1.0], [-1.0, 1.0, 3.0], [-2.0, 0.0, 2.0]
+        )
+        field = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
+        assert conservative(source, target).regrid(field) is field
