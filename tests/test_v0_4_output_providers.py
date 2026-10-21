@@ -245,6 +245,41 @@ def test_runtime_default_provider_writes_selected_period_variables(
     np.testing.assert_allclose(_read(paths[1], "salinity"), 14.0)
 
 
+@pytest.mark.fast_always
+@pytest.mark.parametrize("axis_values", [[0.0, 1.0], (0.0, 1.0)])
+def test_custom_provider_writes_array_like_and_scalar_coordinates(
+    axis_values: Any, tmp_path: Path
+) -> None:
+    """Accepted public coordinate values normalize at the I/O boundary."""
+
+    class Provider:
+        def sample(self, context: Any) -> Any:
+            _ = context
+            return _api("OutputFrame")(
+                {"temperature": _api("OutputVariable")(("x",), [280.0, 281.0])},
+                coordinates={
+                    "x": _api("OutputVariable")(("x",), axis_values, {"units": "m"}),
+                    "height": _api("OutputVariable")((), 2.0, {"units": "m"}),
+                },
+            )
+
+    component = _component(output=_period_spec(provider=Provider()))
+    _coupler(component, steps=1).run(
+        output=_target(tmp_path, write_final_fields=False, write_snapshots=False)
+    )
+
+    path = next(tmp_path.glob("model.averages.*.nc"))
+    with h5netcdf.File(path, "r") as dataset:
+        np.testing.assert_array_equal(dataset.variables["x"], [0.0, 1.0])
+        assert dataset.variables["x"].attrs["units"] == "m"
+        assert dataset.variables["height"].shape == ()
+        assert float(np.asarray(dataset.variables["height"])) == 2.0
+        assert dataset.variables["height"].attrs["units"] == "m"
+        np.testing.assert_array_equal(
+            dataset.variables["temperature"], [[280.0, 281.0]]
+        )
+
+
 def test_custom_provider_receives_public_context_and_uses_same_filtering(
     tmp_path: Path,
 ) -> None:

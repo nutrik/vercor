@@ -278,7 +278,7 @@ def _coordinate_parts(
 def _coordinate_shapes(values: tuple[Any, ...]) -> tuple[tuple[int, ...], ...]:
     """Return coordinate shapes without moving their values out of PyTree leaves."""
 
-    return tuple(tuple(jnp.shape(value)) for value in values)
+    return tuple(tuple(jnp.asarray(value).shape) for value in values)
 
 
 def _coordinate_dtypes(values: tuple[Any, ...]) -> tuple[str, ...]:
