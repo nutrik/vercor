@@ -216,8 +216,10 @@ class TransferPolicy:
 
     ``current`` sends the stored field directly, ``linear`` interpolates the
     adjacent monthly samples using runtime weights, and ``daily`` selects the
-    active daily sample. The mode is static component policy, not traced
-    physics.
+    active daily sample. Non-current selectable outputs require time-first
+    surface or level arrays with twelve monthly or 365 no-leap daily records;
+    declared grid-shaped mask fields remain current. The mode is static
+    component policy, not traced physics.
     """
 
     time_selection: Literal["current", "linear", "daily"] = "current"

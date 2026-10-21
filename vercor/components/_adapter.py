@@ -15,6 +15,7 @@ import jax.numpy as jnp
 from vercor.components._contracts import (
     normalize_field_values,
     validate_declared_updates,
+    validate_selectable_output_fields,
 )
 from vercor.components.contracts import (
     Component,
@@ -135,6 +136,11 @@ class _ComponentBinding:
             grid=self.grid,
             fields=result.fields,
             policy=self._dtype_policy,
+        )
+        validate_selectable_output_fields(
+            component_name=self.name,
+            spec=self.spec,
+            fields=normalized_fields,
         )
         normalized_received = _normalize_prefill_contract_store(
             component=self,
@@ -298,6 +304,11 @@ def prepare_component(
                 policy=dtype,
             )
         )
+    validate_selectable_output_fields(
+        component_name=declaration.name,
+        spec=declaration.spec,
+        fields=data,
+    )
     payload = None if result is None else _copy_owned_pytree(result.payload)
     return _ComponentBinding(
         _component=declaration.component,

@@ -417,8 +417,9 @@ def test_jcm_land_layout_uses_shared_jax_helpers() -> None:
         monthly_weight_right=jnp.asarray(0.0),
         daily_index=jnp.asarray(1, dtype=jnp.int32),
     )
-    daily_forcing = jnp.stack(
-        (land_surface_temperature, land_surface_temperature + 10.0),
+    daily_forcing = (
+        land_surface_temperature[jnp.newaxis, ...]
+        + 10.0 * jnp.arange(365.0)[:, jnp.newaxis, jnp.newaxis]
     )
     assert_finite_jvp_vjp(
         lambda forcing: jnp.sum(

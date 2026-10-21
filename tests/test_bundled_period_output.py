@@ -22,6 +22,8 @@ from vercor.components import (
     TransferPolicy,
 )
 from vercor.coupler import Coupler
+from vercor.dtypes import DTypePolicy
+from vercor.exchanges import Exchange
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.runtime import RuntimeOptions
 from vercor._runtime.time import build_runtime_step_info
@@ -415,6 +417,48 @@ def test_linear_data_month_output_averages_exact_exported_slices(
     ]
     np.testing.assert_allclose(actual, expected)
     assert not np.isclose(actual[0], actual[1])
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True])
+def test_linear_data_period_output_matches_sent_field_precision(
+    enable_x64: bool, tmp_path: Path
+) -> None:
+    grid = make_test_grid(name="linear-output-precision")
+    forcing = np.arange(12.0)[:, None, None] * np.ones((12, *grid.shape))
+    source = time_interpolated_data_component(
+        name="DATA",
+        grid=grid,
+        fields={"air_temperature": forcing},
+        outputs=("air_temperature",),
+        output=OutputSpec(period=PeriodOutput("step")),
+    )
+    target = CallableComponent(
+        "SINK", grid, lambda fields: {}, spec=ComponentSpec(inputs=("air_temperature",))
+    )
+    coupler = Coupler(
+        Clock(datetime(2001, 2, 1), 86400.0, 1),
+        components=(source, target),
+        exchanges=(
+            Exchange("DATA", "SINK", ("air_temperature",), quantity="intensive"),
+        ),
+        run_order=("DATA", "SINK"),
+        runtime=RuntimeOptions(dtype=DTypePolicy(enable_x64=enable_x64)),
+        log_level="WARNING",
+    )
+
+    result = coupler.run(
+        output=OutputTarget(tmp_path, write_final_fields=False, write_snapshots=False)
+    )
+
+    sent = np.asarray(result.component("DATA").field("air_temperature", scope="sent"))
+    path = next(tmp_path.glob("data.averages.*.nc"))
+    with h5netcdf.File(path, "r") as dataset:
+        output = np.asarray(dataset.variables["air_temperature"])[0]
+    expected_dtype = np.dtype(np.float64 if enable_x64 else np.float32)
+    assert sent.dtype == expected_dtype
+    assert output.dtype == expected_dtype
+    np.testing.assert_array_equal(output, sent)
 
 
 def test_daily_data_month_output_averages_exact_exported_slices(

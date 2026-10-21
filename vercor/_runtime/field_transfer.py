@@ -6,6 +6,7 @@ import jax.numpy as jnp
 
 from vercor._numerical_safety import require_active_finite
 from vercor.dtypes import DTypePolicy
+from vercor.components._contracts import validate_time_selected_field_layout
 from vercor._runtime.contracts import ExchangeContract
 from vercor._runtime.component_masks import field_active_mask, resolve_component_masks
 from vercor._runtime.state import ComponentRuntimeState
@@ -42,6 +43,12 @@ def select_runtime_field(
 ) -> RuntimeArray:
     """Select forcing records while keeping declared grid-shaped masks current."""
 
+    validate_time_selected_field_layout(
+        field,
+        transfer,
+        field_name=field_name,
+        masks=masks,
+    )
     if step_info is None or (
         masks is not None and field_name in (masks.binary_field, masks.fractional_field)
     ):
@@ -52,10 +59,9 @@ def select_runtime_field(
         array = jnp.asarray(field)
         left = jnp.take(array, step_info.monthly_index_left, axis=0)
         right = jnp.take(array, step_info.monthly_index_right, axis=0)
-        return (
-            step_info.monthly_weight_left * left
-            + step_info.monthly_weight_right * right
-        )
+        weight_left = jnp.asarray(step_info.monthly_weight_left, dtype=array.dtype)
+        weight_right = jnp.asarray(step_info.monthly_weight_right, dtype=array.dtype)
+        return weight_left * left + weight_right * right
     if time_selection == "daily":
         return jnp.take(jnp.asarray(field), step_info.daily_index, axis=0)
     return field
