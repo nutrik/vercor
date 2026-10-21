@@ -26,3 +26,4 @@ authoring and released versions.
    :caption: Maintained architecture records
 
    source-coupling-audit
+   interface-wrapper-audit

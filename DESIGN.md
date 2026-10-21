@@ -73,6 +73,11 @@ so a supplied state is coherent before any recipient runs. Record arrays keep
 their prior selected export until the source's next time-selected send;
 received values and their last-dispatch support retain independent ownership.
 
+Non-current transfer policies require time-first selectable outputs with twelve
+monthly records or 365 no-leap daily records. Declared grid-shaped mask fields
+remain current. Setup, prefill, and the shared selector enforce this layout;
+monthly interpolation preserves the runtime field dtype in sends and output.
+
 ## 3. Configuration ownership
 
 Configuration has four non-overlapping owners:
@@ -88,8 +93,10 @@ year types and durations, and runtime time metadata derives the applicable
 duration independently from every timestamp's calendar and year.
 
 `RuntimeOptions.dtype` is the sole precision owner. Preparation normalizes
-VerCOR-owned fields, grids, constants, and numeric payload leaves to that
-policy. Integer/index arrays stay 32-bit. Physics code never branches in Python
+VerCOR-owned fields, grids, and constants to that policy. Native adapters own
+payload precision conversion; the generic binding copies arbitrary payload
+leaves without casting opaque native state or categorical values. VerCOR
+integer/index arrays stay 32-bit. Physics code never branches in Python
 on traced constants.
 
 ## 4. Component authoring
@@ -168,9 +175,12 @@ numerical kernels neutralize inactive operands before nonlinear arithmetic so
 output-free JVP and VJP cannot inherit inactive-branch NaNs.
 State validation completes schema, topology, and central route/component field
 finiteness checks before invoking component-author lifecycle validation.
-Bundled adapters validate owned numeric payload/native leaves immediately
-before reuse and after production while preserving each adapter's established
-JAX-transform or host-only differentiation boundary.
+JCM, Veris, and CAMulator validate their owned numeric payload/native leaves
+at native transition boundaries while preserving each adapter's established
+JAX-transform or host-only differentiation boundary. Veros currently relies on
+central exported-field validation; hidden deep native-state validation needs
+an explicit active-mask policy. The current interface and wrapper audit is
+recorded in `docs/interface-wrapper-audit.md`.
 
 ## 7. Workflow and execution
 

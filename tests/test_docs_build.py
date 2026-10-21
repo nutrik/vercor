@@ -49,6 +49,7 @@ PROJECT_RESOURCE_PAGES = (
     "release-notes-0.4.6",
     "releasing",
     "source-coupling-audit",
+    "interface-wrapper-audit",
 )
 
 
