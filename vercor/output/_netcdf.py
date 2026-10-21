@@ -35,17 +35,18 @@ def write_netcdf_dataset(
                 outfile.attrs[attr_name] = attr_value
 
         for name, variable in coordinate_variables.items():
-            _ensure_dimensions(outfile, variable)
+            values = _netcdf_compatible_values(variable.values)
+            _ensure_dimensions(outfile, variable.dims, values.shape)
             output_variable = outfile.create_variable(
                 name,
                 variable.dims,
-                data=_netcdf_compatible_values(variable.values),
+                data=values,
             )
             _write_attrs(output_variable.attrs, variable.attrs)
 
         for name, variable in data_variables.items():
-            _ensure_dimensions(outfile, variable)
             values = _netcdf_compatible_values(variable.values)
+            _ensure_dimensions(outfile, variable.dims, values.shape)
             create_kwargs: dict[str, Any] = {"data": values}
             if values.shape != ():
                 create_kwargs.update(compression="gzip", compression_opts=5)
@@ -66,8 +67,10 @@ def _netcdf_compatible_values(values: Any) -> Any:
     return host_values
 
 
-def _ensure_dimensions(outfile: h5netcdf.File, variable: OutputVariable) -> None:
-    for dim, size in zip(variable.dims, variable.values.shape):
+def _ensure_dimensions(
+    outfile: h5netcdf.File, dims: tuple[str, ...], shape: tuple[int, ...]
+) -> None:
+    for dim, size in zip(dims, shape, strict=True):
         if dim not in outfile.dimensions:
             outfile.dimensions[dim] = size
             continue
