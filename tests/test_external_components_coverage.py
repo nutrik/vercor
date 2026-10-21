@@ -989,6 +989,32 @@ def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "save_interval",
+    [timedelta(0), timedelta(hours=-1), timedelta(minutes=45), timedelta(hours=3)],
+)
+def test_jax_gcm_rejects_invalid_save_interval_before_native_bootstrap(
+    save_interval: timedelta,
+) -> None:
+    component = jax_gcm_state_module.JCMAtmosphereSetupState.__new__(
+        jax_gcm_state_module.JCMAtmosphereSetupState
+    )
+    component.model_timestep = timedelta(minutes=30)
+    component.save_interval = save_interval
+    component.spinup_time = timedelta(0)
+    component.do_spinup = False
+
+    def unexpected_bootstrap() -> None:
+        raise AssertionError("Native bootstrap must follow interval validation")
+
+    component.model = SimpleNamespace(bootstrap_state=unexpected_bootstrap)
+    with pytest.raises(ValueError, match="save_interval"):
+        component.setup(
+            cast(Any, component),
+            _make_coupler(dt_seconds=7200.0, run_order=["ATM"]),
+        )
+
+
 def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1004,7 +1030,7 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     component.grid = make_test_grid()
     component.data = {}
     component._dtype_policy = DTypePolicy()
-    component.save_interval = timedelta(days=1)
+    component.save_interval = timedelta(hours=1)
     component.forcing_data = "provided-forcing"
     initial_dycore_state = {"marker": jnp.asarray(0.0)}
     initial_physics_carry = {"marker": jnp.asarray(10.0)}
@@ -1078,7 +1104,7 @@ def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
     component.name = "ATM"
     component.grid = make_test_grid()
     component.data = {}
-    component.save_interval = timedelta(days=1)
+    component.save_interval = timedelta(hours=1)
     forcing_values = {
         field_name: jnp.ones((2, 3), dtype=jnp.float32)
         for field_name in (
@@ -1191,7 +1217,7 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
     component.grid = make_test_grid()
     component.data = {}
     component._dtype_policy = DTypePolicy()
-    component.save_interval = timedelta(days=1)
+    component.save_interval = timedelta(hours=1)
     component.forcing_data = None
     initial_dycore_state = {"marker": jnp.asarray(0.0)}
     initial_physics_carry = {"marker": jnp.asarray(10.0)}

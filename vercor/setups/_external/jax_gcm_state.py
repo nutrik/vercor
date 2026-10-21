@@ -211,6 +211,12 @@ class JCMAtmosphereSetupState:
             context.dt_seconds,
             self.model_timestep,
         )
+        if self.save_interval <= timedelta(0):
+            raise ValueError("JCM save_interval must be positive")
+        if self.save_interval % self.model_timestep:
+            raise ValueError("JCM save_interval must be divisible by model_timestep")
+        if self.coupling_timestep % self.save_interval:
+            raise ValueError("JCM save_interval must evenly divide coupling_timestep")
         self.spinup_steps = int(
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
