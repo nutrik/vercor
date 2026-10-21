@@ -41,7 +41,7 @@ def test_current_masks_coexist_with_record_forcing_and_period_output(
     )
     coverage = np.array([[0.25, 0.75], [0.25, 0.75]])
     records = (
-        np.broadcast_to(np.array([2.0, 4.0, 6.0])[:, None, None], (3, 2, 2))
+        np.broadcast_to((2.0 * np.arange(1, 366))[:, None, None], (365, 2, 2))
         if selection == "daily"
         else np.full((12, 2, 2), 7.0)
     )

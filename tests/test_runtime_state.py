@@ -929,7 +929,8 @@ def test_shared_runtime_field_selector_applies_every_transfer_policy() -> None:
         lambda value: value[0],
         RuntimeStepInfo.from_sequences([0], [1], [0.75], [0.25], [2]),
     )
-    forcing = jnp.arange(4 * 2 * 2, dtype=jnp.float64).reshape((4, 2, 2))
+    forcing = jnp.arange(12 * 2 * 2, dtype=jnp.float64).reshape((12, 2, 2))
+    daily_forcing = jnp.arange(365 * 2 * 2, dtype=jnp.float64).reshape((365, 2, 2))
 
     current = field_transfer_module.select_runtime_field(
         forcing,
@@ -942,7 +943,7 @@ def test_shared_runtime_field_selector_applies_every_transfer_policy() -> None:
         step_info,
     )
     daily = field_transfer_module.select_runtime_field(
-        forcing,
+        daily_forcing,
         TransferPolicy("daily"),
         step_info,
     )
@@ -958,7 +959,7 @@ def test_shared_runtime_field_selector_applies_every_transfer_policy() -> None:
         linear,
         0.75 * np.asarray(forcing[0]) + 0.25 * np.asarray(forcing[1]),
     )
-    assert_allclose_compact(daily, np.asarray(forcing[2]))
+    assert_allclose_compact(daily, np.asarray(daily_forcing[2]))
 
 
 def test_runtime_send_applies_monthly_interpolation_under_jit_and_grad() -> None:
@@ -1010,7 +1011,7 @@ def test_runtime_send_applies_daily_time_slice_under_jit_and_grad() -> None:
         lambda value: value[0],
         RuntimeStepInfo.from_sequences([0], [1], [1.0], [0.0], [2]),
     )
-    forcing = jnp.arange(5 * 2 * 2, dtype=jnp.float64).reshape((5, 2, 2))
+    forcing = jnp.arange(365 * 2 * 2, dtype=jnp.float64).reshape((365, 2, 2))
 
     def send_loss(field: jax.Array) -> jax.Array:
         state = ComponentRuntimeState(
@@ -1039,7 +1040,7 @@ def test_runtime_send_applies_daily_time_slice_under_jit_and_grad() -> None:
     assert_allclose_compact(sent_state.sent.get("temperature"), np.asarray(forcing[2]))
     assert_allclose_compact(gradient[2], np.ones((2, 2)))
     assert_allclose_compact(gradient[:2], np.zeros((2, 2, 2)))
-    assert_allclose_compact(gradient[3:], np.zeros((2, 2, 2)))
+    assert_allclose_compact(gradient[3:], np.zeros((362, 2, 2)))
 
 
 def _runtime_send_state(forcing: jax.Array) -> ComponentRuntimeState:
@@ -1078,6 +1079,7 @@ def test_runtime_send_rejects_nonfinite_selected_active_field() -> None:
             [[jnp.nan, jnp.nan], [3.0, jnp.nan]],
         ]
     )
+    forcing = jnp.broadcast_to(forcing[0], (365, 2, 2)).at[1].set(forcing[1])
     state = _runtime_send_state(forcing)
     with pytest.raises(CouplerError, match="sent field 'temperature'.*active domain"):
         send_runtime_fields(

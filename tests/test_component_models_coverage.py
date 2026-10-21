@@ -627,6 +627,7 @@ def test_era5_land_constructor_uses_masked_grid_and_enables_interpolation(
             ]
         ),
     }
+    forcing["skt"] = np.repeat(forcing["skt"], 12, axis=2)
 
     def fake_get_forcing_data(file_type: str) -> Path:
         assert file_type == "era5_land_masked"
@@ -686,6 +687,7 @@ def test_era5_ocean_constructor_applies_land_mask_and_reverses_latitude(
             ]
         ),
     }
+    forcing["sst"] = np.tile(forcing["sst"], (1, 1, 6))
 
     def fake_get_forcing_data(file_type: str) -> Path:
         assert file_type == "era5_surface"
@@ -718,7 +720,7 @@ def test_era5_ocean_constructor_applies_land_mask_and_reverses_latitude(
     binary_mask = component.grid.binary_mask
     assert binary_mask is not None
     assert_allclose_compact(binary_mask, expected_mask)
-    assert component._data["sea_surface_temperature"].shape == (2, 2, 2)
+    assert component._data["sea_surface_temperature"].shape == (12, 2, 2)
     assert np.isnan(component._data["sea_surface_temperature"][0, 0, 0])
     assert np.isclose(component._data["sea_surface_temperature"][0, 0, 1], 284.0)
 
@@ -1171,7 +1173,7 @@ def test_jcm_land_canonicalizes_jcm_2_time_series_values(
             latitudes=np.deg2rad(np.asarray([-45.0, 45.0])),
         )
     )
-    values = np.arange(12.0).reshape(3, 2, 2)
+    values = np.arange(365.0 * 2 * 2).reshape(365, 2, 2)
     forcing = SimpleNamespace(
         stl_am=SimpleNamespace(values=values),
         soilw_am=SimpleNamespace(values=values + 20.0),
