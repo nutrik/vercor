@@ -37,9 +37,15 @@ def _require_finite_torch_tensor(value: Any, *, owner: str) -> None:
 def coerce_camulator_datetime(time_obj: Any) -> datetime:
     """Return a Python datetime from CAMulator/xarray time coordinates."""
 
-    if hasattr(time_obj, "item"):
+    if getattr(getattr(time_obj, "dtype", None), "kind", None) == "M":
+        # Nanosecond datetime scalars return integer epochs from item().
+        # Python datetime instead needs the scalar's microsecond representation.
+        time_obj = time_obj.astype("datetime64[us]").item()
+    elif hasattr(time_obj, "item"):
         time_obj = time_obj.item()
 
+    if time_obj is None:
+        raise ValueError("CAMulator forcing time must be a valid datetime, not NaT.")
     if isinstance(time_obj, datetime):
         return time_obj
 
@@ -67,11 +73,40 @@ def run_camulator_prediction_block(
     prediction = None
     prediction_samples: list[torch.Tensor] = []
     last_total_surface_temperature: RuntimeArray | None = None
+    ds_slice = resources.dynamic_ds.isel(time=slice(block_start, block_end))
+    requested_steps = block_end - block_start
+    if requested_steps <= 0 or ds_slice.sizes["time"] != requested_steps:
+        raise ValueError(
+            "CAMulator forcing block must contain every requested native timestep; "
+            f"requested {requested_steps}, available {ds_slice.sizes['time']}."
+        )
+    ds_slice_times = tuple(
+        coerce_camulator_datetime(value) for value in ds_slice["time"].values
+    )
+    previous_time = None
+    if payload.cursor.init_datetime is not None:
+        previous_time = (
+            payload.cursor.init_datetime
+            + (block_start - payload.cursor.start_ix - 1) * resources.model_timestep
+        )
+    elif block_start > payload.cursor.start_ix:
+        previous_time = coerce_camulator_datetime(
+            resources.dynamic_ds["time"].isel(time=block_start - 1).values
+        )
+    for current_time in ds_slice_times:
+        if (
+            previous_time is not None
+            and current_time - previous_time != resources.model_timestep
+        ):
+            raise ValueError(
+                "CAMulator forcing time spacing must match the native model timestep "
+                f"({resources.model_timestep})."
+            )
+        previous_time = current_time
+
+    ds_slice = ds_slice.load()
     model_state = payload.model_state.clone()
     forecast_hour = payload.forecast_hour
-
-    ds_slice = resources.dynamic_ds.isel(time=slice(block_start, block_end)).load()
-    ds_slice_times = ds_slice["time"].values
 
     dynamic_forcing_chunk = _camulator_fields.prepare_camulator_dynamic_forcing_chunk(
         ds_slice.to_array(dim="dynamic_variable").values
@@ -83,7 +118,7 @@ def run_camulator_prediction_block(
     )
 
     for t in range(gpu_forcing_chunk.shape[0]):
-        utc_datetime = coerce_camulator_datetime(ds_slice_times[t])
+        utc_datetime = ds_slice_times[t]
 
         if logger is not None:
             logger.info(

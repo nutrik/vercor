@@ -112,6 +112,8 @@ class CAMulatorGCMSetupState:
     ) -> SetupResult:
         """Align timestep, initialize runtime forcing, and seed output fields."""
 
+        if context.calendar != "gregorian":
+            raise ValueError("CAMulator requires a Gregorian coupler calendar.")
         logger = context.logger
         self.coupler_start_datetime = context.start
         assign_model_timestep_alignment(

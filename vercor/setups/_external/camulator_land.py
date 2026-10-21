@@ -80,6 +80,8 @@ def make_camulator_land(
         component: Component,
         context: SetupContext,
     ) -> SetupResult:
+        if context.calendar != "gregorian":
+            raise ValueError("CAMulator requires a Gregorian coupler calendar.")
         logger = context.logger
         state.coupler_start_datetime = context.start
         assign_model_timestep_alignment(

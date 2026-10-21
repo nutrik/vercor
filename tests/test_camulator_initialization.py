@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import jax
 import jax.numpy as jnp
@@ -138,6 +139,68 @@ def native_case(
         ),
         calls,
     )
+
+
+@pytest.mark.parametrize("calendar", ["noleap", "360_day"])
+@pytest.mark.parametrize("time_alignment", ["strict", "forcing_start"])
+@pytest.mark.parametrize("kind", ["atmosphere", "land"])
+def test_camulator_setup_rejects_model_calendars_with_datetime_start(
+    native_case: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    calendar: Literal["noleap", "360_day"],
+    time_alignment: Literal["strict", "forcing_start"],
+    kind: str,
+) -> None:
+    from vercor.setups._external import camulator_land
+
+    resources, context, calls = native_case
+    resources.time_alignment = time_alignment
+    original = resources.initial_model_state.clone()
+
+    def unexpected_native_access(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError(
+            "Calendar validation must precede native data/model access"
+        )
+
+    resources.init_noise = 0.1
+    monkeypatch.setattr(state_module.xr, "open_dataset", unexpected_native_access)
+    monkeypatch.setattr(
+        state_module._camulator_init, "add_init_noise", unexpected_native_access
+    )
+    setup = resources.setup
+    component = None
+    if kind == "land":
+        monkeypatch.setattr(
+            camulator_land,
+            "create_land_mask_from_ocean",
+            lambda **kwargs: (jnp.ones((2, 3)), jnp.ones((2, 3))),
+        )
+        monkeypatch.setattr(
+            camulator_land,
+            "load_camulator_forcing_context",
+            lambda **kwargs: {
+                "conf": {
+                    **resources.conf,
+                    "data": {**resources.conf["data"], "lead_time_periods": 6},
+                },
+                "forcing_dataset_raw": xr.Dataset(
+                    {"TS": (("time", "lat", "lon"), np.full((1, 2, 3), 280.0))},
+                    coords={"time": [context.start]},
+                ),
+            },
+        )
+        component = camulator_land.make_camulator_land(
+            "dummy.yaml", resources.grid, resources.grid, time_alignment=time_alignment
+        )
+        setup = component.spec.lifecycle.setup
+        assert setup is not None
+
+    assert isinstance(context.start, datetime)
+    with pytest.raises(ValueError, match="CAMulator.*Gregorian"):
+        setup(component, replace(context, calendar=calendar))
+
+    assert calls == {"input": 0, "output": 0, "model": 0, "trace": 0}
+    assert torch.equal(original, resources.initial_model_state)
 
 
 def test_native_bootstrap_maps_latest_input_without_advancing(native_case: Any) -> None:
