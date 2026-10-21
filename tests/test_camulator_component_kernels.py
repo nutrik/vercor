@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import jax
 import jax.numpy as jnp
@@ -1704,6 +1704,7 @@ def _camulator_boundary_case(
     )
     resources = SimpleNamespace(
         dynamic_ds=dynamic_ds,
+        model_timestep=timedelta(hours=6),
         device="cpu",
         stepper=stepper,
         static_forcing=torch.zeros((1, 1, 1, 2, 2)),
@@ -1719,6 +1720,157 @@ def _camulator_boundary_case(
         cursor=camulator_forcing_module.CamulatorRuntimeCursor(),
     )
     return resources, fields, payload
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (
+            np.datetime64("2001-03-04T05:06:07.123456", "ns"),
+            datetime(2001, 3, 4, 5, 6, 7, 123456),
+        ),
+        (
+            np.datetime64("2001-03-04T05:06:07.123456", "us"),
+            datetime(2001, 3, 4, 5, 6, 7, 123456),
+        ),
+        (np.datetime64("2001-03-04T05:06:07", "s"), datetime(2001, 3, 4, 5, 6, 7)),
+        (datetime(2001, 3, 4, 5, 6, 7), datetime(2001, 3, 4, 5, 6, 7)),
+        (
+            np.asarray(np.datetime64("2001-03-04T05:06:07", "ns")),
+            datetime(2001, 3, 4, 5, 6, 7),
+        ),
+    ],
+)
+def test_camulator_forcing_datetime_preserves_supported_scalar_times(
+    value: Any, expected: datetime
+) -> None:
+    assert camulator_runtime_module.coerce_camulator_datetime(value) == expected
+
+
+@pytest.mark.parametrize("unit", ["ns", "us"])
+def test_camulator_forcing_datetime_rejects_nat(unit: Literal["ns", "us"]) -> None:
+    with pytest.raises(ValueError, match="CAMulator.*time"):
+        camulator_runtime_module.coerce_camulator_datetime(np.datetime64("NaT", unit))
+
+
+@pytest.mark.parametrize("available", [0, 1])
+def test_camulator_rejects_incomplete_forcing_before_native_mutation(
+    available: int,
+) -> None:
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.dynamic_ds = resources.dynamic_ds.isel(time=slice(0, available))
+    original = payload.model_state.clone()
+
+    with pytest.raises(ValueError, match="CAMulator forcing block"):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources, fields, payload, block_start=0, block_end=2, logger=None
+        )
+
+    assert stepper.model_calls == 0
+    assert torch.equal(payload.model_state, original)
+    assert payload.cursor.timestep_counter == 0
+    assert payload.forecast_hour == 1
+
+
+@pytest.mark.parametrize("block_start", [0, 1])
+def test_camulator_rejects_native_forcing_cadence_gaps_before_mutation(
+    block_start: int,
+) -> None:
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.dynamic_ds = resources.dynamic_ds.assign_coords(
+        time=[datetime(2000, 1, 1), datetime(2000, 1, 1, 12)]
+    )
+    original = payload.model_state.clone()
+
+    with pytest.raises(ValueError, match="CAMulator forcing.*timestep"):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=block_start,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 0
+    assert torch.equal(payload.model_state, original)
+    assert payload.cursor.timestep_counter == 0
+
+
+def test_camulator_prediction_block_accepts_nanosecond_forcing_coordinates() -> None:
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.dynamic_ds = resources.dynamic_ds.assign_coords(
+        time=np.asarray(["2000-01-01T00", "2000-01-01T06"], dtype="datetime64[ns]")
+    )
+
+    updated, _ = camulator_runtime_module.run_camulator_prediction_block(
+        resources, fields, payload, block_start=0, block_end=2, logger=None
+    )
+
+    assert stepper.model_calls == 2
+    assert updated.forecast_hour == 3
+    assert payload.forecast_hour == 1
+
+
+@pytest.mark.parametrize("shifted", [False, True])
+def test_camulator_forcing_block_checks_initialized_cursor_time_anchor(
+    shifted: bool,
+) -> None:
+    from dataclasses import replace
+
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.dynamic_ds = xr.concat(
+        [
+            resources.dynamic_ds,
+            resources.dynamic_ds.assign_coords(
+                time=[datetime(2000, 1, 1, 12), datetime(2000, 1, 1, 18)]
+            ),
+        ],
+        dim="time",
+    )
+    if shifted:
+        resources.dynamic_ds = resources.dynamic_ds.assign_coords(
+            time=[datetime(2000, 1, 1, hour) for hour in (0, 6, 18, 23)]
+        )
+    payload = replace(
+        payload,
+        cursor=camulator_forcing_module.CamulatorRuntimeCursor(
+            start_ix=1,
+            init_datetime=datetime(2000, 1, 1, 6),
+            model_substeps=1,
+            timestep_counter=1,
+        ),
+    )
+    original = payload.model_state.clone()
+    block_start = payload.cursor.current_index()
+    if shifted:
+        with pytest.raises(ValueError, match="CAMulator forcing.*timestep"):
+            camulator_runtime_module.run_camulator_prediction_block(
+                resources,
+                fields,
+                payload,
+                block_start=block_start,
+                block_end=block_start + 1,
+                logger=None,
+            )
+        assert stepper.model_calls == 0
+    else:
+        updated, _ = camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=block_start,
+            block_end=block_start + 1,
+            logger=None,
+        )
+        assert stepper.model_calls == 1
+        assert updated.forecast_hour == 2
+    assert torch.equal(payload.model_state, original)
+    assert payload.cursor.timestep_counter == 1
 
 
 def test_camulator_rejects_invalid_model_input_before_second_substep() -> None:
