@@ -26,12 +26,12 @@ from vercor.types import RuntimeArray
 
 VEROS_INPUT_FIELD_NAMES = (
     "model_level_height",
-    "u_velocity",
-    "v_velocity",
-    "potential_temperature",
-    "specific_humidity",
-    "density",
-    "temperature",
+    "air_u_velocity",
+    "air_v_velocity",
+    "air_potential_temperature",
+    "air_specific_humidity",
+    "air_density",
+    "air_temperature",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
     "rain_rate",
@@ -85,7 +85,9 @@ class VerosGCMSetupState:
         restore_to_climatology_temp: bool = False,
         restore_to_climatology_salt: bool = False,
         do_spinup: bool = False,
-        surface_forcing: Literal["atmosphere", "coupled"] = "atmosphere",
+        surface_forcing: Literal[
+            "bulk_meteorology", "surface_fluxes"
+        ] = "bulk_meteorology",
         *,
         export_open_water_surface: bool = False,
     ) -> None:
@@ -95,11 +97,11 @@ class VerosGCMSetupState:
         self.execution = execution
         self.surface_forcing = surface_forcing
         self.export_open_water_surface = export_open_water_surface
-        self.uses_atmosphere_forcing = (
-            setup == "global_4deg" and surface_forcing == "atmosphere"
+        self.uses_bulk_meteorology = (
+            setup == "global_4deg" and surface_forcing == "bulk_meteorology"
         )
         override = dict(custom_parameters or {})
-        if execution == "jax" or surface_forcing == "coupled":
+        if execution == "jax" or surface_forcing == "surface_fluxes":
             override["enable_streamfunction"] = False
 
         setup_class = _select_veros_setup_class(setup, execution)
@@ -184,7 +186,7 @@ class VerosGCMSetupState:
 
         _ = component
         surface_fields = _veros_state.extract_veros_runtime_surface_fields(
-            self._veros_state, coupled=self.surface_forcing == "coupled"
+            self._veros_state, coupled=self.surface_forcing == "surface_fluxes"
         )
         if self.export_open_water_surface:
             from vercor.setups._external.veros_runtime import (
@@ -209,9 +211,9 @@ def veros_default_fields(
     names: tuple[str, ...] = ("sea_surface_temperature",)
     if coupled:
         from vercor.fields import _flatten_field_items
-        from vercor.recipes import OCEAN_TO_VERIS_FORCING_FIELDS
+        from vercor.recipes import OCEAN_TO_SEAICE_FORCING_FIELDS
 
-        names = tuple(_flatten_field_items(OCEAN_TO_VERIS_FORCING_FIELDS))
+        names = tuple(_flatten_field_items(OCEAN_TO_SEAICE_FORCING_FIELDS))
     if export_open_water_surface:
         names += ("ice_fraction", "open_water_temperature_contribution")
     return {

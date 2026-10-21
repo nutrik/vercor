@@ -22,12 +22,12 @@ def surface_fields(shape: tuple[int, int] = (2, 3)) -> dict[str, jax.Array]:
         name: jnp.full(shape, value)
         for name, value in {
             "model_level_height": 10.0,
-            "u_velocity": 8.0,
-            "v_velocity": 2.0,
-            "potential_temperature": 299.0,
-            "specific_humidity": 0.01,
-            "density": 1.2,
-            "temperature": 299.0,
+            "air_u_velocity": 8.0,
+            "air_v_velocity": 2.0,
+            "air_potential_temperature": 299.0,
+            "air_specific_humidity": 0.01,
+            "air_density": 1.2,
+            "air_temperature": 299.0,
             "sea_surface_temperature": 300.0,
             "sea_surface_salinity": 35.0,
             "ocean_u_velocity": 0.5,
@@ -119,12 +119,12 @@ def test_reference_temperature_and_humidity_use_same_model_height(
         PhysicalConstants(),
         mask,
         f["model_level_height"],
-        f["u_velocity"],
-        f["v_velocity"],
-        f["potential_temperature"],
-        f["specific_humidity"],
-        f["density"],
-        f["temperature"],
+        f["air_u_velocity"],
+        f["air_v_velocity"],
+        f["air_potential_temperature"],
+        f["air_specific_humidity"],
+        f["air_density"],
+        f["air_temperature"],
         f["ocean_u_velocity"],
         f["ocean_v_velocity"],
         f["sea_surface_temperature"],
@@ -140,5 +140,5 @@ def test_reference_temperature_and_humidity_use_same_model_height(
     )
     np.testing.assert_allclose(result.tref, direct[6], rtol=1e-12)
     np.testing.assert_allclose(result.qref, direct[7], rtol=1e-12)
-    assert not np.allclose(result.tref, f["temperature"])
-    assert not np.allclose(result.qref, f["specific_humidity"])
+    assert not np.allclose(result.tref, f["air_temperature"])
+    assert not np.allclose(result.qref, f["air_specific_humidity"])

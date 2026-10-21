@@ -144,12 +144,12 @@ def test_native_forcing_rollout_jvp_vjp_and_finite_difference(
     )
     coupler, _, _, _ = small_coupler(dt=300.0, steps=2, config=config)
     initial = coupler.initial_state()
-    reference = initial.component("FORCING").field("temperature")
+    reference = initial.component("FORCING").field("air_temperature")
 
     def objective(delta: jax.Array) -> jax.Array:
         fields = {
-            "temperature": reference + delta,
-            "potential_temperature": reference + delta,
+            "air_temperature": reference + delta,
+            "air_potential_temperature": reference + delta,
         }
         state = initial.replace_fields("FORCING", fields)
         result = native_payload(coupler.run(state)).state
@@ -175,7 +175,7 @@ def test_zero_ice_wet_cells_receive_forcing_and_form_ice() -> None:
     np.testing.assert_array_equal(initial.component("CICE").field("ice_fraction"), 0.0)
     final = coupler.run(initial)
     wet = np.asarray(component.grid.binary_mask) > 0
-    temperature = np.asarray(final.component("CICE").field("temperature"))
+    temperature = np.asarray(final.component("CICE").field("air_temperature"))
     np.testing.assert_allclose(temperature[wet], 260.0)
     area = np.asarray(final.component("CICE").field("ice_fraction"))
     assert (area[wet] > 0).any()

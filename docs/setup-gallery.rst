@@ -127,12 +127,14 @@ and rain is ``P - snow``. Their sum and hence their contribution to virtual
 salt flux are preserved. The split does not introduce snow storage or
 melting-energy terms.
 
-The wrapper calls ``surface_flux.t0`` ``temperature_2m`` for phase diagnosis;
-SPEEDY documents it as near-surface temperature without specifying a 2 m
-height. Exported ``temperature``, ``specific_humidity``, winds, density, and
-potential temperature still describe the bottom model level at the exported
-``model_level_height``. Their local names use ``*_bottom`` to distinguish
-them from t0; radiative fluxes are surface quantities.
+The mapper's phase-only ``near_surface_air_temperature`` argument receives
+``surface_flux.t0``. SPEEDY documents it as near-surface temperature without
+specifying a 2 m height. Exported ``air_temperature``, ``air_specific_humidity``,
+``air_u_velocity``, ``air_v_velocity``, ``air_density`` and
+``air_potential_temperature`` describe the bottom model level at
+``model_level_height``. JCM's ``air_pressure_3d`` retains the full sigma-level
+pressure array in Pa. Radiative fluxes are surface quantities. See
+:doc:`coupling-fields` for the field, recipe and configuration migration.
 
 VerCOR combines these rates with bulk evaporation on the ocean grid and
 computes a virtual salt flux using the fixed reference salinity:
@@ -225,6 +227,12 @@ prediction mapping and uses traced physical constants for humidity, lowest-level
 pressure, height, density, potential temperature and winds. There is no
 reference-weather or total-water partition fallback.
 
+CAMulator uses the same six ``air_*`` exchange keys as the other bulk-forcing
+producers. Its horizontal ``model_level_air_pressure`` is the lowest hybrid
+level pressure in Pa, distinct from JCM's full-column ``air_pressure_3d``.
+The private ``prepare_camulator_surface_temperature_input`` packs rescaled
+combined land/ocean surface temperature into the native input tensor.
+
 Initial exports are evaluated before existing inference tracing and do not
 advance native prognostic state or cursor or resample initialization noise.
 The immutable runtime payload retains the same initialized model-state sample.
@@ -293,7 +301,7 @@ sequence is explicitly lagged: ice receives the latest ocean/air state, ocean
 receives the current ice interval means, then ERA5 advances. Heat, total bulk
 mass and actual salt mass use a conservative scalar route. Stress uses the
 vector-capable shared-grid identity route. Both outgoing routes use binary
-source support and together carry ``VERIS_TO_OCEAN_FLUX_FIELDS``; concentration
+source support and together carry ``SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS``; concentration
 is not applied twice. This same-grid proof does not establish different-grid
 staggered stress conservation.
 
@@ -319,7 +327,7 @@ Coupled Veris, Veros and JCM
 ----------------------------
 
 Copy ``run_veris_veros_jcm`` with the standard CLI, or import its public
-``build_coupler`` function. The default is 365 daily noleap intervals starting
+``build_coupler`` function. The default is 365 daily Gregorian intervals starting
 2000-01-03, after two days of native JCM climatological spinup. The builder
 selects precision before constructing models, initializes the ocean once, and
 reuses ``make_veris_veros`` and ``make_jcm_land_atmosphere``. Optional models
@@ -331,8 +339,10 @@ available ocean and atmospheric fields; its interval-mean total ocean heat,
 mass, salt and stress enter Veros once. There is no direct ATM-to-OCN route.
 JCM then receives current Veris ice temperature/albedo/concentration and
 post-advance Veros open-water SST contributions. JCM land supplies separate
-land temperature and soil availability. Land remains prescribed: receiving
-heat fluxes does not make it a prognostic land model.
+land temperature and soil availability. Land remains prescribed and declares
+no heat-flux feedback input. Route endpoints, execution order, state lookup
+and surface-policy roles use the actual component names; the default labels
+above do not constrain custom instance names.
 
 For wet mask W and current ice fraction A, conservative remapping transfers
 ``R(W*(1-A)*SST)``, ``R(W*A*Tice)``, ``R(W*A*alpha_ice)`` and ``R(W*A)``.
@@ -347,10 +357,11 @@ static mask helper's 0.001 threshold defines absent land/ocean support.
 
 Enable the three explicit policies when supplying configurations:
 ``VerisConfig(atmosphere_forcing="model_level")``,
-``VerosConfig(surface_forcing="coupled", export_open_water_surface=True)`` and
-``JAXGCMConfig(seaice_coupling=True)``. Incompatible supplied modes fail early.
-The builder requires noleap dates; coupled JCM binds its native 365-day ordinal
-epoch and requires whole-second dates and spinup aligned to coupling intervals.
+``VerosConfig(surface_forcing="surface_fluxes", export_open_water_surface=True)`` and
+``JCMAtmosphereConfig(seaice_coupling=True)``. Incompatible supplied modes fail early.
+The builder requires a Gregorian clock; coupled JCM preserves native time/step
+carry, including leap days. Its epoch adapter requires whole-second dates and
+enabled spinup aligned to coupling intervals.
 Initial air/radiation is evaluated from initialized native JCM physics without
 advancing its dycore or cross-step carry. Its initial boundary is the native
 climatology; subsequent ATM intervals use the incoming coupled surfaces. Thus
@@ -361,10 +372,10 @@ same CESM bulk solution that diagnoses temperature/humidity for Veris.
 JCM's SPEEDY scheme has one effective marine temperature. This coupling does
 not resolve separate marine turbulent fluxes over ice and water. Raw downward
 shortwave radiation is exported separately: Veris applies the configured water
-albedo to its open-water branch and native ice albedo to ice. JCM's already
-combined turbulent flux channel is selected once; land receives its separate
-per-land-area channels with downward-positive heat signs. Dynamic surface
-weighting never adds another concentration or ocean-area factor.
+albedo to its open-water branch and native ice albedo to ice. JCM 3 exports
+grid-mean downward-positive turbulent heat fluxes, with no separate land/marine
+channels. Dynamic surface weighting never adds another concentration or
+ocean-area factor.
 
 Shared JCM period files add canonical ``sea_surface_temperature`` (K),
 ``marine_surface_albedo`` (1) and ``marine_ice_fraction`` (1) on ``lat, lon``;

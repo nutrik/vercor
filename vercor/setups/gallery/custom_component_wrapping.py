@@ -46,8 +46,8 @@ def make_data_forcing(grid: RectilinearGrid) -> DataComponent:
         "ATM",
         grid,
         {
-            "temperature": 288.15,
-            "specific_humidity": 0.01,
+            "air_temperature": 288.15,
+            "air_specific_humidity": 0.01,
         },
     )
 

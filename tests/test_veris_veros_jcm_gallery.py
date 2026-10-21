@@ -14,7 +14,7 @@ from vercor import Clock
 from vercor.cli import cli
 from vercor.dtypes import DTypePolicy
 from vercor.setups import (
-    JAXGCMConfig,
+    JCMAtmosphereConfig,
     JCMLandAtmosphereConfig,
     Spinup,
     VerisConfig,
@@ -74,12 +74,12 @@ def native_coupler(
         ),
         ocean_config=VerosConfig(
             execution=execution,
-            surface_forcing="coupled",
+            surface_forcing="surface_fluxes",
             export_open_water_surface=True,
             output=period,
         ),
         jcm_config=JCMLandAtmosphereConfig(
-            atmosphere=JAXGCMConfig(
+            atmosphere=JCMAtmosphereConfig(
                 seaice_coupling=True,
                 spinup=Spinup(enabled=False),
                 save_interval=timedelta(seconds=1800),
@@ -106,19 +106,47 @@ def test_gallery_routes_preserve_surface_ownership(
         (
             "ATM",
             "CICE",
-            r.JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
+            r.MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
             "intensive",
             "component",
             b,
         ),
-        ("OCN", "CICE", r.OCEAN_TO_VERIS_FORCING_FIELDS, "intensive", "binary", b),
-        ("CICE", "OCN", r.VERIS_TO_OCEAN_FLUX_FIELDS[:-1], "source_flux", "binary", c),
-        ("CICE", "OCN", r.VERIS_TO_OCEAN_FLUX_FIELDS[-1:], "source_flux", "binary", b),
-        ("CICE", "OCN", r.VERIS_TO_JCM_COVERAGE_FIELDS, "intensive", "binary", b),
-        ("OCN", "ATM", r.OCEAN_TO_JCM_OPEN_WATER_FIELDS, "source_flux", "binary", c),
-        ("CICE", "ATM", r.VERIS_TO_JCM_SURFACE_FIELDS, "source_flux", "component", c),
-        ("CICE", "ATM", r.VERIS_TO_JCM_COVERAGE_FIELDS, "source_flux", "binary", c),
-        ("LND", "ATM", r.JCM_LAND_TO_ATMOSPHERE_FIELDS, "intensive", "component", b),
+        ("OCN", "CICE", r.OCEAN_TO_SEAICE_FORCING_FIELDS, "intensive", "binary", b),
+        (
+            "CICE",
+            "OCN",
+            r.SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[:-1],
+            "source_flux",
+            "binary",
+            c,
+        ),
+        (
+            "CICE",
+            "OCN",
+            r.SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[-1:],
+            "source_flux",
+            "binary",
+            b,
+        ),
+        ("CICE", "OCN", r.SEAICE_COVERAGE_FIELDS, "intensive", "binary", b),
+        (
+            "OCN",
+            "ATM",
+            r.OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS,
+            "source_flux",
+            "binary",
+            c,
+        ),
+        (
+            "CICE",
+            "ATM",
+            r.SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS,
+            "source_flux",
+            "component",
+            c,
+        ),
+        ("CICE", "ATM", r.SEAICE_COVERAGE_FIELDS, "source_flux", "binary", c),
+        ("LND", "ATM", r.LAND_TO_ATMOSPHERE_STATE_FIELDS, "intensive", "component", b),
     ]
     assert [
         (
@@ -179,7 +207,7 @@ assert not {'jcm','veris','veros'} & sys.modules.keys()
     [
         {"clock": Clock(datetime(2000, 1, 3), 86400, 1, calendar="noleap")},
         {"veris_config": VerisConfig()},
-        {"ocean_config": VerosConfig(surface_forcing="coupled")},
+        {"ocean_config": VerosConfig(surface_forcing="surface_fluxes")},
         {"jcm_config": JCMLandAtmosphereConfig()},
     ],
 )

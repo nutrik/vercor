@@ -23,7 +23,7 @@ from vercor.dtypes import DTypePolicy
 from vercor.exchanges import Exchange
 from vercor.exceptions import CouplerError
 from vercor.runtime import RuntimeOptions
-from vercor.setups._external.jax_gcm_runtime import JAXGCMRuntimePayload
+from vercor.setups._external.jax_gcm_runtime import JCMAtmosphereRuntimePayload
 from vercor.setups._external.jax_gcm_state import JCMState
 from vercor._runtime.contracts import ExchangeContract
 from vercor._runtime.component_state import create_runtime_component_state
@@ -77,7 +77,7 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     from vercor.fluxes.bulk_formula_cesm import compute_ocean_surface_fluxes
     from vercor.setups._external.camulator import make_camulator_gcm
     from vercor.setups._external.camulator_land import make_camulator_land
-    from vercor.setups._external.jax_gcm import make_jax_gcm
+    from vercor.setups._external.jax_gcm import make_jcm_atmosphere
     from vercor.setups._external.veros_gcm import make_veros_gcm
     from vercor.setups._jcm import make_jcm_land_atmosphere
 
@@ -89,7 +89,7 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     )
     assert make_camulator_gcm.__module__ == "vercor.setups._external.camulator"
     assert make_camulator_land.__module__ == ("vercor.setups._external.camulator_land")
-    assert make_jax_gcm.__module__ == "vercor.setups._external.jax_gcm"
+    assert make_jcm_atmosphere.__module__ == "vercor.setups._external.jax_gcm"
     assert make_jcm_land_atmosphere.__module__ == "vercor.setups._jcm"
     assert make_veros_gcm.__module__ == "vercor.setups._external.veros_gcm"
     assert compute_ocean_surface_fluxes.__module__ == (
@@ -445,8 +445,8 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "def _create_exchange_masks(" not in coupler_source
     assert "def _validate_land_mask_consistency(" not in coupler_source
     assert "def _patch_exchange_masks(" not in coupler_source
-    assert "compute_ocn_lnd_masks_on_atm_grid" not in coupler_source
-    assert "check_total_lnd_ocn_mask_sum" not in coupler_source
+    assert "compute_ocean_land_masks_on_atmosphere_grid" not in coupler_source
+    assert "check_land_ocean_fraction_sum" not in coupler_source
     assert "jax_ones(" not in coupler_source
     assert "class SetupContext" not in base_source
     assert "class StepContext" not in base_source
@@ -473,7 +473,7 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "elif field_name in store" not in diagnostics_source
     assert ".fields.get(" not in diagnostics_source
     assert "getattr(" not in diagnostics_source
-    assert "def make_jax_gcm" in jax_gcm_source
+    assert "def make_jcm_atmosphere" in jax_gcm_source
     assert "def make_veros_gcm" in veros_source
     assert "def make_camulator_gcm" in camulator_source
     assert "def make_camulator_land" in camulator_land_source
@@ -871,7 +871,7 @@ def test_runtime_coupler_state_restores_component_index_cache_after_pytree_round
 
 
 def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
-    payload = JAXGCMRuntimePayload(
+    payload = JCMAtmosphereRuntimePayload(
         jcm_state=JCMState(
             time=jdt.to_datetime("2000-01-01"),
             step=jnp.int32(0),
@@ -891,9 +891,9 @@ def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
 
     def update(value: ComponentRuntimeState) -> ComponentRuntimeState:
         runtime_payload = value.payload
-        assert isinstance(runtime_payload, JAXGCMRuntimePayload)
+        assert isinstance(runtime_payload, JCMAtmosphereRuntimePayload)
         return value.with_payload(
-            JAXGCMRuntimePayload(
+            JCMAtmosphereRuntimePayload(
                 jcm_state=JCMState(
                     time=jdt.to_datetime("2000-01-01"),
                     step=jnp.int32(0),
@@ -913,7 +913,7 @@ def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
 
     updated = jax.jit(update)(component)
 
-    assert isinstance(updated.payload, JAXGCMRuntimePayload)
+    assert isinstance(updated.payload, JCMAtmosphereRuntimePayload)
     assert_allclose_compact(
         updated.payload.jcm_state.dycore_state["marker"],
         np.asarray(2.0),

@@ -36,8 +36,8 @@ def test_first_ice_step_uses_initialized_jcm(monkeypatch: pytest.MonkeyPatch) ->
     for name in (
         "downward_shortwave_radiation_flux",
         "surface_pressure",
-        "temperature",
-        "specific_humidity",
+        "air_temperature",
+        "air_specific_humidity",
         "model_level_height",
     ):
         expected = remap.regrid(initial.component("ATM").field(name))

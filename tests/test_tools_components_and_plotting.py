@@ -255,15 +255,15 @@ def test_plot_component_scalar_vector_comparison_reads_runtime_state_pair() -> N
                 "total_surface_temperature": jnp.array(
                     [[280.0, 281.0, 282.0], [283.0, 284.0, 285.0]]
                 ),
-                "u_velocity": jnp.ones((2, 3, 2)),
-                "v_velocity": jnp.zeros((2, 3, 2)),
+                "air_u_velocity": jnp.ones((2, 3, 2)),
+                "air_v_velocity": jnp.zeros((2, 3, 2)),
             }
         ),
         received=FieldStore.empty(),
         sent=FieldStore.from_mapping(
             {
-                "u_velocity": jnp.ones((2, 3)),
-                "v_velocity": jnp.zeros((2, 3)),
+                "air_u_velocity": jnp.ones((2, 3)),
+                "air_v_velocity": jnp.zeros((2, 3)),
             }
         ),
     )
@@ -274,8 +274,8 @@ def test_plot_component_scalar_vector_comparison_reads_runtime_state_pair() -> N
                 "ATM",
                 ComponentState._from_runtime("ATM", grid, runtime_state),
                 "total_surface_temperature",
-                "u_velocity",
-                "v_velocity",
+                "air_u_velocity",
+                "air_v_velocity",
             )
         ],
         figsize=(6.0, 4.0),
@@ -301,8 +301,8 @@ def test_plot_component_scalar_vector_comparison_accepts_callable_scalar() -> No
         name="ATM",
         grid=grid,
         fields={
-            "u_velocity": jnp.ones(grid.shape),
-            "v_velocity": jnp.zeros(grid.shape),
+            "air_u_velocity": jnp.ones(grid.shape),
+            "air_v_velocity": jnp.zeros(grid.shape),
         },
         received={
             "land_surface_temperature": jnp.asarray(
@@ -318,8 +318,8 @@ def test_plot_component_scalar_vector_comparison_accepts_callable_scalar() -> No
                 "ATM",
                 runtime_view,
                 diagnostics_module.total_surface_temperature,
-                "u_velocity",
-                "v_velocity",
+                "air_u_velocity",
+                "air_v_velocity",
             )
         ],
         figsize=(6.0, 4.0),

@@ -125,7 +125,7 @@ def test_absent_surfaces_ignore_nan_operands_before_arithmetic() -> None:
 
 
 def test_existing_static_coverage_thresholds_remain_finite() -> None:
-    from vercor.grid_masks import compute_ocn_lnd_masks_on_atm_grid
+    from vercor.grid_masks import compute_ocean_land_masks_on_atmosphere_grid
 
     raw = jnp.array([[0.000999, 0.001, 0.999, 0.999001]])
 
@@ -133,7 +133,7 @@ def test_existing_static_coverage_thresholds_remain_finite() -> None:
         def regrid(self, _: Any) -> Any:
             return raw
 
-    ocean, land, _ = compute_ocn_lnd_masks_on_atm_grid(
+    ocean, land, _ = compute_ocean_land_masks_on_atmosphere_grid(
         jnp.ones((1, 4)), cast(Any, Remap())
     )
     fields = {
@@ -227,7 +227,7 @@ def test_full_ice_coast_accepts_roundoff_from_fractional_land_complement(
     missing_water: bool,
 ) -> None:
     """R(W*A) and 1-(1-R(W)) must share full-ice support despite cancellation."""
-    from vercor.grid_masks import compute_ocn_lnd_masks_on_atm_grid
+    from vercor.grid_masks import compute_ocean_land_masks_on_atmosphere_grid
 
     raw = jnp.full((1, 1), raw_ocean, dtype=dtype)
 
@@ -235,7 +235,9 @@ def test_full_ice_coast_accepts_roundoff_from_fractional_land_complement(
         def regrid(self, _: Any) -> Any:
             return raw
 
-    _, land, _ = compute_ocn_lnd_masks_on_atm_grid(jnp.ones((1, 1)), cast(Any, Remap()))
+    _, land, _ = compute_ocean_land_masks_on_atmosphere_grid(
+        jnp.ones((1, 1)), cast(Any, Remap())
+    )
 
     def surface(alpha: jax.Array) -> Any:
         fields = {

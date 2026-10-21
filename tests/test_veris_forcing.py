@@ -19,13 +19,15 @@ pytestmark = pytest.mark.fast_always
 
 def test_model_level_mode_uses_actual_reference_winds_and_water_albedo() -> None:
     from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
-    from vercor.recipes import JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS
+    from vercor.recipes import MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
     from vercor.fields import _flatten_field_items
 
     fields = surface_fields()
     for name in ("u_velocity_10m", "v_velocity_10m", "net_shortwave_radiation_flux"):
         fields.pop(name)
-        assert name not in _flatten_field_items(JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS)
+        assert name not in _flatten_field_items(
+            MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
+        )
     fields["downward_shortwave_radiation_flux"] = jnp.full((2, 3), 200.0)
     fields["open_water_albedo"] = jnp.full((2, 3), 0.1)
     result = prepare_veris_forcing_pack(
@@ -37,8 +39,8 @@ def test_model_level_mode_uses_actual_reference_winds_and_water_albedo() -> None
     ).native_forcing
     np.testing.assert_allclose(result["SWdown"], 200)
     np.testing.assert_allclose(result["Qsw"], -180)
-    np.testing.assert_allclose(result["uWind"], fields["u_velocity"].T)
-    np.testing.assert_allclose(result["vWind"], fields["v_velocity"].T)
+    np.testing.assert_allclose(result["uWind"], fields["air_u_velocity"].T)
+    np.testing.assert_allclose(result["vWind"], fields["air_v_velocity"].T)
 
 
 @pytest.mark.parametrize("mode", ["unknown", 1])
@@ -68,20 +70,26 @@ def test_model_level_mode_rejects_invalid_open_water_albedo(albedo: float) -> No
 
 def test_veris_recipes_keep_model_and_ten_metre_winds_distinct() -> None:
     from vercor.recipes import (
-        ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-        OCEAN_TO_VERIS_FORCING_FIELDS,
+        OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+        OCEAN_TO_SEAICE_FORCING_FIELDS,
     )
     from vercor.fields import VectorField
 
     pairs = [
         (field.u, field.v)
-        for field in ATMOSPHERE_TO_VERIS_FORCING_FIELDS
+        for field in OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
         if isinstance(field, VectorField)
     ]
-    assert pairs == [("u_velocity", "v_velocity"), ("u_velocity_10m", "v_velocity_10m")]
-    assert "downward_shortwave_radiation_flux" in ATMOSPHERE_TO_VERIS_FORCING_FIELDS
-    assert "surface_pressure" in ATMOSPHERE_TO_VERIS_FORCING_FIELDS
-    assert "sea_surface_salinity" in OCEAN_TO_VERIS_FORCING_FIELDS
+    assert pairs == [
+        ("air_u_velocity", "air_v_velocity"),
+        ("u_velocity_10m", "v_velocity_10m"),
+    ]
+    assert (
+        "downward_shortwave_radiation_flux"
+        in OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
+    )
+    assert "surface_pressure" in OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
+    assert "sea_surface_salinity" in OCEAN_TO_SEAICE_FORCING_FIELDS
 
 
 def _fixed_bulk(monkeypatch: pytest.MonkeyPatch, captured: dict[str, Any]) -> None:
@@ -90,7 +98,7 @@ def _fixed_bulk(monkeypatch: pytest.MonkeyPatch, captured: dict[str, Any]) -> No
 
     def compute(f: Any, **kwargs: Any) -> Any:
         captured.update(kwargs, fields=f)
-        value = jnp.ones_like(f["temperature"])
+        value = jnp.ones_like(f["air_temperature"])
         return SurfaceFluxes(
             value,
             value,
@@ -147,7 +155,7 @@ def test_native_forcing_signs_sources_units_and_transpose(
         assert result[name].shape == (3, 2)
         np.testing.assert_allclose(result[name], value, rtol=1e-12)
     np.testing.assert_array_equal(result["uWind"], f["u_velocity_10m"].T)
-    np.testing.assert_array_equal(captured["fields"]["u_velocity"], 8.0)
+    np.testing.assert_array_equal(captured["fields"]["air_u_velocity"], 8.0)
     np.testing.assert_array_equal(captured["fields"]["model_level_height"], 10.0)
     assert "wSpeed" not in result
 
@@ -222,8 +230,8 @@ def test_dry_operands_are_safe_and_forcing_gradients_match(
     def objective(delta: jax.Array) -> jax.Array:
         fields = {
             **f,
-            "temperature": f["temperature"] + delta,
-            "potential_temperature": f["potential_temperature"] + delta,
+            "air_temperature": f["air_temperature"] + delta,
+            "air_potential_temperature": f["air_potential_temperature"] + delta,
         }
         result = prepare_veris_forcing_pack(
             fields, ocean_mask=mask, constants=PhysicalConstants(), dtype=dtype

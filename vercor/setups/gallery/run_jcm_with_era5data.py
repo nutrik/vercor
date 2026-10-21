@@ -17,12 +17,12 @@ from vercor.components import DataComponent
 from vercor.dtypes import DTypePolicy
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.recipes import (
-    JCM_LAND_TO_ATMOSPHERE_FIELDS,
+    LAND_TO_ATMOSPHERE_STATE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
 from vercor.regridding import bilinear
 from vercor.setups import (
-    JAXGCMConfig,
+    JCMAtmosphereConfig,
     JCMLandAtmosphereConfig,
     JCMInputs,
     Spinup,
@@ -62,7 +62,7 @@ def build_coupler(
         ocn.grid,
         inputs=jcm_inputs,
         config=JCMLandAtmosphereConfig(
-            atmosphere=JAXGCMConfig(
+            atmosphere=JCMAtmosphereConfig(
                 spinup=Spinup(enabled=True),
                 output=OutputSpec(period=PeriodOutput(frequency="month")),
                 jitted=True,
@@ -87,14 +87,16 @@ def build_coupler(
                 quantity="intensive",
                 source=lnd.name,
                 target=atm.name,
-                fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
+                fields=LAND_TO_ATMOSPHERE_STATE_FIELDS,
                 regridder_factory=bilinear,
             ),
         ),
         run_order=[ocn.name, lnd.name, atm.name],
         runtime=RuntimeOptions(
             dtype=runtime_dtype,
-            topology=SurfaceMaskPolicy(),
+            topology=SurfaceMaskPolicy(
+                atmosphere=atm.name, ocean=ocn.name, land=lnd.name
+            ),
         ),
         log_level=log_level,
     )

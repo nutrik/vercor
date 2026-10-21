@@ -57,7 +57,7 @@ def _map_fields(
                 jnp.full(shape, 8.0) if precls is None else precls
             ),
             convective_precipitation=jnp.full(shape, 2.0) if precnv is None else precnv,
-            temperature_2m=temperature_2m,
+            near_surface_air_temperature=temperature_2m,
             snow_temperature=constants.precipitation_snow_temperature,
             rain_temperature=constants.precipitation_rain_temperature,
             dtype=dtype,
@@ -84,11 +84,13 @@ def test_phase_split_uses_calibrated_lt_midpoint_and_slope(enable_x64: bool) -> 
     assert fields["rain_rate"].dtype == policy.jax_real
     assert_allclose_compact(fields["snow_rate"], expected_snow, rtol=tolerance)
     assert_allclose_compact(fields["rain_rate"], 0.01 - expected_snow, rtol=tolerance)
-    assert_allclose_compact(fields["temperature"], 290.0)
-    assert_allclose_compact(fields["specific_humidity"], 0.01)
-    assert_allclose_compact(fields["u_velocity"], 1.0)
-    assert_allclose_compact(fields["v_velocity"], 2.0)
-    assert_allclose_compact(fields["density"], 1.141246774474563, rtol=1e-6)
+    assert_allclose_compact(fields["air_temperature"], 290.0)
+    assert_allclose_compact(fields["air_specific_humidity"], 0.01)
+    assert_allclose_compact(fields["air_u_velocity"], 1.0)
+    assert_allclose_compact(fields["air_v_velocity"], 2.0)
+    assert_allclose_compact(fields["air_density"], 1.141246774474563, rtol=1e-6)
+    assert fields["air_pressure_3d"].shape == (2, 2, 3)
+    assert_allclose_compact(fields["air_pressure_3d"][:, 0, 0], [20000.0, 95000.0])
 
 
 @pytest.mark.fast_always

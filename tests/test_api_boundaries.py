@@ -89,7 +89,7 @@ def test_setup_implementation_modules_are_private_after_boundary_redesign() -> N
 
     public_factory_names = {
         "CAMulatorConfig",
-        "JAXGCMConfig",
+        "JCMAtmosphereConfig",
         "JCMLandAtmosphereConfig",
         "JCMLandAtmosphereSetup",
         "load_jcm_inputs",
@@ -99,7 +99,7 @@ def test_setup_implementation_modules_are_private_after_boundary_redesign() -> N
         "make_era5_land",
         "make_era5_ocean",
         "make_erainterim_ocean",
-        "make_jax_gcm",
+        "make_jcm_atmosphere",
         "make_jcm_land",
         "make_jcm_land_atmosphere",
         "make_slab_atmosphere",
@@ -709,14 +709,14 @@ def test_model_setup_factories_use_the_public_setup_owner() -> None:
     from vercor.setups._data.jcm_land import make_jcm_land
     from vercor.setups._external.camulator import make_camulator_gcm
     from vercor.setups._external.camulator_land import make_camulator_land
-    from vercor.setups._external.jax_gcm import make_jax_gcm
+    from vercor.setups._external.jax_gcm import make_jcm_atmosphere
     from vercor.setups._external.veros_gcm import make_veros_gcm
     from vercor.setups._jcm import make_jcm_land_atmosphere
 
     expected_factories = {
         "make_camulator_gcm": make_camulator_gcm,
         "make_camulator_land": make_camulator_land,
-        "make_jax_gcm": make_jax_gcm,
+        "make_jcm_atmosphere": make_jcm_atmosphere,
         "make_jcm_land": make_jcm_land,
         "make_jcm_land_atmosphere": make_jcm_land_atmosphere,
         "make_veros_gcm": make_veros_gcm,
@@ -962,8 +962,11 @@ def test_slab_driver_uses_runtime_views_for_ice_diagnostics() -> None:
         encoding="utf-8"
     )
 
-    assert 'final_state.components(("ATM", "OCN", "LND", "ICE"))' in slab_source
-    assert 'views["ICE"].field("ice_fraction")' in slab_source
+    assert (
+        "final_state.components((atm.name, ocn.name, lnd.name, ice.name))"
+        in slab_source
+    )
+    assert 'views[ice.name].field("ice_fraction")' in slab_source
     assert 'get_component_state("ICE").fields.get("ice_fraction")' not in slab_source
 
 
@@ -1230,7 +1233,7 @@ def test_external_adapter_all_exports_are_public() -> None:
 def test_external_runtime_helpers_use_concrete_setup_state_annotations() -> None:
     runtime_sources = {
         "vercor/setups/_external/jax_gcm_runtime.py": (
-            "JAXGCMSetupState",
+            "JCMAtmosphereSetupState",
             "vercor.setups._external.jax_gcm_state",
             "state",
         ),
@@ -1262,7 +1265,7 @@ def test_external_runtime_helpers_use_concrete_setup_state_annotations() -> None
 @pytest.mark.fast_always
 def test_jax_gcm_factory_binds_runtime_hooks_directly() -> None:
     source = Path("vercor/setups/_external/jax_gcm.py").read_text(encoding="utf-8")
-    factory_source = source.split("def make_jax_gcm(", 1)[1]
+    factory_source = source.split("def make_jcm_atmosphere(", 1)[1]
 
     assert "from functools import partial" in source
     assert "partial(_jax_gcm_runtime.step_jax_gcm_component, state)" in factory_source
@@ -1330,7 +1333,7 @@ def test_veros_runtime_settings_imports_runtime_settings_lazily() -> None:
 def test_common_exchange_recipes_are_centralized_for_examples() -> None:
     import vercor.recipes as recipes_module
     from vercor.recipes import (
-        SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
+        ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
     )
 
     required_recipes = (
@@ -1338,8 +1341,8 @@ def test_common_exchange_recipes_are_centralized_for_examples() -> None:
         "ATMOSPHERE_TO_LAND_STATE_FIELDS",
         "LAND_TO_ATMOSPHERE_SURFACE_FIELDS",
         "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS",
-        "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS",
-        "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS",
+        "ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS",
+        "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS",
     )
     recipes_source = Path("vercor/recipes.py").read_text(encoding="utf-8")
     for recipe_name in required_recipes:
@@ -1365,8 +1368,8 @@ def test_common_exchange_recipes_are_centralized_for_examples() -> None:
     jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
         encoding="utf-8"
     )
-    assert "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS" in jcm_slab_source
-    assert _flatten_field_items(SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS) == [
+    assert "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS" in jcm_slab_source
+    assert _flatten_field_items(ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS) == [
         "latent_heat_flux",
         "sensible_heat_flux",
     ]

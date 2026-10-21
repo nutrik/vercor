@@ -374,7 +374,7 @@ def test_output_and_setup_configs_use_final_names() -> None:
     output = OutputSpec(period=period)
     spinup = vercor.setups.Spinup(enabled=True)
     veros = vercor.setups.VerosConfig(spinup=spinup, output=output)
-    jax_gcm = vercor.setups.JAXGCMConfig(spinup=spinup, output=output)
+    jax_gcm = vercor.setups.JCMAtmosphereConfig(spinup=spinup, output=output)
     camulator = vercor.setups.CAMulatorConfig(
         config_path="config.yml", spinup=spinup, output=output
     )
@@ -398,7 +398,12 @@ def test_output_and_setup_configs_use_final_names() -> None:
             config_path="config.yml",
             time_alignment=cast(Any, "invalid"),
         )
-    for setup_name in ("Spinup", "VerosConfig", "JAXGCMConfig", "CAMulatorConfig"):
+    for setup_name in (
+        "Spinup",
+        "VerosConfig",
+        "JCMAtmosphereConfig",
+        "CAMulatorConfig",
+    ):
         assert setup_name in vercor.setups.__all__
         assert hasattr(vercor.setups, setup_name)
 

@@ -58,13 +58,13 @@ def step_veros_runtime(
     if payload is None:
         raise ComponentError("Veros runtime requires a native runtime payload.")
     execution = resources.execution
-    uses_atmosphere_forcing = resources.uses_atmosphere_forcing
+    uses_bulk_meteorology = resources.uses_bulk_meteorology
     native_state = payload
     time = context.time
     if execution == "host" and time is None:
         return StepResult(payload=native_state)
 
-    coupled = resources.surface_forcing == "coupled"
+    coupled = resources.surface_forcing == "surface_fluxes"
     if coupled:
         taux, tauy, qnet, salt_flux = _veros_fluxes.compute_coupled_fluxes(
             fields, context.constants, context.dtype
@@ -78,7 +78,7 @@ def step_veros_runtime(
             execution=execution,
             activate_coupled_feedback=True,
         )
-    elif uses_atmosphere_forcing:
+    elif uses_bulk_meteorology:
         taux, tauy, qnet, qnec, salt_flux = _veros_fluxes.compute_fluxes(
             native_state,
             fields,

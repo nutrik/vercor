@@ -52,13 +52,13 @@ from vercor.setups._surface_fluxes import compute_surface_fluxes
 pytestmark = pytest.mark.fast_always
 KINDS = ("data", "callable", "structural", "host")
 AIR = {
-    "temperature": 280.0,
-    "potential_temperature": 280.0,
-    "specific_humidity": 0.002,
-    "density": 1.2,
+    "air_temperature": 280.0,
+    "air_potential_temperature": 280.0,
+    "air_specific_humidity": 0.002,
+    "air_density": 1.2,
     "model_level_height": 10.0,
-    "u_velocity": 5.0,
-    "v_velocity": 0.0,
+    "air_u_velocity": 5.0,
+    "air_v_velocity": 0.0,
     "net_shortwave_radiation_flux": 100.0,
     "downward_longwave_radiation_flux": 300.0,
     "rain_rate": 1e-3,
@@ -116,7 +116,7 @@ def _grid(name: str, *, target: bool = False, wide: bool = False) -> Rectilinear
 
 def _bulk(fields: Mapping[str, Any]) -> Mapping[str, Any]:
     constants, dtype = PhysicalConstants(), DTypePolicy(enable_x64=True)
-    one = jnp.ones_like(fields["temperature"])
+    one = jnp.ones_like(fields["air_temperature"])
     bulk = compute_surface_fluxes(
         fields,
         sea_surface_temperature=290 * one,
@@ -130,12 +130,12 @@ def _bulk(fields: Mapping[str, Any]) -> Mapping[str, Any]:
         constants,
         one,
         fields["model_level_height"],
-        fields["u_velocity"],
-        fields["v_velocity"],
-        fields["potential_temperature"],
-        fields["specific_humidity"],
-        fields["density"],
-        fields["temperature"],
+        fields["air_u_velocity"],
+        fields["air_v_velocity"],
+        fields["air_potential_temperature"],
+        fields["air_specific_humidity"],
+        fields["air_density"],
+        fields["air_temperature"],
         0 * one,
         0 * one,
         290 * one,
@@ -363,14 +363,14 @@ def test_slab_declarations_match_physics_reads(
 
 def test_missing_producer_field_fails_before_receiving_physics() -> None:
     grid = _grid("missing")
-    with pytest.raises(CouplerError, match="specific_humidity"):
+    with pytest.raises(CouplerError, match="air_specific_humidity"):
         Coupler(
             Clock(datetime(2000, 1, 1), 60.0, 1),
             components=(
                 _producer(
                     "data",
                     grid,
-                    {k: v for k, v in AIR.items() if k != "specific_humidity"},
+                    {k: v for k, v in AIR.items() if k != "air_specific_humidity"},
                 ),
                 CallableComponent(
                     "DST", grid, _bulk, spec=ComponentSpec(inputs=tuple(AIR))
@@ -394,7 +394,7 @@ def test_camulator_land_is_prescribed(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         camulator_land,
-        "create_lnd_mask_from_ocn",
+        "create_land_mask_from_ocean",
         lambda **_: (jnp.ones((2, 2)), jnp.ones((2, 2))),
     )
     assert (
@@ -471,7 +471,9 @@ def test_data_gallery_displays_explicit_diagnostic_imports(
     gallery.run_setup(loglevel="error", float_type="float64")
     views, fields, order = captured["table"]
     shown = {name for name, _ in fields if isinstance(name, str)}
-    shown.update(("u_velocity", "v_velocity"))  # component_vector_speed + quiver
+    shown.update(
+        ("air_u_velocity", "air_v_velocity")
+    )  # component_vector_speed + quiver
     shown.add("land_surface_temperature")  # total_surface_temperature plot
     for component in captured["components"]:
         assert component.name in order
@@ -481,7 +483,7 @@ def test_data_gallery_displays_explicit_diagnostic_imports(
                 np.isfinite(views[component.name].field(name, scope="received"))
             )
     np.testing.assert_allclose(
-        views["OCN"].field("specific_humidity", scope="received"),
+        views["OCN"].field("air_specific_humidity", scope="received"),
         [[0.002, 0.0], [0.002, 0.0]],
     )
     np.testing.assert_allclose(views["OCN"].field("sea_surface_temperature"), 290.0)

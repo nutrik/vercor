@@ -25,15 +25,19 @@ from vercor.components import (
 from vercor.fields import _flatten_field_items
 from vercor.output import OutputTarget
 from vercor.recipes import (
-    ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
+    ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
 )
 from vercor.setups.gallery import run_camulator_with_veros
 
 
 @pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "names", [("ATM", "OCN", "LND"), ("air-model", "water-model", "terrain-model")]
+)
 def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    names: tuple[str, str, str],
 ) -> None:
     """Exercise the unavailable CAMulator gallery through a finite host fake."""
 
@@ -84,17 +88,17 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     )
 
     ocean = DataComponent(
-        "OCN",
+        names[1],
         ocean_grid,
         fields={
             "sea_surface_temperature": np.asarray([[280.0, np.nan], [np.nan, 284.0]])
         },
         spec=ComponentSpec(
-            inputs=tuple(_flatten_field_items(ATMOSPHERE_TO_VEROS_FORCING_FIELDS))
+            inputs=tuple(_flatten_field_items(ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS))
         ),
     )
     land = DataComponent(
-        "LND",
+        names[2],
         land_grid,
         fields={
             "land_surface_temperature": np.asarray([[np.nan, 282.0], [286.0, np.nan]])
@@ -104,7 +108,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     atmosphere_output_names = tuple(
         dict.fromkeys(
             _flatten_field_items(
-                (*_flatten_field_items(ATMOSPHERE_TO_VEROS_FORCING_FIELDS),)
+                (*_flatten_field_items(ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS),)
             )
         )
     )
@@ -131,7 +135,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         return StepResult(payload=payload + 1.0)
 
     atmosphere = CallableComponent(
-        "ATM",
+        names[0],
         atmosphere_grid,
         step_atmosphere,
         spec=ComponentSpec(
@@ -202,11 +206,15 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     assert native_steps == [0, 1]
     coupler = cast(Coupler, captured["coupler"])
     topology = coupler._ensure_prepared().topology_maps
-    assert_allclose_compact(topology.binary_masks["ATM->OCN"], ocean_mask)
-    assert_allclose_compact(topology.binary_masks["LND->ATM"], land_mask)
+    assert_allclose_compact(
+        topology.binary_masks[f"{atmosphere.name}->{ocean.name}"], ocean_mask
+    )
+    assert_allclose_compact(
+        topology.binary_masks[f"{land.name}->{atmosphere.name}"], land_mask
+    )
 
     final_state = captured["final_state"]
-    views = final_state.components(("OCN", "LND", "ATM"))
+    views = final_state.components((ocean.name, land.name, atmosphere.name))
     for view in views.values():
         assert view.grid is not None
         assert view.grid.longitude.dtype == jnp.float32
@@ -217,11 +225,11 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
             assert value.dtype == jnp.float32
 
     assert_allclose_compact(
-        views["ATM"].field("sea_surface_temperature", scope="received"),
+        views[atmosphere.name].field("sea_surface_temperature", scope="received"),
         np.asarray([[280.0, 0.0], [0.0, 284.0]], dtype=np.float32),
     )
     assert_allclose_compact(
-        views["ATM"].field("land_surface_temperature", scope="received"),
+        views[atmosphere.name].field("land_surface_temperature", scope="received"),
         np.asarray([[0.0, 282.0], [286.0, 0.0]], dtype=np.float32),
     )
 

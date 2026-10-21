@@ -184,10 +184,10 @@ def test_direct_open_water_stress_uses_complementary_face_area(
 
 
 def test_feedback_recipe_declares_three_scalars_and_one_vector() -> None:
-    from vercor.recipes import VERIS_TO_OCEAN_FLUX_FIELDS
+    from vercor.recipes import SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS
     from vercor.fields import vector
 
-    assert VERIS_TO_OCEAN_FLUX_FIELDS == (
+    assert SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS == (
         "sea_surface_heat_flux",
         "sea_surface_mass_flux",
         "sea_surface_salt_mass_flux",
@@ -211,11 +211,11 @@ def test_complete_melt_exports_total_flux_and_closes_column_budgets() -> None:
     initial = coupler.initial_state()
     forcing = cold_fields()
     for name, value in {
-        "temperature": 290.0,
-        "potential_temperature": 290.0,
+        "air_temperature": 290.0,
+        "air_potential_temperature": 290.0,
         "sea_surface_temperature": 278.0,
-        "u_velocity": 0.0,
-        "v_velocity": 0.0,
+        "air_u_velocity": 0.0,
+        "air_v_velocity": 0.0,
         "u_velocity_10m": 0.0,
         "v_velocity_10m": 0.0,
         "net_shortwave_radiation_flux": 800.0,

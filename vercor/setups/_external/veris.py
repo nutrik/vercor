@@ -17,11 +17,11 @@ from vercor.fields import _flatten_field_items
 from vercor.grids import RectilinearGrid
 from vercor.output import OutputSpec
 from vercor.recipes import (
-    ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-    JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-    OCEAN_TO_VERIS_FORCING_FIELDS,
-    VERIS_TO_OCEAN_FLUX_FIELDS,
-    VERIS_TO_JCM_SURFACE_FIELDS,
+    OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+    MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+    OCEAN_TO_SEAICE_FORCING_FIELDS,
+    SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS,
+    SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS,
 )
 from vercor.setups.config import VerisConfig
 
@@ -117,25 +117,25 @@ def make_veris(
                 _flatten_field_items(
                     (
                         *(
-                            JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS
+                            MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
                             if config.atmosphere_forcing == "model_level"
-                            else ATMOSPHERE_TO_VERIS_FORCING_FIELDS
+                            else OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS
                         ),
-                        *OCEAN_TO_VERIS_FORCING_FIELDS,
+                        *OCEAN_TO_SEAICE_FORCING_FIELDS,
                     )
                 )
             ),
             outputs=(
                 "ice_fraction",
-                *_flatten_field_items(VERIS_TO_JCM_SURFACE_FIELDS),
-                *_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS),
+                *_flatten_field_items(SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS),
+                *_flatten_field_items(SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS),
             ),
             initial_fields={
                 name: 0.0
                 for name in (
                     "ice_fraction",
-                    *_flatten_field_items(VERIS_TO_JCM_SURFACE_FIELDS),
-                    *_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS),
+                    *_flatten_field_items(SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS),
+                    *_flatten_field_items(SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS),
                 )
             },
             masks=ComponentMaskSpec(fractional_field="ice_fraction"),

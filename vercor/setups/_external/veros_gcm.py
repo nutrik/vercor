@@ -13,7 +13,10 @@ from vercor.components import (
 )
 from vercor.output import OutputSpec
 from vercor.fields import _flatten_field_items
-from vercor.recipes import VERIS_TO_OCEAN_FLUX_FIELDS, OCEAN_TO_VERIS_FORCING_FIELDS
+from vercor.recipes import (
+    SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS,
+    OCEAN_TO_SEAICE_FORCING_FIELDS,
+)
 from vercor.setups.config import VerosConfig
 
 
@@ -78,13 +81,13 @@ def _initialize_veros_owner(config: VerosConfig) -> Any:
 def _make_veros_component(state: Any, config: VerosConfig) -> Component:
     """Bind the existing owner to its current shared grid without reinitializing."""
     _veros_gcm_state, _veros_output, _veros_runtime, _ = _load_veros_implementation()
-    if config.surface_forcing == "coupled":
-        input_fields = tuple(_flatten_field_items(VERIS_TO_OCEAN_FLUX_FIELDS))
-        output_fields = tuple(_flatten_field_items(OCEAN_TO_VERIS_FORCING_FIELDS))
+    if config.surface_forcing == "surface_fluxes":
+        input_fields = tuple(_flatten_field_items(SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS))
+        output_fields = tuple(_flatten_field_items(OCEAN_TO_SEAICE_FORCING_FIELDS))
     else:
         input_fields = (
             _veros_gcm_state.VEROS_INPUT_FIELD_NAMES
-            if state.uses_atmosphere_forcing
+            if state.uses_bulk_meteorology
             else ()
         )
         output_fields = ("sea_surface_temperature",)
@@ -99,7 +102,7 @@ def _make_veros_component(state: Any, config: VerosConfig) -> Component:
             inputs=input_fields,
             outputs=output_fields,
             initial_fields=_veros_gcm_state.veros_default_fields(
-                coupled=config.surface_forcing == "coupled",
+                coupled=config.surface_forcing == "surface_fluxes",
                 export_open_water_surface=config.export_open_water_surface,
             ),
             execution=config.execution,

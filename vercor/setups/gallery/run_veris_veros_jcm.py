@@ -15,17 +15,17 @@ from vercor import Clock, Coupler, Exchange, RuntimeOptions
 from vercor.dtypes import DTypePolicy
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.recipes import (
-    JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-    JCM_LAND_TO_ATMOSPHERE_FIELDS,
-    OCEAN_TO_JCM_OPEN_WATER_FIELDS,
-    OCEAN_TO_VERIS_FORCING_FIELDS,
-    VERIS_TO_JCM_COVERAGE_FIELDS,
-    VERIS_TO_JCM_SURFACE_FIELDS,
-    VERIS_TO_OCEAN_FLUX_FIELDS,
+    MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+    LAND_TO_ATMOSPHERE_STATE_FIELDS,
+    OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS,
+    OCEAN_TO_SEAICE_FORCING_FIELDS,
+    SEAICE_COVERAGE_FIELDS,
+    SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS,
+    SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS,
 )
 from vercor.regridding import bilinear, conservative
 from vercor.setups import (
-    JAXGCMConfig,
+    JCMAtmosphereConfig,
     JCMLandAtmosphereConfig,
     Spinup,
     VerisConfig,
@@ -72,7 +72,7 @@ def build_coupler(
         raise ValueError("Veris requires model_level atmosphere forcing")
     if ocean_config is not None and (
         not ocean_config.export_open_water_surface
-        or ocean_config.surface_forcing != "coupled"
+        or ocean_config.surface_forcing != "surface_fluxes"
         or ocean_config.setup != "global_4deg"
     ):
         raise ValueError(
@@ -91,7 +91,7 @@ def build_coupler(
             ),
             ocean_config=ocean_config
             or VerosConfig(
-                surface_forcing="coupled",
+                surface_forcing="surface_fluxes",
                 export_open_water_surface=True,
                 output=OutputSpec(
                     period=PeriodOutput(
@@ -127,7 +127,7 @@ def build_coupler(
         inputs=jcm_inputs,
         config=jcm_config
         or JCMLandAtmosphereConfig(
-            atmosphere=JAXGCMConfig(
+            atmosphere=JCMAtmosphereConfig(
                 seaice_coupling=True,
                 spinup=Spinup(enabled=True),
                 output=OutputSpec(period=PeriodOutput(frequency="month")),
@@ -143,14 +143,14 @@ def build_coupler(
             Exchange(
                 atmosphere.name,
                 ice.name,
-                JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
+                MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
                 quantity="intensive",
                 regridder_factory=bilinear,
             ),
             Exchange(
                 ocean.name,
                 ice.name,
-                OCEAN_TO_VERIS_FORCING_FIELDS,
+                OCEAN_TO_SEAICE_FORCING_FIELDS,
                 quantity="intensive",
                 source_coverage="binary",
                 regridder_factory=bilinear,
@@ -158,7 +158,7 @@ def build_coupler(
             Exchange(
                 ice.name,
                 ocean.name,
-                VERIS_TO_OCEAN_FLUX_FIELDS[:-1],
+                SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[:-1],
                 route_id=f"{ice.name}->{ocean.name}.scalars",
                 quantity="source_flux",
                 source_coverage="binary",
@@ -167,7 +167,7 @@ def build_coupler(
             Exchange(
                 ice.name,
                 ocean.name,
-                VERIS_TO_OCEAN_FLUX_FIELDS[-1:],
+                SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS[-1:],
                 route_id=f"{ice.name}->{ocean.name}.stress",
                 quantity="source_flux",
                 source_coverage="binary",
@@ -176,7 +176,7 @@ def build_coupler(
             Exchange(
                 ice.name,
                 ocean.name,
-                VERIS_TO_JCM_COVERAGE_FIELDS,
+                SEAICE_COVERAGE_FIELDS,
                 route_id=f"{ice.name}->{ocean.name}.coverage",
                 quantity="intensive",
                 source_coverage="binary",
@@ -185,7 +185,7 @@ def build_coupler(
             Exchange(
                 ocean.name,
                 atmosphere.name,
-                OCEAN_TO_JCM_OPEN_WATER_FIELDS,
+                OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS,
                 quantity="source_flux",
                 source_coverage="binary",
                 regridder_factory=conservative,
@@ -193,7 +193,7 @@ def build_coupler(
             Exchange(
                 ice.name,
                 atmosphere.name,
-                VERIS_TO_JCM_SURFACE_FIELDS,
+                SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS,
                 route_id=f"{ice.name}->{atmosphere.name}.surface",
                 quantity="source_flux",
                 regridder_factory=conservative,
@@ -201,7 +201,7 @@ def build_coupler(
             Exchange(
                 ice.name,
                 atmosphere.name,
-                VERIS_TO_JCM_COVERAGE_FIELDS,
+                SEAICE_COVERAGE_FIELDS,
                 route_id=f"{ice.name}->{atmosphere.name}.coverage",
                 quantity="source_flux",
                 source_coverage="binary",
@@ -210,7 +210,7 @@ def build_coupler(
             Exchange(
                 land.name,
                 atmosphere.name,
-                JCM_LAND_TO_ATMOSPHERE_FIELDS,
+                LAND_TO_ATMOSPHERE_STATE_FIELDS,
                 quantity="intensive",
                 regridder_factory=bilinear,
             ),

@@ -15,7 +15,7 @@ from vercor.components import (
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grids import RectilinearGrid
-from vercor.grid_masks import create_lnd_mask_from_ocn
+from vercor.grid_masks import create_land_mask_from_ocean
 from vercor.exceptions import ComponentError
 from vercor.jax_logging import LoggerLike
 from vercor.setups._time_helpers import assign_model_timestep_alignment
@@ -55,10 +55,10 @@ def make_camulator_land(
 
     longitude = camulator_grid.longitude
     latitude = camulator_grid.latitude
-    lnd_bmask, land_fraction = create_lnd_mask_from_ocn(
-        atm_lat=latitude,
-        atm_lon=longitude,
-        ocn_grid=ocn_grid,
+    land_binary_mask, land_fraction = create_land_mask_from_ocean(
+        atmosphere_latitude=latitude,
+        atmosphere_longitude=longitude,
+        ocean_grid=ocn_grid,
     )
 
     forcing_context = load_camulator_forcing_context(config_path=config_path)
@@ -73,7 +73,7 @@ def make_camulator_land(
         name=f"{name.lower()}-grid",
         longitude=longitude,
         latitude=latitude,
-        binary_mask=lnd_bmask,
+        binary_mask=land_binary_mask,
     )
 
     def setup(

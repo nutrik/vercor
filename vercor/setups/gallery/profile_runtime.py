@@ -26,8 +26,8 @@ from vercor.setups import (
 from vercor.recipes import (
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_SEAICE_SURFACE_FIELDS,
-    SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-    SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
+    ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
+    ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
 )
 from vercor.topology import SurfaceMaskPolicy
 
@@ -117,49 +117,51 @@ def build_slab_coupler(
         latitude=(-90.0, 90.0),
     )
 
+    atm = make_slab_atmosphere(atm_grid)
+    ocn = make_slab_ocean(ocn_grid)
+    lnd = make_slab_land(lnd_grid)
+    ice = make_slab_seaice(ice_grid)
+
     exchanges = (
         Exchange(
             quantity="intensive",
-            source="OCN",
-            target="ATM",
+            source=ocn.name,
+            target=atm.name,
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="OCN",
-            fields=SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
+            source=atm.name,
+            target=ocn.name,
+            fields=ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="LND",
-            fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
+            source=atm.name,
+            target=lnd.name,
+            fields=ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
             regridder_factory=conservative,
         ),
         Exchange(
             quantity="intensive",
-            source="OCN",
-            target="ICE",
+            source=ocn.name,
+            target=ice.name,
             fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
     )
     return Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=steps),
-        components=(
-            make_slab_atmosphere(atm_grid),
-            make_slab_ocean(ocn_grid),
-            make_slab_land(lnd_grid),
-            make_slab_seaice(ice_grid),
-        ),
+        components=(atm, ocn, lnd, ice),
         exchanges=exchanges,
-        run_order=("OCN", "ATM", "LND", "ICE"),
+        run_order=(ocn.name, atm.name, lnd.name, ice.name),
         runtime=RuntimeOptions(
             dtype=DTypePolicy() if dtype is None else dtype,
-            topology=SurfaceMaskPolicy(),
+            topology=SurfaceMaskPolicy(
+                atmosphere=atm.name, ocean=ocn.name, land=lnd.name
+            ),
         ),
         log_level=log_level,
     )

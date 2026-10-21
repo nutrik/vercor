@@ -31,18 +31,18 @@ _ERA5_ATMOSPHERE_FIELD_NAMES = (
     "surface_pressure",
     "specific_humidity_3d",
     "temperature_3d",
-    "u_velocity",
-    "v_velocity",
+    "air_u_velocity",
+    "air_v_velocity",
     "u_velocity_10m",
     "v_velocity_10m",
     "downward_shortwave_radiation_flux",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
-    "specific_humidity",
-    "temperature",
+    "air_specific_humidity",
+    "air_temperature",
     "model_level_height",
-    "density",
-    "potential_temperature",
+    "air_density",
+    "air_potential_temperature",
     "rain_rate",
     "snow_rate",
 )
@@ -177,10 +177,10 @@ def make_era5_atmosphere(
         "downward_shortwave_radiation_flux": canonicalize_time_last_surface_field(
             _read_forcing(data_files, "msdwswrf", where="surface", flip_y=True)
         ),
-        "u_velocity": canonicalize_time_last_surface_field(
+        "air_u_velocity": canonicalize_time_last_surface_field(
             _read_forcing(data_files, "u", where="model_level", flip_y=True)[:, :, 1, :]
         ),
-        "v_velocity": canonicalize_time_last_surface_field(
+        "air_v_velocity": canonicalize_time_last_surface_field(
             _read_forcing(data_files, "v", where="model_level", flip_y=True)[:, :, 1, :]
         ),
         "net_shortwave_radiation_flux": canonicalize_time_last_surface_field(
@@ -189,8 +189,8 @@ def make_era5_atmosphere(
         "downward_longwave_radiation_flux": canonicalize_time_last_surface_field(
             _read_forcing(data_files, "msdwlwrf", where="surface", flip_y=True)
         ),
-        "specific_humidity": specific_humidity_3d[:, 0, :, :],
-        "temperature": temperature_3d[:, 0, :, :],
+        "air_specific_humidity": specific_humidity_3d[:, 0, :, :],
+        "air_temperature": temperature_3d[:, 0, :, :],
         "rain_rate": jnp.zeros_like(surface_pressure),
         "snow_rate": jnp.zeros_like(surface_pressure),
     }
@@ -208,7 +208,7 @@ def make_era5_atmosphere(
                 hybm,
                 fields["temperature_3d"][month_index],
                 fields["specific_humidity_3d"][month_index],
-                fields["temperature"][month_index],
+                fields["air_temperature"][month_index],
             )
             for month_index in range(int(fields["surface_pressure"].shape[0]))
         ]
@@ -219,8 +219,8 @@ def make_era5_atmosphere(
                     [item[0] for item in diagnostics],
                     axis=0,
                 ),
-                "density": jnp.stack([item[1] for item in diagnostics], axis=0),
-                "potential_temperature": jnp.stack(
+                "air_density": jnp.stack([item[1] for item in diagnostics], axis=0),
+                "air_potential_temperature": jnp.stack(
                     [item[2] for item in diagnostics],
                     axis=0,
                 ),

@@ -1,6 +1,9 @@
 Exchange coverage and quantity semantics
 ========================================
 
+See :doc:`coupling-fields` for canonical field names, units, vertical locations,
+native staggering and migration from former setup/recipe names.
+
 Ownership
 ---------
 

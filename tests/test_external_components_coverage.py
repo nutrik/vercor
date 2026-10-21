@@ -426,9 +426,9 @@ def test_jax_gcm_prefill_uses_physical_bulk_flux_defaults() -> None:
     )
 
     expected = {
-        "temperature": 288.15,
-        "potential_temperature": 288.15,
-        "density": 1.2,
+        "air_temperature": 288.15,
+        "air_potential_temperature": 288.15,
+        "air_density": 1.2,
         "model_level_height": 50.0,
     }
     for field_name, value in expected.items():
@@ -513,7 +513,7 @@ def _map_uniform_jcm_column(
             open_water_albedo=0.07,
             large_scale_precipitation=jnp.zeros((1, 1)),
             convective_precipitation=jnp.zeros((1, 1)),
-            temperature_2m=jnp.full((1, 1), 275.46),
+            near_surface_air_temperature=jnp.full((1, 1), 275.46),
             snow_temperature=272.77,
             rain_temperature=278.15,
             dtype=DTypePolicy(),
@@ -558,7 +558,7 @@ def test_jcm_precipitation_sums_both_diagnostics_and_converts_grams_before_excha
             open_water_albedo=0.07,
             large_scale_precipitation=precls,
             convective_precipitation=jnp.asarray([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),
-            temperature_2m=jnp.full((3, 2), 275.46),
+            near_surface_air_temperature=jnp.full((3, 2), 275.46),
             snow_temperature=272.77,
             rain_temperature=278.15,
             dtype=DTypePolicy(),
@@ -641,7 +641,7 @@ def test_map_jcm_output_fields_supports_jit(
             open_water_albedo=0.07,
             large_scale_precipitation=jnp.zeros((2, 2)),
             convective_precipitation=jnp.zeros((2, 2)),
-            temperature_2m=jnp.full((2, 2), 275.46),
+            near_surface_air_temperature=jnp.full((2, 2), 275.46),
             snow_temperature=272.77,
             rain_temperature=278.15,
             dtype=DTypePolicy(),
@@ -686,16 +686,16 @@ def test_map_jcm_output_fields_supports_jit(
     )
 
     assert_allclose_compact(
-        mapped_fields["u_velocity"], np.asarray([[5.0, 7.0], [6.0, 8.0]])
+        mapped_fields["air_u_velocity"], np.asarray([[5.0, 7.0], [6.0, 8.0]])
     )
     assert_allclose_compact(
-        mapped_fields["v_velocity"], np.asarray([[6.0, 8.0], [7.0, 9.0]])
+        mapped_fields["air_v_velocity"], np.asarray([[6.0, 8.0], [7.0, 9.0]])
     )
     assert_allclose_compact(
-        mapped_fields["temperature"], np.asarray([[284.0, 286.0], [285.0, 287.0]])
+        mapped_fields["air_temperature"], np.asarray([[284.0, 286.0], [285.0, 287.0]])
     )
     assert_allclose_compact(
-        mapped_fields["specific_humidity"],
+        mapped_fields["air_specific_humidity"],
         np.asarray([[0.05, 0.07], [0.06, 0.08]]),
     )
     assert_allclose_compact(mapped_fields["sensible_heat_flux"], np.full((2, 2), -5.0))
@@ -704,7 +704,7 @@ def test_map_jcm_output_fields_supports_jit(
         np.full((2, 2), -5000.0),
     )
     assert_allclose_compact(
-        mapped_fields["pressure"],
+        mapped_fields["air_pressure_3d"],
         np.asarray(
             [
                 np.full((2, 2), 90000.0),
@@ -713,14 +713,14 @@ def test_map_jcm_output_fields_supports_jit(
         ),
     )
     assert_allclose_compact(
-        mapped_fields["density"],
+        mapped_fields["air_density"],
         28.966
         / 8314.47
         * np.full((2, 2), 80000.0)
         / np.asarray([[284.0, 286.0], [285.0, 287.0]]),
     )
     assert_allclose_compact(
-        mapped_fields["potential_temperature"],
+        mapped_fields["air_potential_temperature"],
         np.asarray([[284.0, 286.0], [285.0, 287.0]]) * (100000.0 / 80000.0) ** 0.286,
     )
     assert_allclose_compact(mapped_fields["model_level_height"], np.full((2, 2), 150.0))
@@ -754,7 +754,7 @@ def test_map_jcm_output_fields_supports_jit(
             open_water_albedo=0.07,
             large_scale_precipitation=jnp.zeros((2, 2)),
             convective_precipitation=jnp.zeros((2, 2)),
-            temperature_2m=jnp.full((2, 2), 275.46),
+            near_surface_air_temperature=jnp.full((2, 2), 275.46),
             snow_temperature=272.77,
             rain_temperature=278.15,
             dtype=DTypePolicy(),
@@ -772,8 +772,8 @@ def test_map_jcm_output_fields_supports_jit(
 
 
 def test_generate_step_function_threads_jcm_3_clock_and_carry() -> None:
-    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
-        jax_gcm_state_module.JAXGCMSetupState
+    component = jax_gcm_state_module.JCMAtmosphereSetupState.__new__(
+        jax_gcm_state_module.JCMAtmosphereSetupState
     )
     component.seaice_coupling = False
     component.save_interval = timedelta(days=2)
@@ -948,7 +948,7 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
     )
     monkeypatch.setattr(jax_gcm_state_module, "Model", _FakeModel)
 
-    component = jax_gcm_module.make_jax_gcm(coords=coords, terrain=terrain)
+    component = jax_gcm_module.make_jcm_atmosphere(coords=coords, terrain=terrain)
 
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component.grid.latitude, jax.Array)
@@ -964,7 +964,7 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
         "sea_surface_temperature",
         "total_surface_temperature",
         *jax_gcm_fields_module.JAXGCM_OUTPUT_GRID_FIELD_NAMES,
-        "pressure",
+        "air_pressure_3d",
     )
     assert_allclose_compact(component.grid.longitude, np.asarray([0.0, 180.0]))
     assert_allclose_compact(component.grid.latitude, np.asarray([-45.0, 0.0, 45.0]))
@@ -973,8 +973,8 @@ def test_jax_gcm_constructor_builds_jax_backed_grid(
 
 
 def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
-    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
-        jax_gcm_state_module.JAXGCMSetupState
+    component = jax_gcm_state_module.JCMAtmosphereSetupState.__new__(
+        jax_gcm_state_module.JCMAtmosphereSetupState
     )
     component.seaice_coupling = False
     component.spinup_time = timedelta(hours=6)
@@ -992,8 +992,8 @@ def test_jax_gcm_initialize_validates_timestep_multiple() -> None:
 def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
-        jax_gcm_state_module.JAXGCMSetupState
+    component = jax_gcm_state_module.JCMAtmosphereSetupState.__new__(
+        jax_gcm_state_module.JCMAtmosphereSetupState
     )
     component.seaice_coupling = False
     component.spinup_time = timedelta(hours=2)
@@ -1067,8 +1067,8 @@ def test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up(
 def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
-        jax_gcm_state_module.JAXGCMSetupState
+    component = jax_gcm_state_module.JCMAtmosphereSetupState.__new__(
+        jax_gcm_state_module.JCMAtmosphereSetupState
     )
     component.seaice_coupling = False
     component.spinup_time = timedelta(hours=1)
@@ -1095,7 +1095,7 @@ def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
         sea_surface_temperature=forcing_values["sea_surface_temperature"],
     )
     initial_dycore_state = {
-        "temperature": jnp.ones((2, 3), dtype=jnp.float32),
+        "air_temperature": jnp.ones((2, 3), dtype=jnp.float32),
         "mode": jnp.asarray(1, dtype=jnp.int32),
         "marker": jnp.asarray(0.0, dtype=jnp.float32),
     }
@@ -1179,8 +1179,8 @@ def test_jax_gcm_spinup_normalizes_loaded_forcing_to_runtime_dtype(
 def test_jax_gcm_initialize_builds_default_forcing_when_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
-        jax_gcm_state_module.JAXGCMSetupState
+    component = jax_gcm_state_module.JCMAtmosphereSetupState.__new__(
+        jax_gcm_state_module.JCMAtmosphereSetupState
     )
     component.seaice_coupling = False
     component.spinup_time = timedelta(hours=1)
@@ -1247,8 +1247,8 @@ def test_jax_gcm_initialize_builds_default_forcing_when_missing(
 def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    component = jax_gcm_state_module.JAXGCMSetupState.__new__(
-        jax_gcm_state_module.JAXGCMSetupState
+    component = jax_gcm_state_module.JCMAtmosphereSetupState.__new__(
+        jax_gcm_state_module.JCMAtmosphereSetupState
     )
     component.seaice_coupling = False
     component.name = "ATM"
@@ -1412,16 +1412,16 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         np.asarray([[270.0, 281.0], [282.0, 284.0]]),
     )
     assert_allclose_compact(
-        data.get("u_velocity"), np.asarray([[5.0, 7.0], [6.0, 8.0]])
+        data.get("air_u_velocity"), np.asarray([[5.0, 7.0], [6.0, 8.0]])
     )
     assert_allclose_compact(
-        data.get("v_velocity"), np.asarray([[6.0, 8.0], [7.0, 9.0]])
+        data.get("air_v_velocity"), np.asarray([[6.0, 8.0], [7.0, 9.0]])
     )
     assert_allclose_compact(
-        data.get("temperature"), np.asarray([[284.0, 286.0], [285.0, 287.0]])
+        data.get("air_temperature"), np.asarray([[284.0, 286.0], [285.0, 287.0]])
     )
     assert_allclose_compact(
-        data.get("specific_humidity"),
+        data.get("air_specific_humidity"),
         np.asarray([[0.05, 0.07], [0.06, 0.08]]),
     )
     assert_allclose_compact(data.get("sensible_heat_flux"), np.full((2, 2), -5.0))
@@ -1433,7 +1433,7 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         ),
     )
     assert_allclose_compact(
-        data.get("pressure"),
+        data.get("air_pressure_3d"),
         np.asarray(
             [
                 np.full((2, 2), 90000.0),
@@ -1442,14 +1442,14 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         ),
     )
     assert_allclose_compact(
-        data.get("density"),
+        data.get("air_density"),
         coupler.constants.dry_air_molecular_weight
         / coupler.constants.universal_gas_constant
         * np.full((2, 2), 80000.0)
         / np.asarray([[284.0, 286.0], [285.0, 287.0]]),
     )
     assert_allclose_compact(
-        data.get("potential_temperature"),
+        data.get("air_potential_temperature"),
         np.asarray([[284.0, 286.0], [285.0, 287.0]])
         * (coupler.constants.reference_pressure / 80000.0)
         ** coupler.constants.dry_air_kappa,
@@ -1834,18 +1834,18 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_atmosphere_forcing = True
-    component.surface_forcing = "atmosphere"
+    component.uses_bulk_meteorology = True
+    component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
     component._veros_state = _make_flux_ready_veros_state()
     component.data = {
         "model_level_height": np.full((2, 2), 100.0),
-        "u_velocity": np.full((2, 2), 2.0),
-        "v_velocity": np.full((2, 2), 3.0),
-        "potential_temperature": np.full((2, 2), 280.0),
-        "specific_humidity": np.full((2, 2), 0.01),
-        "density": np.full((2, 2), 1.2),
-        "temperature": np.full((2, 2), 281.0),
+        "air_u_velocity": np.full((2, 2), 2.0),
+        "air_v_velocity": np.full((2, 2), 3.0),
+        "air_potential_temperature": np.full((2, 2), 280.0),
+        "air_specific_humidity": np.full((2, 2), 0.01),
+        "air_density": np.full((2, 2), 1.2),
+        "air_temperature": np.full((2, 2), 281.0),
         "net_shortwave_radiation_flux": np.full((2, 2), 10.0),
         "downward_longwave_radiation_flux": np.full((2, 2), 20.0),
         "rain_rate": np.full((2, 2), 1e-4),
@@ -2804,8 +2804,8 @@ def test_veros_initialize_validates_timestep_multiple() -> None:
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_atmosphere_forcing = True
-    component.surface_forcing = "atmosphere"
+    component.uses_bulk_meteorology = True
+    component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
     component.dt_tracer = 7.0
 
@@ -2825,10 +2825,10 @@ def test_veros_initialize_spinup_follows_enabled_only(
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_atmosphere_forcing = True
+    component.uses_bulk_meteorology = True
     component.dt_tracer = 10.0
     component.do_spinup = do_spinup
-    component.surface_forcing = "atmosphere"
+    component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
     component.spinup_time = timedelta(seconds=20.0)
     component.spinup_steps = 2
@@ -2949,12 +2949,12 @@ def test_veros_constructor_builds_jax_backed_grid(
     assert isinstance(component.grid.binary_mask, jax.Array)
     assert component.spec.inputs == (
         "model_level_height",
-        "u_velocity",
-        "v_velocity",
-        "potential_temperature",
-        "specific_humidity",
-        "density",
-        "temperature",
+        "air_u_velocity",
+        "air_v_velocity",
+        "air_potential_temperature",
+        "air_specific_humidity",
+        "air_density",
+        "air_temperature",
         "net_shortwave_radiation_flux",
         "downward_longwave_radiation_flux",
         "rain_rate",
@@ -2979,8 +2979,8 @@ def test_veros_host_runtime_owns_one_complete_copy_before_forcing(
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_atmosphere_forcing = True
-    component.surface_forcing = "atmosphere"
+    component.uses_bulk_meteorology = True
+    component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
     component.model_substeps = 2
     initial_native_state = _make_copyable_fake_veros_state(surface_temperature=12.0)
@@ -3112,8 +3112,8 @@ def test_veros_step_requires_native_runtime_payload() -> None:
         veros_gcm_state_module.VerosGCMSetupState
     )
     resources.execution = "host"
-    resources.uses_atmosphere_forcing = True
-    resources.surface_forcing = "atmosphere"
+    resources.uses_bulk_meteorology = True
+    resources.surface_forcing = "bulk_meteorology"
     resources.export_open_water_surface = False
     context = StepContext(dt_seconds=20.0, time=None, logger=None)
 
@@ -3127,11 +3127,11 @@ def test_veros_acc_jax_step_uses_internal_forcing_without_host_logging(
     resources = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
-    resources.surface_forcing = "atmosphere"
+    resources.surface_forcing = "bulk_meteorology"
     resources.export_open_water_surface = False
     resources.name = "OCN"
     resources.execution = "jax"
-    resources.uses_atmosphere_forcing = False
+    resources.uses_bulk_meteorology = False
     resources.model_substeps = 1
     stepped_states: list[Any] = []
 
@@ -3173,8 +3173,8 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_atmosphere_forcing = True
-    component.surface_forcing = "atmosphere"
+    component.uses_bulk_meteorology = True
+    component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
     component.model_substeps = 0
     component._veros_state = _make_copyable_fake_veros_state(surface_temperature=12.0)

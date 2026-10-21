@@ -19,8 +19,8 @@ def test_model_level_config_declares_its_owned_forcing_inputs() -> None:
     from tests.test_veris_component import small_ocean
     from vercor.setups import VerisConfig, make_veris
     from vercor.recipes import (
-        JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-        OCEAN_TO_VERIS_FORCING_FIELDS,
+        MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+        OCEAN_TO_SEAICE_FORCING_FIELDS,
     )
     from vercor.fields import _flatten_field_items
 
@@ -30,8 +30,8 @@ def test_model_level_config_declares_its_owned_forcing_inputs() -> None:
     assert component.spec.inputs == tuple(
         _flatten_field_items(
             (
-                *JCM_ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-                *OCEAN_TO_VERIS_FORCING_FIELDS,
+                *MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+                *OCEAN_TO_SEAICE_FORCING_FIELDS,
             )
         )
     )
@@ -58,13 +58,13 @@ def test_reference_wind_identity_and_frame() -> None:
     fields = surface_fields()
     actual = jnp.stack(bulk_winds(fields), axis=-1)
     np.testing.assert_allclose(
-        actual, jnp.stack((fields["u_velocity"], fields["v_velocity"]), axis=-1)
+        actual, jnp.stack((fields["air_u_velocity"], fields["air_v_velocity"]), axis=-1)
     )
     fields["model_level_height"] = jnp.full((2, 3), 40.0)
     reference = jnp.stack(bulk_winds(fields), axis=-1)
     for air, water, shift in (
-        ("u_velocity", "ocean_u_velocity", 3.0),
-        ("v_velocity", "ocean_v_velocity", -2.0),
+        ("air_u_velocity", "ocean_u_velocity", 3.0),
+        ("air_v_velocity", "ocean_v_velocity", -2.0),
     ):
         fields[air] += shift
         fields[water] += shift
@@ -143,8 +143,8 @@ def test_reference_winds_calm_and_masked_nan_gradients() -> None:
         gradient, (evaluate(point + 1e-4) - evaluate(point - 1e-4)) / 2e-4, rtol=1e-12
     )
     fields = surface_fields()
-    fields["u_velocity"] = fields["ocean_u_velocity"]
-    fields["v_velocity"] = fields["ocean_v_velocity"]
+    fields["air_u_velocity"] = fields["ocean_u_velocity"]
+    fields["air_v_velocity"] = fields["ocean_v_velocity"]
     u, v = bulk_winds(fields)
-    np.testing.assert_allclose(u, fields["u_velocity"])
-    np.testing.assert_allclose(v, fields["v_velocity"])
+    np.testing.assert_allclose(u, fields["air_u_velocity"])
+    np.testing.assert_allclose(v, fields["air_v_velocity"])

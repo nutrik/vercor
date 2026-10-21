@@ -393,15 +393,15 @@ def test_compiled_camulator_dynamic_forcing_rejects_nonfinite_source(
 def test_prepare_camulator_sst_input_supports_jit_and_shape() -> None:
     surface_temperature = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
 
-    prepared = jax.jit(camulator_fields_module.prepare_camulator_sst_input)(
-        surface_temperature
-    )
+    prepared = jax.jit(
+        camulator_fields_module.prepare_camulator_surface_temperature_input
+    )(surface_temperature)
 
     assert prepared.shape == (1, 1, 1, 2, 2)
     assert_allclose_compact(prepared[0, 0, 0], np.asarray(surface_temperature))
     assert_finite_jvp_vjp(
         lambda forcing: jnp.sum(
-            camulator_fields_module.prepare_camulator_sst_input(forcing)
+            camulator_fields_module.prepare_camulator_surface_temperature_input(forcing)
         ),
         surface_temperature,
         jnp.ones_like(surface_temperature),
@@ -943,12 +943,16 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
         native_step_seconds=native_step_seconds,
     )
 
-    assert_allclose_compact(mapped_fields["u_velocity"], np.asarray(u_wind[-1]))
-    assert_allclose_compact(mapped_fields["v_velocity"], np.asarray(v_wind[-1]))
+    assert_allclose_compact(mapped_fields["air_u_velocity"], np.asarray(u_wind[-1]))
+    assert_allclose_compact(mapped_fields["air_v_velocity"], np.asarray(v_wind[-1]))
     assert_allclose_compact(
-        mapped_fields["temperature"], np.asarray(temperature_3d[-1])
+        mapped_fields["air_temperature"], np.asarray(temperature_3d[-1])
     )
-    assert_allclose_compact(mapped_fields["specific_humidity"], np.full((2, 2), 0.002))
+    assert_allclose_compact(
+        mapped_fields["air_specific_humidity"], np.full((2, 2), 0.002)
+    )
+    assert mapped_fields["model_level_air_pressure"].shape == (2, 2)
+    assert_allclose_compact(mapped_fields["model_level_air_pressure"], 27500.0)
     assert_allclose_compact(
         mapped_fields["net_shortwave_radiation_flux"],
         np.full((2, 2), 100.0),
@@ -959,8 +963,8 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
         - 3.0,
     )
     assert mapped_fields["model_level_height"].shape == (2, 2)
-    assert mapped_fields["density"].shape == (2, 2)
-    assert mapped_fields["potential_temperature"].shape == (2, 2)
+    assert mapped_fields["air_density"].shape == (2, 2)
+    assert mapped_fields["air_potential_temperature"].shape == (2, 2)
     pressure_interfaces = (
         hyai[:, jnp.newaxis, jnp.newaxis] * 100000.0
         + hybi[:, jnp.newaxis, jnp.newaxis] * surface_pressure[jnp.newaxis, :, :]
@@ -975,8 +979,8 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
         mapped_fields["model_level_height"], expected_model_level_height
     )
     assert np.all(np.isfinite(np.asarray(mapped_fields["model_level_height"])))
-    assert np.all(np.isfinite(np.asarray(mapped_fields["density"])))
-    assert np.all(np.isfinite(np.asarray(mapped_fields["potential_temperature"])))
+    assert np.all(np.isfinite(np.asarray(mapped_fields["air_density"])))
+    assert np.all(np.isfinite(np.asarray(mapped_fields["air_potential_temperature"])))
 
     def mapped_arrays(
         temperature_values: jax.Array,
@@ -1207,7 +1211,9 @@ def test_camulator_default_snapshot_uses_native_provider_when_period_provider_is
         def sample(self, context: OutputContext) -> OutputFrame:
             samples.append(self.name)
             sample_payloads.append(context.payload)
-            return OutputFrame({"temperature": OutputVariable((), np.asarray(280.0))})
+            return OutputFrame(
+                {"air_temperature": OutputVariable((), np.asarray(280.0))}
+            )
 
     custom_provider = _Provider("custom")
     native_provider = _Provider("native")
@@ -1406,7 +1412,7 @@ def test_camulator_land_stores_jax_runtime_arrays(
 
     monkeypatch.setattr(
         camulator_land_module,
-        "create_lnd_mask_from_ocn",
+        "create_land_mask_from_ocean",
         lambda **kwargs: (jnp.ones((2, 2)), jnp.zeros((2, 2))),
     )
     monkeypatch.setattr(
@@ -1522,7 +1528,7 @@ def test_camulator_land_rejects_unused_physical_feedback(
     )
     monkeypatch.setattr(
         camulator_land_module,
-        "create_lnd_mask_from_ocn",
+        "create_land_mask_from_ocean",
         lambda **kwargs: (jnp.ones((2, 2)), jnp.zeros((2, 2))),
     )
     monkeypatch.setattr(
@@ -2016,7 +2022,7 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
         np.asarray([[11.0, 283.0], [33.0, 44.0]]),
     )
     assert_allclose_compact(
-        component_state.fields.get("temperature"), np.full((2, 2), 9.0)
+        component_state.fields.get("air_temperature"), np.full((2, 2), 9.0)
     )
     assert_allclose_compact(
         first.payload.output_prediction,

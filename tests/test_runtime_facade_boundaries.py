@@ -927,9 +927,9 @@ def test_runtime_topology_policy_boundaries_are_focused() -> None:
     assert "def build_topology_context(" in topology_policy_source
 
     for marker in (
-        "compute_ocn_lnd_masks_on_atm_grid",
+        "compute_ocean_land_masks_on_atmosphere_grid",
         "check_remap_conservation",
-        "check_total_lnd_ocn_mask_sum",
+        "check_land_ocean_fraction_sum",
         "ConservativeRectilinearRegridder",
         "jax_ones",
         "def create_exchange_masks(",

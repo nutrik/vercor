@@ -6,7 +6,7 @@ from typing import Any
 
 from vercor.setups.config import (
     CAMulatorConfig,
-    JAXGCMConfig,
+    JCMAtmosphereConfig,
     JCMLandAtmosphereConfig,
     Spinup,
     VerosConfig,
@@ -45,7 +45,7 @@ _LAZY_EXPORTS = {
         "_data.erainterim_ocean",
         "make_erainterim_ocean",
     ),
-    "make_jax_gcm": _LazyExport("_external.jax_gcm", "make_jax_gcm"),
+    "make_jcm_atmosphere": _LazyExport("_external.jax_gcm", "make_jcm_atmosphere"),
     "make_jcm_land": _LazyExport("_data.jcm_land", "make_jcm_land"),
     "make_veros_gcm": _LazyExport("_external.veros_gcm", "make_veros_gcm"),
     "make_veris": _LazyExport("_external.veris", "make_veris"),
@@ -60,7 +60,7 @@ _LAZY_EXPORTS = {
 
 __all__ = [
     "CAMulatorConfig",
-    "JAXGCMConfig",
+    "JCMAtmosphereConfig",
     "JCMLandAtmosphereConfig",
     "JCMLandAtmosphereSetup",
     "JCMInputs",

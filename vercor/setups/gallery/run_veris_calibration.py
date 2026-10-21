@@ -22,8 +22,8 @@ from vercor import Clock, Coupler, Exchange, RectilinearGrid, RuntimeOptions
 from vercor.components import DataComponent
 from vercor.dtypes import DTypePolicy, as_jax_real_array, jax_full
 from vercor.recipes import (
-    ATMOSPHERE_TO_VERIS_FORCING_FIELDS,
-    OCEAN_TO_VERIS_FORCING_FIELDS,
+    OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+    OCEAN_TO_SEAICE_FORCING_FIELDS,
 )
 from vercor.setups import VerisConfig, make_veris, replace_veris_parameters
 from vercor.state import RunState
@@ -204,14 +204,14 @@ def _cold_fields(
     wind_u = 0.0 if calm else 6.0 if holdout else 5.0
     wind_v = 0.0 if calm else 1.5 if holdout else 2.0
     values = {
-        "temperature": temperature,
-        "potential_temperature": temperature,
-        "specific_humidity": 0.0008 if holdout else 0.001,
-        "density": 1.3,
+        "air_temperature": temperature,
+        "air_potential_temperature": temperature,
+        "air_specific_humidity": 0.0008 if holdout else 0.001,
+        "air_density": 1.3,
         "model_level_height": 10.0,
         "surface_pressure": 1e5,
-        "u_velocity": wind_u,
-        "v_velocity": wind_v,
+        "air_u_velocity": wind_u,
+        "air_v_velocity": wind_v,
         "u_velocity_10m": wind_u,
         "v_velocity_10m": wind_v,
         "net_shortwave_radiation_flux": 30.0 if holdout else 20.0,
@@ -291,13 +291,16 @@ def _make_coupler(
         components=(source, ice),
         exchanges=(
             Exchange(
-                "FORCING",
-                "CICE",
-                (*ATMOSPHERE_TO_VERIS_FORCING_FIELDS, *OCEAN_TO_VERIS_FORCING_FIELDS),
+                source.name,
+                ice.name,
+                (
+                    *OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS,
+                    *OCEAN_TO_SEAICE_FORCING_FIELDS,
+                ),
                 quantity="intensive",
             ),
         ),
-        run_order=("FORCING", "CICE"),
+        run_order=(source.name, ice.name),
         runtime=RuntimeOptions(dtype=policy),
         log_level=loglevel,
     )
@@ -308,9 +311,11 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     coupler = _make_coupler(loglevel=loglevel, float_type=float_type)
     initial = coupler.initial_state()
     truth = as_jax_real_array(0.43, coupler.runtime.dtype)
-    observed = _predict_fraction(truth, initial, coupler=coupler, component="CICE")
+    observed = _predict_fraction(
+        truth, initial, coupler=coupler, component=coupler.run_order[-1]
+    )
     fitted = calibrate_lead_closing_thickness(
-        coupler, initial, observed, initial_h0=0.3
+        coupler, initial, observed, initial_h0=0.3, component=coupler.run_order[-1]
     )
     holdout = _make_coupler(
         loglevel=loglevel, float_type=float_type, steps=6, holdout=True
@@ -319,9 +324,14 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
     error = jnp.max(
         jnp.abs(
             _predict_fraction(
-                fitted.h0, held_initial, coupler=holdout, component="CICE"
+                fitted.h0,
+                held_initial,
+                coupler=holdout,
+                component=holdout.run_order[-1],
             )
-            - _predict_fraction(truth, held_initial, coupler=holdout, component="CICE")
+            - _predict_fraction(
+                truth, held_initial, coupler=holdout, component=holdout.run_order[-1]
+            )
         )
     )
     print(

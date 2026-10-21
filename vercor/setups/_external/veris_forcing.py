@@ -62,10 +62,14 @@ def prepare_veris_forcing_pack(
         fallback = (
             273.15
             if name
-            in {"temperature", "potential_temperature", "sea_surface_temperature"}
+            in {
+                "air_temperature",
+                "air_potential_temperature",
+                "sea_surface_temperature",
+            }
             else (
                 1.0
-                if name in {"density", "model_level_height"}
+                if name in {"air_density", "model_level_height"}
                 else constants.reference_pressure if name == "surface_pressure" else 0.0
             )
         )

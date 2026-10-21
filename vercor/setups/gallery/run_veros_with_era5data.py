@@ -12,7 +12,7 @@ from vercor.setups import make_era5_atmosphere
 from vercor.setups import make_era5_land
 from vercor.setups import VerosConfig, make_veros_gcm
 from vercor.recipes import (
-    ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
+    ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
 )
 from vercor.regridding import bilinear
 from vercor.topology import SurfaceMaskPolicy
@@ -28,7 +28,7 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
                 frequency="month",
                 variables=(
                     "surface_pressure",
-                    "temperature",
+                    "air_temperature",
                     "net_shortwave_radiation_flux",
                     "downward_longwave_radiation_flux",
                     "rain_rate",
@@ -76,15 +76,15 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         steps=365,
         calendar="noleap",
     )
-    run_order = ["OCN", "LND", "ATM"]
+    run_order = [ocn.name, lnd.name, atm.name]
 
     # Exchanges
     exchanges = (
         Exchange(
             quantity="intensive",
-            source="ATM",
-            target="OCN",
-            fields=ATMOSPHERE_TO_VEROS_FORCING_FIELDS,
+            source=atm.name,
+            target=ocn.name,
+            fields=ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
             regridder_factory=bilinear,
         ),
     )
@@ -94,7 +94,12 @@ def run_setup(*, loglevel: str, float_type: str) -> None:
         components=components,
         exchanges=exchanges,
         run_order=run_order,
-        runtime=RuntimeOptions(dtype=dtype, topology=SurfaceMaskPolicy()),
+        runtime=RuntimeOptions(
+            dtype=dtype,
+            topology=SurfaceMaskPolicy(
+                atmosphere=atm.name, ocean=ocn.name, land=lnd.name
+            ),
+        ),
         log_level=loglevel,
     )
 
