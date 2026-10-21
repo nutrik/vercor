@@ -7,6 +7,8 @@ versioning; pre-releases may still refine new contracts.
 
 ### Added
 
+- Audit component interfaces, wrappers, physical recipe compatibility, lifecycle,
+  and output/restart boundaries in `docs/interface-wrapper-audit.md`.
 - Transfer ERA5 rain and water-equivalent snow and JCM total precipitation to
   Veros through zero-seeded `rain_rate` and `snow_rate` exchange fields.
 - Compute virtual salt flux in VerCOR from precipitation minus bulk evaporation,
@@ -32,6 +34,17 @@ versioning; pre-releases may still refine new contracts.
 
 ### Fixed
 
+- Preserve independently supplied conservative cell bounds and explicit source
+  exclusion masks, including grids with identical centers. Compute bilinear
+  weights from the same wrapped/clipped longitude used for source-cell lookup.
+- Validate monthly/daily forcing record layouts before selection, and preserve
+  field precision in monthly interpolation and period output.
+- Write accepted list, tuple, and scalar provider coordinates through the shared
+  host-array boundary before defining NetCDF dimensions.
+- Accept nanosecond CAMulator forcing times and reject missing records,
+  inconsistent native cadence, and unsupported calendars before native stepping.
+- Keep JCM evolving state exclusively in payloads and validate native save
+  intervals before bootstrap or spinup.
 - Distinguish JCM bottom-level air variables from near-surface temperature and
   surface radiation in local adapter names, preserving bulk-flux field meanings.
 - Apply the VerCOR global forcing callback in both Veros execution lanes,
