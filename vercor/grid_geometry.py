@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from functools import partial as _partial
 from typing import Any, cast
 
+import jax as _jax
 from jax import Array, lax
 import jax.numpy as jnp
 
@@ -35,8 +37,13 @@ def grids_identical(g0: _RectilinearGrid, g1: _RectilinearGrid) -> bool:
     )
 
 
+@_partial(_jax.jit, static_argnames=("grid_type",))
 def centers_to_edges(centers: Any, grid_type: str) -> Any:
-    """Convert 1D latitude or longitude centers to cell edges."""
+    """Convert 1D latitude or longitude centers to cell edges.
+
+    Grid kind is static; numeric coordinates remain traced. Retaining this
+    kernel avoids rebuilding longitude conditionals in native output samples.
+    """
 
     centers = _as_jax_real_array(centers)
 

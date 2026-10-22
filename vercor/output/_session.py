@@ -435,7 +435,10 @@ class _OutputSession(PyTreeNodeMixin):
                 current = replace(
                     current,
                     coordinate_values=tuple(
-                        jnp.asarray(value) for value in current.coordinate_values
+                        # Abstract zero allocation uses explicit dtypes. Match
+                        # that strong typing when providers return weak scalars.
+                        jnp.asarray(value, dtype=jnp.asarray(value).dtype)
+                        for value in current.coordinate_values
                     ),
                 )
             accumulated.append(current)

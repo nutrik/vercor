@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Any, cast
 
 import jax
+import jax.numpy as jnp
 from jax.errors import JaxRuntimeError
 
 from vercor.calendar import ModelDateTime
@@ -129,7 +131,9 @@ def build_jax_chunk_executor(
     )
 
     def scanned_chunk(
-        runtime_state: RunState, step_indices: RuntimeArray, step_infos: RuntimeStepInfo
+        runtime_state: RunState,
+        step_indices: RuntimeArray,
+        step_infos: RuntimeStepInfo,
     ) -> RunState:
         def run_step(
             carry: RunState, scan_input: tuple[RuntimeArray, Any]
@@ -148,6 +152,38 @@ def build_jax_chunk_executor(
     return cast(_JaxChunkExecutor, jax.jit(scanned_chunk))
 
 
+@partial(jax.jit, static_argnames=("size",))
+def jax_chunk_inputs(
+    step_infos: RuntimeStepInfo, start: RuntimeArray, *, size: int
+) -> tuple[RuntimeArray, RuntimeStepInfo]:
+    """Gather fixed-width metadata with dynamic absolute indices.
+
+    Each schedule uses the greatest common divisor of its chunk lengths, so
+    every block contains only actual steps. A fixed scan length retains
+    reverse-mode differentiation while changing month lengths, schedule windows
+    and final tails reuse the same executable without inactive branches.
+    """
+    indices = start + jnp.arange(size, dtype=start.dtype)
+    infos = jax.tree_util.tree_map(
+        lambda value: jnp.take(value, indices, axis=0, mode="clip"), step_infos
+    )
+    return indices, cast(RuntimeStepInfo, infos)
+
+
+def iter_jax_chunk_inputs(
+    chunk: ExecutionChunk, execution_data: _RuntimeExecutionData, *, max_steps: int
+) -> Iterator[tuple[RuntimeArray, RuntimeStepInfo]]:
+    """Split one core chunk into fixed-width calls without adding I/O boundaries."""
+    if not chunk.steps:
+        return
+    stop = chunk.steps[-1].step + 1
+    for start in range(chunk.steps[0].step, stop, max_steps):
+        indices, infos = jax_chunk_inputs(
+            execution_data.step_infos, as_jax_index_array(start), size=max_steps
+        )
+        yield indices, infos
+
+
 def execute_jax_chunk(
     state: RunState,
     *,
@@ -155,24 +191,16 @@ def execute_jax_chunk(
     context: RuntimeRunContext,
     execution_data: _RuntimeExecutionData,
     executor: _JaxChunkExecutor,
+    max_steps: int,
 ) -> RunState:
     """Execute one uniform chunk with its schedule's reusable JAX executor."""
 
-    if not chunk.steps:
-        return state
-    start = chunk.steps[0].step
-    stop = chunk.steps[-1].step + 1
-    step_infos = jax.tree_util.tree_map(
-        lambda value: value[start:stop],
-        execution_data.step_infos,
-    )
-
     try:
-        return executor(
-            state,
-            execution_data.step_indices[start:stop],
-            cast(RuntimeStepInfo, step_infos),
-        )
+        for indices, infos in iter_jax_chunk_inputs(
+            chunk, execution_data, max_steps=max_steps
+        ):
+            state = executor(state, indices, infos)
+        return state
     except JaxRuntimeError as error:
         context.interrupts.raise_if_jax_callback_interrupted(
             error,

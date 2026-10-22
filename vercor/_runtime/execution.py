@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from math import gcd
 from typing import cast
 
 from vercor.components.runtime_execution import host_component_names
@@ -192,6 +193,10 @@ def execute_plan(
     )
     jax_executors: dict[tuple[str, ...], _JaxChunkExecutor] = {}
     output_executors: dict[tuple[str, ...], _JaxOutputExecutor] = {}
+    scan_sizes: dict[tuple[str, ...], int] = {}
+    for chunk in chunks:
+        components = chunk.steps[0].components
+        scan_sizes[components] = gcd(scan_sizes.get(components, 0), len(chunk.steps))
     for chunk in chunks:
         context.interrupts.checkpoint("runtime chunk")
         if scanned_output:
@@ -213,6 +218,7 @@ def execute_plan(
                 context=context,
                 execution_data=execution_data,
                 executor=output_executor,
+                max_steps=scan_sizes[components],
             )
         elif selected == "jax":
             components = chunk.steps[0].components
@@ -230,6 +236,7 @@ def execute_plan(
                 context=context,
                 execution_data=execution_data,
                 executor=executor,
+                max_steps=scan_sizes[components],
             )
         elif selected == "host":
             state = execute_host_chunk(

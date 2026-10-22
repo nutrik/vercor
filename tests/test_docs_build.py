@@ -50,6 +50,7 @@ PROJECT_RESOURCE_PAGES = (
     "releasing",
     "source-coupling-audit",
     "interface-wrapper-audit",
+    "jax-compilation-audit",
 )
 
 

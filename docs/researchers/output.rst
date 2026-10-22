@@ -69,3 +69,11 @@ sampling and accumulation run inside scans between output boundaries. Host
 components execute and sample in Python, so their native payloads need not be
 JAX PyTrees. Both paths use the same validation and averaging implementation;
 files and calendar formatting remain with the host coordinator.
+
+For a fixed provider schema, unequal calendar periods and incomplete tails
+reuse the schedule's compiled scan. A common exact block size divides every
+window, so shorter windows need no padding or extra samples. Coprime window
+lengths use single-step blocks. Numeric scalar coordinates use an explicit
+dtype inside the scan so period resets preserve the JAX input signature.
+Initial compilation is expected; new provider shapes, dtypes or static
+metadata require a new configuration.

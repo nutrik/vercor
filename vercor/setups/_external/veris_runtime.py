@@ -9,7 +9,7 @@ residuals. No native Simulation, clock, output writer or mutable model is steppe
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, fields as dataclass_fields, replace
 from typing import Any, Literal, TypeAlias, cast
 
@@ -25,6 +25,7 @@ from vercor.components import (
 )
 from vercor.dtypes import DTypePolicy
 from vercor.exceptions import ComponentError
+from vercor.physics import PhysicalConstants
 from vercor._numerical_safety import _require_zero
 from vercor.setups.config import VerisConfig
 from vercor.setups._time_helpers import align_model_timestep
@@ -51,6 +52,9 @@ class VerisPayload:
 
 _VerisCarry: TypeAlias = tuple[
     VerisPayload, VerisSurfaceFluxes, VerisIntervalBudget, jax.Array
+]
+_VerisStep: TypeAlias = Callable[
+    [Mapping[str, RuntimeArray], PhysicalConstants, float, VerisPayload], StepResult
 ]
 
 
@@ -235,6 +239,32 @@ def step_veris_runtime(
     )
 
 
+def _build_veris_runtime_step(resources: VerisRuntimeResources) -> _VerisStep:
+    """Retain one native executable with traced forcing, constants and duration.
+
+    Host coupling calls otherwise recreate the local native loop at every
+    interval. Bind immutable numerical resources once while passing every
+    evolving array and physical constant through the compiled boundary.
+    """
+
+    def native_step(
+        fields: Mapping[str, RuntimeArray],
+        constants: PhysicalConstants,
+        dt_seconds: float,
+        payload: VerisPayload,
+    ) -> StepResult:
+        return step_veris_runtime(
+            resources,
+            fields,
+            StepContext(
+                dt_seconds=dt_seconds, constants=constants, dtype=resources.dtype
+            ),
+            payload,
+        )
+
+    return cast(_VerisStep, jax.jit(native_step))
+
+
 class VerisSetupState:
     """Setup-only owner; stepping reads frozen resources and replaces payloads."""
 
@@ -243,6 +273,7 @@ class VerisSetupState:
         self.config = config
         self.geometry = geometry
         self.resources: VerisRuntimeResources | None = None
+        self._step_function: _VerisStep | None = None
 
     def setup(self, component: Component, context: SetupContext) -> SetupResult:
         """Initialize physical geometry at runtime precision with serial native execution."""
@@ -303,6 +334,7 @@ class VerisSetupState:
                 context.dtype,
                 self.config.atmosphere_forcing,
             )
+            self._step_function = _build_veris_runtime_step(self.resources)
         if "rhoFresh" in (self.config.physical_constants or {}):
             _require_zero(
                 jnp.count_nonzero(
@@ -344,6 +376,12 @@ class VerisSetupState:
         self, fields: Mapping[str, RuntimeArray], context: StepContext, payload: Any
     ) -> StepResult:
         """Delegate to the pure transition without assigning any evolving owner state."""
-        if self.resources is None:
+        if self.resources is None or self._step_function is None:
             raise ComponentError("Veris must be initialized before stepping")
-        return step_veris_runtime(self.resources, fields, context, payload)
+        if not isinstance(payload, VerisPayload):
+            raise ComponentError(
+                "Veris requires its initialized native runtime payload"
+            )
+        return self._step_function(
+            fields, context.constants, context.dt_seconds, payload
+        )

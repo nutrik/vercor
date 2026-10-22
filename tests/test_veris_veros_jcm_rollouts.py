@@ -2,6 +2,7 @@
 
 from typing import Any
 from pathlib import Path
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -21,14 +22,19 @@ def test_first_ice_step_uses_initialized_jcm(monkeypatch: pytest.MonkeyPatch) ->
     captured: list[Any] = []
     original = veris_runtime.prepare_veris_forcing_pack
 
-    def capture(fields: Any, **kwargs: Any) -> Any:
+    def record(fields: Any) -> None:
         captured.append(
             {key: np.asarray(value).copy() for key, value in fields.items()}
         )
+
+    def capture(fields: Any, **kwargs: Any) -> Any:
+        jax.debug.callback(record, fields, ordered=True)
         return original(fields, **kwargs)
 
     monkeypatch.setattr(veris_runtime, "prepare_veris_forcing_pack", capture)
-    coupler.run(initial)
+    jax.block_until_ready(coupler.run(initial))
+    jax.effects_barrier()
+    assert len(captured) == 1
     atm = coupler.components["ATM"]
     ice = coupler.components["CICE"]
     wet = np.asarray(ice.grid.binary_mask) > 0

@@ -196,8 +196,12 @@ absolute clock indices. Output-free uniform workflows preserve one JIT-wrapped
 `jax.lax.scan`; a run-local executor is reused for repeated schedules. The
 fixed-shape scan step is wrapped in `jax.checkpoint`, so reverse-mode rollouts
 rematerialize per-step intermediates instead of retaining the complete
-trajectory. Scan length, callback order, progress reporting, interrupt checks,
-and carry structure are unchanged.
+trajectory. Each schedule uses a fixed scan width equal to the greatest common
+divisor of its chunk lengths. Larger chunks use multiple internal blocks with
+dynamic absolute indices while retaining their original validation and output
+boundaries. Every scan slot is an actual step; no padding or conditional wraps
+the runtime state. Uniform workflows still use one complete scan. Coprime
+calendar or schedule windows use smaller blocks to preserve one compiled shape.
 
 Numeric output uses the same private runtime-step builder, composing each
 post-step sample with immutable sum/count accumulation inside a checkpointed
@@ -215,6 +219,14 @@ reordered, skipped, or out-of-chunk plans before dispatch.
 execution. Forced JAX rejects host components; forced host runs all scheduled
 components in Python. Host, compiled, and custom execution share receive,
 step, send, cancellation, state validation, and output boundaries.
+
+For fixed array schemas, VerCOR-owned JAX work retains its compiled functions
+throughout a run. Bilinear extrapolation kernels and the native Veris transition
+retain stable JIT boundaries on host, mixed and custom-driver execution too.
+Initial compilation per schedule/kernel is expected. Separate runs create
+run-local executors; new shapes, dtypes, static configuration or user-created
+JIT functions can require new compilation. Host component and custom-backend
+Python semantics remain unchanged; plugin authors own their internal JIT caches.
 
 Graceful interruption is scoped around each run. Host paths check at step and
 component boundaries. Compiled paths use ordered callbacks and a nonblocking
