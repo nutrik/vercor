@@ -139,3 +139,12 @@ modules form the application layer. Task 8 changes tests/documentation only.
 The complete inventory, remaining adapters with actual callers, and removal
 decisions are in `docs/source-coupling-audit.md`. No new runtime dependency or
 alternate preparation/output path is introduced.
+
+Scanned numeric output (2026-10-22) adds `vercor/output/_scan.py` after layer 17
+and before layer 18. It composes layer 17's shared JAX runtime-step builder with
+layer 14's existing immutable output accumulator; it owns neither cadence nor
+file writes. The optional numeric provider/context contract remains in the
+existing public output owner, with concrete extraction in layer 14. The layer
+18 coordinator selects the numeric lane only when every enabled provider opts
+in, and splits at the union of output boundaries plus schedule changes. Host
+providers and custom backends retain their established single-step behavior.

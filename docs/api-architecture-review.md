@@ -124,7 +124,7 @@ signatures from installed artifacts.
   "vercor.grid_masks": ["check_remap_conservation", "check_land_ocean_fraction_sum", "compute_land_mask", "compute_ocean_land_masks_on_atmosphere_grid", "create_land_mask_from_ocean"],
   "vercor.grids": ["RectilinearGrid"],
   "vercor.jax_logging": ["CANONICAL_LOG_DATE_FORMAT", "CANONICAL_LOG_FORMAT", "DEFAULT_LOGGER_NAME", "JaxCallbackLogger", "LoggerLike", "configure_python_logger", "effective_log_level", "emit_host_log", "get_default_logger", "logger_enabled_for", "normalize_log_level", "setup_logger"],
-  "vercor.output": ["OutputContext", "OutputFrame", "OutputProvider", "OutputSpec", "OutputTarget", "OutputVariable", "PeriodOutput", "SnapshotContext", "SnapshotWriter"],
+  "vercor.output": ["JaxOutputContext", "JaxOutputProvider", "OutputContext", "OutputFrame", "OutputProvider", "OutputSpec", "OutputTarget", "OutputVariable", "PeriodOutput", "SnapshotContext", "SnapshotWriter"],
   "vercor.physics": ["PhysicalConstants"],
   "vercor.recipes": ["ATMOSPHERE_TO_LAND_RADIATION_FIELDS", "ATMOSPHERE_TO_LAND_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS", "ATMOSPHERE_TO_OCEAN_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS", "OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS", "MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS", "LAND_TO_ATMOSPHERE_STATE_FIELDS", "LAND_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS", "OCEAN_TO_SEAICE_SURFACE_FIELDS", "OCEAN_TO_SEAICE_FORCING_FIELDS", "ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS", "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS", "SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS", "SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS", "SEAICE_COVERAGE_FIELDS"],
   "vercor.regridding": ["Regridder", "RegridderFactory", "VectorRegridder", "bilinear", "conservative"],
@@ -248,6 +248,7 @@ vercor.output._dataset
 vercor.output._netcdf
 vercor.output._period
 vercor.output._runtime
+vercor.output._scan
 vercor.output._session
 vercor.setups._data
 vercor.setups._data._component_helpers

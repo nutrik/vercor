@@ -232,6 +232,8 @@ def test_public_facades_hide_private_implementation_modules() -> None:
         "RunState",
     ]
     assert output_module.__all__ == [
+        "JaxOutputContext",
+        "JaxOutputProvider",
         "OutputContext",
         "OutputFrame",
         "OutputProvider",

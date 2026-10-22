@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
@@ -10,12 +11,12 @@ import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
-from vercor._host_arrays import array_to_host
-from vercor.output import OutputContext, OutputFrame, SnapshotContext
+from vercor.output import JaxOutputContext, OutputContext, OutputFrame, SnapshotContext
 from vercor.output._dataset import time_coordinate_variable, used_dimension_names
 from vercor.output._period import TIME_NAME, period_mean_sample_to_output_variable
 from vercor.output._netcdf import write_netcdf_dataset
 from vercor.output import OutputVariable
+from vercor.types import RuntimeArray
 from veros import variables as veros_variables
 
 VEROS_TIME_DIM = TIME_NAME
@@ -108,8 +109,8 @@ def _attrs_for_variable(variable: Any, settings: Any) -> dict[str, Any]:
     return attrs
 
 
-def _current_timestep_index(vs: Any) -> int:
-    return int(array_to_host(as_jax_index_array(vs.tau)))
+def _current_timestep_index(vs: Any) -> RuntimeArray:
+    return as_jax_index_array(vs.tau)
 
 
 def _drop_timestep_dim(
@@ -181,21 +182,50 @@ def veros_average_coordinate_variables(
 ) -> dict[str, OutputVariable]:
     """Return coordinates used by a Veros period-average dataset."""
 
-    coordinate_variables = {
-        VEROS_TIME_DIM: time_coordinate_variable(output_time, time_dim=VEROS_TIME_DIM)
+    return {
+        VEROS_TIME_DIM: time_coordinate_variable(output_time, time_dim=VEROS_TIME_DIM),
+        **_veros_numeric_coordinates(veros_state, variables),
     }
+
+
+def _veros_numeric_coordinates(
+    veros_state: Any,
+    variables: Mapping[str, OutputVariable],
+) -> dict[str, OutputVariable]:
+    """Extract native coordinate arrays without host calendar conversion."""
+
+    coordinate_variables = {}
     for dim in used_dimension_names(variables, excluded_dims=(VEROS_TIME_DIM,)):
         coordinate_variables[dim] = _extract_coordinate_variable(veros_state, dim)
     return coordinate_variables
 
 
 class _VerosOutputProvider:
-    """Ordinary provider adapting the current payload-owned Veros host state."""
+    """Adapt the current payload-owned Veros state for host or JAX output."""
 
     def sample(self, context: OutputContext) -> OutputFrame:
-        """Extract the active native variables after one Veros host step."""
+        """Extract active native variables and the real post-step timestamp."""
 
-        veros_state = context.payload
+        frame = self._sample_frame(context.payload)
+        return replace(
+            frame,
+            coordinates={
+                VEROS_TIME_DIM: time_coordinate_variable(
+                    context.time,
+                    time_dim=VEROS_TIME_DIM,
+                ),
+                **frame.coordinates,
+            },
+        )
+
+    def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
+        """Purely extract the current native time slot for compiled means."""
+
+        return self._sample_frame(context.payload)
+
+    def _sample_frame(self, veros_state: Any) -> OutputFrame:
+        """Share native state extraction independently of host timestamps."""
+
         if veros_state is None:
             raise ValueError("Veros output requires a native runtime payload.")
         native_variables = _native_output_variables(
@@ -204,11 +234,7 @@ class _VerosOutputProvider:
         )
         return OutputFrame(
             native_variables,
-            coordinates=veros_average_coordinate_variables(
-                veros_state=veros_state,
-                output_time=context.time,
-                variables=native_variables,
-            ),
+            coordinates=_veros_numeric_coordinates(veros_state, native_variables),
             time_dimension=VEROS_TIME_DIM,
         )
 
