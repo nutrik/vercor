@@ -8,7 +8,7 @@ Use these objects to select output, provide sampled variables, and configure
 period or snapshot writing at run boundaries.
 
 .. automodule:: vercor.output
-   :members: OutputContext, OutputFrame, OutputProvider, OutputSpec, OutputTarget, OutputVariable, PeriodOutput, SnapshotContext, SnapshotWriter
+   :members: JaxOutputContext, JaxOutputProvider, OutputContext, OutputFrame, OutputProvider, OutputSpec, OutputTarget, OutputVariable, PeriodOutput, SnapshotContext, SnapshotWriter
    :show-inheritance:
 
 Diagnostics

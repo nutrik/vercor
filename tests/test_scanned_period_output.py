@@ -12,7 +12,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from tests._workflow_test_support import make_clock, make_component
+from tests._workflow_test_support import SequentialBackend, make_clock, make_component
 from vercor import Coupler
 from vercor.dtypes import DTypePolicy
 from vercor.components import CallableComponent, ComponentSpec, LifecycleHooks
@@ -274,36 +274,51 @@ def test_numeric_provider_failures_remain_component_scoped(
         np.asarray([1.000000000001, 1.000000000002], dtype=np.float64),
     ],
 )
+@pytest.mark.parametrize("sampling", ["ordinary", "numeric_host", "numeric_custom"])
 def test_host_provider_preserves_coordinate_precision_with_x64_disabled(
     coordinates: np.ndarray,
+    sampling: str,
     tmp_path: Path,
 ) -> None:
-    """Numeric carry normalization must not cast ordinary provider coordinates."""
+    """Scan carry normalization must not cast any concrete provider coordinates."""
+
+    def frame(values: Any) -> output.OutputFrame:
+        return output.OutputFrame(
+            {"value": output.OutputVariable(("row", "col"), values)},
+            coordinates={"id": output.OutputVariable(("row",), coordinates)},
+        )
 
     class HostProvider:
         def sample(self, context: output.OutputContext) -> output.OutputFrame:
-            return output.OutputFrame(
-                {
-                    "value": output.OutputVariable(
-                        ("row", "col"), context.state.field("value")
-                    )
-                },
-                coordinates={"id": output.OutputVariable(("row",), coordinates)},
-            )
+            return frame(context.state.field("value"))
+
+    class NumericProvider(HostProvider):
+        def sample(self, context: output.OutputContext) -> output.OutputFrame:
+            raise AssertionError("numeric provider must use its numeric capability")
+
+        def sample_jax(self, context: output.JaxOutputContext) -> output.OutputFrame:
+            return frame(context.state.field("value"))
 
     component = make_component(
         "A",
         output=output.OutputSpec(
-            provider=HostProvider(),
+            provider=HostProvider() if sampling == "ordinary" else NumericProvider(),
             period=output.PeriodOutput(frequency="day"),
         ),
     )
+    backend: Any = {
+        "ordinary": "auto",
+        "numeric_host": "host",
+        "numeric_custom": SequentialBackend(),
+    }[sampling]
     with jax.enable_x64(False):
         coupler = Coupler(
             make_clock(2, dt_seconds=43_200.0),
             components=(component,),
             run_order=("A",),
-            runtime=RuntimeOptions(dtype=DTypePolicy(enable_x64=False)),
+            runtime=RuntimeOptions(
+                backend=backend, dtype=DTypePolicy(enable_x64=False)
+            ),
             log_level="ERROR",
         )
         coupler.run(output=_target(tmp_path))
@@ -355,11 +370,11 @@ def test_scanned_output_rejects_transient_lifecycle_validation_failure(
     assert not tuple(tmp_path.glob("*.nc"))
 
 
-def test_one_host_provider_preserves_host_sampling_for_all_providers(
+def test_one_host_provider_preserves_concrete_sampling_without_tracing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Using any rather than all numeric capabilities must not trace host code."""
+    """Ordinary sampling stays concrete while numeric neighbors use their capability."""
     observed = []
 
     class HostProvider:
@@ -375,8 +390,18 @@ def test_one_host_provider_preserves_host_sampling_for_all_providers(
             )
 
     class NumericProvider(HostProvider):
+        def sample(self, context: output.OutputContext) -> output.OutputFrame:
+            raise AssertionError("numeric providers must use their numeric capability")
+
         def sample_jax(self, context: Any) -> output.OutputFrame:
-            raise AssertionError("mixed providers must retain host sampling")
+            observed.append((context.component.name, int(context.step)))
+            return output.OutputFrame(
+                {
+                    "value": output.OutputVariable(
+                        ("row", "col"), context.state.field("value")
+                    )
+                }
+            )
 
     components = tuple(
         make_component(

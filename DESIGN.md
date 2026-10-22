@@ -202,9 +202,9 @@ and carry structure are unchanged.
 Numeric output uses the same private runtime-step builder, composing each
 post-step sample with immutable sum/count accumulation inside a checkpointed
 scan. Output-free and output-carry executors retain separate run-local caches
-by component schedule. Ordinary host-only providers and host/custom backends
-preserve single-step sampling. A schedule change also splits a scanned output
-window while retaining every provider's partial accumulator.
+by component schedule. Ordinary providers and host/custom backends preserve
+single-step sampling through the same output session. A schedule change also
+splits a scanned output window while retaining every provider's partial accumulator.
 
 An `ExecutionBackend.execute(...)` receives state, public context, a core-owned
 chunk, and `RuntimeDriver`. It must consume every plan exactly once and in order
@@ -237,10 +237,13 @@ complete keyword-only `OutputSpec`, allowing cadence, variable selection,
 providers, and snapshots to be configured independently per component.
 
 `JaxOutputProvider` is an optional structural capability in addition to ordinary
-`OutputProvider.sample`. Its pure `sample_jax(JaxOutputContext)` receives state,
-payload, absolute step and coupling interval in seconds, with no Python
-datetime. Numeric values and coordinates may change, but names, dimensions,
-metadata, shapes and dtypes remain fixed. The default field provider and bundled
+`OutputProvider.sample`. Period sampling prefers this capability independently
+for each provider on every backend, including mixed-component and custom runs.
+Its pure `sample_jax(JaxOutputContext)` receives state, payload, absolute int32
+step and coupling interval in seconds, with no Python datetime. The step is
+traced inside a scan and concrete on the host. Numeric values and coordinates
+may change, but names, dimensions, metadata, shapes and dtypes remain fixed.
+The default field provider and bundled
 JCM, Veris and Veros providers implement it. Their host methods add calendar
 timestamps to the same numeric extraction; snapshots retain ordinary host I/O.
 
@@ -250,9 +253,15 @@ model step and accumulates no initial-state sample. The first actual post-step
 sample remains inside the first scan. The carry stores only current state,
 sums, finite counts and latest coordinates, without a trajectory. Completed
 periods reset only their due accumulators; incomplete periods are not flushed.
-Zero-step runs do not trace or sample providers. A host-only provider among the
-enabled providers retains the existing per-step host-sampling path for all of
-them, without speculative tracing of third-party ordinary sampling methods.
+Zero-step runs do not trace or sample providers. An ordinary provider among the
+enabled providers retains per-step execution without speculative tracing of its
+sampling method; numeric neighbors still use `sample_jax`. Ordinary providers
+receive the concrete Python step, exact end-of-step calendar time and interval.
+Host and custom backends sample concrete post-step state without abstractly
+tracing native payloads. All sampling paths share provider selection, frame
+validation, variable selection, finite sum/count accumulation and period resets.
+Only scanned carry normalizes coordinate leaves to JAX arrays; host sampling
+preserves native coordinate precision.
 
 The default runtime-field provider applies the component's `TransferPolicy`
 with the exact precomputed metadata for `OutputContext.step`. Period output
