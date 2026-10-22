@@ -35,6 +35,13 @@ from vercor.output._session import (
     initial_output_session,
     write_output_boundary,
 )
+from vercor.output._scan import (
+    _JaxOutputExecutor,
+    build_jax_output_executor,
+    execute_jax_output_chunk,
+    initial_jax_output_session,
+    supports_scanned_output,
+)
 
 
 def build_validated_execution_plan(context: RuntimeRunContext) -> ExecutionPlan:
@@ -142,7 +149,6 @@ def execute_plan(
             boundary.stop_step: boundary for boundary in output_plan.boundaries
         }
 
-    chunks = _execution_chunks(plan, output_enabled=output_enabled)
     scheduled_names = _scheduled_component_names(plan)
     scheduled_components = {
         name: context.dispatch_context.components[name] for name in scheduled_names
@@ -158,6 +164,26 @@ def execute_plan(
     if selected == "host" and host_names:
         _warn_non_differentiable_host_runtime(context, host_names)
 
+    scanned_output = (
+        selected == "jax"
+        and output_plan is not None
+        and supports_scanned_output(output_plan)
+    )
+    chunks = _execution_chunks(
+        plan,
+        output_enabled=output_enabled and not scanned_output,
+        stop_steps=frozenset(output_boundaries) if scanned_output else frozenset(),
+    )
+    if scanned_output and chunks:
+        assert output_plan is not None
+        output_session = initial_jax_output_session(
+            output_plan,
+            state,
+            components=chunks[0].steps[0].components,
+            context=context,
+            execution_data=execution_data,
+        )
+
     public_context = ExecutionContext(
         clock=context.clock,
         component_names=tuple(context.dispatch_context.components),
@@ -165,9 +191,30 @@ def execute_plan(
         logger=context.logger,
     )
     jax_executors: dict[tuple[str, ...], _JaxChunkExecutor] = {}
+    output_executors: dict[tuple[str, ...], _JaxOutputExecutor] = {}
     for chunk in chunks:
         context.interrupts.checkpoint("runtime chunk")
-        if selected == "jax":
+        if scanned_output:
+            assert output_plan is not None and output_session is not None
+            components = chunk.steps[0].components
+            output_executor = output_executors.get(components)
+            if output_executor is None:
+                output_executor = build_jax_output_executor(
+                    components,
+                    plan=output_plan,
+                    context=context,
+                    execution_data=execution_data,
+                )
+                output_executors[components] = output_executor
+            state, output_session = execute_jax_output_chunk(
+                state,
+                output_session,
+                chunk=chunk,
+                context=context,
+                execution_data=execution_data,
+                executor=output_executor,
+            )
+        elif selected == "jax":
             components = chunk.steps[0].components
             executor = jax_executors.get(components)
             if executor is None:
@@ -200,19 +247,20 @@ def execute_plan(
                 context=context,
                 execution_data=execution_data,
             )
-        _validate_chunk_result(state, context=context)
+        _validate_chunk_result(
+            state, context=context, validate_lifecycle=not scanned_output
+        )
         if output_plan is not None and output_session is not None:
-            # Output-enabled chunks are deliberately one step so sampling and
-            # accumulation remain core-owned for every backend.
             step_index = chunk.steps[-1].step
-            _, output_time, output_dt = execution_data.clock_steps[step_index]
-            output_session = output_session.accumulate(
-                output_plan,
-                state,
-                step=step_index,
-                time=output_time + output_dt,
-                dt=output_dt,
-            )
+            if not scanned_output:
+                _, output_time, output_dt = execution_data.clock_steps[step_index]
+                output_session = output_session.accumulate(
+                    output_plan,
+                    state,
+                    step=step_index,
+                    time=output_time + output_dt,
+                    dt=output_dt,
+                )
             stop = chunk.steps[-1].step + 1
             boundary = output_boundaries.get(stop)
             if boundary is not None:
@@ -230,6 +278,7 @@ def _execution_chunks(
     plan: ExecutionPlan,
     *,
     output_enabled: bool,
+    stop_steps: frozenset[int] = frozenset(),
 ) -> tuple[ExecutionChunk, ...]:
     """Split a plan into contiguous uniform schedules and output sample points."""
 
@@ -244,6 +293,9 @@ def _execution_chunks(
             current = []
         current.append(step)
         current_components = step.components
+        if step.step + 1 in stop_steps:
+            chunks.append(ExecutionChunk(tuple(current)))
+            current = []
     if current:
         chunks.append(ExecutionChunk(tuple(current)))
     return tuple(chunks)
@@ -255,7 +307,12 @@ def _scheduled_component_names(plan: ExecutionPlan) -> tuple[str, ...]:
     return tuple(dict.fromkeys(name for step in plan.steps for name in step.components))
 
 
-def _validate_chunk_result(state: RunState, *, context: RuntimeRunContext) -> None:
+def _validate_chunk_result(
+    state: RunState,
+    *,
+    context: RuntimeRunContext,
+    validate_lifecycle: bool = True,
+) -> None:
     """Validate every built-in or custom backend result at the core boundary."""
 
     dispatch = context.dispatch_context
@@ -266,6 +323,7 @@ def _validate_chunk_result(state: RunState, *, context: RuntimeRunContext) -> No
         regridders=dispatch.regridders,
         contracts=dispatch.contracts,
         run_order=tuple(dispatch.components),
+        validate_lifecycle=validate_lifecycle,
     )
 
 

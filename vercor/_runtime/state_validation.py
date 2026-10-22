@@ -28,6 +28,7 @@ def validate_runtime_state(
     regridders: Mapping[str, Any],
     contracts: Mapping[str, ExchangeContract],
     run_order: Sequence[str] | None,
+    validate_lifecycle: bool = True,
 ) -> None:
     """Validate that runtime state matches the configured coupler topology."""
 
@@ -154,11 +155,12 @@ def validate_runtime_state(
             received_masks=received_masks,
             contract=contracts[component.name],
         )
-    for component in components.values():
-        component._validate_runtime_state(
-            runtime_state._component_state(component.name),
-            contracts[component.name],
-        )
+    if validate_lifecycle:
+        for component in components.values():
+            component._validate_runtime_state(
+                runtime_state._component_state(component.name),
+                contracts[component.name],
+            )
 
 
 def _validate_route_mask(

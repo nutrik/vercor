@@ -14,6 +14,7 @@ from vercor.components._protocol import Component as _Component
 from vercor.jax_logging import LoggerLike as _LoggerLike
 from vercor._field_names import freeze_name_sequence as _freeze_name_sequence
 from vercor.state import ComponentState as _ComponentState
+from vercor.types import RuntimeArray as _RuntimeArray
 
 _OutputFrequency: TypeAlias = Literal["step", "day", "month", "year"]
 
@@ -229,6 +230,36 @@ class OutputProvider(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class JaxOutputContext:
+    """Numeric post-step view for pure, fixed-schema scanned output sampling.
+
+    ``step`` is a traced absolute zero-based clock index. ``dt_seconds`` is
+    the static coupling interval in seconds. Calendar formatting belongs to
+    host output; numeric sampling must not perform I/O or mutate native state.
+    """
+
+    component: _Component
+    state: _ComponentState
+    payload: Any | None
+    step: int | _RuntimeArray
+    dt_seconds: float
+
+
+@runtime_checkable
+class JaxOutputProvider(OutputProvider, Protocol):
+    """Optional output capability for abstract tracing and numeric JAX scans.
+
+    Numeric frames have a fixed schema, metadata, shapes and dtypes across the
+    run. Numeric values and coordinates may evolve; Python time coordinates
+    are omitted. Ordinary providers need only implement :class:`OutputProvider`.
+    """
+
+    def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
+        """Return a pure numeric frame from the supplied post-step state."""
+        ...
+
+
 @dataclass(frozen=True, init=False)
 class PeriodOutput:
     """Mean-output cadence and uniform provider-variable selection policy.
@@ -370,6 +401,8 @@ SnapshotContext.__init__.__annotations__.update(
 
 
 __all__ = [
+    "JaxOutputContext",
+    "JaxOutputProvider",
     "OutputContext",
     "OutputFrame",
     "OutputProvider",

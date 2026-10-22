@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import datetime
 from importlib import resources
 from pathlib import Path
@@ -15,7 +16,7 @@ import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array, jax_index_dtype
-from vercor.output import OutputContext, OutputFrame, SnapshotContext
+from vercor.output import JaxOutputContext, OutputContext, OutputFrame, SnapshotContext
 from vercor.output._dataset import time_coordinate_variable
 from vercor.output._netcdf import write_netcdf_dataset
 from vercor.output._period import TIME_NAME
@@ -92,16 +93,24 @@ def jax_gcm_coordinate_variables(
 ) -> dict[str, OutputVariable]:
     """Return NetCDF coordinate variables for JAXGCM period output."""
 
+    return {
+        JAX_GCM_TIME_DIM: time_coordinate_variable(
+            output_time,
+            time_dim=JAX_GCM_TIME_DIM,
+        ),
+        **_jax_gcm_numeric_coordinates(coords),
+    }
+
+
+def _jax_gcm_numeric_coordinates(coords: Any) -> dict[str, OutputVariable]:
+    """Extract native coordinate arrays without host calendar conversion."""
+
     lon, sin_lat = coords.horizontal.nodal_axes
     lon_k, lat_k = coords.horizontal.modal_axes
     level = as_jax_real_array(coords.vertical.centers)
     layers = _vertical_layers(coords)
 
     coordinate_variables = {
-        JAX_GCM_TIME_DIM: time_coordinate_variable(
-            output_time,
-            time_dim=JAX_GCM_TIME_DIM,
-        ),
         _LON_NAME: OutputVariable(
             (_LON_NAME,),
             as_jax_real_array(lon) * 180.0 / jnp.pi,
@@ -405,6 +414,26 @@ class _JAXGCMOutputProvider:
     def sample(self, context: OutputContext) -> OutputFrame:
         """Extract one post-step JCM state using native dimensions and metadata."""
 
+        frame = self._sample_frame(context)
+        return replace(
+            frame,
+            coordinates={
+                JAX_GCM_TIME_DIM: time_coordinate_variable(
+                    context.time,
+                    time_dim=JAX_GCM_TIME_DIM,
+                ),
+                **frame.coordinates,
+            },
+        )
+
+    def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
+        """Purely extract current native arrays for compiled period means."""
+
+        return self._sample_frame(context)
+
+    def _sample_frame(self, context: OutputContext | JaxOutputContext) -> OutputFrame:
+        """Share native state extraction independently of host timestamps."""
+
         jcm_state = getattr(context.payload, "jcm_state", None)
         if jcm_state is None:
             raise ValueError("JAXGCM output requires a post-step JCM state.")
@@ -429,10 +458,7 @@ class _JAXGCMOutputProvider:
                 )
         return OutputFrame(
             variables,
-            coordinates=jax_gcm_coordinate_variables(
-                coords=self._coords,
-                output_time=context.time,
-            ),
+            coordinates=_jax_gcm_numeric_coordinates(self._coords),
             sample_dimension=JAX_GCM_TIME_DIM,
             time_dimension=JAX_GCM_TIME_DIM,
             dimension_order=JAX_GCM_OUTPUT_DIMENSION_ORDER,

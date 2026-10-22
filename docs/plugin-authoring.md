@@ -223,6 +223,31 @@ class GuideProvider:
         )
 ```
 
+## Numeric output inside JAX scans
+
+An ordinary `OutputProvider.sample(OutputContext)` continues to receive concrete
+Python step indices and post-step end timestamps. For an all-JAX coupled run,
+providers may additionally implement `JaxOutputProvider.sample_jax` to enable
+one scan between output boundaries. `JaxOutputContext` contains the original
+component, post-step state and payload, absolute step, and `dt_seconds`.
+Its step may be traced; it contains no Python datetime.
+
+The numeric method must be pure and support abstract tracing. Return an
+`OutputFrame` with fixed variable/coordinate names, dimensions, metadata,
+shapes and dtypes; array values and coordinates may evolve. Omit the time
+coordinate: the coordinator supplies the averaging-window timestamp when it
+writes. Share numeric extraction with the ordinary method, adding timestamp
+formatting only there. Native sample axes still use `sample_dimension` and
+finite-value counts, rather than averaging already-averaged native samples.
+
+The coordinator abstractly traces the first runtime step and numeric sample
+to prepare a zero accumulator. This does not execute an actual step or add an
+initial-state sample. Numeric sampling therefore must not perform file I/O,
+host array conversions, mutation, or Python branching on traced array values.
+All period providers must opt in for the scanned path; otherwise the existing
+host sampling path remains active. Host/custom backends also keep that path.
+Output-free and final-only execution do not invoke the numeric sampler.
+
 ## Testing with fakes
 
 Test component kernels directly with a small public context before composing

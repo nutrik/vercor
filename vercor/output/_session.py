@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 import re
@@ -17,6 +17,8 @@ from vercor.clock import Clock
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.jax_logging import LoggerLike
 from vercor.output import (
+    JaxOutputContext,
+    JaxOutputProvider,
     OutputContext,
     OutputFrame,
     OutputTarget,
@@ -34,6 +36,7 @@ from vercor._runtime.field_transfer import select_runtime_field
 from vercor._runtime.time import RuntimeStepInfo
 from vercor._pytree import PyTreeNodeMixin
 from vercor.state import ComponentState
+from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components._adapter import _ComponentBinding
@@ -305,6 +308,19 @@ class _RuntimeFieldProvider:
         self._step_infos = step_infos
 
     def sample(self, context: OutputContext) -> OutputFrame:
+        """Return time-selected runtime fields using the ordinary public context."""
+        return self.sample_jax(
+            JaxOutputContext(
+                context.component,
+                context.state,
+                context.payload,
+                context.step,
+                context.dt.total_seconds(),
+            )
+        )
+
+    def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
+        """Select fields with the traced absolute index and fixed grid schema."""
         step_info = cast(
             RuntimeStepInfo,
             jax.tree_util.tree_map(
@@ -361,11 +377,14 @@ class _OutputPlan:
     target: OutputTarget
 
 
+@jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class _OutputSession:
+class _OutputSession(PyTreeNodeMixin):
     """Immutable per-run optional accumulator bundle."""
 
     accumulators: tuple[_OutputAccumulator | None, ...]
+    pytree_children = ("accumulators",)
+    pytree_aux_data = ()
 
     def accumulate(
         self,
@@ -391,26 +410,77 @@ class _OutputSession:
                 time=time,
                 dt=dt,
             )
-            try:
-                frame = schema.provider.sample(context)
-                if not isinstance(frame, OutputFrame):
-                    raise TypeError(
-                        "must return OutputFrame; " f"got {type(frame).__name__}"
-                    )
-                current = (
-                    _OutputAccumulator.zeros_from_frame(
-                        frame,
-                        selected=schema.period.variables,
-                    )
-                    if accumulator is None
-                    else accumulator
+            accumulated.append(
+                _accumulate_provider_frame(
+                    schema,
+                    accumulator,
+                    lambda: schema.provider.sample(context),
                 )
-                accumulated.append(current.add_frame(frame))
-            except (KeyError, TypeError, ValueError) as exc:
-                raise ComponentError(
-                    f"Output provider for component {schema.component.name!r}: {exc}"
-                ) from exc
+            )
         return _OutputSession(tuple(accumulated))
+
+    def accumulate_jax(
+        self,
+        plan: _OutputPlan,
+        state: "RunState",
+        *,
+        step: int | RuntimeArray,
+        dt_seconds: float,
+    ) -> "_OutputSession":
+        """Accumulate one pure numeric sample inside a fixed-shape JAX scan."""
+        accumulated = []
+        for schema, accumulator in zip(plan.schemas, self.accumulators, strict=True):
+            context = JaxOutputContext(
+                schema.component._component,
+                ComponentState._from_runtime(
+                    schema.component.name,
+                    schema.component.grid,
+                    state._component_state(schema.component.name),
+                ),
+                state._component_state(schema.component.name).payload,
+                step,
+                dt_seconds,
+            )
+            provider = cast(JaxOutputProvider, schema.provider)
+            current = _accumulate_provider_frame(
+                schema,
+                accumulator,
+                lambda: provider.sample_jax(context),
+            )
+            accumulated.append(
+                replace(
+                    current,
+                    coordinate_values=tuple(
+                        jnp.asarray(value) for value in current.coordinate_values
+                    ),
+                )
+            )
+        return _OutputSession(tuple(accumulated))
+
+
+def _accumulate_provider_frame(
+    schema: _OutputSchema,
+    accumulator: _OutputAccumulator | None,
+    sample: Callable[[], OutputFrame],
+) -> _OutputAccumulator:
+    """Apply the same frame validation and reduction to both sampling lanes."""
+    try:
+        frame = sample()
+        if not isinstance(frame, OutputFrame):
+            raise TypeError(f"must return OutputFrame; got {type(frame).__name__}")
+        current = (
+            accumulator
+            if accumulator is not None
+            else _OutputAccumulator.zeros_from_frame(
+                frame,
+                selected=schema.period.variables,
+            )
+        )
+        return current.add_frame(frame)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ComponentError(
+            f"Output provider for component {schema.component.name!r}: {exc}"
+        ) from exc
 
 
 def has_period_output(

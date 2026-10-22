@@ -74,6 +74,49 @@ def build_runtime_execution_data(
     )
 
 
+def build_jax_runtime_step(
+    components: tuple[str, ...],
+    *,
+    context: RuntimeRunContext,
+    execution_data: _RuntimeExecutionData,
+) -> Callable[[RunState, RuntimeArray, RuntimeStepInfo], RunState]:
+    """Build the shared component sequence for either scanned carry layout."""
+
+    def run_step(
+        carry: RunState, step_index: RuntimeArray, step_info: RuntimeStepInfo
+    ) -> RunState:
+        context.interrupts.scanned_checkpoint(
+            "scanned runtime step",
+            step_index,
+        )
+        log_scanned_step_progress(
+            context.logger,
+            step_index,
+            execution_data.progress_messages,
+        )
+        for component_name in components:
+            label = f"scanned runtime component {component_name}"
+            context.interrupts.scanned_checkpoint(label, step_index)
+            log_scanned_component_progress(context.logger, component_name)
+            carry = step_runtime_component(
+                carry,
+                component_name,
+                step_info,
+                dispatch_context=context.dispatch_context,
+                allow_host_runtime=False,
+                logger=context.logger,
+                step=step_index,
+            )
+            context.interrupts.scanned_checkpoint(label, step_index)
+        context.interrupts.scanned_checkpoint(
+            "scanned runtime step",
+            step_index,
+        )
+        return carry
+
+    return run_step
+
+
 def build_jax_chunk_executor(
     components: tuple[str, ...],
     *,
@@ -81,45 +124,18 @@ def build_jax_chunk_executor(
     execution_data: _RuntimeExecutionData,
 ) -> _JaxChunkExecutor:
     """Compile one reusable scanned executor for a component schedule."""
+    runtime_step = build_jax_runtime_step(
+        components, context=context, execution_data=execution_data
+    )
 
     def scanned_chunk(
-        runtime_state: RunState,
-        step_indices: RuntimeArray,
-        step_infos: RuntimeStepInfo,
+        runtime_state: RunState, step_indices: RuntimeArray, step_infos: RuntimeStepInfo
     ) -> RunState:
         def run_step(
-            carry: RunState,
-            scan_input: tuple[RuntimeArray, Any],
+            carry: RunState, scan_input: tuple[RuntimeArray, Any]
         ) -> tuple[RunState, None]:
             step_index, step_info = scan_input
-            context.interrupts.scanned_checkpoint(
-                "scanned runtime step",
-                step_index,
-            )
-            log_scanned_step_progress(
-                context.logger,
-                step_index,
-                execution_data.progress_messages,
-            )
-            for component_name in components:
-                label = f"scanned runtime component {component_name}"
-                context.interrupts.scanned_checkpoint(label, step_index)
-                log_scanned_component_progress(context.logger, component_name)
-                carry = step_runtime_component(
-                    carry,
-                    component_name,
-                    step_info,
-                    dispatch_context=context.dispatch_context,
-                    allow_host_runtime=False,
-                    logger=context.logger,
-                    step=step_index,
-                )
-                context.interrupts.scanned_checkpoint(label, step_index)
-            context.interrupts.scanned_checkpoint(
-                "scanned runtime step",
-                step_index,
-            )
-            return carry, None
+            return runtime_step(carry, step_index, step_info), None
 
         final_state, _ = jax.lax.scan(
             jax.checkpoint(run_step),

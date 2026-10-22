@@ -190,13 +190,21 @@ registered components but may not reference unknown names or repeat one. The
 default `SequentialWorkflow` repeats the constructor run order.
 
 The private coordinator validates the plan, groups compatible consecutive
-schedules, and splits at output boundaries. Each `ExecutionChunk` retains
+schedules, and splits at the union of enabled output cadence boundaries when
+every provider supports numeric JAX sampling. Each `ExecutionChunk` retains
 absolute clock indices. Output-free uniform workflows preserve one JIT-wrapped
 `jax.lax.scan`; a run-local executor is reused for repeated schedules. The
 fixed-shape scan step is wrapped in `jax.checkpoint`, so reverse-mode rollouts
 rematerialize per-step intermediates instead of retaining the complete
 trajectory. Scan length, callback order, progress reporting, interrupt checks,
 and carry structure are unchanged.
+
+Numeric output uses the same private runtime-step builder, composing each
+post-step sample with immutable sum/count accumulation inside a checkpointed
+scan. Output-free and output-carry executors retain separate run-local caches
+by component schedule. Ordinary host-only providers and host/custom backends
+preserve single-step sampling. A schedule change also splits a scanned output
+window while retaining every provider's partial accumulator.
 
 An `ExecutionBackend.execute(...)` receives state, public context, a core-owned
 chunk, and `RuntimeDriver`. It must consume every plan exactly once and in order
@@ -227,6 +235,24 @@ Bundled slab and data factories default to `OutputSpec()` with no period
 policy, matching bundled external configuration defaults. They accept a
 complete keyword-only `OutputSpec`, allowing cadence, variable selection,
 providers, and snapshots to be configured independently per component.
+
+`JaxOutputProvider` is an optional structural capability in addition to ordinary
+`OutputProvider.sample`. Its pure `sample_jax(JaxOutputContext)` receives state,
+payload, absolute step and coupling interval in seconds, with no Python
+datetime. Numeric values and coordinates may change, but names, dimensions,
+metadata, shapes and dtypes remain fixed. The default field provider and bundled
+JCM, Veris and Veros providers implement it. Their host methods add calendar
+timestamps to the same numeric extraction; snapshots retain ordinary host I/O.
+
+Before the first output scan, abstract tracing of the first runtime step and
+numeric sample establishes a zero accumulator template. It executes no actual
+model step and accumulates no initial-state sample. The first actual post-step
+sample remains inside the first scan. The carry stores only current state,
+sums, finite counts and latest coordinates, without a trajectory. Completed
+periods reset only their due accumulators; incomplete periods are not flushed.
+Zero-step runs do not trace or sample providers. A host-only provider among the
+enabled providers retains the existing per-step host-sampling path for all of
+them, without speculative tracing of third-party ordinary sampling methods.
 
 The default runtime-field provider applies the component's `TransferPolicy`
 with the exact precomputed metadata for `OutputContext.step`. Period output

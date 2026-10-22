@@ -163,6 +163,8 @@ def test_output_public_api_is_spec_not_mutable_adapter() -> None:
     assert vercor.output.OutputSpec.__module__ == "vercor.output"
     assert vercor.output.PeriodOutput.__module__ == "vercor.output"
     assert vercor.output.__all__ == [
+        "JaxOutputContext",
+        "JaxOutputProvider",
         "OutputContext",
         "OutputFrame",
         "OutputProvider",

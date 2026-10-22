@@ -117,6 +117,8 @@ def _read(path: Path, name: str) -> np.ndarray:
 
 def test_output_module_exports_exact_v0_4_contract() -> None:
     assert output_api.__all__ == [
+        "JaxOutputContext",
+        "JaxOutputProvider",
         "OutputContext",
         "OutputFrame",
         "OutputProvider",

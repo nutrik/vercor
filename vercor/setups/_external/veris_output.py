@@ -22,9 +22,10 @@ from vercor.calendar import ModelDateTime
 from vercor.grids import RectilinearGrid
 from vercor.grid_geometry import centers_to_edges
 from vercor.output import (
+    JaxOutputContext,
+    JaxOutputProvider,
     OutputContext,
     OutputFrame,
-    OutputProvider,
     OutputVariable,
     SnapshotContext,
 )
@@ -38,7 +39,7 @@ _STATE_VARIABLES = ("Area", "hIceMean", "hSnowMean", "TSurf", "uIce", "vIce")
 def _sample(
     payload: Any,
     grid: RectilinearGrid,
-    time: datetime | ModelDateTime,
+    time: datetime | ModelDateTime | None,
     canonical_fields: Mapping[str, RuntimeArray],
 ) -> OutputFrame:
     """Build one frame from current payload arrays and native registry metadata."""
@@ -122,7 +123,7 @@ def _sample(
             centers_to_edges(grid.latitude, "lat") if y_edges is None else y_edges
         )[1:],
     }
-    coordinates = {"time": time_coordinate_variable(time)}
+    coordinates = {} if time is None else {"time": time_coordinate_variable(time)}
     for name in used_dimension_names(variables):
         longitude = name.startswith("x_")
         coordinates[name] = OutputVariable(
@@ -148,8 +149,18 @@ class _VerisOutputProvider:
         )
         return _sample(context.payload, grid, context.time, context.state.fields())
 
+    def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
+        """Purely extract current sea-ice arrays without host calendar values."""
 
-def veris_output_provider() -> OutputProvider:
+        grid = (
+            context.state.grid
+            if context.state.grid is not None
+            else context.component.grid
+        )
+        return _sample(context.payload, grid, None, context.state.fields())
+
+
+def veris_output_provider() -> JaxOutputProvider:
     """Return a provider compatible with shared empty/subset variable selection."""
     return _VerisOutputProvider()
 

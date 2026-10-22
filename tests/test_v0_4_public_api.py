@@ -175,6 +175,8 @@ PUBLIC_MODULE_EXPORTS = {
         "setup_logger",
     ),
     "vercor.output": (
+        "JaxOutputContext",
+        "JaxOutputProvider",
         "OutputContext",
         "OutputFrame",
         "OutputProvider",
