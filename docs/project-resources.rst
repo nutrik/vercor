@@ -27,3 +27,4 @@ authoring and released versions.
 
    source-coupling-audit
    interface-wrapper-audit
+   jax-compilation-audit

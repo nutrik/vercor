@@ -50,7 +50,7 @@ def _values(path: Path, name: str = "value") -> np.ndarray:
         return np.asarray(dataset.variables[name])
 
 
-def test_daily_output_scans_whole_windows_and_incomplete_tail(
+def test_daily_output_reuses_exact_blocks_with_incomplete_tail(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A singleton-chunk regression must fail the invocation and mean checks."""
@@ -67,7 +67,7 @@ def test_daily_output_scans_whole_windows_and_incomplete_tail(
     lengths = _scan_lengths(monkeypatch)
     final = coupler.run(seed, output=_target(tmp_path))
     jax.block_until_ready(final)
-    assert lengths == [4, 4, 2]
+    assert lengths == [2, 2, 2, 2, 2]
     paths = sorted(tmp_path.glob("a.averages.*.nc"))
     assert len(paths) == 2
     np.testing.assert_allclose(_values(paths[0]), 2.5)

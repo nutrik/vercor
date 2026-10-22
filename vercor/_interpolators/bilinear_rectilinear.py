@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
@@ -266,6 +266,11 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
 
     def apply_scalar(self, src: Any) -> Any:
         out, _ = self._apply_bilinear_scalar(src)
+        return self._finish_scalar(src, out)
+
+    @jax.jit
+    def _finish_scalar(self, src: Any, out: Array) -> Any:
+        """Reuse extrapolation control flow while source checks stay eager."""
         need = ~jnp.isfinite(out)
         ext = lax.cond(
             jnp.any(need),
@@ -343,6 +348,22 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         vt3_for_projection = jnp.where(need[..., None], 0.0, vt3)
         u_t = jnp.sum(vt3_for_projection * self._e_east_t, axis=-1)
         v_t = jnp.sum(vt3_for_projection * self._e_north_t, axis=-1)
+        return cast(
+            tuple[Any, Any],
+            self._finish_vector(u_src_array, v_src_array, valid, need, u_t, v_t),
+        )
+
+    @jax.jit
+    def _finish_vector(
+        self,
+        u_src_array: Array,
+        v_src_array: Array,
+        valid: Array,
+        need: Array,
+        u_t: Array,
+        v_t: Array,
+    ) -> tuple[Any, Any]:
+        """Reuse vector extrapolation without changing source error boundaries."""
 
         def apply_vector_extrapolation(_: None) -> tuple[Array, Array]:
             u_fill = self._extrapolate_scalar(u_src_array, valid)

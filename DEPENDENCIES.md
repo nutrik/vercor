@@ -14,6 +14,12 @@ concrete calendar contexts. Layer 18's execution coordinator selects scan
 acceleration only when the runtime and every enabled provider support it.
 This adds no layer or dependency cycle.
 
+Layer 18's execution coordinator selects an exact common scan block size per schedule;
+the existing backend owner supplies shared numeric chunk inputs to the output
+scan owner. Bilinear extrapolation and Veris setup retain compiled kernels at
+their existing layers. Scanned coordinates receive strong numeric dtypes in
+the output session. No new module, public protocol or dependency is added.
+
 The 2026-07-20 simplification removed the one-caller
 `vercor/_runtime/component_topology.py` and one-use
 `vercor/_runtime/runner.py` modules. Surface-role lookup now belongs to

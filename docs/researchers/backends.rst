@@ -30,3 +30,15 @@ recommendation:
 Forcing ``backend="jax"`` rejects host components during configuration before
 the coupler takes a step. See :doc:`../developers/host-components` for the
 host-component contract.
+
+With fixed array schemas, VerCOR reuses its compiled kernels during a run.
+Initial compilation of a schedule or kernel is expected. Changes to shapes,
+dtypes or static configuration can require another executable. Separate runs
+retain their existing run-local compilation lifetime.
+
+Host components and custom backends keep their Python execution contract.
+Their authors should construct reusable JIT functions during setup and pass
+changing numerical values, including step indices, as dynamic arguments.
+Defining a new JIT function or local JAX control-flow body on every Python step
+can trigger compilation inside that component even when VerCOR's kernels are
+stable.

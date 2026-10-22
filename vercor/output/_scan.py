@@ -17,7 +17,11 @@ from jax.errors import JaxRuntimeError
 
 from vercor.output import JaxOutputProvider
 from vercor.output._session import _OutputPlan, _OutputSession, initial_output_session
-from vercor._runtime.backends import _RuntimeExecutionData, build_jax_runtime_step
+from vercor._runtime.backends import (
+    _RuntimeExecutionData,
+    build_jax_runtime_step,
+    iter_jax_chunk_inputs,
+)
 from vercor._runtime.run_context import RuntimeRunContext
 from vercor._runtime.time import RuntimeStepInfo
 from vercor.runtime import ExecutionChunk
@@ -89,7 +93,9 @@ def build_jax_output_executor(
     )
 
     def scanned_chunk(
-        carry: _OutputCarry, indices: RuntimeArray, infos: RuntimeStepInfo
+        carry: _OutputCarry,
+        indices: RuntimeArray,
+        infos: RuntimeStepInfo,
     ) -> _OutputCarry:
         def step(
             carry: _OutputCarry, inputs: tuple[RuntimeArray, Any]
@@ -139,18 +145,16 @@ def execute_jax_output_chunk(
     context: RuntimeRunContext,
     execution_data: _RuntimeExecutionData,
     executor: _JaxOutputExecutor,
+    max_steps: int,
 ) -> _OutputCarry:
     """Execute a core-owned uniform slice and translate callback interruption."""
-    start = chunk.steps[0].step
-    stop = chunk.steps[-1].step + 1
-    infos = cast(
-        RuntimeStepInfo,
-        jax.tree_util.tree_map(lambda x: x[start:stop], execution_data.step_infos),
-    )
+    carry = (state, session)
     try:
-        return executor(
-            (state, session), execution_data.step_indices[start:stop], infos
-        )
+        for indices, infos in iter_jax_chunk_inputs(
+            chunk, execution_data, max_steps=max_steps
+        ):
+            carry = executor(carry, indices, infos)
+        return carry
     except JaxRuntimeError as error:
         context.interrupts.raise_if_jax_callback_interrupted(
             error, "compiled scanned output runtime"
