@@ -219,6 +219,8 @@ The source code is a sequential pipeline of pure functions, each returning a fro
 Key principle:
 **Physics related parameters/constants are JAX-traced** (for AD),
 **Precision parameters are static** (control array shapes).
+**No retracing or recompilation**: Ensure that all JAX functions required during the simulation are traced and JIT-compiled during initialization (or a warm-up phase).
+Subsequent simulation steps must reuse the compiled executables without triggering additional tracing or compilation.
 Never branch on Physics parameters.
 
 ---
@@ -234,7 +236,6 @@ Never branch on Physics parameters.
 - **Naming**: Use snake_case for everything.
 - **Docstrings**: Every public function and class must have a docstring explaining what it does, its inputs/outputs, and any non-obvious choices. Follow PEP 257 style.
 - **Precision**: globaly define JAX precision policy (e.g., `jax.config.update("jax_enable_x64", True)`) and stick to it. Don't mix dtypes within the entire code. 
-
 ---
 
 ## Module dependency order
