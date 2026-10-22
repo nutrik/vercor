@@ -232,11 +232,12 @@ class OutputProvider(Protocol):
 
 @dataclass(frozen=True)
 class JaxOutputContext:
-    """Numeric post-step view for pure, fixed-schema scanned output sampling.
+    """Numeric post-step view for pure, fixed-schema output sampling.
 
-    ``step`` is a traced absolute zero-based clock index. ``dt_seconds`` is
-    the static coupling interval in seconds. Calendar formatting belongs to
-    host output; numeric sampling must not perform I/O or mutate native state.
+    ``step`` is an absolute zero-based int32 clock index, traced inside JAX
+    scans and concrete on host runs. ``dt_seconds`` is the static coupling
+    interval in seconds. Calendar formatting belongs to host output; numeric
+    sampling must not perform I/O or mutate native state.
     """
 
     component: _Component
@@ -248,11 +249,13 @@ class JaxOutputContext:
 
 @runtime_checkable
 class JaxOutputProvider(OutputProvider, Protocol):
-    """Optional output capability for abstract tracing and numeric JAX scans.
+    """Optional numeric sampling capability used independently of the backend.
 
     Numeric frames have a fixed schema, metadata, shapes and dtypes across the
     run. Numeric values and coordinates may evolve; Python time coordinates
     are omitted. Ordinary providers need only implement :class:`OutputProvider`.
+    Period output prefers ``sample_jax`` wherever this capability is present;
+    all-numeric JAX runs additionally accumulate samples inside scans.
     """
 
     def sample_jax(self, context: JaxOutputContext) -> OutputFrame:

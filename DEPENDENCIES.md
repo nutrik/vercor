@@ -7,6 +7,13 @@ earlier layer. Imports guarded only by `TYPE_CHECKING` are annotation edges and
 are not runtime-order constraints. Public owner facades are listed separately
 from their concrete private implementations.
 
+Layer 14's `vercor/output/_session.py` owns backend-independent provider
+selection and accumulation. It uses layer 1's canonical int32 index conversion
+for numeric sampling on both host and JAX runs; ordinary providers retain
+concrete calendar contexts. Layer 18's execution coordinator selects scan
+acceleration only when the runtime and every enabled provider support it.
+This adds no layer or dependency cycle.
+
 The 2026-07-20 simplification removed the one-caller
 `vercor/_runtime/component_topology.py` and one-use
 `vercor/_runtime/runner.py` modules. Surface-role lookup now belongs to

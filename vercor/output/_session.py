@@ -14,6 +14,7 @@ import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.clock import Clock
+from vercor.dtypes import as_jax_index_array
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.jax_logging import LoggerLike
 from vercor.output import (
@@ -395,29 +396,10 @@ class _OutputSession(PyTreeNodeMixin):
         time: _Time,
         dt: timedelta,
     ) -> "_OutputSession":
-        accumulated: list[_OutputAccumulator] = []
-        for schema, accumulator in zip(plan.schemas, self.accumulators, strict=True):
-            runtime_state = state._component_state(schema.component.name)
-            context = OutputContext(
-                component=schema.component._component,
-                state=ComponentState._from_runtime(
-                    schema.component.name,
-                    schema.component.grid,
-                    runtime_state,
-                ),
-                payload=runtime_state.payload,
-                step=step,
-                time=time,
-                dt=dt,
-            )
-            accumulated.append(
-                _accumulate_provider_frame(
-                    schema,
-                    accumulator,
-                    lambda: schema.provider.sample(context),
-                )
-            )
-        return _OutputSession(tuple(accumulated))
+        """Sample every provider's supported capability after one concrete step."""
+        return self._accumulate(
+            plan, state, step=step, dt_seconds=dt.total_seconds(), host_time=(time, dt)
+        )
 
     def accumulate_jax(
         self,
@@ -428,34 +410,83 @@ class _OutputSession(PyTreeNodeMixin):
         dt_seconds: float,
     ) -> "_OutputSession":
         """Accumulate one pure numeric sample inside a fixed-shape JAX scan."""
+        return self._accumulate(plan, state, step=step, dt_seconds=dt_seconds)
+
+    def _accumulate(
+        self,
+        plan: _OutputPlan,
+        state: "RunState",
+        *,
+        step: int | RuntimeArray,
+        dt_seconds: float,
+        host_time: tuple[_Time, timedelta] | None = None,
+    ) -> "_OutputSession":
+        """Share provider selection, frame checks and reduction on every backend."""
         accumulated = []
         for schema, accumulator in zip(plan.schemas, self.accumulators, strict=True):
-            context = JaxOutputContext(
-                schema.component._component,
-                ComponentState._from_runtime(
-                    schema.component.name,
-                    schema.component.grid,
-                    state._component_state(schema.component.name),
-                ),
-                state._component_state(schema.component.name).payload,
-                step,
-                dt_seconds,
-            )
-            provider = cast(JaxOutputProvider, schema.provider)
             current = _accumulate_provider_frame(
                 schema,
                 accumulator,
-                lambda: provider.sample_jax(context),
+                lambda: _sample_provider(
+                    schema, state, step=step, dt_seconds=dt_seconds, host_time=host_time
+                ),
             )
-            accumulated.append(
-                replace(
+            if host_time is None:
+                current = replace(
                     current,
                     coordinate_values=tuple(
                         jnp.asarray(value) for value in current.coordinate_values
                     ),
                 )
-            )
+            accumulated.append(current)
         return _OutputSession(tuple(accumulated))
+
+
+def _sample_provider(
+    schema: _OutputSchema,
+    state: "RunState",
+    *,
+    step: int | RuntimeArray,
+    dt_seconds: float,
+    host_time: tuple[_Time, timedelta] | None,
+) -> OutputFrame:
+    """Prefer numeric extraction per provider, independently of runtime backend.
+
+    Concrete host sampling does not trace component payloads or coerce their
+    coordinates. Only ordinary providers require calendar time and a Python
+    step index; scan eligibility is checked before abstract preparation.
+    """
+    runtime_state = state._component_state(schema.component.name)
+    view = ComponentState._from_runtime(
+        schema.component.name, schema.component.grid, runtime_state
+    )
+    provider = schema.provider
+    if isinstance(provider, JaxOutputProvider):
+        return provider.sample_jax(
+            JaxOutputContext(
+                schema.component._component,
+                view,
+                runtime_state.payload,
+                as_jax_index_array(step),
+                dt_seconds,
+            )
+        )
+    if host_time is None:
+        raise TypeError("scanned output requires a JaxOutputProvider")
+    time, dt = host_time
+    return cast(
+        OutputFrame,
+        provider.sample(
+            OutputContext(
+                schema.component._component,
+                view,
+                runtime_state.payload,
+                cast(int, step),
+                time,
+                dt,
+            )
+        ),
+    )
 
 
 def _accumulate_provider_frame(
