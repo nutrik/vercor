@@ -316,3 +316,49 @@ def test_roundoff_reconciliation_rejects_materially_excessive_ice() -> None:
     with pytest.raises(Exception, match="ocean-area bounds"):
         result = prepare(fields, jnp.full((2, 3), 1 - 0.0011))
         jax.block_until_ready(result)
+
+
+@pytest.mark.parametrize("enable_x64", [False, True])
+def test_full_ice_remapped_to_t31_passes_compiled_surface_bounds(
+    enable_x64: bool,
+) -> None:
+    """Reproduce the late full-ice failure with geometry alone, without a rollout."""
+    from vercor import RectilinearGrid
+    from vercor.grid_masks import compute_ocean_land_masks_on_atmosphere_grid
+    from vercor.regridding import conservative
+
+    with jax.enable_x64(enable_x64):
+        source = RectilinearGrid(
+            "ocean",
+            longitude=jnp.arange(2.0, 360.0, 4.0),
+            latitude=jnp.arange(-76.0, 84.0, 4.0),
+        )
+        gaussian_latitudes = np.rad2deg(
+            np.arcsin(np.polynomial.legendre.leggauss(48)[0])
+        )
+        target = RectilinearGrid(
+            "atmosphere",
+            longitude=jnp.arange(96) * 3.75,
+            latitude=gaussian_latitudes,
+        )
+        remap = conservative(source, target)
+        wet = jnp.ones(source.shape)
+        _, land, _ = compute_ocean_land_masks_on_atmosphere_grid(wet, remap)
+        ice = jax.jit(remap.regrid)(wet)
+        fields = {
+            "land_surface_temperature": jnp.full(target.shape, 300.0),
+            "soil_moisture": jnp.full(target.shape, 0.42),
+            "ice_fraction": ice,
+            "ice_surface_temperature": remap.regrid(wet * 260.0),
+            "ice_surface_albedo": remap.regrid(wet * 0.7),
+            "open_water_temperature_contribution": jnp.zeros(target.shape),
+        }
+        result = prepare(fields, land, dtype=ice.dtype)
+        jax.block_until_ready(result)
+        marine = np.asarray(land) < 1
+        np.testing.assert_array_equal(result.marine_ice_fraction[marine], 1)
+        np.testing.assert_allclose(
+            result.sea_surface_temperature[marine],
+            260.0,
+            rtol=1e-5 if ice.dtype == jnp.float32 else 1e-12,
+        )

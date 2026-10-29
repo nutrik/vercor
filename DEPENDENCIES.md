@@ -14,6 +14,10 @@ concrete calendar contexts. Layer 18's execution coordinator selects scan
 acceleration only when the runtime and every enabled provider support it.
 This adds no layer or dependency cycle.
 
+Conservative remapping computes destination longitude widths with the same
+degree-difference/radian-conversion arithmetic as its overlap weights. The
+ice-area bounds repair changes no import or topological layer.
+
 Layer 18's execution coordinator selects an exact common scan block size per schedule;
 the existing backend owner supplies shared numeric chunk inputs to the output
 scan owner. Bilinear extrapolation and Veris setup retain compiled kernels at
