@@ -188,8 +188,15 @@ def create_land_mask_from_ocean(
     atmosphere_latitude: _RuntimeArray,
     atmosphere_longitude: _RuntimeArray,
     ocean_grid: _RectilinearGrid,
+    *,
+    native_land_fraction: _RuntimeArray | None = None,
 ) -> tuple[_RuntimeArray, _RuntimeArray]:
-    """Create land binary and fractional masks from an ocean-grid binary mask."""
+    """Create land support, retaining optional native terrain outside the ocean.
+
+    Without native terrain, land remains the historical complement of coupled
+    wet coverage. Native fractions have atmosphere-grid shape and values in
+    [0, 1]; only the fraction outside the ocean's rectangular footprint is used.
+    """
 
     atmosphere_grid = _RectilinearGrid(
         name="atmosphere-mask-grid",
@@ -197,24 +204,52 @@ def create_land_mask_from_ocean(
         latitude=atmosphere_latitude,
     )
 
-    regridder = _ConservativeRectilinearRegridder(
-        ocean_grid,
-        atmosphere_grid,
+    ocean_fraction, _, land_fraction = _surface_fractions_from_ocean(
+        atmosphere_grid, ocean_grid, native_land_fraction
     )
+    binary = (
+        compute_land_mask(ocean_fraction)
+        if native_land_fraction is None
+        else jnp.where(land_fraction > 0.0, 1, 0)
+    )
+    return binary, land_fraction
 
+
+def _surface_fractions_from_ocean(
+    atmosphere_grid: _RectilinearGrid,
+    ocean_grid: _RectilinearGrid,
+    native_land_fraction: _RuntimeArray | None = None,
+) -> tuple[_RuntimeArray, _RuntimeArray, _RuntimeArray]:
+    """Return coupled ocean, prescribed marine, and land target-area fractions.
+
+    One conservative remapper gives wet coverage C and rectangular footprint G.
+    Native terrain supplies U=(1-G)*(1-native_land) outside that footprint;
+    L=1-C-U closes the partition. Geometry is setup-only, with the historical
+    0.001 endpoint thresholds applied consistently so C never exceeds G.
+    """
+    native = None
+    if native_land_fraction is not None:
+        native = _as_jax_real_array(native_land_fraction)
+        if native.shape != atmosphere_grid.shape:
+            raise ValueError("native_land_fraction must have atmosphere-grid shape")
+        if not bool(jnp.all(jnp.isfinite(native) & (native >= 0) & (native <= 1))):
+            raise ValueError(
+                "native_land_fraction must contain finite fractions in [0, 1]"
+            )
+    regridder = _ConservativeRectilinearRegridder(ocean_grid, atmosphere_grid)
     ocean_binary_mask = _as_jax_real_array(ocean_grid.binary_mask)
-
-    (
-        ocean_fraction_on_atmosphere_grid,
-        land_fraction_on_atmosphere_grid,
-        land_binary_mask_on_atmosphere_grid,
-    ) = compute_ocean_land_masks_on_atmosphere_grid(ocean_binary_mask, regridder)
-
-    check_remap_conservation(
-        regridder, ocean_binary_mask, ocean_fraction_on_atmosphere_grid
+    ocean, land, _ = compute_ocean_land_masks_on_atmosphere_grid(
+        ocean_binary_mask, regridder
     )
-    check_land_ocean_fraction_sum(
-        land_fraction_on_atmosphere_grid, ocean_fraction_on_atmosphere_grid
-    )
+    prescribed = jnp.zeros_like(ocean)
+    if native is not None:
+        footprint, _, _ = compute_ocean_land_masks_on_atmosphere_grid(
+            jnp.ones_like(ocean_binary_mask), regridder
+        )
+        ocean = jnp.minimum(ocean, footprint)
+        prescribed = (1.0 - jnp.asarray(footprint)) * (1.0 - native)
+        land = 1.0 - ocean - prescribed
 
-    return land_binary_mask_on_atmosphere_grid, land_fraction_on_atmosphere_grid
+    check_remap_conservation(regridder, ocean_binary_mask, ocean)
+    check_land_ocean_fraction_sum(land, ocean + prescribed)
+    return ocean, prescribed, land

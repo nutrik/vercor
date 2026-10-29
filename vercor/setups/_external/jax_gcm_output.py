@@ -446,16 +446,7 @@ class _JAXGCMOutputProvider:
             variables, self._unit_metadata
         )
         if self._coupled:
-            for name, units in (
-                ("sea_surface_temperature", "K"),
-                ("marine_surface_albedo", "1"),
-                ("marine_ice_fraction", "1"),
-            ):
-                variables[name] = OutputVariable(
-                    (JAX_GCM_TIME_DIM, _LAT_NAME, _LON_NAME),
-                    as_jax_real_array(context.state.field(name))[jnp.newaxis, ...],
-                    {"units": units},
-                )
+            variables.update(_coupled_surface_output_variables(context))
         return OutputFrame(
             variables,
             coordinates=_jax_gcm_numeric_coordinates(self._coords),
@@ -469,6 +460,24 @@ def jax_gcm_output_provider(state: Any) -> _JAXGCMOutputProvider:
     """Return the native JAXGCM provider installed by the setup factory."""
 
     return _JAXGCMOutputProvider(state)
+
+
+def _coupled_surface_output_variables(
+    context: OutputContext | JaxOutputContext | SnapshotContext,
+) -> dict[str, OutputVariable]:
+    """Share the actually applied marine boundary fields across output forms."""
+    return {
+        name: OutputVariable(
+            (JAX_GCM_TIME_DIM, _LAT_NAME, _LON_NAME),
+            as_jax_real_array(context.state.field(name))[jnp.newaxis, ...],
+            {"units": units},
+        )
+        for name, units in (
+            ("sea_surface_temperature", "K"),
+            ("marine_surface_albedo", "1"),
+            ("marine_ice_fraction", "1"),
+        )
+    }
 
 
 def write_jax_gcm_snapshot_output(
@@ -496,6 +505,8 @@ def write_jax_gcm_snapshot_output(
         variables,
         unit_metadata,
     )
+    if state.seaice_coupling:
+        data_variables.update(_coupled_surface_output_variables(context))
     write_netcdf_dataset(
         output=str(context.output_path),
         coordinate_variables=jax_gcm_coordinate_variables(

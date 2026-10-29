@@ -15,6 +15,7 @@ from vercor.components import (
 )
 from vercor.output import OutputSpec
 from vercor.setups.config import JCMAtmosphereConfig
+from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from dinosaur.coordinate_systems import CoordinateSystem as _CoordinateSystem
@@ -29,8 +30,14 @@ def make_jcm_atmosphere(
     terrain: _TerrainData,
     *,
     config: JCMAtmosphereConfig | None = None,
+    prescribed_marine_fraction: RuntimeArray | None = None,
 ) -> Component:
-    """Return a differentiable JAXGCM/JCM atmosphere component."""
+    """Return a differentiable JCM component with optional prescribed ocean area.
+
+    ``prescribed_marine_fraction`` is whole-cell area in canonical (latitude,
+    longitude) layout outside the coupled ocean's domain. Native SST, ice and
+    albedo retain their time selection there. Omission means full coupling.
+    """
 
     try:
         import jcm  # noqa: F401
@@ -58,6 +65,7 @@ def make_jcm_atmosphere(
         do_spinup=config.spinup.enabled,
         jitted=config.jitted,
         seaice_coupling=config.seaice_coupling,
+        prescribed_marine_fraction=prescribed_marine_fraction,
     )
     initial_fields: dict[str, object] = dict(_jax_gcm_runtime.jax_gcm_default_fields())
     initial_fields["air_pressure_3d"] = jnp.zeros(

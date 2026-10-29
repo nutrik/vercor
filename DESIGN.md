@@ -281,6 +281,13 @@ therefore samples the same `current`, linearly interpolated monthly, or indexed
 daily field exported during that coupling step; internal forcing-record axes
 are never emitted as physical output dimensions.
 
+Paired JCM surface output retains prescribed marine forcing beyond a coupled
+ocean's rectangular footprint. Coupled source-weighted products and prescribed
+native contributions are merged by fractional area before output. SST and ice
+sample the same native physics dates as saved model snapshots; albedo comes
+from the retained native radiation diagnostic. Period output and final native
+snapshots share these applied marine boundary fields.
+
 One private session owns:
 
 - provider schema validation and selection;
@@ -419,6 +426,20 @@ Ocean/ice masks
 and native cyclic halo exchange are applied to the final salt flux. Its
 metadata is `m g kg-1 s-1`; no timestep or top-cell-depth factor is applied
 before Veros's tracer integration.
+
+Paired JCM construction distinguishes geometric ocean footprint `G` from
+remapped wet coverage `C`. Native land fraction `N` supplies prescribed marine
+area `U=(1-G)*(1-N)` outside the footprint, and effective land is `L=1-C-U`.
+Inside the footprint, the coupled ocean still owns the coastline. Land and
+atmosphere share this effective terrain; surface topology preserves actual
+land support outside the ocean domain. Standalone mask construction retains
+its complement policy unless native land fractions are supplied explicitly.
+Native SST/ice time-series blending preserves labels, interpolation and solar
+selection; each coupling interval starts from the original immutable forcing.
+The existing native forcing hook diagnoses prescribed albedo and merges it
+with coupled albedo without duplicating SPEEDY's albedo law. A two-machine-
+epsilon full-prescribed reconciliation handles precision conversion before
+support decisions, with the same identity-tangent policy as full ice.
 
 The JAX global adapter consumes external atmospheric forcing, disables
 streamfunction and diagnostics that would change the payload PyTree, and uses

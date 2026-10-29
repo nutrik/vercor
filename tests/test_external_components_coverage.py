@@ -1277,6 +1277,10 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         jax_gcm_state_module.JCMAtmosphereSetupState
     )
     component.seaice_coupling = False
+    component.prescribed_marine_fraction = None
+    component.model_timestep = timedelta(hours=1)
+    component.save_interval = timedelta(hours=1)
+    component.coupling_timestep = timedelta(hours=1)
     component.name = "ATM"
     component.grid = make_test_grid(name="atm")
     component._dtype_policy = DTypePolicy()
@@ -1294,9 +1298,11 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
     component.open_water_albedo = jnp.asarray(0.07)
 
     class _FunctionalForcing(_FakeForcing):
-        def copy(self, **kwargs: Any) -> _FakeForcing:
+        sea_surface_temperature = jnp.full((2, 2), 288.15)
+
+        def copy(self, **kwargs: Any) -> Any:
             super().copy(**kwargs)
-            return _FakeForcing()
+            return jax_gcm_state_module.ForcingData.zeros((2, 2)).copy(**kwargs)
 
     component.forcing = _FunctionalForcing()
     cast(Any, component).sigma_levels = np.asarray([0.2, 1.0], dtype=float)

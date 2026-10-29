@@ -284,3 +284,24 @@ Native CREDIT/checkpoint execution remains unavailable; CAMulator boundary
 stand-ins do not certify native model skill. The short coupled run does not
 certify long-term climate or binary-transition/host AD. All cleanup delivery
 is local, with no push, merge or publication.
+Prescribed surfaces beyond an ocean domain
+-----------------------------------------
+
+The paired JCM setup distinguishes the ocean grid's geometric footprint from
+its wet-cell coverage. Within that footprint, the ocean mask defines the
+coupled coastline. Outside it, JCM retains its native fractional land/ocean
+terrain and prescribed SST and sea ice. Cells crossing the footprint boundary
+combine both contributions by area, including the native land fraction.
+
+For remapped geometric coverage ``G``, remapped wet fraction ``C`` and native
+land fraction ``N``, prescribed marine area is ``U=(1-G)*(1-N)`` and effective
+land is ``L=1-C-U``. Source-weighted marine products are combined with ``U``
+times the prescribed native marine value and divided by ``C+U``. This applies
+to SST, marine ice fraction and marine albedo. Ice area is checked against
+``C``; it cannot consume the prescribed ocean area. Native time selection is
+preserved at every atmospheric substep.
+
+This setup policy does not change route quantity semantics or the dispatcher's
+zero values outside source coverage. Veros keeps its native wet mask and
+Veris keeps dynamic ice coverage on that wet support. Land, atmosphere,
+period output and final native snapshots use the reconciled surface fields.

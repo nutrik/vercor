@@ -68,22 +68,35 @@ def test_native_rollout_composes_current_surfaces_and_shared_output(
     # Apply the established static-mask threshold, as the paired terrain does.
     fo = jnp.clip(1 - land_fraction, 0, 1)
     fo = jnp.where(fo < 0.001, 0, jnp.where(fo > 0.999, 1, fo))
+    footprint = jnp.clip(remap.regrid(jnp.ones_like(wet)), 0, 1)
+    footprint = jnp.where(
+        footprint < 0.001, 0, jnp.where(footprint > 0.999, 1, footprint)
+    )
+    # The fixture's native land fraction is 1/4, SST is 271 K, and native
+    # marine ice is 0.4. Preserve those prescribed tiles beyond the ocean.
+    prescribed = (1 - footprint) * 0.75
+    total_ocean = fo + prescribed
+    denominator = jnp.where(total_ocean > 0, total_ocean, 1)
     fi = remap.regrid(wet * area)
     water = remap.regrid(wet * (1 - area) * ocean.field("sea_surface_temperature"))
     ice_temperature = remap.regrid(wet * area * ice.field("ice_surface_temperature"))
     ice_albedo = remap.regrid(wet * area * ice.field("ice_surface_albedo"))
-    marine = np.asarray(fo) > 0
+    marine = np.asarray(total_ocean) > 0
     np.testing.assert_allclose(
         atm.field("sea_surface_temperature", scope="state")[marine],
-        np.asarray((water + ice_temperature) / jnp.where(fo > 0, fo, 1))[marine],
+        np.asarray((water + ice_temperature + prescribed * 271.0) / denominator)[
+            marine
+        ],
     )
     np.testing.assert_allclose(
         atm.field("marine_surface_albedo")[marine],
-        np.asarray(((fo - fi) * 0.07 + ice_albedo) / jnp.where(fo > 0, fo, 1))[marine],
+        np.asarray(((fo - fi) * 0.07 + ice_albedo + prescribed * 0.282) / denominator)[
+            marine
+        ],
     )
     np.testing.assert_allclose(
         atm.field("marine_ice_fraction")[marine],
-        np.asarray(fi / jnp.where(fo > 0, fo, 1))[marine],
+        np.asarray((fi + prescribed * 0.4) / denominator)[marine],
     )
     assert (
         np.max(

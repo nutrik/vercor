@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import jax
@@ -390,6 +391,21 @@ def step_jax_gcm_runtime(
     )
 
     surface_fields: dict[str, Any]
+    from vercor.setups._external.jax_gcm_surface import blend_jcm_forcing_field
+
+    land_fraction = as_jax_real_array(state.model.terrain.fmask, dtype).T
+    ocean_fraction, prescribed_area, _ = _jax_gcm_fields._marine_surface_fractions(
+        land_fraction,
+        (
+            0.0
+            if state.prescribed_marine_fraction is None
+            else state.prescribed_marine_fraction
+        ),
+        dtype=dtype,
+    )
+    prescribed_weight = prescribed_area / jnp.where(
+        ocean_fraction > 0, ocean_fraction, 1
+    )
     if state.seaice_coupling:
         from vercor.setups._external.jax_gcm_surface import CoupledJCMForcing
 
@@ -398,18 +414,29 @@ def step_jax_gcm_runtime(
                 name: fields[name]
                 for name in _jax_gcm_fields.JAXGCM_COUPLED_INPUT_GRID_FIELD_NAMES
             },
-            as_jax_real_array(state.model.terrain.fmask, dtype).T,
+            land_fraction,
             state.open_water_albedo,
+            prescribed_marine_fraction=prescribed_area,
             dtype=dtype,
         )
         applied_forcing = CoupledJCMForcing(
             payload.forcing.copy(
                 stl_am=composed.land_surface_temperature.T,
-                sea_surface_temperature=composed.sea_surface_temperature.T,
+                sea_surface_temperature=blend_jcm_forcing_field(
+                    payload.forcing.sea_surface_temperature,
+                    composed.sea_surface_temperature.T,
+                    prescribed_weight.T,
+                ),
                 soilw_am=composed.soil_moisture.T,
-                sice_am=composed.marine_ice_fraction.T,
+                sice_am=blend_jcm_forcing_field(
+                    payload.forcing.sice_am,
+                    composed.marine_ice_fraction.T,
+                    prescribed_weight.T,
+                ),
             ),
             composed.marine_surface_albedo.T,
+            native_background=payload.forcing,
+            prescribed_marine_fraction=prescribed_weight.T,
         )
         surface_fields = {
             name: getattr(composed, name)
@@ -423,7 +450,6 @@ def step_jax_gcm_runtime(
             )
         }
     else:
-        land_fraction = as_jax_real_array(state.model.terrain.fmask, dtype).T
         land_surface_temperature, sea_surface_temperature, total_surface_temperature = (
             _jax_gcm_fields.prepare_surface_temperature_forcing(
                 fields["land_surface_temperature"],
@@ -438,7 +464,11 @@ def step_jax_gcm_runtime(
         soil_moisture = jnp.where(land_fraction > 0, soil_moisture, 0.0)
         applied_forcing = payload.forcing.copy(
             stl_am=land_surface_temperature.T,
-            sea_surface_temperature=sea_surface_temperature.T,
+            sea_surface_temperature=blend_jcm_forcing_field(
+                payload.forcing.sea_surface_temperature,
+                ((1 - prescribed_weight) * sea_surface_temperature).T,
+                prescribed_weight.T,
+            ),
             soilw_am=soil_moisture.T,
         )
         surface_fields = {
@@ -457,6 +487,28 @@ def step_jax_gcm_runtime(
     )
     mapped_fields = _map_jax_gcm_state_fields(state, jcm_state, constants, dtype)
 
+    # Native JCM removes its transient _forcing_2d diagnostic from the carry.
+    # Select the same dates as the last physics step of each saved snapshot;
+    # this is pure boundary sampling, without another physics evaluation.
+    sampled_surface = _sample_surface_forcing(
+        state, payload.jcm_state, applied_forcing, dtype
+    )
+    land_temperature = sampled_surface["land_surface_temperature"]
+    sea_temperature = sampled_surface["sea_surface_temperature"]
+    surface_fields.update(
+        land_surface_temperature=land_temperature,
+        sea_surface_temperature=sea_temperature,
+        total_surface_temperature=land_fraction * land_temperature
+        + ocean_fraction * sea_temperature,
+    )
+    if state.seaice_coupling:
+        surface_fields.update(
+            marine_surface_albedo=as_jax_real_array(
+                jcm_state.physics["_mod_radcon"].alb_s, dtype
+            ).T,
+            marine_ice_fraction=sampled_surface["marine_ice_fraction"],
+        )
+
     return StepResult(
         fields={
             **surface_fields,
@@ -465,6 +517,73 @@ def step_jax_gcm_runtime(
         payload=JCMAtmosphereRuntimePayload(
             jcm_state=jcm_state,
             forcing=payload.forcing,
+        ),
+    )
+
+
+def _sample_surface_forcing(
+    state: "JCMAtmosphereSetupState",
+    initial_state: Any,
+    forcing: Any,
+    dtype: DTypePolicy,
+) -> dict[str, jax.Array]:
+    """Average boundary values at the exact physics dates of saved snapshots."""
+    return cast(
+        dict[str, jax.Array],
+        _sample_native_surface_forcing(
+            initial_state.time,
+            initial_state.step,
+            forcing,
+            model_seconds=int(state.model_timestep.total_seconds()),
+            save_seconds=int(state.save_interval.total_seconds()),
+            coupling_seconds=int(state.coupling_timestep.total_seconds()),
+            dtype=dtype,
+        ),
+    )
+
+
+@partial(
+    jax.jit,
+    static_argnames=("model_seconds", "save_seconds", "coupling_seconds", "dtype"),
+)
+def _sample_native_surface_forcing(
+    initial_time: Any,
+    initial_step: Any,
+    forcing: Any,
+    *,
+    model_seconds: int,
+    save_seconds: int,
+    coupling_seconds: int,
+    dtype: DTypePolicy,
+) -> dict[str, jax.Array]:
+    """Reuse a fixed-shape native boundary sampler on host and scanned runs."""
+    import jax_datetime as jdt
+    from jcm.date import DateData
+
+    offsets = jnp.arange(
+        save_seconds - model_seconds, coupling_seconds, save_seconds, dtype=jnp.int32
+    )
+
+    def sample(offset: jax.Array) -> dict[str, jax.Array]:
+        date = DateData.set_date(
+            initial_time + jdt.Timedelta(seconds=offset),
+            model_step=initial_step + offset // model_seconds,
+            dt_seconds=model_seconds,
+        )
+        selected = forcing.select(date)
+        return {
+            name: as_jax_real_array(value, dtype).T
+            for name, value in (
+                ("land_surface_temperature", selected.stl_am),
+                ("sea_surface_temperature", selected.sea_surface_temperature),
+                ("marine_ice_fraction", selected.sice_am),
+            )
+        }
+
+    return cast(
+        dict[str, jax.Array],
+        jax.tree_util.tree_map(
+            lambda value: jnp.mean(value, axis=0), jax.vmap(sample)(offsets)
         ),
     )
 
