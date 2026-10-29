@@ -230,3 +230,57 @@ Central differences at 1e-2, 1e-3 and 1e-4 are -0.8314114656589787,
 -0.8314104661621968 and -0.8314104510039749. The forward-identical stopped
 CICE-to-ATM control has derivative -0.8310681765206815; their difference,
 -0.0003422751121991974, isolates a nonzero atmosphere-mediated ocean response.
+Prescribed polar marine surfaces
+-------------------------------
+
+The paired setup now preserves native JCM terrain and prescribed marine
+forcing beyond the coupled ocean's geometric footprint. Boundary cells
+combine coupled and prescribed contributions by fractional area. Native SST
+and ice retain their original time-selection policy, and prescribed albedo
+uses the native SPEEDY diagnosis. Period output and final snapshots include
+the same applied marine fields.
+
+Regression coverage includes native land and ocean poles, fractional latitude
+and longitude boundaries, float32/float64 composition, endpoint roundoff,
+inactive operands, JVP/VJP checks, ordinary and sea-ice coupling, and native
+host/JAX integrations. A changing-forcing case uses several model steps per
+save interval and several saves per coupling interval to check sampling dates.
+
+The instrumented real global host check completed two coupling days with
+96 native atmospheric evaluations. Across 252 prescribed polar cells, applied
+SST and ice matched the original selected forcing exactly at every evaluation.
+Their original ranges were 237.6954--271.1052 K and 0.086948--0.998946,
+respectively. Atmospheric latitude centers span about -87.159 to 87.159 degrees;
+the inspected ocean centers span -78 to 78 degrees. Period files and the final
+snapshot retain nonzero SST, ice and albedo there. This is a short coupling
+and provenance check, not a climate-skill assessment. Local harness and
+receipts are ``/private/tmp/vercor-mask-global.py`` and
+``/private/tmp/vercor-mask-global-host/verification.json``.
+
+The all-JAX global check repeats the same 96 native evaluations with the exact
+Veros differentiable fork and obtains zero polar SST/ice discrepancy as well.
+Both lanes write nine shared output files. Its receipt is
+``/private/tmp/vercor-mask-global-jax/verification.json``.
+
+The end-to-end ice-albedo acceptance test retains native polar marine forcing
+and the original gradient tolerances. At albedo 0.70, JVP and VJP agree at
+about -0.552228598 mK per unit albedo. A deterministic convergence probe gives
+-0.552228319, -0.552226235 and -0.552195919 at finite-difference widths
+``1e-5``, ``1e-6`` and ``1e-7``. Those widths check the local derivative;
+the former ``1e-2``--``1e-4`` perturbations give different finite-perturbation
+behavior. Both stencil ranges are recorded in the acceptance artifact. The
+exact native regime or numerical-solver cause of the coarse discrepancy is
+unproven; no native physics, geography or tolerance was changed to obtain
+agreement. This check certifies the local derivative, not finite excursions.
+
+Final verification passes 2,472 stock tests and 1,522 fast stock tests with
+zero failures, errors or skips. Exact-fork AD acceptance passes all 15 cases
+(14 initially, then the corrected local-stencil case). Combined line/branch
+coverage is 92.892266 percent, above the unchanged 90 percent gate; raw lane
+data hashes are preserved. Black and mypy cover 310 source/test files, strict
+maintained-source lint is clear, and compileall, strict Sphinx, wheel/sdist
+build, Twine and whitespace checks pass. The wheel's 180 Python files match
+tested source byte for byte. Whole-repository lint retains 200 historical
+snippet findings. Validation uses isolated Python 3.12 dependencies because
+the required scipy baseline crashed workers before collection; installed
+environments remain unchanged.

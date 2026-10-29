@@ -105,10 +105,12 @@ class JCMAtmosphereSetupState:
         do_spinup: bool = False,
         jitted: bool = True,
         seaice_coupling: bool = False,
+        prescribed_marine_fraction: RuntimeArray | None = None,
     ) -> None:
         """Build JAXGCM model resources and the VerCOR grid."""
 
         self.seaice_coupling = seaice_coupling
+        self.prescribed_marine_fraction = prescribed_marine_fraction
         self.forcing_data = forcing_data
         self.model_timestep = model_timestep
         self.save_interval = save_interval

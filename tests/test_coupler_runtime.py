@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Literal, NamedTuple, cast
 
 import jax
@@ -92,6 +92,13 @@ class _FakeJCMForcing(NamedTuple):
     stl_am: jax.Array
     sea_surface_temperature: jax.Array
 
+    @property
+    def sice_am(self) -> jax.Array:
+        return jnp.zeros_like(self.sea_surface_temperature)
+
+    def select(self, date: Any) -> "_FakeJCMForcing":
+        return self
+
     def copy(self, **kwargs: Any) -> "_FakeJCMForcing":
         return _FakeJCMForcing(
             stl_am=kwargs.get("stl_am", self.stl_am),
@@ -168,6 +175,11 @@ def _fake_jcm_step(
     state: JCMState,
     forcing: _FakeJCMForcing,
 ) -> tuple[JCMState, _FakePrediction]:
+    from jcm.date import DateData
+
+    forcing = forcing.select(
+        DateData.set_date(state.time, model_step=state.step, dt_seconds=60)
+    )
     surface_temperature = forcing.stl_am + forcing.sea_surface_temperature
     temperature = jnp.stack(
         (surface_temperature + 1.0, surface_temperature + 2.0),
@@ -237,6 +249,10 @@ def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
         jax_gcm_state_module.JCMAtmosphereSetupState
     )
     state.seaice_coupling = False
+    state.prescribed_marine_fraction = None
+    state.model_timestep = timedelta(seconds=60)
+    state.save_interval = timedelta(seconds=60)
+    state.coupling_timestep = timedelta(seconds=60)
     state.open_water_albedo = jnp.asarray(0.07)
     state.name = "ATM"
     state.grid = grid
@@ -1824,9 +1840,15 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
     grid = make_test_grid(name="jcm-runtime-forcing-template")
     fixture = _make_jax_gcm_fixture(grid)
     component = fixture.component
-    forcing_template = _FakeJCMForcing(
-        stl_am=jnp.zeros((*grid.shape, 365), dtype=jnp.float64),
-        sea_surface_temperature=jnp.zeros((*grid.shape, 365), dtype=jnp.float64),
+    from jcm.forcing import ForcingData, make_time_series
+
+    times = jdt.to_datetime("2000-01-01") + jdt.Timedelta(days=jnp.arange(365))
+    records = make_time_series(
+        jnp.zeros((365, grid.shape[1], grid.shape[0]), dtype=jnp.float64), times
+    )
+    forcing_template = ForcingData.zeros((grid.shape[1], grid.shape[0])).copy(
+        stl_am=records,
+        sea_surface_temperature=records,
     )
     fixture.state.forcing = forcing_template
     coupler = Coupler(
@@ -1844,10 +1866,10 @@ def test_jax_gcm_runtime_keeps_time_dependent_forcing_payload_shape_stable() -> 
 
     assert atmosphere_state.fields.get("air_temperature").shape == grid.shape
     assert payload is not None
-    assert payload.forcing.stl_am.shape == forcing_template.stl_am.shape
+    assert payload.forcing.stl_am.values.shape == forcing_template.stl_am.values.shape
     assert (
-        payload.forcing.sea_surface_temperature.shape
-        == forcing_template.sea_surface_temperature.shape
+        payload.forcing.sea_surface_temperature.values.shape
+        == forcing_template.sea_surface_temperature.values.shape
     )
 
 

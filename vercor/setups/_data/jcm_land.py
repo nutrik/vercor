@@ -14,6 +14,7 @@ from vercor.grids import RectilinearGrid
 from vercor.grid_masks import create_land_mask_from_ocean
 from vercor.output import OutputSpec
 from vercor.setups._output import resolve_output
+from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from dinosaur.coordinate_systems import CoordinateSystem as _CoordinateSystem
@@ -57,8 +58,14 @@ def make_jcm_land(
     name: str = "LND",
     *,
     output: OutputSpec | None = None,
+    native_land_fraction: RuntimeArray | None = None,
 ) -> DataComponent:
-    """Return a JCM land forcing component."""
+    """Return JCM land forcing, optionally retaining native terrain outside ocean.
+
+    ``native_land_fraction`` uses the canonical atmosphere (latitude, longitude)
+    layout. Forcing records and their independent time-selection policy remain
+    unchanged; geometry alone selects which land tiles participate in exchange.
+    """
 
     longitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.longitudes))
     latitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.latitudes))
@@ -86,11 +93,19 @@ def make_jcm_land(
         shape = (records, *land_surface_temperature.shape[-2:])
         land_surface_temperature = jnp.broadcast_to(land_surface_temperature, shape)
         soil_moisture = jnp.broadcast_to(soil_moisture, shape)
-    land_binary_mask, land_fraction = create_land_mask_from_ocean(
-        atmosphere_latitude=latitude,
-        atmosphere_longitude=longitude,
-        ocean_grid=ocn_grid,
-    )
+    if native_land_fraction is None:
+        land_binary_mask, land_fraction = create_land_mask_from_ocean(
+            atmosphere_latitude=latitude,
+            atmosphere_longitude=longitude,
+            ocean_grid=ocn_grid,
+        )
+    else:
+        land_binary_mask, land_fraction = create_land_mask_from_ocean(
+            atmosphere_latitude=latitude,
+            atmosphere_longitude=longitude,
+            ocean_grid=ocn_grid,
+            native_land_fraction=native_land_fraction,
+        )
 
     grid = RectilinearGrid(
         name=f"{name.lower()}-grid",

@@ -142,8 +142,16 @@ def validate_land_mask_consistency(
             raise CouplerError(
                 "Land binary mask read from component does not match atmospheric grid shape"
             )
-        if not bool(jnp.all(component_mask == remapped_mask)):
-            mismatch = int(jnp.count_nonzero(component_mask != remapped_mask))
+        covered = jnp.ones_like(remapped_mask, dtype=bool)
+        if policy.ocean in components and policy.atmosphere in components:
+            ocean = components[policy.ocean]
+            atmosphere = components[policy.atmosphere]
+            regridder = ConservativeRectilinearRegridder(ocean.grid, atmosphere.grid)
+            footprint = regridder.regrid(jnp.ones(ocean.grid.shape))
+            covered = jnp.asarray(footprint) >= 1.0 - 0.001
+        disagreements = covered & (component_mask != remapped_mask)
+        if bool(jnp.any(disagreements)):
+            mismatch = int(jnp.count_nonzero(disagreements))
             raise CouplerError(
                 "Land binary mask created from remapped ocean mask does not match component-provided mask "
                 f"(mismatched points: {mismatch})"
@@ -170,6 +178,11 @@ def build_surface_mask_topology_patch(
         land_binary_mask_on_atmosphere_grid,
         policy=policy,
     )
+    # Native terrain may retain marine tiles outside a regional ocean domain.
+    # Route support must follow the actual land component there.
+    component_land_mask = context.components[policy.land].grid.binary_mask
+    if component_land_mask is not None:
+        land_binary_mask_on_atmosphere_grid = component_land_mask
     binary_masks = {}
     for exchange in context.exchanges:
         source = exchange.source

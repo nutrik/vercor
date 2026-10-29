@@ -45,20 +45,17 @@ class JCMCoupledSurface:
 
 
 @partial(jax.jit, static_argnames=("dtype",))
-def prepare_coupled_surface_forcing(
-    fields: Mapping[str, RuntimeArray],
+def _marine_surface_fractions(
     land_fraction: RuntimeArray,
-    open_water_albedo: RuntimeArray,
+    prescribed_marine_fraction: RuntimeArray | float,
     *,
     dtype: DTypePolicy,
-) -> JCMCoupledSurface:
-    """Compose separately remapped water/ice contributions without reweighting.
+) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """Validate marine areas and reconcile only full-prescribed roundoff.
 
-    Incoming ice properties already contain R(W*A*property); ice_fraction is
-    R(W*A), and the ocean temperature contribution is R(W*(1-A)*SST).
-    Static land coverage follows the existing ocean-mask helper's threshold.
-    Undefined absent-surface operands are neutralized before arithmetic, and
-    a finite reference temperature fills native branches on absent surfaces.
+    Normalizing setup fractions to float32 can round U and 1-L differently.
+    The same two-epsilon endpoint policy as full ice keeps the remainder
+    nonnegative without hiding material coverage errors or changing tangents.
     """
     land = as_jax_real_array(land_fraction, dtype)
     require_active_finite(land, active_mask=None, owner="JCM land fraction")
@@ -66,25 +63,66 @@ def prepare_coupled_surface_forcing(
         jnp.count_nonzero((land < 0) | (land > 1)), "JCM land fraction", "range [0, 1]"
     )
     ocean = 1 - land
+    prescribed = jnp.broadcast_to(
+        as_jax_real_array(prescribed_marine_fraction, dtype), ocean.shape
+    )
+    require_active_finite(
+        prescribed, active_mask=None, owner="JCM prescribed marine fraction"
+    )
+    roundoff = 2 * jnp.finfo(land.dtype).eps
+    _require_zero(
+        jnp.count_nonzero((prescribed < 0) | (prescribed > ocean + roundoff)),
+        "JCM prescribed marine fraction",
+        "ocean-area bounds",
+    )
+    endpoint = (prescribed > 0) & (jnp.abs(prescribed - ocean) <= roundoff)
+    reconciled = jnp.where(endpoint, ocean, prescribed)
+    prescribed = prescribed + jax.lax.stop_gradient(reconciled - prescribed)
+    return ocean, prescribed, ocean - prescribed
+
+
+@partial(jax.jit, static_argnames=("dtype",))
+def prepare_coupled_surface_forcing(
+    fields: Mapping[str, RuntimeArray],
+    land_fraction: RuntimeArray,
+    open_water_albedo: RuntimeArray,
+    *,
+    prescribed_marine_fraction: RuntimeArray | float = 0.0,
+    dtype: DTypePolicy,
+) -> JCMCoupledSurface:
+    """Compose separately remapped water/ice contributions without reweighting.
+
+    Incoming ice properties already contain R(W*A*property); ice_fraction is
+    R(W*A), and the ocean temperature contribution is R(W*(1-A)*SST).
+    Prescribed marine area is excluded from the coupled water/ice support.
+    Returned marine values are coupled numerators per total marine area;
+    the forcing adapter adds the native prescribed contribution in time.
+    Undefined absent-surface operands are neutralized before arithmetic, and
+    a finite reference temperature fills native branches on absent surfaces.
+    """
+    land = as_jax_real_array(land_fraction, dtype)
+    ocean, _, coupled_ocean = _marine_surface_fractions(
+        land, prescribed_marine_fraction, dtype=dtype
+    )
     marine = ocean > 0
     ice = as_jax_real_array(fields["ice_fraction"], dtype)
-    require_active_finite(ice, active_mask=marine, owner="JCM ice_fraction")
-    ice = jnp.where(marine, ice, 0)
+    require_active_finite(ice, active_mask=coupled_ocean > 0, owner="JCM ice_fraction")
+    ice = jnp.where(coupled_ocean > 0, ice, 0)
     # The independently remapped ice coverage and 1-(1-R(W)) can differ
     # through unit-scale subtraction/remapping roundoff. Reconcile a full-ice
     # endpoint within two machine epsilons before deciding water support.
     roundoff = 2 * jnp.finfo(land.dtype).eps
     _require_zero(
-        jnp.count_nonzero((ice < 0) | (ice > ocean + roundoff)),
+        jnp.count_nonzero((ice < 0) | (ice > coupled_ocean + roundoff)),
         "JCM ice_fraction",
         "ocean-area bounds",
     )
-    full_ice = jnp.abs(ice - ocean) <= roundoff
-    reconciled = jnp.where(full_ice, ocean, ice)
+    full_ice = jnp.abs(ice - coupled_ocean) <= roundoff
+    reconciled = jnp.where(full_ice, coupled_ocean, ice)
     # This corrects only floating-point representation. Keep the identity
     # tangent of valid coverage, including the one-sided full-ice limit.
     ice = ice + jax.lax.stop_gradient(reconciled - ice)
-    water = ocean - ice
+    water = coupled_ocean - ice
 
     def supported(
         value: RuntimeArray,
@@ -98,7 +136,9 @@ def prepare_coupled_surface_forcing(
         # Weighted fields are already zero on absent surfaces. Retain their
         # finite zero operands so their limiting area derivatives survive;
         # sanitize missing inactive NaNs before they enter arithmetic.
-        active = (marine & jnp.isfinite(array)) if retain_finite else support
+        active = (
+            ((coupled_ocean > 0) & jnp.isfinite(array)) if retain_finite else support
+        )
         return jnp.where(active, array, 0)
 
     land_active = land > 0

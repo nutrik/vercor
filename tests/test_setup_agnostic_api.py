@@ -421,11 +421,11 @@ def test_no_exchange_components_run_initialize_hooks_before_state_creation() -> 
 def test_make_jcm_land_atmosphere_accepts_jax_gcm_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    ocn_grid = make_test_grid(name="ocn")
+    ocn_grid = make_test_grid(name="ocn", binary_mask=np.ones((2, 2)))
     jcm_grid = make_test_grid(name="jcm", binary_mask=np.ones((2, 2)))
     coords = SimpleNamespace(horizontal=SimpleNamespace())
     terrain = SimpleNamespace(
-        fmask=None, copy=lambda **updates: SimpleNamespace(**updates)
+        fmask=jnp.zeros((2, 2)), copy=lambda **updates: SimpleNamespace(**updates)
     )
     forcing = object()
     captured_config: dict[str, JCMAtmosphereConfig] = {}
@@ -445,6 +445,7 @@ def test_make_jcm_land_atmosphere_accepts_jax_gcm_config(
         *,
         name: str = "LND",
         output: OutputSpec | None = None,
+        native_land_fraction: object = None,
     ) -> DataComponent:
         assert loaded_coords is coords
         assert loaded_forcing is forcing
@@ -461,6 +462,7 @@ def test_make_jcm_land_atmosphere_accepts_jax_gcm_config(
         loaded_terrain: object,
         *,
         config: JCMAtmosphereConfig | None = None,
+        prescribed_marine_fraction: object = None,
     ) -> Component:
         assert loaded_coords is coords
         assert loaded_terrain is not terrain
