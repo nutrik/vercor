@@ -66,6 +66,27 @@ def test_remapper_does_not_expose_vector_api() -> None:
     assert not hasattr(remapper, "get_dst_total_mass")
 
 
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True])
+@pytest.mark.parametrize("longitude_origin", [0.0, 90.0])
+def test_global_full_coverage_stays_within_surface_roundoff(
+    enable_x64: bool, longitude_origin: float
+) -> None:
+    """Keep a constant field at unity across T31 longitudes, including the seam."""
+    with jax.enable_x64(enable_x64):
+        remapper = _make_remapper(
+            src_lon_edges=np.arange(91) * 4.0 + longitude_origin,
+            src_lat_edges=np.array([-80.0, 0.0, 80.0]),
+            dst_lon_edges=np.arange(97) * 3.75 - 1.875 + longitude_origin,
+            dst_lat_edges=np.array([-80.0, -40.0, 0.0, 40.0, 80.0]),
+        )
+        field = jnp.ones((2, 90))
+        result = jax.jit(remapper.apply_scalar)(field)
+        assert_allclose_compact(
+            result, np.ones((4, 96)), rtol=0, atol=2 * np.finfo(result.dtype).eps
+        )
+
+
 def test_constant_field_preserved_on_refinement_conservation_mode() -> None:
     remapper = _make_remapper(
         src_lon_edges=np.array([0.0, 1.0, 2.0]),

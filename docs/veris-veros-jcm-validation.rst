@@ -12,6 +12,77 @@ The execution order is LND, CICE (native Veris), OCN (prognostic Veros), ATM
 (JCM). Source code, tests, native data and the shared output coordinator are
 reused; no additional model or integration loop was introduced.
 
+Delayed full-ice bounds repair (2026-10-29)
+------------------------------------------------------------
+
+A geometry-only reproduction identified inconsistent longitude arithmetic in
+``ConservativeRectilinearRemapper``. Overlap widths were computed by subtracting
+degree coordinates and then converting the interval to radians. Destination
+cell areas instead subtracted already-converted radian coordinates. Cancellation
+at large longitudes made the denominator slightly inconsistent with the
+overlap numerator: a uniform unit field mapped to the T31 grid reached
+``1.0000000000000082``, 37 float64 machine epsilons above one.
+
+The static ocean-mask path bounds its remapped fractions, while physical
+``ice_fraction`` retains the conservative remap. As evolving ice approaches
+full coverage, the mismatch can exceed JCM's two-epsilon ocean-area guard.
+The callback traceback reports that rejection; the callback is not its cause.
+
+The remapper now computes both longitude widths as degree differences before
+conversion. This preserves its spherical overlap formula and existing exchange
+ownership. JCM's bounds, endpoint reconciliation, and native physics are
+unchanged. Six new regression cases fail before the fix and pass afterwards:
+float32/64 unit coverage across periodic seams and shifted origins, plus a
+compiled full-ice remap into JCM on the Gaussian T31 grid. All 89 focused
+remapping/surface cases pass, including existing conservation and gradient
+checks. Independent masked-grid checks also retain finite JVP/VJP values and
+mass conservation to dtype precision.
+
+The exact supplied Veris parameters are used by the single global validation
+harness at ``/private/tmp/vercor-ice-bounds-global.py``. Its receipts, captured
+surface inputs and shared monthly output are kept under
+``/private/tmp/vercor-ice-bounds-global/``. The first harness preparation stopped
+after initialization on a payload-inspection API error, before any coupled
+timestep; it was corrected before launching the expensive trajectory. Captured
+old-normalization comparisons replay the new trajectory's incoming ice values;
+they are diagnostics, not a second historical trajectory.
+
+The run uses the packaged 365-day Gregorian clock, daily coupling, the ordinary
+two-day JCM spinup and monthly output. ``VerosConfig(execution="jax")`` selects
+the differentiable ocean; all four component specifications declare JAX
+execution. ``VerisConfig.physical_constants`` contains exactly::
+
+    {
+        "pStar": 18764.412842134217,
+        "cStar": 21.70524853277675,
+        "PlasDefCoeff": 1.5797477010208008,
+        "airIceDrag": 0.0013712803103803446,
+        "waterIceDrag": 0.00987660047535896,
+        "h0": 0.36901695784821165,
+        "uStarBase": 0.008896379124487205,
+    }
+
+Validation uses isolated Python 3.12 targets with JAX/JAXlib 0.11.2, Flax
+0.12.10, JCM 3.0.0, Veris v0.2.1 and exact differentiable Veros
+``7a8c964cf00b5aa0713c995edd760643a431b3c9``. Installed environments are
+unchanged. Stock Veros 1.7.0 tests run in separate processes. The complete
+stock invocation passed 2,446 cases; its sole RST underline failure passed
+after correction (1/1). Fast stock passed 1,497 cases and the exact-fork
+AD lane passed 15, with no remaining failures or skips. Black, maintained
+source/test flake8, mypy, compileall and strict Sphinx passed. Repository-wide
+lint retains 200 pre-existing findings in ignored scientific snippets.
+
+The single corrected global trajectory completed all 365 coupling steps and
+8,760 native ice substeps in 1,120.25 seconds, writing 43 shared-output files.
+Every surface-input bounds check passed. The largest incoming ice-area excess
+was one float64 epsilon, below the unchanged two-epsilon allowance. Replaying
+the old area normalization on these incoming values first flags one cell on
+day 253 and again flags one cell on day 270. This explains why the error can
+appear late as ice coverage evolves; the replay does not certify the exact
+original failing trajectory or its date. The six new regression cases also
+pass directly in the regular ``scipy`` environment; broad native validation
+uses the isolated Python 3.12 stack because ``scipy`` native collection aborts.
+
 Revisions and environment
 -------------------------
 

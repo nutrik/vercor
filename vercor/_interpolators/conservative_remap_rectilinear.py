@@ -126,7 +126,10 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
         self.src_indices = src_indices.astype(jax_index_dtype())
         self.overlap_weights = overlap_weights.astype(jax_real_dtype())
 
-        dst_lon_diff = jnp.abs(jnp.diff(jnp.deg2rad(self.dst_lon_b)))
+        # Match the overlap calculation: subtract in degrees before converting.
+        # Subtracting radian coordinates instead loses relative precision at
+        # large longitudes and can remap unit coverage above physical bounds.
+        dst_lon_diff = jnp.deg2rad(jnp.abs(jnp.diff(self.dst_lon_b)))
         dst_lat_diff = jnp.abs(jnp.diff(dst_sin_lat))
         dst_areas = (
             (self.radius**2) * jnp.outer(dst_lat_diff, dst_lon_diff)
