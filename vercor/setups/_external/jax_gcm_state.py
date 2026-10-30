@@ -14,7 +14,7 @@ import tree_math
 from dinosaur.coordinate_systems import CoordinateSystem
 
 from jcm.forcing import ForcingData, default_forcing
-from jcm.model import Model, ModelPredictions
+from jcm.model import Model
 from jcm.physics.speedy.params import Parameters
 from jcm.physics.speedy.speedy_terms import speedy_physics
 from jcm.physics_interface import PhysicsState
@@ -34,7 +34,6 @@ from vercor.setups._time_helpers import (
 )
 from vercor.setups._external._jax_gcm_pytree import (
     tree_as_runtime_dtype,
-    tree_mean,
 )
 import vercor.setups._external.jax_gcm_runtime as _jax_gcm_runtime
 from vercor.setups._external.jax_gcm_tools import change_jcm_parameter_values
@@ -44,7 +43,7 @@ from vercor.types import RuntimeArray
 @tree_math.struct
 @dataclass
 class JCMState:
-    """JCM output, resumable native state, and its authoritative exact clock."""
+    """Endpoint JCM output, resumable native state, and its exact clock."""
 
     dynamics: PhysicsState
     physics: Any
@@ -84,7 +83,9 @@ def jax_gcm_epoch(start: datetime | ModelDateTime, effective_spinup: timedelta) 
 class JCMAtmosphereSetupState:
     """Mutable setup-time owner for a JAXGCM/JCM atmosphere adapter."""
 
-    _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, ModelPredictions]]
+    _step_function: Callable[
+        [JCMState, ForcingData], tuple[JCMState, dict[str, jax.Array]]
+    ]
     _epoch_key: tuple[datetime | ModelDateTime, timedelta, timedelta]
     _state: JCMState
     forcing: ForcingData
@@ -161,17 +162,17 @@ class JCMAtmosphereSetupState:
 
     def _generate_step_function(
         self, jitted: bool = True
-    ) -> Callable[[JCMState, ForcingData], tuple[JCMState, ModelPredictions]]:
+    ) -> Callable[[JCMState, ForcingData], tuple[JCMState, dict[str, jax.Array]]]:
         """Return the model step function, optionally JIT compiled."""
 
         def step_function(
             state: JCMState, forcing: ForcingData
-        ) -> tuple[JCMState, ModelPredictions]:
+        ) -> tuple[JCMState, dict[str, jax.Array]]:
             precision_policy = self._dtype_policy
             native, predictions = self.model.run_from_state_with_carry(
                 initial_state=state.dycore_state,
                 initial_physics_state=state.physics_carry,
-                save_interval=self.save_interval / timedelta(days=1),
+                save_interval=self.model_timestep / timedelta(days=1),
                 total_time=self.coupling_timestep / timedelta(days=1),
                 output_averages=False,
                 forcing=forcing,
@@ -179,15 +180,16 @@ class JCMAtmosphereSetupState:
                 initial_step=state.step,
             )
 
-            # JCM currently returns a stacked object; reduce to one runtime state.
+            # Every native rate is needed for interval integration; endpoint
+            # state and exact continuation carry retain their own ownership.
             return (
                 JCMState(
                     dynamics=tree_as_runtime_dtype(
-                        tree_mean(predictions.dynamics, axis=0),
+                        jax.tree.map(lambda value: value[-1], predictions.dynamics),
                         precision_policy,
                     ),
                     physics=tree_as_runtime_dtype(
-                        tree_mean(predictions.physics, axis=0),
+                        jax.tree.map(lambda value: value[-1], predictions.physics),
                         precision_policy,
                     ),
                     dycore_state=native.dynamics,
@@ -195,7 +197,9 @@ class JCMAtmosphereSetupState:
                     time=native.time,
                     step=native.step,
                 ),
-                predictions,
+                _jax_gcm_runtime._jcm_flux_samples(
+                    predictions.physics, component_name=self.name
+                ),
             )
 
         return jax.jit(step_function) if jitted else step_function

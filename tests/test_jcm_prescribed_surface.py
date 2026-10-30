@@ -177,18 +177,17 @@ def test_native_time_selection_and_albedo_use_original_background(series: bool) 
             jnp.int32(0),
             wrapper,
             model_seconds=1800,
-            save_seconds=3600,
             coupling_seconds=7200,
             dtype=DTypePolicy(enable_x64=True),
         )
-        # Native physics samples at 00:30 and 01:30 for these saved frames.
-        # Their mean date is 01:00: SST=270.5 K and ice=0.225.
+        # Applied state is the final native physics date, 01:30, independent
+        # of diagnostic save cadence: SST=270.75 K and ice=0.2375.
         np.testing.assert_allclose(
             sampled["sea_surface_temperature"],
-            ((1 - fraction) * 290 + fraction * 270.5).T,
+            ((1 - fraction) * 290 + fraction * 270.75).T,
         )
         np.testing.assert_allclose(
-            sampled["marine_ice_fraction"], ((1 - fraction) * 0.3 + fraction * 0.225).T
+            sampled["marine_ice_fraction"], ((1 - fraction) * 0.3 + fraction * 0.2375).T
         )
     assert isinstance(wrapper.copy(), CoupledJCMForcing)
 
@@ -298,9 +297,10 @@ def test_varying_native_forcing_reaches_runtime_period_and_snapshot(
     final = coupler.run(output=OutputTarget(tmp_path))
     pole = np.abs(np.asarray(pair.atmosphere.grid.latitude)) > 70
     for name, expected in (
-        ("sea_surface_temperature", 271.5),
-        ("marine_ice_fraction", 0.275),
-        ("marine_surface_albedo", 0.21575),
+        # The last physics call is 3.5 hours after the forcing origin.
+        ("sea_surface_temperature", 271.75),
+        ("marine_ice_fraction", 0.2875),
+        ("marine_surface_albedo", 0.222375),
     ):
         np.testing.assert_allclose(
             np.asarray(final.component("ATM").field(name))[pole], expected

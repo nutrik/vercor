@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any, Literal, NamedTuple, cast
@@ -174,7 +175,7 @@ def _make_data_component(
 def _fake_jcm_step(
     state: JCMState,
     forcing: _FakeJCMForcing,
-) -> tuple[JCMState, _FakePrediction]:
+) -> tuple[JCMState, dict[str, jax.Array]]:
     from jcm.date import DateData
 
     forcing = forcing.select(
@@ -241,7 +242,27 @@ def _fake_jcm_step(
             "marker": state.physics_carry["marker"] + 2.0 * jnp.sum(surface_temperature)
         },
     )
-    return updated_state, prediction
+    # Match the native step's compact surface-history return while retaining
+    # the complete endpoint diagnostics above for native-state mapping.
+    flux_samples = {
+        "surface_sensible_heat_flux": surface_flux[jnp.newaxis, ...],
+        "surface_evaporation": (surface_flux * 0.1)[jnp.newaxis, ...],
+        "downward_longwave_radiation_flux": (surface_temperature + 3.0)[
+            jnp.newaxis, ...
+        ],
+        "net_shortwave_radiation_flux": (surface_temperature + 4.0)[jnp.newaxis, ...],
+        "downward_shortwave_radiation_flux": (surface_temperature + 5.0)[
+            jnp.newaxis, ...
+        ],
+        "large_scale_precipitation": jnp.ones_like(surface_temperature)[
+            jnp.newaxis, ...
+        ],
+        "convective_precipitation": jnp.full_like(surface_temperature, 2.0)[
+            jnp.newaxis, ...
+        ],
+        "near_surface_air_temperature": surface_temperature[jnp.newaxis, ...],
+    }
+    return updated_state, flux_samples
 
 
 def _make_jax_gcm_fixture(grid: RectilinearGrid) -> _JAXGCMFixture:
@@ -1898,9 +1919,14 @@ def test_jax_gcm_rejects_nonfinite_input_carry_before_model_reuse() -> None:
         jnp.asarray(jnp.nan),
     )
     native_calls = 0
-    valid_step = fixture.state._step_function
+    valid_step = cast(
+        Callable[[JCMState, Any], tuple[JCMState, dict[str, jax.Array]]],
+        fixture.state._step_function,
+    )
 
-    def recording_step(state: JCMState, forcing: Any) -> Any:
+    def recording_step(
+        state: JCMState, forcing: Any
+    ) -> tuple[JCMState, dict[str, jax.Array]]:
         nonlocal native_calls
         native_calls += 1
         return valid_step(state, forcing)
@@ -1929,12 +1955,17 @@ def test_jax_gcm_rejects_nonfinite_output_carry_before_next_substep() -> None:
     fixture = _make_jax_gcm_fixture(make_test_grid(name="jcm-invalid-output-carry"))
     payload = jax_gcm_runtime_module.create_jax_gcm_runtime_payload(fixture.state)
     native_calls = 0
-    valid_step = fixture.state._step_function
+    valid_step = cast(
+        Callable[[JCMState, Any], tuple[JCMState, dict[str, jax.Array]]],
+        fixture.state._step_function,
+    )
 
-    def invalid_output_step(state: JCMState, forcing: Any) -> Any:
+    def invalid_output_step(
+        state: JCMState, forcing: Any
+    ) -> tuple[JCMState, dict[str, jax.Array]]:
         nonlocal native_calls
         native_calls += 1
-        updated_state, prediction = valid_step(state, forcing)
+        updated_state, flux_samples = valid_step(state, forcing)
         return (
             JCMState(
                 time=updated_state.time,
@@ -1944,7 +1975,7 @@ def test_jax_gcm_rejects_nonfinite_output_carry_before_next_substep() -> None:
                 dycore_state=updated_state.dycore_state,
                 physics_carry={"marker": jnp.asarray(jnp.nan)},
             ),
-            prediction,
+            flux_samples,
         )
 
     fixture.state._step_function = invalid_output_step
@@ -1972,9 +2003,14 @@ def test_jax_gcm_rejects_nonfinite_output_carry_before_next_substep() -> None:
 def test_jax_gcm_reports_compiled_nonfinite_input_carry_path() -> None:
     fixture = _make_jax_gcm_fixture(make_test_grid(name="jcm-compiled-invalid-carry"))
     payload = jax_gcm_runtime_module.create_jax_gcm_runtime_payload(fixture.state)
-    valid_step = fixture.state._step_function
+    valid_step = cast(
+        Callable[[JCMState, Any], tuple[JCMState, dict[str, jax.Array]]],
+        fixture.state._step_function,
+    )
 
-    def finite_output_step(state: JCMState, forcing: Any) -> Any:
+    def finite_output_step(
+        state: JCMState, forcing: Any
+    ) -> tuple[JCMState, dict[str, jax.Array]]:
         finite_state = JCMState(
             time=state.time,
             step=state.step,

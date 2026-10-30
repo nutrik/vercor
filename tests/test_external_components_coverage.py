@@ -772,11 +772,15 @@ def test_map_jcm_output_fields_supports_jit(
 
 
 def test_generate_step_function_threads_jcm_3_clock_and_carry() -> None:
+    from collections import namedtuple
+
     component = jax_gcm_state_module.JCMAtmosphereSetupState.__new__(
         jax_gcm_state_module.JCMAtmosphereSetupState
     )
     component.seaice_coupling = False
+    component.name = "ATM"
     component.save_interval = timedelta(days=2)
+    component.model_timestep = timedelta(minutes=30)
     component.coupling_timestep = timedelta(hours=12)
     component._dtype_policy = DTypePolicy()
 
@@ -802,9 +806,22 @@ def test_generate_step_function_threads_jcm_3_clock_and_carry() -> None:
                 output_averages,
                 forcing,
             )
+            Fields = namedtuple("Fields", "shf evap rlds t0 rsns rsds precls precnv")
+            rates = Fields(*(jnp.asarray([[2.0, 4.0], [6.0, 8.0]]) for _ in range(8)))
             predictions = SimpleNamespace(
                 dynamics={"wind": jnp.asarray([[1.0, 3.0], [5.0, 7.0]])},
-                physics={"heat": jnp.asarray([[2.0, 4.0], [6.0, 8.0]])},
+                physics={
+                    "heat": jnp.asarray([[2.0, 4.0], [6.0, 8.0]]),
+                    **{
+                        name: rates
+                        for name in (
+                            "_surface_flux",
+                            "_shortwave_rad",
+                            "_condensation",
+                            "_convection",
+                        )
+                    },
+                },
             )
             return (
                 SimpleNamespace(
@@ -833,7 +850,7 @@ def test_generate_step_function_threads_jcm_3_clock_and_carry() -> None:
     assert calls["run"] == (
         "initial-dycore",
         "initial-carry",
-        2.0,
+        1 / 48,
         0.5,
         False,
         "forcing",
@@ -842,9 +859,9 @@ def test_generate_step_function_threads_jcm_3_clock_and_carry() -> None:
     assert next_state.physics_carry == "next-carry"
     assert int(next_state.time.delta.seconds) == 43200
     assert int(next_state.step) == 24
-    assert_allclose_compact(next_state.dynamics["wind"], np.asarray([3.0, 5.0]))
-    assert_allclose_compact(next_state.physics["heat"], np.asarray([4.0, 6.0]))
-    assert predictions.physics["heat"].shape == (2, 2)
+    assert_allclose_compact(next_state.dynamics["wind"], np.asarray([5.0, 7.0]))
+    assert_allclose_compact(next_state.physics["heat"], np.asarray([6.0, 8.0]))
+    assert predictions["surface_sensible_heat_flux"].shape == (2, 2)
 
 
 def test_bootstrap_jcm_state_captures_native_state_and_physics_carry() -> None:
@@ -1356,7 +1373,18 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
         normalized_surface_pressure=np.asarray([[0.9, 1.0], [1.1, 1.2]], dtype=float),
     )
 
-    prediction = SimpleNamespace(physics=p, dynamics=d)
+    prediction = SimpleNamespace(
+        physics={
+            name: SimpleNamespace(
+                **{
+                    key: jnp.asarray(value)[jnp.newaxis, ...]
+                    for key, value in vars(diagnostic).items()
+                }
+            )
+            for name, diagnostic in p.items()
+        },
+        dynamics=d,
+    )
     component._step_function = cast(
         Any,
         lambda state, forcing: (
@@ -1368,7 +1396,9 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
                 dycore_state={"marker": state.dycore_state["marker"] + 1.0},
                 physics_carry={"marker": state.physics_carry["marker"] + 2.0},
             ),
-            prediction,
+            jax_gcm_runtime_module._jcm_flux_samples(
+                prediction.physics, component_name="ATM"
+            ),
         ),
     )
     monkeypatch.setattr(
