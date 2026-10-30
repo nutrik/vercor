@@ -317,6 +317,30 @@ def _map_jax_gcm_state_fields(
     )
 
 
+def _jcm_flux_samples(
+    physics: Mapping[str, Any], *, component_name: str
+) -> dict[str, jax.Array]:
+    """Project native history to the eight surface arrays needed for exchange.
+
+    This projection belongs before the native step's JIT return, so host and
+    mixed runs never materialize unused vertical/state diagnostic histories.
+    Samples retain native (time, longitude, latitude) layout and native units.
+    """
+    surface, shortwave, condensation, convection = _required_speedy_diagnostics(
+        physics, component_name=component_name
+    )
+    return {
+        "surface_sensible_heat_flux": surface.shf,
+        "surface_evaporation": surface.evap,
+        "downward_longwave_radiation_flux": surface.rlds,
+        "net_shortwave_radiation_flux": shortwave.rsns,
+        "downward_shortwave_radiation_flux": shortwave.rsds,
+        "large_scale_precipitation": condensation.precls,
+        "convective_precipitation": convection.precnv,
+        "near_surface_air_temperature": surface.t0,
+    }
+
+
 def diagnose_jax_gcm_initial_fields(
     state: "JCMAtmosphereSetupState",
     payload: JCMAtmosphereRuntimePayload,
@@ -476,7 +500,7 @@ def step_jax_gcm_runtime(
             "sea_surface_temperature": sea_surface_temperature,
             "total_surface_temperature": total_surface_temperature,
         }
-    jcm_state, _ = state._step_function(
+    jcm_state, flux_samples = state._step_function(
         payload.jcm_state,
         applied_forcing,
     )
@@ -486,9 +510,19 @@ def step_jax_gcm_runtime(
         stage="step output",
     )
     mapped_fields = _map_jax_gcm_state_fields(state, jcm_state, constants, dtype)
+    mapped_fields.update(
+        _jax_gcm_fields._map_jcm_surface_flux_fields(
+            constants.latent_heat_of_vaporization,
+            **flux_samples,
+            snow_temperature=constants.precipitation_snow_temperature,
+            rain_temperature=constants.precipitation_rain_temperature,
+            dtype=dtype,
+            interval_mean=True,
+        )
+    )
 
     # Native JCM removes its transient _forcing_2d diagnostic from the carry.
-    # Select the same dates as the last physics step of each saved snapshot;
+    # Select the final native physics date independently of diagnostic saving;
     # this is pure boundary sampling, without another physics evaluation.
     sampled_surface = _sample_surface_forcing(
         state, payload.jcm_state, applied_forcing, dtype
@@ -527,7 +561,7 @@ def _sample_surface_forcing(
     forcing: Any,
     dtype: DTypePolicy,
 ) -> dict[str, jax.Array]:
-    """Average boundary values at the exact physics dates of saved snapshots."""
+    """Return boundary state actually used by the final native physics step."""
     return cast(
         dict[str, jax.Array],
         _sample_native_surface_forcing(
@@ -535,7 +569,6 @@ def _sample_surface_forcing(
             initial_state.step,
             forcing,
             model_seconds=int(state.model_timestep.total_seconds()),
-            save_seconds=int(state.save_interval.total_seconds()),
             coupling_seconds=int(state.coupling_timestep.total_seconds()),
             dtype=dtype,
         ),
@@ -544,7 +577,7 @@ def _sample_surface_forcing(
 
 @partial(
     jax.jit,
-    static_argnames=("model_seconds", "save_seconds", "coupling_seconds", "dtype"),
+    static_argnames=("model_seconds", "coupling_seconds", "dtype"),
 )
 def _sample_native_surface_forcing(
     initial_time: Any,
@@ -552,40 +585,28 @@ def _sample_native_surface_forcing(
     forcing: Any,
     *,
     model_seconds: int,
-    save_seconds: int,
     coupling_seconds: int,
     dtype: DTypePolicy,
 ) -> dict[str, jax.Array]:
-    """Reuse a fixed-shape native boundary sampler on host and scanned runs."""
+    """Sample the final applied boundary without another physics evaluation."""
     import jax_datetime as jdt
     from jcm.date import DateData
 
-    offsets = jnp.arange(
-        save_seconds - model_seconds, coupling_seconds, save_seconds, dtype=jnp.int32
+    offset = jnp.asarray(coupling_seconds - model_seconds, dtype=jnp.int32)
+    date = DateData.set_date(
+        initial_time + jdt.Timedelta(seconds=offset),
+        model_step=initial_step + offset // model_seconds,
+        dt_seconds=model_seconds,
     )
-
-    def sample(offset: jax.Array) -> dict[str, jax.Array]:
-        date = DateData.set_date(
-            initial_time + jdt.Timedelta(seconds=offset),
-            model_step=initial_step + offset // model_seconds,
-            dt_seconds=model_seconds,
+    selected = forcing.select(date)
+    return {
+        name: as_jax_real_array(value, dtype).T
+        for name, value in (
+            ("land_surface_temperature", selected.stl_am),
+            ("sea_surface_temperature", selected.sea_surface_temperature),
+            ("marine_ice_fraction", selected.sice_am),
         )
-        selected = forcing.select(date)
-        return {
-            name: as_jax_real_array(value, dtype).T
-            for name, value in (
-                ("land_surface_temperature", selected.stl_am),
-                ("sea_surface_temperature", selected.sea_surface_temperature),
-                ("marine_ice_fraction", selected.sice_am),
-            )
-        }
-
-    return cast(
-        dict[str, jax.Array],
-        jax.tree_util.tree_map(
-            lambda value: jnp.mean(value, axis=0), jax.vmap(sample)(offsets)
-        ),
-    )
+    }
 
 
 def step_jax_gcm_component(

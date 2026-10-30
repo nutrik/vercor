@@ -252,6 +252,67 @@ def prepare_surface_temperature_forcing(
     return land, sea, fraction * land + (1 - fraction) * sea
 
 
+@partial(jax.jit, static_argnames=("dtype", "interval_mean"))
+def _map_jcm_surface_flux_fields(
+    latvap: object,
+    surface_sensible_heat_flux: object,
+    surface_evaporation: object,
+    downward_longwave_radiation_flux: object,
+    net_shortwave_radiation_flux: object,
+    downward_shortwave_radiation_flux: object,
+    large_scale_precipitation: object,
+    convective_precipitation: object,
+    near_surface_air_temperature: object,
+    snow_temperature: object,
+    rain_temperature: object,
+    *,
+    dtype: DTypePolicy,
+    interval_mean: bool = False,
+) -> dict[str, jax.Array]:
+    """Map native surface rates, diagnosing each phase before averaging.
+
+    Inputs use native (longitude, latitude), optionally preceded by equal
+    native-duration samples. Heat is downward-positive W/m2 and precipitation
+    converts g/m2/s to kg/m2/s. Only the final spatial axes transpose; interval
+    means reduce the leading sample axis after the nonlinear phase diagnosis.
+    """
+    total = (
+        as_jax_real_array(large_scale_precipitation, dtype)
+        + as_jax_real_array(convective_precipitation, dtype)
+    ) / 1000
+    snow_threshold = as_jax_real_array(snow_temperature, dtype)
+    rain_threshold = as_jax_real_array(rain_temperature, dtype)
+    midpoint = (snow_threshold + rain_threshold) / 2
+    fraction = jax.nn.sigmoid(
+        4
+        * (midpoint - as_jax_real_array(near_surface_air_temperature, dtype))
+        / (rain_threshold - snow_threshold)
+    )
+    snow = total * fraction
+    fluxes = {
+        "sensible_heat_flux": -as_jax_real_array(surface_sensible_heat_flux, dtype),
+        "latent_heat_flux": -as_jax_real_array(surface_evaporation, dtype)
+        * (as_jax_real_array(latvap, dtype) / 1000),
+        "downward_longwave_radiation_flux": as_jax_real_array(
+            downward_longwave_radiation_flux, dtype
+        ),
+        "net_shortwave_radiation_flux": as_jax_real_array(
+            net_shortwave_radiation_flux, dtype
+        ),
+        "downward_shortwave_radiation_flux": as_jax_real_array(
+            downward_shortwave_radiation_flux, dtype
+        ),
+        "rain_rate": total - snow,
+        "snow_rate": snow,
+    }
+    return {
+        name: (
+            jnp.mean(jnp.swapaxes(value, -1, -2), axis=0) if interval_mean else value.T
+        )
+        for name, value in fluxes.items()
+    }
+
+
 @partial(jax.jit, static_argnames=("dtype",))
 def map_jcm_output_fields(
     latvap: float,
@@ -299,7 +360,6 @@ def map_jcm_output_fields(
     diagnosis. Radiation and turbulent heat fluxes are surface quantities.
     """
 
-    latvap_array = as_jax_real_array(latvap, dtype)
     reference_pressure_array = as_jax_real_array(reference_pressure, dtype)
     sigma_levels_array = as_jax_real_array(sigma_levels, dtype)
     mwdair_array = as_jax_real_array(mwdair, dtype)
@@ -318,36 +378,23 @@ def map_jcm_output_fields(
     v_velocity_bottom = as_jax_real_array(v_wind, dtype)[-1, :, :].T
     temperature_bottom = temperature_array[-1, :, :].T
     specific_humidity_bottom = specific_humidity_array[-1, :, :].T
-    near_surface_air_temperature = as_jax_real_array(
-        near_surface_air_temperature, dtype
+    fluxes = _map_jcm_surface_flux_fields(
+        latvap,
+        surface_sensible_heat_flux,
+        surface_evaporation,
+        downward_longwave_radiation_flux,
+        net_shortwave_radiation_flux,
+        jnp.broadcast_to(
+            as_jax_real_array(downward_shortwave_radiation_flux, dtype),
+            temperature_bottom.T.shape,
+        ),
+        large_scale_precipitation,
+        convective_precipitation,
+        near_surface_air_temperature,
+        snow_temperature,
+        rain_temperature,
+        dtype=dtype,
     )
-    snow_temperature_array = as_jax_real_array(snow_temperature, dtype)
-    rain_temperature_array = as_jax_real_array(rain_temperature, dtype)
-    total_precipitation = (
-        as_jax_real_array(large_scale_precipitation, dtype)
-        + as_jax_real_array(convective_precipitation, dtype)
-    ) / 1000.0
-    threshold_span = rain_temperature_array - snow_temperature_array
-    midpoint = 0.5 * (rain_temperature_array + snow_temperature_array)
-    # A logistic has midpoint derivative -k/4; LT has derivative -1/span.
-    snow_fraction = jax.nn.sigmoid(
-        4.0 * (midpoint - near_surface_air_temperature) / threshold_span
-    )
-    snow_precipitation = total_precipitation * snow_fraction
-    rain_rate = (total_precipitation - snow_precipitation).T
-    snow_rate = snow_precipitation.T
-
-    # JCM 3 publishes delivered grid means, with evaporation still in g/m2/s.
-    sensible_heat_flux = -as_jax_real_array(surface_sensible_heat_flux, dtype).T
-    latent_heat_flux = -as_jax_real_array(surface_evaporation, dtype).T * (
-        latvap_array / 1000
-    )
-    net_shortwave_radiation_flux_surface = as_jax_real_array(
-        net_shortwave_radiation_flux, dtype
-    ).T
-    downward_longwave_radiation_flux_surface = as_jax_real_array(
-        downward_longwave_radiation_flux, dtype
-    ).T
 
     pressure = compute_sigma_pressure_levels(
         reference_pressure_array,
@@ -371,10 +418,7 @@ def map_jcm_output_fields(
     )
 
     return {
-        "downward_shortwave_radiation_flux": jnp.broadcast_to(
-            as_jax_real_array(downward_shortwave_radiation_flux, dtype),
-            temperature_bottom.T.shape,
-        ).T,
+        **fluxes,
         "surface_pressure": reference_pressure_array
         * normalized_surface_pressure_array,
         "open_water_albedo": jnp.broadcast_to(
@@ -384,16 +428,10 @@ def map_jcm_output_fields(
         "air_v_velocity": v_velocity_bottom,
         "air_temperature": temperature_bottom,
         "air_specific_humidity": specific_humidity_bottom,
-        "sensible_heat_flux": sensible_heat_flux,
-        "latent_heat_flux": latent_heat_flux,
-        "net_shortwave_radiation_flux": net_shortwave_radiation_flux_surface,
-        "downward_longwave_radiation_flux": downward_longwave_radiation_flux_surface,
         "air_pressure_3d": pressure,
         "air_density": density_bottom,
         "air_potential_temperature": potential_temperature_bottom,
         "model_level_height": model_level_height,
-        "rain_rate": rain_rate,
-        "snow_rate": snow_rate,
     }
 
 
