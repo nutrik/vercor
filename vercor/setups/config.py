@@ -21,7 +21,12 @@ class Spinup:
 
 @dataclass(frozen=True)
 class JCMAtmosphereConfig:
-    """Configuration for the bundled JAXGCM/JCM atmosphere setup factory."""
+    """Configuration for the bundled JAXGCM/JCM atmosphere setup factory.
+
+    Exchanged fluxes integrate every native step and evolving air fields use
+    the endpoint. ``save_interval`` remains a validated compatibility setting;
+    it cannot thin exchange samples. ``output`` owns file cadence and selection.
+    """
 
     name: str = "ATM"
     custom_parameters: Mapping[str, float] | None = None
@@ -57,6 +62,10 @@ class VerosConfig:
     The ACC setup retains its native internal forcing. Explicit ``surface_forcing="surface_fluxes"``
     accepts only total sea-ice ocean fluxes on the global grid, keeps independent
     restoring, and requires native pressure/free-surface execution for real SSH.
+    Its default momentum and tracer timesteps are both 1800 seconds so physical
+    interval stress and tracer fluxes advance over the same duration. An explicit
+    ``custom_parameters["dt_mom"]`` also sets the implicit tracer timestep;
+    explicit ``dt_tracer`` preserves a deliberately accelerated native policy.
     """
 
     name: str = "OCN"

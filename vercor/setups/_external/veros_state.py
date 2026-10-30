@@ -149,8 +149,17 @@ def pure(
     linear_solver: Any,
     *,
     execution: Literal["host", "jax"],
+    synchronize_surface_height: bool = False,
 ) -> VerosState:
-    """Run one native step with the component-owned solver."""
+    """Run one native step with the component-owned solver.
+
+    Coupled pressure execution refreshes the diagnostic SSH after the native
+    driver rotates time slots. Native pressure kernels diagnose SSH from the
+    old tau while updating velocity from taup1. In pressure mode psi is surface
+    geopotential (m²/s²), so psi at the rotated tau divided by gravity is the
+    current height in metres. Streamfunction psi (m³/s) is never converted.
+    Native prognostic slots and the native integrator remain untouched.
+    """
 
     next_state = (
         state if execution == "host" else copy_state(state, execution=execution)
@@ -162,6 +171,12 @@ def pure(
     solver_cache[cache_key] = linear_solver
     try:
         step(next_state)
+        if synchronize_surface_height and not next_state.settings.enable_streamfunction:
+            variables = next_state.variables
+            with variables.unlock():
+                variables.ssh = (
+                    variables.psi[..., variables.tau] / next_state.settings.grav
+                )
     finally:
         if previous_solver is missing:
             solver_cache.pop(cache_key, None)
@@ -190,8 +205,9 @@ def extract_veros_runtime_surface_fields(
     """Extract native SST K and, for coupled mode, actual prognostic surfaces.
 
     SSS retains native g/kg, east/north face velocities are m/s, and active
-    native SSH is metres. Native psi has different units and is never used as
-    height. Dry/coastal operands use their actual native wet masks.
+    native SSH is metres. Extraction reads the SSH diagnostic synchronized by
+    coupled pressure stepping, rather than interpreting the formulation-dependent
+    psi here. Dry/coastal operands use their actual native wet masks.
     """
     vs = state.variables
     result = {"sea_surface_temperature": extract_veros_runtime_sst(state)}

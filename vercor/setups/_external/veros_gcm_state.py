@@ -103,6 +103,13 @@ class VerosGCMSetupState:
         override = dict(custom_parameters or {})
         if execution == "jax" or surface_forcing == "surface_fluxes":
             override["enable_streamfunction"] = False
+        if surface_forcing == "surface_fluxes":
+            # The global native daily tracer step accelerates tracers relative
+            # to momentum (1800 s). Transient interval fluxes require the same
+            # physical duration for both. An explicit dt_tracer retains native
+            # acceleration for callers deliberately choosing that policy.
+            override.setdefault("dt_mom", 1800.0)
+            override.setdefault("dt_tracer", override["dt_mom"])
 
         setup_class = _select_veros_setup_class(setup, execution)
         self.model = (
@@ -127,6 +134,7 @@ class VerosGCMSetupState:
                 step=self.model.step,
                 linear_solver=self._linear_solver,
                 execution=execution,
+                synchronize_surface_height=surface_forcing == "surface_fluxes",
             ),
         )
         self._step_function = (

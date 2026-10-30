@@ -239,7 +239,11 @@ def test_public_coupled_runtime_uses_only_total_fluxes(
         raise AssertionError("atmospheric bulk must not run in total-feedback mode")
 
     monkeypatch.setattr(veros_fluxes, "compute_fluxes", forbidden_bulk)
-    ocean = make_veros_gcm(config=VerosConfig(surface_forcing="surface_fluxes"))
+    ocean = make_veros_gcm(
+        config=VerosConfig(
+            surface_forcing="surface_fluxes", custom_parameters={"dt_mom": 600.0}
+        )
+    )
     assert tuple(ocean.spec.inputs) == tuple(
         _flatten_field_items(SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS)
     )
