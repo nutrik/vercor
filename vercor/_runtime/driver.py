@@ -33,6 +33,7 @@ def step_runtime_component(
         runtime_state,
         component_name,
         dispatch_context.destination_exchanges(component_name),
+        step_info,
         context=dispatch_context,
     )
     component_state = runtime_state._component_state(component_name)
