@@ -12,6 +12,73 @@ The execution order is LND, CICE (native Veris), OCN (prognostic Veros), ATM
 (JCM). Source code, tests, native data and the shared output coordinator are
 reused; no additional model or integration loop was introduced.
 
+Longitude-wrap geometry repair (2026-10-30)
+------------------------------------------------------------
+
+The live native ocean grid confirms the reported source edges
+``[360, 4, 8, ..., 360]`` degrees. The original overlap calculation treated
+``360 -> 4`` as an interval with negative width, dropping its contribution.
+An independent NumPy replay on the native wet mask and JCM T31 grid gives
+all-wet middle-row coverage ``[0.5, 0.43333333333333324]`` in the first two
+columns. Replacing only the first source edge by zero in that independent
+calculation restores unit coverage.
+
+The shared remapper now unwraps eastward source and target bounds once during
+construction, preserving field/mask column order. Both overlap weights and
+destination cell areas use those bounds. Monotonic descending targets keep
+their existing ordering; an ambiguous single wrapped target cell should be
+given explicit eastward bounds, for example ``[356, 364]``. Periodic shifts
+are selected from the static supports so explicit broad cells retain every
+overlap. This changes setup geometry, not physics tolerances or runtime field
+normalization. The native ocean/ice identity bypass remains active.
+
+The live-grid replay measures the following differences using radius 6371 km:
+
+* Restored spherical footprint: 5,581,282.738587 km².
+* Restored wet spherical area: 3,530,779.048999 km², equal to the direct native
+  wet first-strip area to within ``1e-7`` km².
+* Gaussian equivalents: 5,582,270.045591 km² footprint and 3,531,403.347589 km²
+  wet area.
+* Removed spurious prescribed marine area under Gaussian weighting:
+  3,677,888.908539 km²; retained prescribed polar marine area:
+  3,478,089.685460 km².
+
+Corrected production wet coverage agrees with the independent NumPy result
+to a maximum absolute difference of ``4.44e-16``. These measurements verify
+the report's rounded geometric quantities using current native data. The
+four archived target arrays were not supplied for this repair, so their
+reported ``5.55e-16`` archive-reconstruction agreement is not independently
+certified here. Geometry receipts and the native integration harness are
+``/private/tmp/vercor-longitude-native-{host,jax}/`` and
+``/private/tmp/vercor-longitude-native.py``.
+
+Thirty regression cases cover float32/64 wrapped source/target seams, shifted
+origins, first-strip integrals, masks, exact field JVP/VJP, descending targets,
+broad cells, and prescribed polar versus coupled marine partitioning. The
+original code fails all 26 initial wrap regressions; four additional review
+regressions protect existing target-grid behavior. The final independently
+reviewed focused suite passes 101 cases with no remaining material findings.
+Final full stock, fast and separate exact-fork autodiff suites pass 2,502,
+1,552 and 15 tests respectively, with zero failures, errors or skips. Combined
+statement/branch coverage is 92.894807%, above the unchanged 90% gate; raw
+stock and autodiff coverage files are retained separately. Black, mypy on
+311 files, maintained-source flake8, compileall, strict Sphinx, and wheel/sdist
+build pass. The wheel matches all 180 production Python modules. Repository
+lint still reports 200 pre-existing findings in historical ``test_logs`` snippets.
+
+Final two-day global host and all-JAX runs each complete 96 native atmospheric
+evaluations and write nine shared output files. Selected prescribed polar SST
+and ice agree exactly with native forcing at every evaluation; native marine
+SST, ice and albedo remain nonzero in period and final output. Their geometric
+receipts are identical. These are short corrected integration runs, separate
+from the offline legacy replay and the earlier long trajectory described below.
+
+The restored coupled wet area and removed prescribed marine area differ
+because the latter also depends on native fractional terrain. No temperature,
+budget, circulation or radiative correction can be inferred from these areas.
+This repair does not certify a corrected long-term climate trajectory or
+retroactively correct archived model states.
+
 Delayed full-ice bounds repair (2026-10-29)
 ------------------------------------------------------------
 

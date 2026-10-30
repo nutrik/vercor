@@ -17,6 +17,9 @@ This adds no layer or dependency cycle.
 Conservative remapping computes destination longitude widths with the same
 degree-difference/radian-conversion arithmetic as its overlap weights. The
 ice-area bounds repair changes no import or topological layer.
+The longitude-wrap repair standardizes source/destination bounds in that same
+layer-2 remapper before overlaps and areas, retaining native cell order and the
+existing identity bypass. No module or dependency layer is added.
 
 Layer 18's execution coordinator selects an exact common scan block size per schedule;
 the existing backend owner supplies shared numeric chunk inputs to the output
