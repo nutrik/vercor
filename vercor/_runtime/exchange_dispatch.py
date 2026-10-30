@@ -6,11 +6,13 @@ import jax.numpy as jnp
 
 from vercor._numerical_safety import require_active_finite, safe_masked_divide
 from vercor._runtime.exchange_masks import exchange_coverage, exchange_mask_operands
+from vercor._runtime.field_transfer import send_runtime_fields
 from vercor.exceptions import ExchangeError
 from vercor.exchanges import Exchange
 from vercor.fields import VectorField
 from vercor.state import RunState
 from vercor._runtime.stores import FieldStore
+from vercor._runtime.time import RuntimeStepInfo
 
 if TYPE_CHECKING:
     from vercor._runtime.dispatch_context import RuntimeDispatchContext
@@ -80,10 +82,36 @@ def dispatch_component_exchanges(
     state: RunState,
     destination_name: str,
     exchanges: Sequence[Exchange],
+    step_info: RuntimeStepInfo | None = None,
     *,
     context: RuntimeDispatchContext,
 ) -> RunState:
-    """Dispatch quantities and save coverage with the resulting stored imports."""
+    """Select clock-dependent exports, dispatch quantities, and retain support.
+
+    Record sources select at the receiving step's time even when the workflow
+    omits their step or schedules them later. Refresh each source's sent store
+    once across its routes without advancing author physics. Current exports
+    retain the sequential workflow's explicit send ownership. A missing time
+    leaves stores untouched for direct dispatch of already-selected exports.
+    """
+    refreshed_sources: set[str] = set()
+    if step_info is not None:
+        for exchange in exchanges:
+            if exchange.source in refreshed_sources:
+                continue
+            component = context.components[exchange.source]
+            if component.spec.transfer.time_selection == "current":
+                continue
+            component_state = send_runtime_fields(
+                component,
+                state._component_state(exchange.source),
+                step_info,
+                contract=context.contracts[exchange.source],
+                dtype=context.dtype,
+            )
+            state = state._with_component_state(exchange.source, component_state)
+            refreshed_sources.add(exchange.source)
+
     destination_component = state._component_state(destination_name)
     received_updates: dict[str, Any] = {}
     for exchange in exchanges:
