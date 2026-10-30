@@ -159,7 +159,7 @@ Fluxes, coverage and geometry
      - Downward positive; snow is water-equivalent mass
    * - ``sensible_heat_flux`` / ``latent_heat_flux``
      - W/m²
-     - Downward positive; JCM 3 exports grid means
+     - Downward positive; JCM grid-area and native-interval means
    * - ``sea_surface_heat_flux``
      - W/m²
      - Downward into ocean; total-area interval mean
@@ -204,3 +204,53 @@ coverage before the recipient steps. The coupled gallery retains the physical
 land → ice → ocean → atmosphere order, with routes, state lookup and topology
 roles derived from actual component names. Configurable instance names such as
 ``ATM`` and ``OCN`` remain instance identities rather than physical field names.
+
+Temporal support
+----------------
+
+State and flux exports serve different purposes. Prognostic surface and air
+states represent native endpoints. An interval-mean rate represents the integral
+of native rates divided by the coupling duration; it must be applied over that
+same duration to preserve the transferred quantity. ``quantity`` controls area
+normalization, while ``TransferPolicy.current`` sends a stored array. Neither
+name alone declares temporal support.
+
+JCM requests every native step for heat, radiation and precipitation exchange,
+regardless of ``save_interval``. The common surface mapper diagnoses rain and
+snow for each native near-surface temperature and precipitation sample before
+averaging. It converts each native rate once and returns the full coupling mean.
+Air fields and their derived density, pressure and height use the final native
+dynamics state. The resumable native dynamics, physics cache, exact clock and
+categorical fields retain their endpoint values. Applied marine boundary fields
+use the final physics date, one native step before the dynamics endpoint.
+
+CAMulator retains the last native meteorology prediction and averages radiation
+rates across all native windows in the coupling block. Native FSNS/FLNS energies
+are divided by the native duration; downward longwave is reconstructed using
+each prediction's surface emission before averaging. Prescribed CAMulator land
+still supplies the interval-start temperature. Native CREDIT checkpoint
+compatibility remains a separate validation requirement.
+
+Veris integrates total ocean heat, mass, salt and concentration-weighted face
+stress at every native step. Ice fraction, temperature and albedo are final
+state/diagnostic values. Veros holds received interval means through native
+substeps. Coupled surface-flux runs default to matching 1800-second momentum
+and tracer steps; overriding only ``dt_mom`` also selects that implicit tracer
+step. An explicit ``custom_parameters['dt_tracer']`` retains deliberate native
+acceleration. This changes the default daily coupled run from one accelerated
+tracer step to 48 physically synchronous native steps. In pressure mode, SSH is
+synchronized to the final native pressure solution after time-slot rotation;
+streamfunction values are never interpreted as height.
+
+Monthly/daily record sources select at the receiving step's clock, including
+when omitted or scheduled after their recipient. This operation does not step
+the source. Current evolving feedback retains explicit sequential order. The
+external atmosphere/ocean state is still held through each component's native
+substeps; smaller native timesteps alone do not remove that coupling error.
+
+Native diagnostic output and exchanged rates have separate sampling meanings.
+JCM's native output provider samples endpoint physics, while exchanged surface
+fluxes are native-interval means. CAMulator period output retains every native
+prediction. A period mean of endpoint native diagnostics need not reproduce the
+interval-integrated exchanged budget; use the canonical transferred fields
+when checking that budget.
