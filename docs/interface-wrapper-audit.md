@@ -190,10 +190,12 @@ These are not claims of reproduced bundled-model failures:
    recomputes turbulent fluxes, but a third-party route must not treat placeholder
    zero exports as measured physical fluxes. Checkpoint vapor semantics and
    native CREDIT execution remain uncertified here.
-6. Native temporal representations differ: Veris total fluxes are interval means,
-   JCM exports average saved native samples, CAMulator exchange uses the latest
-   prediction and prescribed land uses interval-start TS. Document these choices;
-   a common method signature does not establish interval-conservative feedback.
+6. Native states and interval rates have distinct temporal support. The
+   2026-10-30 repair integrates every native JCM surface rate, diagnoses phases
+   before averaging and averages CAMulator radiation across its complete block.
+   Meteorology remains endpoint state; prescribed CAMulator land remains
+   interval-start TS. Held inputs and explicit sequential feedback still require
+   coupling-interval convergence studies for transient accuracy.
 7. Output coordinate schemas validate dimensions/dtypes/attributes, while
    same-schema coordinate values may move between samples. A period mean then
    retains the latest coordinates. Moving-grid support or rejection needs an
@@ -367,3 +369,32 @@ and native suites use the existing isolated `scipy312` setup after the known
 `scipy` native-worker abort. Repository-wide lint retains 200 historical
 `test_logs` findings. Raw coverage lanes and 312 frozen source/test hashes are
 preserved in the final verification receipt.
+
+## Temporal exchange remediation (2026-10-30)
+
+The follow-up audit identified sparse JCM rate sampling, precipitation phase
+partition after averaging, last-window-only CAMulator radiation, and stale
+record selection when prescribed sources followed their consumers. The repairs
+use the existing mapper, native step and dispatch owners. JCM/CAMulator state
+outputs now retain endpoints while relevant rates integrate every native window.
+The JCM compiled return projects to eight horizontal histories: actual T31L8
+float64 daily return shape falls from about421 MiB to29.46 MiB including endpoint
+state with the default wrapper JIT enabled. Disabling that wrapper JIT can still
+materialize native histories before projection; these figures describe returned
+array shapes rather than measured process peak memory.
+
+The native Veros pressure kernels in stock1.7 and the exact differentiable fork
+updated velocity at the new pressure slot but diagnosed SSH at the previous one.
+The coupled adapter refreshes only SSH after native slot rotation. Actual native
+replay verifies unchanged temperature, salinity, velocity, pressure and clocks.
+Default coupled momentum/tracer durations now match at1800s; explicit tracer
+acceleration remains supported, and bulk/ACC defaults retain their native policy.
+
+Independent temporal regressions cover native-rate integrals, nonlinear phases,
+endpoint/categorical ownership, diagnostic-save independence, host/JAX/mixed/
+custom clock selection, current feedback, masks, gradients and native pressure
+units. Native output endpoint samples remain distinct from exchanged interval
+means. Prescribed climatology weather covariance, held external forcing,
+CAMulator placeholder precipitation/turbulence and native CREDIT compatibility
+remain explicit limitations. Detailed execution and final gate evidence live in
+`docs/superpowers/plans/2026-10-30-temporal-exchange.md` and `PROGRESS.md`.

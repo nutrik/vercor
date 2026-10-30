@@ -21,6 +21,15 @@ The longitude-wrap repair standardizes source/destination bounds in that same
 layer-2 remapper before overlaps and areas, retaining native cell order and the
 existing identity bypass. No module or dependency layer is added.
 
+Temporal exchange repair retains existing owners and layers. Layer 4's JCM
+surface mapper owns both single-sample conversion and phase-before-mean
+integration. The native step projects eight horizontal histories before its
+compiled return; runtime keeps endpoint state separately. CAMulator reuses its
+canonical mapper for all native radiation samples. Runtime dispatch consumes
+the existing field selector at recipient time, and pressure-mode Veros stepping
+refreshes the native SSH diagnostic after slot rotation. No module, public
+protocol, third-party dependency or import cycle is added.
+
 Bilinear layer-1 geometry owns canonical degree/radian longitude phases.
 Layer-2 weights compare source candidates in each target's whole-turn frame
 during construction and return unchanged source-column indices; scalar/vector fallback shares one orientation

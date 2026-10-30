@@ -69,14 +69,32 @@ The public state surface is intentionally opaque. `RunState.component(...)`,
 immutable replacement. Runtime stores, topology maps, alignment metadata, and
 prepared bindings remain private.
 Replacing a current exported field also replaces its matching outgoing copy,
-so a supplied state is coherent before any recipient runs. Record arrays keep
-their prior selected export until the source's next time-selected send;
-received values and their last-dispatch support retain independent ownership.
+so a supplied state is coherent before any recipient runs. Record arrays refresh
+their selected export at each recipient's clock time as well as at source send.
+Selection does not advance source physics and works for omitted or later sources;
+current evolving exports retain explicit sequential feedback ordering. Received
+values and their last-dispatch support retain independent ownership.
 
 Non-current transfer policies require time-first selectable outputs with twelve
 monthly records or 365 no-leap daily records. Declared grid-shaped mask fields
 remain current. Setup, prefill, and the shared selector enforce this layout;
 monthly interpolation preserves the runtime field dtype in sends and output.
+
+Bundled evolving states use native endpoints, while JCM surface fluxes and
+Veris ocean feedback integrate every native interval. JCM diagnoses rain/snow
+before reduction, independently of diagnostic save cadence. Its native step
+returns only endpoint state and eight horizontal sample histories. With the
+default wrapper JIT enabled, host/mixed paths avoid materializing unused full
+diagnostic histories; disabling wrapper JIT can retain those native temporaries.
+CAMulator retains endpoint meteorology and averages each native prediction's
+decoded radiation rates. Native output samples and exchanged flux integrals
+have distinct meanings and are documented separately.
+
+Coupled pressure-mode Veros stepping synchronizes SSH to the rotated current
+pressure solution without changing prognostic state. Surface-flux setups use
+matching 1800-second momentum/tracer steps by default; custom momentum duration
+sets implicit tracer duration, and explicit tracer overrides retain deliberate
+native acceleration. Bulk-meteorology and ACC timestep policies are unchanged.
 
 ## 3. Configuration ownership
 
