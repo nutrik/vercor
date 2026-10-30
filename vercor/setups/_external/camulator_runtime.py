@@ -218,7 +218,13 @@ def step_camulator_runtime(
     context: StepContext,
     payload: Any | None,
 ) -> StepResult:
-    """Advance the private host-backed CAMulator atmosphere boundary."""
+    """Export endpoint meteorology and complete-window mean radiation rates.
+
+    Every native forecast window has the same duration. Map each prediction
+    before averaging radiation so native J/m² normalization and nonlinear
+    surface emission reconstruction occur at that prediction's temperature.
+    Native state and output history retain their original endpoint/samples.
+    """
 
     if not isinstance(payload, CAMulatorRuntimePayload):
         raise ComponentError("CAMulator runtime requires a native runtime payload.")
@@ -241,21 +247,35 @@ def step_camulator_runtime(
         logger=logger,
     )
     next_payload = replace(next_payload, cursor=next_payload.cursor.advanced())
-    prediction = cast(torch.Tensor, next_payload.output_prediction)
-
-    mapped_fields = _camulator_fields.map_camulator_prediction_to_runtime_fields(
-        context.constants,
-        camulator_reference_pressure=resources.P0,
-        native_step_seconds=resources.model_timestep.total_seconds(),
-        water_vapor_variable=resources.water_vapor_variable,
-        hyai=resources.hyai,
-        hybi=resources.hybi,
-        hyam=resources.hyam,
-        hybm=resources.hybm,
-        accessor_output=resources.accessor_output,
-        state_transformer=resources.state_transformer,
-        prediction=prediction,
-    )
+    predictions = cast(torch.Tensor, next_payload.output_prediction_samples)
+    mapped_samples = [
+        _camulator_fields.map_camulator_prediction_to_runtime_fields(
+            context.constants,
+            camulator_reference_pressure=resources.P0,
+            native_step_seconds=resources.model_timestep.total_seconds(),
+            water_vapor_variable=resources.water_vapor_variable,
+            hyai=resources.hyai,
+            hybi=resources.hybi,
+            hyam=resources.hyam,
+            hybm=resources.hybm,
+            accessor_output=resources.accessor_output,
+            state_transformer=resources.state_transformer,
+            prediction=prediction,
+        )
+        for prediction in predictions.split(1, dim=0)
+    ]
+    mapped_fields = {
+        **mapped_samples[-1],
+        **{
+            name: jnp.mean(
+                jnp.stack([sample[name] for sample in mapped_samples]), axis=0
+            )
+            for name in (
+                "net_shortwave_radiation_flux",
+                "downward_longwave_radiation_flux",
+            )
+        },
+    }
 
     return StepResult(
         fields={
