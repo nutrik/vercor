@@ -21,6 +21,11 @@ The longitude-wrap repair standardizes source/destination bounds in that same
 layer-2 remapper before overlaps and areas, retaining native cell order and the
 existing identity bypass. No module or dependency layer is added.
 
+Bilinear layer-1 geometry owns canonical degree/radian longitude phases.
+Layer-2 weights compare source candidates in each target's whole-turn frame
+during construction and return unchanged source-column indices; scalar/vector fallback shares one orientation
+boundary in layer 3. No runtime state, public interface, or layer is added.
+
 Layer 18's execution coordinator selects an exact common scan block size per schedule;
 the existing backend owner supplies shared numeric chunk inputs to the output
 scan owner. Bilinear extrapolation and Veris setup retain compiled kernels at

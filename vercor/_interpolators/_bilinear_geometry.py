@@ -4,10 +4,23 @@ from jax import Array
 import jax.numpy as jnp
 
 
-def wrap_longitudes_like(lon_deg: Array, base0_deg: float) -> Array:
-    r"""Map longitudes in degrees into the ``[base0, base0 + 360)`` interval."""
+def canonical_longitudes(lon_deg: Array) -> Array:
+    """Return signed longitude phases in [-180, 180) without offset cancellation.
 
-    return base0_deg + jnp.mod(lon_deg - base0_deg, 360.0)
+    The shared degree frame keeps lookup, tangent bases, and distances
+    consistent without forming a full-turn offset for small coordinates.
+    """
+    # A signed remainder retains small positive/negative longitudes. Adding
+    # 180 before reduction would erase their resolution, especially in float32.
+    reduced = jnp.fmod(lon_deg, 360.0)
+    reduced = jnp.where(reduced >= 180.0, reduced - 360.0, reduced)
+    reduced = jnp.where(reduced < -180.0, reduced + 360.0, reduced)
+    return reduced
+
+
+def longitude_radians(lon_deg: Array) -> Array:
+    """Reduce whole turns before conversion to preserve spherical phase precision."""
+    return jnp.deg2rad(canonical_longitudes(lon_deg))
 
 
 def unit_east_north(lon_rad: Array, lat_rad: Array) -> tuple[Array, Array]:
