@@ -122,7 +122,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
 
         self.lon_src_deg = lon_src_deg
         self.lat_src_deg = lat_src_deg
-        self.lon_src_rad = jnp.deg2rad(lon_src_deg)
+        self.lon_src_rad = _geometry.longitude_radians(lon_src_deg)
         self.lat_src_rad = jnp.deg2rad(lat_src_deg)
         self.nlon = int(lon_src_deg.size)
         self.nlat = int(lat_src_deg.size)
@@ -133,7 +133,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         self.tshape = tuple(int(size) for size in lon_tgt_deg.shape)
         self.lon_tgt_deg = lon_tgt_deg
         self.lat_tgt_deg = lat_tgt_deg
-        self.lon_tgt_rad = jnp.deg2rad(lon_tgt_deg)
+        self.lon_tgt_rad = _geometry.longitude_radians(lon_tgt_deg)
         self.lat_tgt_rad = jnp.deg2rad(lat_tgt_deg)
         self._lon_tgt_flat = self.lon_tgt_rad.reshape(-1)
         self._lat_tgt_flat = self.lat_tgt_rad.reshape(-1)
@@ -245,13 +245,13 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         return out, wsum
 
     def _extrapolate_scalar(self, src: Array, src_mask: Array | None) -> Array:
+        """Extrapolate source values already aligned with the internal mask."""
         if self.extrapolation_mode is None:
             return jax_full(self.tshape, self.fill_value)
 
-        src_array = self._prepare_source_field(src)
-        valid = _extrapolation.valid_scalar_source_mask(src_array, src_mask)
+        valid = _extrapolation.valid_scalar_source_mask(src, src_mask)
         return _extrapolation.extrapolate_scalar_field(
-            source_values=src_array,
+            source_values=src,
             valid_source_mask=valid,
             target_shape=self.tshape,
             target_lon_flat=self._lon_tgt_flat,
@@ -274,7 +274,9 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         need = ~jnp.isfinite(out)
         ext = lax.cond(
             jnp.any(need),
-            lambda _: self._extrapolate_scalar(src, self.src_mask),
+            lambda _: self._extrapolate_scalar(
+                self._prepare_source_field(src), self.src_mask
+            ),
             lambda _: jax_full(self.tshape, self.fill_value),
             operand=None,
         )

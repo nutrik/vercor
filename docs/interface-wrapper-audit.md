@@ -297,3 +297,73 @@ remain outside this validation claim.
 Git delivery uses the existing `feat/veris-seaice` branch and GitHub CLI
 credentials. The final handoff records the pushed commit and independently
 verified remote branch SHA.
+
+## Bilinear geometry follow-up (2026-10-30)
+
+The follow-up starts at `13c31ee` on `feat/veris-seaice`. Bilinear interpolation
+uses sampling centers, not conservative cell edges. The actual ocean centers
+start `[2, 6, 10]` degrees while the native edges start `[360, 4, 8]`. The
+conservative missing-strip mechanism therefore does not enter bilinear lookup.
+`RectilinearGrid` requires increasing coordinates; the low-level interpolator
+also accepts strictly descending source axes and rejects mixed wrapped order
+before calculating weights.
+
+The audit traced public factories, cell lookup, fractions, spherical bases,
+mask alignment, scalar/vector fallback, and explicit exchange dispatch. It
+verified and repaired these defects in the existing owners:
+
+| Finding | Verified behavior | Repair |
+| --- | --- | --- |
+| Degree/radian cancellation | The T31 seam sample at 358 degrees should retain source-last weight 2/3.75. Float32 at origin 720 instead gives 0.5333236456; an irregular affine latitude/longitude case also loses accuracy. | Calculate dimensionless fractions from degree differences. |
+| Periodic lookup/weight phase loss | A representable target 0.0003 on source `[-180,0,0.001,90]` becomes 0.30517578125 instead of 0.3 in float32. At a fine seam, forming a full-turn coordinate can erase the target phase and give 1 instead of 0.9214918432. | Compare source candidates in each target's whole-turn frame without translating the precise target, and compute seam distances as sums of small intervals. Original columns, inclusive endpoints and wider grids retain their first-turn convention. |
+| Spherical whole-turn sensitivity | Converting large longitude aliases directly to radians changes tangent bases and fallback distances through phase roundoff. | Reduce degrees with a signed remainder before conversion. This also retains small positive/negative coordinates; offsetting by180 first would erase their resolution. |
+| Descending-source vector fallback | With one valid source u=30, scalar nearest/IDW returns 30 but vector fallback can return 0 because values are flipped twice against an already-oriented mask. | The shared extrapolator consumes prepared values. Scalar finishing prepares once; vector finishing uses its already-prepared source. |
+
+One construction-only cached binary search handles periodic neighbors with
+fixed iteration count and unchanged source-column indices. It subtracts each
+target's whole turn from candidate sources for comparison, instead of adding a
+large origin to a precise target. Nonwrapped widths remain raw degree
+differences, including wider intervals; wrapped widths use positive signed-phase
+differences. Thus fine seams, inclusive endpoints and wider source domains use
+one lookup owner without sorting, a dense target/source matrix, or span-specific
+fallbacks. The existing PyTree, eager validation, compiled finishing kernels,
+and runtime ownership are retained.
+
+The audit preserves nonperiodic endpoint clipping, ascending/descending latitude,
+scalar NaN renormalization, target masks, and existing componentwise vector
+extrapolation. Identical-grid scalar/vector no-ops remain unchanged. Explicit
+exchange dispatch already applies source coverage and target support; it
+continues to own those masks rather than introducing a second masking pass.
+
+Targeted regressions use analytic scalar/vector values, exact rational geometry
+of represented seam coordinates, independent JVP/VJP expectations, inactive
+NaNs, nearest/IDW fallback, both precision policies, and compatibility controls.
+The native harness compares actual T31/4-degree coordinate pairs in both
+directions with SciPy `RegularGridInterpolator`, independently interpolating
+Cartesian vector components before projection. It also observes prescribed
+polar surfaces through two-day host and all-JAX runs and checks exact native
+ocean/ice identity. Receipts are under `/private/tmp/vercor-bilinear-*`; final
+gate results and delivery status are recorded in `PROGRESS.md` and the handoff.
+
+This is a numerical implementation audit. It does not establish a temperature,
+budget, or circulation correction from an interpolation error alone. Malformed
+input validation and changes to the established vector extrapolation convention
+are outside this repair.
+
+Final verification passes **2,586 full stock, 1,636 fast, and 15 exact-fork
+autodiff tests**, with zero failures, errors or skips. Combined statement/branch
+coverage is **92.922171%**, above the unchanged 90% gate. The 84 new regression
+cases and existing focused cases pass 153/153. Independent review passes 1,028
+exact-coordinate scalar/index/order oracles per precision and masked vector/VJP
+checks across source-axis orders, inclusive endpoints and wider grids.
+
+Both final two-day native runs complete 96 atmospheric evaluations and write
+nine shared output files. SciPy agreement is within 3.331e-16 for scalars and
+9.992e-16 for vectors, with exact unit coverage and identical host/JAX geometric
+receipts. Prescribed polar SST/ice match selected native forcing exactly.
+Black, mypy on 312 files, maintained-source flake8, compileall, strict Sphinx, and
+wheel/sdist build pass; the wheel matches all 180 production modules. The full
+and native suites use the existing isolated `scipy312` setup after the known
+`scipy` native-worker abort. Repository-wide lint retains 200 historical
+`test_logs` findings. Raw coverage lanes and 312 frozen source/test hashes are
+preserved in the final verification receipt.
