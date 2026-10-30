@@ -43,6 +43,7 @@ def ocean_coupler(
     ocean = make_veros_gcm(
         config=VerosConfig(
             surface_forcing="surface_fluxes",
+            custom_parameters={"dt_mom": 600.0},
             export_open_water_surface=enabled,
         )
     )

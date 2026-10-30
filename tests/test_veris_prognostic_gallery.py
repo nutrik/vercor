@@ -215,6 +215,7 @@ def _prognostic_coupler(
         ocean_config=VerosConfig(
             execution=execution,
             surface_forcing="surface_fluxes",
+            custom_parameters={"dt_mom": 600.0},
             export_open_water_surface=export_open_water_surface,
         ),
     )

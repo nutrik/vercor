@@ -669,7 +669,11 @@ def test_total_feedback_native_velocity_and_ssh_derivatives(
         veros_gcm_state, "_select_veros_setup_class", lambda *args: setup
     )
     ocean = make_veros_gcm(
-        config=VerosConfig(execution="jax", surface_forcing="surface_fluxes")
+        config=VerosConfig(
+            execution="jax",
+            surface_forcing="surface_fluxes",
+            custom_parameters={"dt_mom": 600.0},
+        )
     )
     wet = jnp.asarray(ocean.grid.binary_mask)
     east = wet * jnp.roll(wet, -1, axis=1)
