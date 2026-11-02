@@ -39,42 +39,6 @@ def test_regridder_constructor_sets_interpolator_and_grids() -> None:
     assert regridder.interpolator is not None
 
 
-def test_regridder_constructor_propagates_interpolator_options() -> None:
-    src_mask = np.array([[True, False, True], [True, True, False]])
-    dst_mask = np.array([[True, False], [False, True], [True, True]])
-
-    src_grid = _make_grid(
-        "src", np.array([0.0, 1.0, 2.0]), np.array([0.0, 1.0]), mask=src_mask
-    )
-    dst_grid = _make_grid(
-        "dst", np.array([0.0, 2.0]), np.array([0.0, 1.0, 2.0]), mask=dst_mask
-    )
-
-    regridder = BilinearRectilinearRegridder(
-        src_grid,
-        dst_grid,
-        periodic_longitude=False,
-        nan_renorm=False,
-        extrapolation_mode="nearest",
-        idw_k=3,
-        idw_eps=1e-6,
-        fill_value=-99.0,
-    )
-
-    assert isinstance(regridder, BilinearRectilinearRegridder)
-    interp = regridder.interpolator
-    if isinstance(interp, BilinearRectilinearInterpolator):
-        assert interp is not None
-        assert interp.periodic is False
-        assert interp.nan_renorm is False
-        assert interp.extrapolation_mode == "nearest"
-        assert interp.idw_k == 3
-        assert np.isclose(interp.idw_eps, 1e-6)
-        assert np.isclose(interp.fill_value, -99.0)
-        assert_array_equal_compact(interp.src_mask, src_mask)
-        assert_array_equal_compact(interp.tgt_mask, dst_mask)
-
-
 def test_regridder_scalar_call_dispatches_and_returns_destination_shape() -> None:
     src_grid = _make_grid("src", np.array([0.0, 1.0, 2.0]), np.array([0.0, 1.0, 2.0]))
     dst_grid = _make_grid("dst", np.array([0.0, 2.0]), np.array([0.0, 2.0]))

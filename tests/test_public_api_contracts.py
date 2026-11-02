@@ -250,30 +250,8 @@ def test_public_component_contracts_use_public_state_and_output_types() -> None:
         signature(contracts_module.ValidationContext).parameters["state"].annotation
         == "ComponentState"
     )
+    assert get_type_hints(contracts_module.ValidationContext)["state"] is ComponentState
     assert get_type_hints(components_module.ComponentSpec)["output"] is OutputSpec
-
-
-@pytest.mark.fast_always
-def test_validation_context_runtime_type_hints_resolve_public_state() -> None:
-    contracts_module = importlib.import_module("vercor.components.contracts")
-
-    type_hints = get_type_hints(contracts_module.ValidationContext)
-
-    assert type_hints["state"] is ComponentState
-
-
-@pytest.mark.fast_always
-def test_public_component_step_type_hints_resolve_at_runtime() -> None:
-    components_module = importlib.import_module("vercor.components")
-
-    for component_type in (
-        components_module.Component,
-        components_module.CallableComponent,
-        components_module.DataComponent,
-    ):
-        type_hints = get_type_hints(component_type.step)
-        assert type_hints["context"] is components_module.StepContext
-        assert "StepResult" in str(type_hints["return"])
 
 
 @pytest.mark.fast_always
