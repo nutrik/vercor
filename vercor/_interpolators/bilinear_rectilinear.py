@@ -201,7 +201,11 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             raise ValueError(
                 f"src field must have shape (nlat,nlon)=({self.nlat},{self.nlon})"
             )
-        valid = _extrapolation.valid_scalar_source_mask(src_array, self.src_mask)
+        # Keep the entry guard outside compiled control flow so eager checkify
+        # retains its direct CouplerError; finishing kernels remain compiled.
+        valid = _extrapolation.valid_scalar_source_mask(
+            src_array, self.src_mask, conditional_callback=False
+        )
 
         v00 = src_array[self.j0, self.i0]
         v10 = src_array[self.j0, self.i1]

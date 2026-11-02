@@ -440,9 +440,13 @@ def _require_true(predicate: Any, message: str) -> None:
     """Raise for a false scalar predicate, including inside JAX transforms."""
 
     if _array_is_traced(predicate):
-        jax.debug.callback(
-            lambda concrete: _raise_if_false(concrete, message),
+        # Keep valid predicates on device, preserving the same host error path.
+        jax.lax.cond(
             predicate,
+            lambda: None,
+            lambda: jax.debug.callback(
+                lambda concrete: _raise_if_false(concrete, message), predicate
+            ),
         )
         return
     _raise_if_false(predicate, message)
