@@ -25,6 +25,7 @@ from tests._distribution_support import (
     EXPECTED_WHEEL_NAME,
 )
 from tests._signature_support import canonicalize_external_typing_aliases
+from tests.test_v0_4_public_api import PUBLIC_MODULE_EXPORTS, ROOT_EXPORTS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REVIEW_PATH = PROJECT_ROOT / "docs" / "api-architecture-review.md"
@@ -358,6 +359,7 @@ def test_documented_public_manifest_matches_live_canonical_owners() -> None:
     """Execute the review's public inventory against live ``__all__`` values."""
 
     manifest = _documented_public_manifest(REVIEW_PATH.read_text(encoding="utf-8"))
+    assert manifest == {"vercor": ROOT_EXPORTS, **PUBLIC_MODULE_EXPORTS}
     assert tuple(manifest) == ("vercor",) + tuple(sorted(manifest)[1:])
     for module_name, documented_exports in manifest.items():
         module = importlib.import_module(module_name)

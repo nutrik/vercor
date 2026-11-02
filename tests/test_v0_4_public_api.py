@@ -318,14 +318,6 @@ def test_public_module_inventory_exactly_matches_the_manifest() -> None:
     assert discovered == set(PUBLIC_MODULE_EXPORTS)
 
 
-@pytest.mark.parametrize("module_name", tuple(PUBLIC_MODULE_EXPORTS))
-def test_supported_public_module_has_exact_manifest(module_name: str) -> None:
-    module = importlib.import_module(module_name)
-    expected = PUBLIC_MODULE_EXPORTS[module_name]
-    assert tuple(module.__all__) == expected
-    assert all(hasattr(module, name) for name in expected)
-
-
 def test_public_module_namespaces_do_not_leak_non_exported_vercor_objects() -> None:
     violations: list[str] = []
     for module_name, exports in PUBLIC_MODULE_EXPORTS.items():
