@@ -12,6 +12,8 @@ import pytest
 
 from tests.test_veris_component import cold_fields, small_coupler
 from tests.test_veris_rollouts import native_payload
+from vercor import Coupler, Exchange
+from vercor.components import CallableComponent, ComponentSpec
 from vercor.components import StepContext
 from vercor.dtypes import DTypePolicy
 from vercor.exceptions import CouplerError
@@ -20,7 +22,7 @@ pytestmark = pytest.mark.fast_always
 
 
 def _controlled_transition(
-    monkeypatch: pytest.MonkeyPatch, *, failure: str = ""
+    monkeypatch: pytest.MonkeyPatch, *, failure: str = "", state_fields: bool = False
 ) -> tuple[Any, Any, Any]:
     import veris
     import vercor.setups._external.veris_runtime as runtime
@@ -48,7 +50,9 @@ def _controlled_transition(
             Qnet=zero - heat,
             AreaW=zero + fraction,
             AreaS=zero + fraction,
-            Area=zero,
+            Area=(fraction * state.iceMask if state_fields else zero),
+            TSurf=state.TSurf + (jnp.where(first, 0.0, 14.0) if state_fields else 0.0),
+            hSnowMean=zero if state_fields else state.hSnowMean,
             sigma1=jnp.where(first & (failure == "hidden_nan"), jnp.nan, zero),
         )
         diagnostics = replace(
@@ -69,6 +73,135 @@ def _controlled_transition(
     monkeypatch.setattr(veris, "advance", advance)
     context = StepContext(600.0, dtype=DTypePolicy(enable_x64=True))
     return initial, resources, context
+
+
+@pytest.mark.parametrize("substeps", [1, 2])
+def test_ice_properties_average_native_diagnostics_before_exchange(
+    monkeypatch: pytest.MonkeyPatch, substeps: int
+) -> None:
+    from vercor.setups._external.veris_runtime import step_veris_runtime
+
+    initial, resources, context = _controlled_transition(monkeypatch, state_fields=True)
+    resources = replace(resources, model_substeps=substeps)
+    context = replace(context, dt_seconds=300.0 * substeps)
+    result = step_veris_runtime(resources, cold_fields(), context, initial)
+    wet = np.asarray(initial.state.iceMask[2:-2, 2:-2].T) > 0
+    expected_area, expected_temperature = (
+        (0.25, 260.0) if substeps == 1 else (0.5, 267.0)
+    )
+    np.testing.assert_allclose(result.fields["ice_fraction"], expected_area * wet)
+    np.testing.assert_allclose(
+        np.asarray(result.fields["ice_surface_temperature"])[wet], expected_temperature
+    )
+    phys = initial.physical_constants
+    albedo = phys.dryIceAlb if substeps == 1 else (phys.dryIceAlb + phys.wetIceAlb) / 2
+    np.testing.assert_allclose(result.fields["ice_surface_albedo"], albedo * wet)
+    np.testing.assert_allclose(
+        result.payload.state.Area[2:-2, 2:-2].T, (0.25 if substeps == 1 else 0.75) * wet
+    )
+    np.testing.assert_allclose(
+        np.asarray(result.payload.state.TSurf[2:-2, 2:-2].T)[wet],
+        260.0 if substeps == 1 else 274.0,
+    )
+    continued = step_veris_runtime(resources, cold_fields(), context, result.payload)
+    np.testing.assert_allclose(continued.fields["ice_fraction"], 0.75 * wet)
+    np.testing.assert_allclose(
+        np.asarray(continued.fields["ice_surface_temperature"])[wet],
+        (274.0 if substeps == 1 else 295.0),
+    )
+
+
+def test_mean_ice_state_keeps_jit_forward_and_reverse_derivatives(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from vercor.setups._external.veris_runtime import step_veris_runtime
+
+    initial, resources, context = _controlled_transition(monkeypatch, state_fields=True)
+    wet = initial.state.iceMask[2:-2, 2:-2].T > 0
+
+    @jax.jit
+    def temperature_sum(delta: Any) -> Any:
+        payload = replace(
+            initial, state=replace(initial.state, TSurf=initial.state.TSurf + delta)
+        )
+        result = step_veris_runtime(resources, cold_fields(), context, payload)
+        return jnp.sum(jnp.where(wet, result.fields["ice_surface_temperature"], 0))
+
+    point = jnp.asarray(0.0)
+    primal, tangent = jax.jvp(temperature_sum, (point,), (jnp.ones_like(point),))
+    np.testing.assert_allclose(primal, 267.0 * np.sum(wet))
+    np.testing.assert_allclose(tangent, np.sum(wet))
+    np.testing.assert_allclose(jax.grad(temperature_sum)(point), tangent)
+
+
+@pytest.mark.parametrize("backend", ["jax", "host", "auto", "custom"])
+def test_recipient_receives_mean_ice_state_and_mean_coverage(
+    monkeypatch: pytest.MonkeyPatch, backend: str
+) -> None:
+    from tests._workflow_test_support import SequentialBackend
+
+    _controlled_transition(monkeypatch, state_fields=True)
+    base, ice, _, _ = small_coupler(steps=1)
+    sink = CallableComponent(
+        "SINK",
+        ice.grid,
+        lambda fields: {
+            "seen_fraction": fields["ice_fraction"],
+            "seen_product": fields["ice_surface_temperature"],
+        },
+        spec=ComponentSpec(
+            inputs=("ice_fraction", "ice_surface_temperature"),
+            outputs=("seen_fraction", "seen_product"),
+            initial_fields={"seen_fraction": 0.0, "seen_product": 0.0},
+        ),
+    )
+    components = [*base.components.values(), sink]
+    if backend == "auto":
+        components.append(
+            CallableComponent(
+                "HOST",
+                ice.grid,
+                lambda fields: {},
+                spec=ComponentSpec(execution="host"),
+            )
+        )
+    selected: Any = SequentialBackend() if backend == "custom" else backend
+    coupler = Coupler(
+        base.clock,
+        components=components,
+        exchanges=(
+            *base.exchanges,
+            Exchange(
+                "CICE",
+                "SINK",
+                ("ice_fraction",),
+                quantity="intensive",
+                source_coverage="binary",
+                route_id="mean-area",
+            ),
+            Exchange(
+                "CICE",
+                "SINK",
+                ("ice_surface_temperature",),
+                quantity="source_flux",
+                route_id="mean-temperature",
+            ),
+        ),
+        run_order=tuple(component.name for component in components),
+        runtime=replace(base.runtime, backend=selected),
+        log_level="ERROR",
+    )
+    final = coupler.run()
+    wet = np.asarray(ice.grid.binary_mask)
+    np.testing.assert_allclose(
+        final.component("SINK").field("seen_fraction"), 0.5 * wet
+    )
+    np.testing.assert_allclose(
+        final.component("SINK").field("seen_product"), 133.5 * wet
+    )
+    np.testing.assert_allclose(
+        native_payload(final).state.Area[2:-2, 2:-2].T, 0.75 * wet
+    )
 
 
 def test_two_native_substeps_export_interval_means(

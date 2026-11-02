@@ -279,13 +279,23 @@ def _map_jax_gcm_state_fields(
     dtype: DTypePolicy,
 ) -> dict[str, jax.Array]:
     """Map one diagnosed native snapshot with shared units and channel selection."""
-    surface_flux, shortwave_rad, condensation, convection = (
-        _required_speedy_diagnostics(
-            jcm_state.physics,
-            component_name=state.name,
-        )
+    return _map_jcm_sample_fields(
+        state,
+        _jcm_exchange_samples(
+            jcm_state.dynamics, jcm_state.physics, component_name=state.name
+        ),
+        constants,
+        dtype,
     )
 
+
+def _map_jcm_sample_fields(
+    state: "JCMAtmosphereSetupState",
+    sample: Mapping[str, jax.Array],
+    constants: PhysicalConstants,
+    dtype: DTypePolicy,
+) -> dict[str, jax.Array]:
+    """Diagnose canonical fields before reducing any native sample axis."""
     return cast(
         dict[str, jax.Array],
         _jax_gcm_fields.map_jcm_output_fields(
@@ -296,25 +306,32 @@ def _map_jax_gcm_state_fields(
             constants.universal_gas_constant,
             constants.reference_pressure,
             constants.dry_air_kappa,
-            surface_flux.shf,
-            surface_flux.evap,
-            surface_flux.rlds,
-            shortwave_rad.rsns,
-            jcm_state.dynamics.normalized_surface_pressure,
-            jcm_state.dynamics.u_wind,
-            jcm_state.dynamics.v_wind,
-            jcm_state.dynamics.temperature,
-            jcm_state.dynamics.specific_humidity,
-            downward_shortwave_radiation_flux=shortwave_rad.rsds,
+            **sample,
             open_water_albedo=state.open_water_albedo,
-            large_scale_precipitation=condensation.precls,
-            convective_precipitation=convection.precnv,
-            near_surface_air_temperature=surface_flux.t0,
             snow_temperature=constants.precipitation_snow_temperature,
             rain_temperature=constants.precipitation_rain_temperature,
             dtype=dtype,
         ),
     )
+
+
+def _jcm_exchange_samples(
+    dynamics: Any, physics: Mapping[str, Any], *, component_name: str
+) -> dict[str, jax.Array]:
+    """Project snapshots/history to surface rates and lowest-level dynamics.
+
+    Leading time axes are preserved. Only the bottom dynamics level crosses
+    the compiled native boundary; all pressure levels derive from normalized
+    surface pressure and the fixed sigma coordinates in the canonical mapper.
+    """
+    return {
+        **_jcm_flux_samples(physics, component_name=component_name),
+        "normalized_surface_pressure": dynamics.normalized_surface_pressure,
+        **{
+            name: getattr(dynamics, name)[..., -1:, :, :]
+            for name in ("u_wind", "v_wind", "temperature", "specific_humidity")
+        },
+    }
 
 
 def _jcm_flux_samples(
@@ -500,7 +517,7 @@ def step_jax_gcm_runtime(
             "sea_surface_temperature": sea_surface_temperature,
             "total_surface_temperature": total_surface_temperature,
         }
-    jcm_state, flux_samples = state._step_function(
+    jcm_state, exchange_samples = state._step_function(
         payload.jcm_state,
         applied_forcing,
     )
@@ -509,16 +526,11 @@ def step_jax_gcm_runtime(
         component_name=state.name,
         stage="step output",
     )
-    mapped_fields = _map_jax_gcm_state_fields(state, jcm_state, constants, dtype)
-    mapped_fields.update(
-        _jax_gcm_fields._map_jcm_surface_flux_fields(
-            constants.latent_heat_of_vaporization,
-            **flux_samples,
-            snow_temperature=constants.precipitation_snow_temperature,
-            rain_temperature=constants.precipitation_rain_temperature,
-            dtype=dtype,
-            interval_mean=True,
-        )
+    mapped_fields = jax.tree.map(
+        lambda value: jnp.mean(value, axis=0),
+        jax.vmap(
+            lambda sample: _map_jcm_sample_fields(state, sample, constants, dtype)
+        )(exchange_samples),
     )
 
     # Native JCM removes its transient _forcing_2d diagnostic from the carry.

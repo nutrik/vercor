@@ -51,7 +51,11 @@ class VerisPayload:
 
 
 _VerisCarry: TypeAlias = tuple[
-    VerisPayload, VerisSurfaceFluxes, VerisIntervalBudget, jax.Array
+    VerisPayload,
+    VerisSurfaceFluxes,
+    VerisIntervalBudget,
+    dict[str, RuntimeArray],
+    jax.Array,
 ]
 _VerisStep: TypeAlias = Callable[
     [Mapping[str, RuntimeArray], PhysicalConstants, float, VerisPayload], StepResult
@@ -74,7 +78,8 @@ def veris_surface_state_fields(
     """Extract current native (x, y) surfaces into canonical physical (y, x).
 
     Temperature and albedo remain per ice area; the exchange dispatcher applies
-    current concentration on the source grid. Flux exports remain interval means.
+    exported concentration on the source grid. The native loop averages these
+    diagnosed samples separately from its continuation state and mean fluxes.
     """
     from veris import diagnose_surface_albedo
 
@@ -139,7 +144,7 @@ def step_veris_runtime(
     All native inputs and outputs are checked each substep. A failed carry
     skips later physics; one aggregate guard at the coupling boundary prevents
     accepting it, including under outer JIT. Final diagnostics stay instantaneous
-    while the five ordinary exported fields and external budget are interval means.
+    while exported state, boundary rates and external budget are interval means.
     """
     if not isinstance(payload, VerisPayload):
         raise ComponentError("Veris requires its initialized native runtime payload")
@@ -161,13 +166,17 @@ def step_veris_runtime(
     zero = jnp.zeros_like(payload.state.Area[2:-2, 2:-2].T)
     totals = VerisSurfaceFluxes(zero, zero, zero, zero, zero)
     external = VerisIntervalBudget(zero, zero)
+    surfaces = {
+        name: zero
+        for name in ("ice_fraction", "ice_surface_temperature", "ice_surface_albedo")
+    }
     dt = jnp.asarray(resources.configuration.deltatTherm, dtype=context.dtype.jax_real)
 
     def substep(
         _: int,
         carry: _VerisCarry,
     ) -> _VerisCarry:
-        current, total, boundary, valid = carry
+        current, total, boundary, surface_total, valid = carry
         valid = valid & _valid_native_payload(current)
 
         def advance_valid(
@@ -203,6 +212,11 @@ def step_veris_runtime(
                 jax.tree.map(
                     lambda accumulated, flux: accumulated + dt * flux, boundary, inputs
                 ),
+                jax.tree.map(
+                    lambda accumulated, sample: accumulated + dt * sample,
+                    surface_total,
+                    veris_surface_state_fields(updated, resources),
+                ),
                 _valid_native_payload(updated),
             )
 
@@ -211,30 +225,31 @@ def step_veris_runtime(
             jax.lax.cond(
                 valid,
                 advance_valid,
-                lambda _: (current, total, boundary, valid),
+                lambda _: (current, total, boundary, surface_total, valid),
                 None,
             ),
         )
 
-    updated, totals, external, valid = jax.lax.fori_loop(
+    updated, totals, external, surfaces, valid = jax.lax.fori_loop(
         0,
         resources.model_substeps,
         substep,
-        (payload, totals, external, jnp.asarray(True)),
+        (payload, totals, external, surfaces, jnp.asarray(True)),
     )
     duration = jnp.asarray(context.dt_seconds, dtype=context.dtype.jax_real)
     means = jax.tree.map(lambda value: value / duration, totals)
+    surface_means = jax.tree.map(lambda value: value / duration, surfaces)
     updated = replace(
         updated, interval_budget=jax.tree.map(lambda value: value / duration, external)
     )
-    valid = valid & _finite_leaves((means, updated.interval_budget))
+    valid = valid & _finite_leaves((means, surface_means, updated.interval_budget))
     _require_zero(
         jnp.count_nonzero(~valid),
         "Veris",
         "valid native substeps, interval means and physical status",
     )
     return StepResult(
-        fields={**veris_surface_state_fields(updated, resources), **means.to_fields()},
+        fields={**surface_means, **means.to_fields()},
         payload=updated,
     )
 
@@ -274,6 +289,12 @@ class VerisSetupState:
         self.geometry = geometry
         self.resources: VerisRuntimeResources | None = None
         self._step_function: _VerisStep | None = None
+
+    def surface_state_fields(self, payload: VerisPayload) -> dict[str, RuntimeArray]:
+        """Diagnose endpoint output fields with the initialized static resources."""
+        if self.resources is None:
+            raise ComponentError("Veris surface output requires initialized resources")
+        return veris_surface_state_fields(payload, self.resources)
 
     def setup(self, component: Component, context: SetupContext) -> SetupResult:
         """Initialize physical geometry at runtime precision with serial native execution."""

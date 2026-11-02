@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 from vercor.types import RuntimeArray
 
@@ -41,10 +41,12 @@ def _sample(
     grid: RectilinearGrid,
     time: datetime | ModelDateTime | None,
     canonical_fields: Mapping[str, RuntimeArray],
+    surface_state_fields: Callable[[Any], Mapping[str, RuntimeArray]],
 ) -> OutputFrame:
     """Build one frame from current payload arrays and native registry metadata."""
     if payload is None:
         raise ValueError("Veris output requires a native runtime payload")
+    endpoint_fields = surface_state_fields(payload)
     from veris.model.variables import VARIABLES
     from veris.model.diagnostics import DIAGNOSTICS
 
@@ -102,7 +104,7 @@ def _sample(
     ):
         variables[name] = OutputVariable(
             ("y_center", "x_center"),
-            canonical_fields[name],
+            endpoint_fields[name],
             {"units": units, "long_name": description, "cell_methods": "time: point"},
         )
     x_edges = grid.longitude_edges
@@ -138,7 +140,12 @@ def _sample(
 
 
 class _VerisOutputProvider:
-    """Stateless native provider; no retained model or output cursor."""
+    """Native provider retaining only a setup-bound endpoint diagnostic function."""
+
+    def __init__(
+        self, surface_state_fields: Callable[[Any], Mapping[str, RuntimeArray]]
+    ) -> None:
+        self._surface_state_fields = surface_state_fields
 
     def sample(self, context: OutputContext) -> OutputFrame:
         """Sample current State/Diagnostics only when the coordinator requests it."""
@@ -147,7 +154,13 @@ class _VerisOutputProvider:
             if context.state.grid is not None
             else context.component.grid
         )
-        return _sample(context.payload, grid, context.time, context.state.fields())
+        return _sample(
+            context.payload,
+            grid,
+            context.time,
+            context.state.fields(),
+            self._surface_state_fields,
+        )
 
     def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
         """Purely extract current sea-ice arrays without host calendar values."""
@@ -157,20 +170,37 @@ class _VerisOutputProvider:
             if context.state.grid is not None
             else context.component.grid
         )
-        return _sample(context.payload, grid, None, context.state.fields())
+        return _sample(
+            context.payload,
+            grid,
+            None,
+            context.state.fields(),
+            self._surface_state_fields,
+        )
 
 
-def veris_output_provider() -> JaxOutputProvider:
+def veris_output_provider(
+    surface_state_fields: Callable[[Any], Mapping[str, RuntimeArray]],
+) -> JaxOutputProvider:
     """Return a provider compatible with shared empty/subset variable selection."""
-    return _VerisOutputProvider()
+    return _VerisOutputProvider(surface_state_fields)
 
 
-def write_veris_snapshot_output(context: SnapshotContext) -> None:
+def write_veris_snapshot_output(
+    surface_state_fields: Callable[[Any], Mapping[str, RuntimeArray]],
+    context: SnapshotContext,
+) -> None:
     """Write the final native frame through the existing NetCDF boundary."""
     grid = (
         context.state.grid if context.state.grid is not None else context.component.grid
     )
-    frame = _sample(context.payload, grid, context.time, context.state.fields())
+    frame = _sample(
+        context.payload,
+        grid,
+        context.time,
+        context.state.fields(),
+        surface_state_fields,
+    )
     write_netcdf_dataset(
         output=str(context.output_path),
         coordinate_variables=frame.coordinates,

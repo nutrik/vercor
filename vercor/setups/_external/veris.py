@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from functools import partial
 from typing import Any
 
 from vercor._host_arrays import array_to_host
@@ -85,7 +86,9 @@ def make_veris(
     without halos. Incoming canonical currents use Veros east/north faces.
     The factory
     copies geometry; setup alone initializes native state and static resources.
-    Runtime ice_fraction is native Area, independent of wet-cell forcing support.
+    Runtime ice_fraction averages native Area over the coupling interval,
+    independently of the wet-cell forcing support. Setup diagnoses the initial
+    instant before any completed interval exists.
     """
     native = load_standalone_veris()
     if not isinstance(grid, RectilinearGrid):
@@ -142,13 +145,13 @@ def make_veris(
             lifecycle=LifecycleHooks(setup=owner.setup),
             output=OutputSpec(
                 provider=(
-                    veris_output_provider()
+                    veris_output_provider(owner.surface_state_fields)
                     if config.output.provider is None
                     else config.output.provider
                 ),
                 period=config.output.period,
                 snapshot_writer=(
-                    write_veris_snapshot_output
+                    partial(write_veris_snapshot_output, owner.surface_state_fields)
                     if config.output.snapshot_writer is None
                     else config.output.snapshot_writer
                 ),

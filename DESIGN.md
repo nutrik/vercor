@@ -80,15 +80,24 @@ monthly records or 365 no-leap daily records. Declared grid-shaped mask fields
 remain current. Setup, prefill, and the shared selector enforce this layout;
 monthly interpolation preserves the runtime field dtype in sends and output.
 
-Bundled evolving states use native endpoints, while JCM surface fluxes and
-Veris ocean feedback integrate every native interval. JCM diagnoses rain/snow
-before reduction, independently of diagnostic save cadence. Its native step
-returns only endpoint state and eight horizontal sample histories. With the
+Bundled evolving adapters exchange means of canonical state samples after every
+native step in the coupling interval. One native step yields its endpoint;
+initialization retains instantaneous initial diagnostics. Nonlinear derived
+state fields are diagnosed before reduction. Native continuation payloads,
+clocks, categorical fields and native diagnostic snapshots retain endpoints.
+JCM surface fluxes and Veris ocean feedback integrate every native interval.
+JCM diagnoses rain/snow before reduction, independently of diagnostic save
+cadence. Its native step returns endpoint state, eight horizontal flux histories,
+normalized surface pressure and four bottom-level dynamics histories. With the
 default wrapper JIT enabled, host/mixed paths avoid materializing unused full
 diagnostic histories; disabling wrapper JIT can retain those native temporaries.
-CAMulator retains endpoint meteorology and averages each native prediction's
-decoded radiation rates. Native output samples and exchanged flux integrals
-have distinct meanings and are documented separately.
+CAMulator averages every native prediction's mapped meteorology and decoded
+radiation rates. Veros accumulates canonical native surfaces; Veris accumulates
+ice fraction, temperature and diagnosed albedo alongside its mean fluxes.
+Prescribed records retain their existing time selection, and slab components
+use one coupling-sized step. Plugin authors own internal native sampling.
+Native output samples and exchanged state/rate means have distinct meanings
+and are documented separately.
 
 Coupled pressure-mode Veros stepping synchronizes SSH to the rotated current
 pressure solution without changing prognostic state. Surface-flux setups use

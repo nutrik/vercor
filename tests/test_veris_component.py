@@ -300,8 +300,9 @@ def test_optional_dependency_pins_veris_release() -> None:
 
 @pytest.mark.parametrize("after_step", [False, True])
 def test_veris_surface_exports_follow_payload(after_step: bool) -> None:
-    """Current ice properties use native orientation and per-ice-area meaning."""
-    from veris import diagnose_surface_albedo
+    """Instantaneous setup and native-step means retain per-ice-area meaning."""
+    from veris import advance, diagnose_surface_albedo
+    from vercor.setups._external.veris_forcing import prepare_veris_forcing_pack
 
     coupler, component, _, _ = small_coupler(steps=1)
     initial = coupler.initial_state()
@@ -311,12 +312,40 @@ def test_veris_surface_exports_follow_payload(after_step: bool) -> None:
     owner = component.spec.lifecycle.setup.__self__
     fields = result.component("CICE").fields()
     assert payload is not None
+    snapshots = [payload.state]
+    if after_step:
+        original = initial._component_state("CICE").payload
+        assert original is not None
+        forcing = prepare_veris_forcing_pack(
+            cold_fields(),
+            ocean_mask=component.grid.binary_mask,
+            constants=coupler.constants,
+            dtype=coupler.runtime.dtype,
+        ).native_forcing
+        current = original.state
+        snapshots = []
+        for _ in range(owner.resources.model_substeps):
+            current, _ = advance(
+                current,
+                owner.resources.configuration,
+                payload.physical_constants,
+                forcing,
+                physics="coupled",
+            )
+            snapshots.append(current)
     np.testing.assert_allclose(
-        fields["ice_surface_temperature"], payload.state.TSurf[2:-2, 2:-2].T
+        fields["ice_surface_temperature"],
+        np.mean([sample.TSurf[2:-2, 2:-2].T for sample in snapshots], axis=0),
     )
-    expected = diagnose_surface_albedo(
-        payload.state, owner.resources.configuration, payload.physical_constants
-    )[2:-2, 2:-2].T
+    expected = np.mean(
+        [
+            diagnose_surface_albedo(
+                sample, owner.resources.configuration, payload.physical_constants
+            )[2:-2, 2:-2].T
+            for sample in snapshots
+        ],
+        axis=0,
+    )
     np.testing.assert_allclose(fields["ice_surface_albedo"], expected)
     assert expected.shape == (2, 3)
     assert fields["ice_surface_albedo"].dtype == payload.state.Area.dtype

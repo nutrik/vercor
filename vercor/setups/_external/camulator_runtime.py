@@ -218,10 +218,10 @@ def step_camulator_runtime(
     context: StepContext,
     payload: Any | None,
 ) -> StepResult:
-    """Export endpoint meteorology and complete-window mean radiation rates.
+    """Export mapped state and radiation means over all native windows.
 
     Every native forecast window has the same duration. Map each prediction
-    before averaging radiation so native J/m² normalization and nonlinear
+    before averaging so native J/m² normalization and nonlinear
     surface emission reconstruction occur at that prediction's temperature.
     Native state and output history retain their original endpoint/samples.
     """
@@ -265,16 +265,8 @@ def step_camulator_runtime(
         for prediction in predictions.split(1, dim=0)
     ]
     mapped_fields = {
-        **mapped_samples[-1],
-        **{
-            name: jnp.mean(
-                jnp.stack([sample[name] for sample in mapped_samples]), axis=0
-            )
-            for name in (
-                "net_shortwave_radiation_flux",
-                "downward_longwave_radiation_flux",
-            )
-        },
+        name: jnp.mean(jnp.stack([sample[name] for sample in mapped_samples]), axis=0)
+        for name in mapped_samples[0]
     }
 
     return StepResult(

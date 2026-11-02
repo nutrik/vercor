@@ -280,15 +280,27 @@ def advance_veros_substeps(
     step_function: Callable[[VerosState], VerosState],
     model_substeps: int,
     logger: Any | None,
-) -> VerosState:
-    """Advance Veros through the configured number of native substeps."""
+    sample_fields: Callable[[VerosState], dict[str, jax.Array]],
+) -> tuple[VerosState, dict[str, jax.Array]]:
+    """Advance native state and average mapped post-step surfaces without history.
+
+    Every aligned native step has equal duration. The final native state stays
+    separate from the small canonical field sums used by the coupling exchange.
+    """
 
     updated_state = state
+    totals: dict[str, jax.Array] | None = None
     for i in range(model_substeps):
         if logger is not None:
             logger.info(f"Veros sub-step {i+1} / {model_substeps}")
         updated_state = step_function(updated_state)
-    return updated_state
+        sample = sample_fields(updated_state)
+        totals = sample if totals is None else jax.tree.map(jnp.add, totals, sample)
+    if totals is None:
+        raise ValueError(
+            "Veros requires at least one native step per coupling interval"
+        )
+    return updated_state, jax.tree.map(lambda value: value / model_substeps, totals)
 
 
 __all__ = [

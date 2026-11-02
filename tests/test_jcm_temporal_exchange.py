@@ -148,6 +148,11 @@ def _case(temperatures: Any, *, enable_x64: bool = True) -> tuple[Any, Any, Any]
                 ].precls,
                 "convective_precipitation": predictions.physics["_convection"].precnv,
                 "near_surface_air_temperature": predictions.physics["_surface_flux"].t0,
+                "normalized_surface_pressure": predictions.dynamics.normalized_surface_pressure,
+                "u_wind": predictions.dynamics.u_wind[:, -1:],
+                "v_wind": predictions.dynamics.v_wind[:, -1:],
+                "temperature": predictions.dynamics.temperature[:, -1:],
+                "specific_humidity": predictions.dynamics.specific_humidity[:, -1:],
             },
         ),
     )
@@ -181,9 +186,72 @@ def test_flux_exports_integrate_both_native_windows(enable_x64: bool) -> None:
     }.items():
         assert_allclose_compact(result.fields[name], expected, rtol=2e-6)
         assert result.fields[name].dtype == DTypePolicy(enable_x64=enable_x64).jax_real
-    assert_allclose_compact(result.fields["air_temperature"], 300.0)
-    assert_allclose_compact(result.fields["air_u_velocity"], 5.0)
-    assert_allclose_compact(result.fields["surface_pressure"], 1e5)
+    assert_allclose_compact(result.fields["air_temperature"], 290.0)
+    assert_allclose_compact(result.fields["air_u_velocity"], 3.0)
+    assert_allclose_compact(result.fields["surface_pressure"], 95000.0)
+
+
+@pytest.mark.parametrize("enable_x64", [False, True])
+def test_state_diagnostics_are_mapped_before_averaging(enable_x64: bool) -> None:
+    result = _advance([272.77, 278.15], enable_x64=enable_x64)
+    constants = PhysicalConstants()
+    pressures = np.array([85500.0, 95000.0])
+    temperatures = np.array([280.0, 300.0])
+    expected = {
+        "air_density": float(constants.dry_air_molecular_weight)
+        / float(constants.universal_gas_constant)
+        * np.mean(pressures / temperatures),
+        "air_potential_temperature": np.mean(
+            temperatures
+            * (float(constants.reference_pressure) / pressures)
+            ** float(constants.dry_air_kappa)
+        ),
+        "air_specific_humidity": 0.0075,
+        "air_v_velocity": 4.0,
+    }
+    for name, value in expected.items():
+        assert_allclose_compact(result.fields[name], value, rtol=2e-6)
+        assert result.fields[name].dtype == DTypePolicy(enable_x64=enable_x64).jax_real
+    assert_allclose_compact(
+        result.fields["air_pressure_3d"][:, 0, 0], [19000, 90250], rtol=2e-6
+    )
+    assert_allclose_compact(result.payload.jcm_state.dynamics.temperature, 300.0)
+
+
+@pytest.mark.parametrize("samples", [1, 2])
+def test_state_mean_keeps_singleton_endpoint_and_native_sample_gradients(
+    samples: int,
+) -> None:
+    owner, payload, _ = _case([272.77, 278.15])
+    native_step = owner._step_function
+
+    @jax.jit
+    def temperature_sum(delta: Any) -> Any:
+        def sampled(state: Any, forcing: Any) -> Any:
+            endpoint, histories = native_step(state, forcing)
+            histories = {name: value[-samples:] for name, value in histories.items()}
+            histories["temperature"] = histories["temperature"] + delta
+            return endpoint, histories
+
+        owner._step_function = sampled
+        result = step_jax_gcm_runtime(
+            owner,
+            {
+                "land_surface_temperature": jnp.full((2, 2), 290.0),
+                "sea_surface_temperature": jnp.full((2, 2), 280.0),
+                "soil_moisture": jnp.full((2, 2), 0.5),
+            },
+            payload,
+            PhysicalConstants(),
+            DTypePolicy(enable_x64=True),
+        )
+        return jnp.sum(result.fields["air_temperature"])
+
+    point = jnp.asarray(0.0)
+    primal, tangent = jax.jvp(temperature_sum, (point,), (jnp.ones_like(point),))
+    assert_allclose_compact(primal, 4 * (300.0 if samples == 1 else 290.0))
+    assert_allclose_compact(tangent, 4.0)
+    assert_allclose_compact(jax.grad(temperature_sum)(point), tangent)
 
 
 @pytest.mark.parametrize("enable_x64", [False, True])
@@ -256,6 +324,11 @@ def test_native_sampling_and_endpoint_do_not_follow_save_interval() -> None:
             "large_scale_precipitation",
             "convective_precipitation",
             "near_surface_air_temperature",
+            "normalized_surface_pressure",
+            "u_wind",
+            "v_wind",
+            "temperature",
+            "specific_humidity",
         }
     assert_allclose_compact(seen, [1 / 48, 1 / 48])
 
@@ -338,7 +411,7 @@ def test_native_flux_integral_and_endpoint_match_uninterrupted_run(
         assert_allclose_compact(result.fields[name], expected, rtol=1e-12, atol=1e-12)
     assert_allclose_compact(
         result.fields["air_temperature"],
-        np.asarray(predictions.dynamics.temperature[-1, -1]).T,
+        np.mean(np.asarray(predictions.dynamics.temperature[:, -1]), axis=0).T,
         rtol=1e-12,
     )
     endpoint = cast(JCMAtmosphereRuntimePayload, result.payload).jcm_state
