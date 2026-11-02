@@ -53,7 +53,7 @@ def surface_setup_class(
             vs = state.variables
             vs.dxt = npx.full_like(vs.dxt, 1.0)
             vs.dyt = npx.full_like(vs.dyt, 1.0)
-            vs.dzt = npx.array([30.0, top_depth])
+            vs.dzt = npx.array([30.0, top_depth], dtype=vs.dzt.dtype)
 
         @veros_routine
         def set_coriolis(self, state: Any) -> None:
@@ -106,13 +106,17 @@ def surface_model(
 
 
 def feedback_fields(
-    *, heat: float = -20.0, mass: float = 1e-4, salt: float = 0.0
+    *,
+    heat: float = -20.0,
+    mass: float = 1e-4,
+    salt: float = 0.0,
+    dtype: Any = None,
 ) -> dict[str, Any]:
-    """Return total-area downward input with zero stress on a 4x4 domain."""
+    """Return total-area input on a 4x4 domain, optionally selecting precision."""
     import jax.numpy as jnp
 
     return {
-        name: jnp.full((4, 4), value)
+        name: jnp.full((4, 4), value, dtype=dtype)
         for name, value in (
             ("sea_surface_heat_flux", heat),
             ("sea_surface_mass_flux", mass),

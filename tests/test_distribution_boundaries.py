@@ -1201,7 +1201,7 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
         assert capability in verify["run"]
     assert rollout["run"] == (
         "python -m pytest tests/test_veros_autodiff_rollouts.py tests/test_veris_prognostic_autodiff.py "
-        "tests/test_veris_veros_jcm_autodiff.py "
+        "tests/test_veris_veros_jcm_autodiff.py tests/test_veros_float32.py "
         "-q -n0 -m veros_autodiff --tb=short "
         "--cov=vercor --cov-branch --cov-report= --cov-fail-under=0"
     )
