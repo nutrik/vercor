@@ -17,6 +17,74 @@ from vercor._numerical_safety import (
 from vercor.exceptions import CouplerError
 
 
+@pytest.mark.fast_always
+@pytest.mark.parametrize("check", ["numeric", "state"])
+def test_successful_compiled_validation_does_not_call_host(
+    monkeypatch: pytest.MonkeyPatch, check: str
+) -> None:
+    """Valid numerical state must not transfer predicates to Python."""
+    import vercor._numerical_safety as safety
+    import vercor._runtime.state_validation as validation
+
+    observed: list[int] = []
+    if check == "numeric":
+        original = safety._raise_for_invalid_count
+
+        def record(count: object, owner: str, requirement: str) -> None:
+            observed.append(int(count))  # type: ignore[call-overload]
+            original(count, owner, requirement)
+
+        monkeypatch.setattr(safety, "_raise_for_invalid_count", record)
+
+        def validate(values: jax.Array) -> jax.Array:
+            require_active_finite(values, active_mask=None, owner="profile field")
+            return values * 2
+
+    else:
+        original_predicate = validation._raise_if_false
+
+        def record_predicate(predicate: object, message: str) -> None:
+            observed.append(int(predicate))  # type: ignore[call-overload]
+            original_predicate(predicate, message)
+
+        monkeypatch.setattr(validation, "_raise_if_false", record_predicate)
+
+        def validate(values: jax.Array) -> jax.Array:
+            validation._require_true(jnp.all(jnp.isfinite(values)), "profile field")
+            return values * 2
+
+    compiled = jax.jit(validate)
+    assert_array_equal_compact(compiled(jnp.asarray([1.0, 2.0])), [2.0, 4.0])
+    jax.effects_barrier()
+    assert observed == []
+    with pytest.raises(JaxRuntimeError, match="profile field"):
+        compiled(jnp.asarray([1.0, jnp.nan])).block_until_ready()
+    assert len(observed) == 1
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("transform", ["scan", "vmap"])
+def test_compiled_validation_rejects_later_invalid_values(transform: str) -> None:
+    """Skipping successful callbacks must still check later transformed values."""
+
+    def checked(value: jax.Array) -> jax.Array:
+        require_active_finite(value, active_mask=None, owner="later field")
+        return value
+
+    def scanned(values: jax.Array) -> jax.Array:
+        def step(total: jax.Array, value: jax.Array) -> tuple[jax.Array, None]:
+            return total + checked(value), None
+
+        return jax.lax.scan(step, jnp.asarray(0.0), values)[0]
+
+    transformed = scanned if transform == "scan" else jax.vmap(checked)
+    compiled = jax.jit(transformed)
+    valid = jnp.asarray([1.0, 2.0, 3.0])
+    assert_array_equal_compact(compiled(valid), 6.0 if transform == "scan" else valid)
+    with pytest.raises(JaxRuntimeError, match="later field.*active domain"):
+        compiled(jnp.asarray([1.0, 2.0, jnp.nan])).block_until_ready()
+
+
 def test_active_finite_contract_broadcasts_trailing_grid_mask() -> None:
     values = jnp.asarray(
         [[[1.0, jnp.nan], [2.0, jnp.nan]], [[3.0, jnp.nan], [4.0, jnp.nan]]]

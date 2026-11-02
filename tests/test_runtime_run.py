@@ -825,9 +825,27 @@ def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
     assert callable(profile_runtime.main)
     assert callable(profile_runtime.run_setup)
     parser = profile_runtime.build_parser()
-    args = parser.parse_args(["--steps", "3", "--log-level", "WARNING"])
+    args = parser.parse_args(
+        [
+            "--steps",
+            "3",
+            "--log-level",
+            "WARNING",
+            "--repeats",
+            "2",
+            "--float-type",
+            "float32",
+            "--trace-dir",
+            "/tmp/profile",
+            "--json",
+        ]
+    )
     assert args.steps == 3
     assert args.log_level == "WARNING"
+    assert args.repeats == 2
+    assert args.float_type == "float32"
+    assert args.trace_dir == Path("/tmp/profile")
+    assert args.json
     assert not hasattr(args, "donate_state")
 
 
@@ -872,7 +890,7 @@ def test_runtime_profile_run_setup_maps_cli_options_and_returns_zero(
     }
 
 
-def test_runtime_profile_harness_runs_small_slab_profile() -> None:
+def test_runtime_profile_harness_runs_small_slab_profile(tmp_path: Path) -> None:
     profile_runtime = importlib.import_module("vercor.setups.gallery.profile_runtime")
 
     result = profile_runtime.profile_runtime(
@@ -880,8 +898,20 @@ def test_runtime_profile_harness_runs_small_slab_profile() -> None:
         grid_nx=2,
         grid_ny=2,
         log_level="WARNING",
+        repeats=2,
+        trace_dir=tmp_path,
     )
 
     assert result.run_seconds >= 0.0
+    assert result.setup_seconds >= 0.0
+    assert len(result.warm_run_seconds) == 2
+    assert all(value >= 0.0 for value in result.warm_run_seconds)
+    traces = tuple(tmp_path.glob("plugins/profile/*/perfetto_trace.json.gz"))
+    assert len(traces) == 1
+    import gzip
+    import json
+
+    events = json.loads(gzip.decompress(traces[0].read_bytes()))["traceEvents"]
+    assert any(event.get("name") == "vercor_warm_run" for event in events)
     assert not hasattr(result, "compiled_cache_entries")
     assert result.final_state_leaves > 0
