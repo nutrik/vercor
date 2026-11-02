@@ -217,7 +217,9 @@ if explicit:
 else:
     assert not tuple(output.glob('cice.averages.*.nc'))  # no monthly boundary after one day
 with xr.open_dataset(output / 'cice.snapshot.nc') as ds:
-    np.testing.assert_allclose(ds.Area[0], area)
+    # Native snapshots retain the final state; runtime ice_fraction is the
+    # mean over native substeps of the last coupling interval.
+    np.testing.assert_allclose(ds.Area[0], np.asarray(state.Area)[2:-2, 2:-2].T)
     assert ds.forc_salt_surface.attrs['units'] == 'g kg-1 m s-1'
 assert (output / 'cice.runtime_fields.nc').is_file()
 print(json.dumps({

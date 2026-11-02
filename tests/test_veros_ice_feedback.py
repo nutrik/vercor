@@ -274,12 +274,12 @@ def test_public_coupled_runtime_uses_only_total_fluxes(
     wet = np.asarray(ocean.grid.binary_mask) > 0
     np.testing.assert_allclose(
         np.asarray(final.component("OCN").field("sea_surface_salinity"))[wet],
-        35.0 - 1200 * 3.47e-6 / 10,
+        35.0 - 900 * 3.47e-6 / 10,
         rtol=1e-11,
     )
     np.testing.assert_allclose(
         np.asarray(final.component("OCN").field("sea_surface_temperature"))[wet],
-        271.15 - 1200 * 20 / (10 * native.settings.rho_0 * 3991.86795711963),
+        271.15 - 900 * 20 / (10 * native.settings.rho_0 * 3991.86795711963),
         rtol=1e-11,
     )
     assert float(native.variables.coupled_feedback_active) == 1.0

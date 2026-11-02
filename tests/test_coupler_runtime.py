@@ -261,6 +261,11 @@ def _fake_jcm_step(
             jnp.newaxis, ...
         ],
         "near_surface_air_temperature": surface_temperature[jnp.newaxis, ...],
+        "normalized_surface_pressure": prediction.dynamics.normalized_surface_pressure,
+        "u_wind": prediction.dynamics.u_wind[:, -1:],
+        "v_wind": prediction.dynamics.v_wind[:, -1:],
+        "temperature": prediction.dynamics.temperature[:, -1:],
+        "specific_humidity": prediction.dynamics.specific_humidity[:, -1:],
     }
     return updated_state, flux_samples
 

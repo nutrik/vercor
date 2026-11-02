@@ -62,7 +62,7 @@ outputs, initial fields, execution, lifecycle, transfer, output, and masks.
 | JCM land | Input-free DataComponent, static or daily selection | T K, dimensionless soil availability, explicit fractional land mask; static partner broadcast to daily records | Shared output; daily climatology contract is 365 records |
 | JCM atmosphere | CallableComponent, JAX; setup/prefill/validate; native construction at factory | Frozen native state/physics carry/forcing payload; Gregorian epoch and integer native substeps; ordinary intensive SST or explicit water/ice source products | Native provider and snapshot through shared coordinator; unnecessary host mirrors F7; deferred save-interval validation F8 |
 | Veros global / ACC | CallableComponent; host stock or capability-gated JAX fork; setup hook | Full native payload; generic host copy before mutation, fork copy for JAX. Global bulk meteorology or total-flux mode; ACC internal forcing | Shared native provider/snapshot. Process-wide backend lock and fixed native climatology need explicit compatibility limits |
-| Veris | CallableComponent, JAX; setup hook and pure native advance | Frozen state/diagnostics/constants/budgets; static wet support, evolving Area; explicit face conversion and fresh forcing each substep | Shared native provider/snapshot; interval-mean total ocean fluxes and current per-ice properties |
+| Veris | CallableComponent, JAX; setup hook and pure native advance | Frozen state/diagnostics/constants/budgets; static wet support, evolving Area; explicit face conversion and fresh forcing each substep | Shared native provider/snapshot; interval-mean total ocean fluxes and per-ice properties; endpoint native payload |
 | CAMulator atmosphere | CallableComponent, host; setup hook, no implemented spinup | Frozen payload with cloned Torch state, cursor, forecast hour, predictions; declared vapor channel; Gregorian datetime forcing | Shared native provider/snapshot; timestamp and partial-block defects F5/F6; native float32 is intentional |
 | CAMulator land | CallableComponent, host; setup hook | Immutable forcing cursor; selects prescribed TS at interval start; fractional land support | Default OutputSpec; unlike other land factories, no explicit output argument |
 | Coupler / orchestrator | Constructor-only assembly; lazy preparation; initial_state and run | Same receive/step/send for all backends; exact plans/chunks, immutable stores, current versus received coverage, declared precision | One output lifecycle; optional native snapshots, no generic restart loader/finalizer protocol |
@@ -376,7 +376,7 @@ The follow-up audit identified sparse JCM rate sampling, precipitation phase
 partition after averaging, last-window-only CAMulator radiation, and stale
 record selection when prescribed sources followed their consumers. The repairs
 use the existing mapper, native step and dispatch owners. JCM/CAMulator state
-outputs now retain endpoints while relevant rates integrate every native window.
+outputs at that repair retained endpoints while relevant rates integrated every native window.
 The JCM compiled return projects to eight horizontal histories: actual T31L8
 float64 daily return shape falls from about421 MiB to29.46 MiB including endpoint
 state with the default wrapper JIT enabled. Disabling that wrapper JIT can still
@@ -398,3 +398,27 @@ means. Prescribed climatology weather covariance, held external forcing,
 CAMulator placeholder precipitation/turbulence and native CREDIT compatibility
 remain explicit limitations. Detailed execution and final gate evidence live in
 `docs/superpowers/plans/2026-10-30-temporal-exchange.md` and `PROGRESS.md`.
+
+## State-exchange means (2026-11-02)
+
+The approved follow-up replaces evolving endpoint state exports with the mean
+of every mapped post-native-step sample. This covers JCM atmospheric state and
+derived diagnostics, all CAMulator prediction fields, Veros surface state and
+open-water contribution, and Veris ice fraction, temperature and diagnosed
+albedo. Nonlinear diagnostics are evaluated before reduction. Single-step
+components retain endpoint exchange; initialization and prescribed record
+selection retain their established meanings. Native payloads, clocks,
+categorical values and native output histories remain endpoint/sample state.
+
+JCM adds normalized surface pressure and four bottom-level dynamics histories
+to its compact compiled return; no complete vertical dynamics history crosses
+that boundary. Veros accumulates only canonical surfaces, and Veris extends its
+existing native loop carry. No public timing registry or generic runtime
+subcycling is introduced. Mean ice concentration drives the existing spatial
+coverage contract; separate field means do not preserve temporal covariance.
+The Veris output provider and snapshot writer bind the setup owner's pure
+surface diagnostic callback, so native endpoint temperature/albedo remain
+distinct from canonical exchange means without retaining evolving native state.
+Design and validation evidence are recorded in
+`docs/superpowers/specs/2026-11-02-state-exchange-means-design.md` and
+`docs/superpowers/plans/2026-11-02-state-exchange-means.md`.

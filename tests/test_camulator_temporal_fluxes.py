@@ -130,11 +130,11 @@ def _native_window_case(
     "windows, shortwave, longwave, temperature, humidity, pressure",
     [
         (1, 100.0, 14.0, 270.0, 0.001, 90000.0),
-        (2, 200.0, 44.5, 290.0, 0.003, 100000.0),
-        (3, 400.0, 335.0 / 3.0, 310.0, 0.005, 110000.0),
+        (2, 200.0, 44.5, 280.0, 0.002, 95000.0),
+        (3, 400.0, 335.0 / 3.0, 290.0, 0.003, 100000.0),
     ],
 )
-def test_radiation_integrates_every_native_window_and_meteorology_is_endpoint(
+def test_all_exports_average_every_native_window(
     native_seconds: int,
     windows: int,
     shortwave: float,
@@ -159,8 +159,8 @@ def test_radiation_integrates_every_native_window_and_meteorology_is_endpoint(
         "air_specific_humidity": humidity,
         "specific_humidity_3d": humidity,
         "surface_pressure": pressure,
-        "air_u_velocity": windows,
-        "air_v_velocity": -windows,
+        "air_u_velocity": (windows + 1) / 2,
+        "air_v_velocity": -(windows + 1) / 2,
     }.items():
         assert_allclose_compact(result.fields[name], expected, rtol=1e-6)
     assert_allclose_compact(
@@ -173,6 +173,25 @@ def test_radiation_integrates_every_native_window_and_meteorology_is_endpoint(
     assert torch.count_nonzero(payload.model_state).item() == 0
     assert torch.equal(result.payload.model_state, result.payload.output_prediction)
     assert_allclose_compact(result.payload.output_prediction[0, 0, 0], windows)
+    native_temperatures = np.array([270.0, 290.0, 310.0])[:windows]
+    native_pressures = 2500.0 + 0.25 * np.array([90000.0, 100000.0, 110000.0])[:windows]
+    constants = context.constants
+    assert_allclose_compact(
+        result.fields["air_density"],
+        float(constants.dry_air_molecular_weight)
+        / float(constants.universal_gas_constant)
+        * np.mean(native_pressures / native_temperatures),
+        rtol=1e-6,
+    )
+    assert_allclose_compact(
+        result.fields["air_potential_temperature"],
+        np.mean(
+            native_temperatures
+            * (float(constants.reference_pressure) / native_pressures)
+            ** float(constants.dry_air_kappa)
+        ),
+        rtol=1e-6,
+    )
 
 
 def test_interval_radiation_preserves_native_prediction_output_history() -> None:

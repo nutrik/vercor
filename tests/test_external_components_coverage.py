@@ -808,8 +808,15 @@ def test_generate_step_function_threads_jcm_3_clock_and_carry() -> None:
             )
             Fields = namedtuple("Fields", "shf evap rlds t0 rsns rsds precls precnv")
             rates = Fields(*(jnp.asarray([[2.0, 4.0], [6.0, 8.0]]) for _ in range(8)))
+            Dynamics = namedtuple(
+                "Dynamics",
+                "normalized_surface_pressure u_wind v_wind temperature specific_humidity",
+            )
+            wind = jnp.asarray([[1.0, 3.0], [5.0, 7.0]]).reshape(2, 1, 1, 2)
             predictions = SimpleNamespace(
-                dynamics={"wind": jnp.asarray([[1.0, 3.0], [5.0, 7.0]])},
+                dynamics=Dynamics(
+                    jnp.ones((2, 1, 2)), wind, wind, wind + 280, wind / 1000
+                ),
                 physics={
                     "heat": jnp.asarray([[2.0, 4.0], [6.0, 8.0]]),
                     **{
@@ -859,7 +866,9 @@ def test_generate_step_function_threads_jcm_3_clock_and_carry() -> None:
     assert next_state.physics_carry == "next-carry"
     assert int(next_state.time.delta.seconds) == 43200
     assert int(next_state.step) == 24
-    assert_allclose_compact(next_state.dynamics["wind"], np.asarray([5.0, 7.0]))
+    assert_allclose_compact(
+        next_state.dynamics.u_wind.reshape(-1), np.asarray([5.0, 7.0])
+    )
     assert_allclose_compact(next_state.physics["heat"], np.asarray([6.0, 8.0]))
     assert predictions["surface_sensible_heat_flux"].shape == (2, 2)
 
@@ -1396,8 +1405,15 @@ def test_jax_gcm_step_maps_outputs_without_owning_output_cadence(
                 dycore_state={"marker": state.dycore_state["marker"] + 1.0},
                 physics_carry={"marker": state.physics_carry["marker"] + 2.0},
             ),
-            jax_gcm_runtime_module._jcm_flux_samples(
-                prediction.physics, component_name="ATM"
+            jax_gcm_runtime_module._jcm_exchange_samples(
+                SimpleNamespace(
+                    **{
+                        name: jnp.asarray(value)[jnp.newaxis, ...]
+                        for name, value in vars(d).items()
+                    }
+                ),
+                prediction.physics,
+                component_name="ATM",
             ),
         ),
     )
@@ -3259,7 +3275,7 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
     component.uses_bulk_meteorology = True
     component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
-    component.model_substeps = 0
+    component.model_substeps = 1
     component._veros_state = _make_copyable_fake_veros_state(surface_temperature=12.0)
     component.name = "OCN"
     component.grid = make_test_grid(

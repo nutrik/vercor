@@ -7,8 +7,9 @@ for the exact differentiable fork without changing installed packages.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 import os
+from types import SimpleNamespace
 from typing import Any, Literal
 
 import jax
@@ -17,8 +18,98 @@ import numpy as np
 import pytest
 
 from tests._veros_surface_support import surface_model, surface_setup_class
+from tests.assertions import assert_allclose_compact
 
 pytestmark = pytest.mark.fast_always
+
+
+@pytest.mark.parametrize("substeps", [1, 2, 3])
+def test_runtime_exports_mean_surfaces_and_retains_endpoint(
+    execution: Any, substeps: int
+) -> None:
+    from veros.core.operators import numpy as npx
+    from vercor.components import StepContext
+    from vercor.setups._external.veros_runtime import step_veros_runtime
+    from vercor.setups._external.veros_state import copy_state, pure
+    from tests.test_veros_ice_feedback import feedback_fields
+
+    model = surface_model(execution=execution)
+    original = model.state
+    wet = npx.asarray(original.variables.maskT[2:-2, 2:-2, -1]).T
+
+    def native_step(current: Any, scale: Any) -> Any:
+        def transition(state: Any) -> None:
+            vs = state.variables
+            with vs.unlock():
+                index = vs.itt + 1
+                vs.temp = npx.full_like(vs.temp, -2 + scale * index**2)
+                vs.salt = npx.full_like(vs.salt, 30 + 2 * scale * index)
+                vs.u = npx.full_like(vs.u, scale * index**2)
+                vs.v = npx.full_like(vs.v, -scale * index)
+                vs.ssh = npx.full_like(vs.ssh, 2 * scale * index)
+                vs.itt = index
+                vs.time = vs.time + 600
+
+        return pure(
+            current, step=transition, linear_solver=object(), execution=execution
+        )
+
+    advance = jax.jit(native_step) if execution == "jax" else native_step
+    resources: Any = SimpleNamespace(
+        execution=execution,
+        uses_bulk_meteorology=False,
+        surface_forcing="surface_fluxes",
+        model_substeps=substeps,
+        export_open_water_surface=True,
+        grid=SimpleNamespace(binary_mask=wet),
+    )
+    forcing = feedback_fields()
+    forcing["ice_fraction"] = jnp.full(wet.shape, 0.25)
+    context = StepContext(substeps * 600, time=datetime(2000, 1, 1))
+
+    def run(scale: Any, payload: Any = original) -> Any:
+        resources._step_function = lambda current: advance(current, scale)
+        return step_veros_runtime(
+            resources, forcing, context, copy_state(payload, execution=execution)
+        )
+
+    result = run(1.0)
+    first = (substeps + 1) / 2
+    second = (substeps + 1) * (2 * substeps + 1) / 6
+    masks = original.variables
+    expected = {
+        "sea_surface_temperature": 271.15 + second,
+        "sea_surface_salinity": (30 + 2 * first) * wet,
+        "ocean_u_velocity": second * npx.asarray(masks.maskU[2:-2, 2:-2, -1]).T,
+        "ocean_v_velocity": -first * npx.asarray(masks.maskV[2:-2, 2:-2, -1]).T,
+        "sea_surface_height": 2 * first * wet,
+        "open_water_temperature_contribution": 0.75 * (271.15 + second) * wet,
+    }
+    for name, value in expected.items():
+        actual = np.asarray(result.fields[name])
+        if name == "sea_surface_temperature":
+            # The canonical SST extractor retains its established land fill.
+            actual = actual[np.asarray(wet) > 0]
+        assert_allclose_compact(actual, value, rtol=1e-12, atol=1e-12)
+    assert int(result.payload.variables.itt) == substeps
+    assert_allclose_compact(result.payload.variables.temp, -2 + substeps**2)
+    assert int(original.variables.itt) == 0
+    continued = run(1.0, result.payload)
+    indices = np.arange(substeps + 1, 2 * substeps + 1)
+    assert_allclose_compact(
+        np.asarray(continued.fields["sea_surface_temperature"])[np.asarray(wet) > 0],
+        271.15 + np.mean(indices**2),
+    )
+    if execution == "jax":
+
+        def objective(scale: Any) -> Any:
+            return jnp.sum(run(scale).fields["sea_surface_height"])
+
+        point = jnp.asarray(1.0)
+        _, tangent = jax.jvp(objective, (point,), (jnp.ones_like(point),))
+        reverse = jax.grad(objective)(point)
+        assert_allclose_compact(tangent, 2 * first * np.sum(wet))
+        assert_allclose_compact(reverse, tangent)
 
 
 @pytest.fixture(scope="module")

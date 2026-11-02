@@ -94,23 +94,28 @@ def step_veros_runtime(
             forcing_fields,
             execution=execution,
         )
-    native_state = _veros_state.advance_veros_substeps(
+
+    def sample_fields(current: Any) -> dict[str, jax.Array]:
+        surface_fields = _veros_state.extract_veros_runtime_surface_fields(
+            current, coupled=coupled
+        )
+        if resources.export_open_water_surface:
+            surface_fields["open_water_temperature_contribution"] = (
+                open_water_temperature_contribution(
+                    surface_fields["sea_surface_temperature"],
+                    fields["ice_fraction"],
+                    resources.grid.binary_mask,
+                )
+            )
+        return surface_fields
+
+    native_state, surface_fields = _veros_state.advance_veros_substeps(
         native_state,
         step_function=resources._step_function,
         model_substeps=resources.model_substeps,
         logger=context.logger if execution == "host" else None,
+        sample_fields=sample_fields,
     )
-    surface_fields = _veros_state.extract_veros_runtime_surface_fields(
-        native_state, coupled=coupled
-    )
-    if resources.export_open_water_surface:
-        surface_fields["open_water_temperature_contribution"] = (
-            open_water_temperature_contribution(
-                surface_fields["sea_surface_temperature"],
-                fields["ice_fraction"],
-                resources.grid.binary_mask,
-            )
-        )
     return StepResult(fields=surface_fields, payload=native_state)
 
 

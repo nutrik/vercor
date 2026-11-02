@@ -33,6 +33,9 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
     from vercor.setups._external.veris_output import veris_output_provider
 
     grid, _ = small_ocean()
+    actual, actual_component, _, _ = small_coupler(steps=0)
+    original = native_payload(actual.initial_state())
+    owner = actual_component.spec.lifecycle.setup.__self__
     assert grid.longitude_edges is not None and grid.latitude_edges is not None
     expected_x = np.asarray(grid.longitude_edges)[:-1]
     expected_y = np.asarray(grid.latitude_edges)[:-1]
@@ -46,13 +49,16 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
             binary_mask=grid.binary_mask,
         )
     tagged = jnp.arange(42.0).reshape(7, 6)
-    state = SimpleNamespace(
+    state = replace(
+        original.state,
         Area=0.5 * jnp.ones_like(tagged),
         hIceMean=0.25 * jnp.ones_like(tagged),
         hSnowMean=tagged,
         TSurf=260.0 + tagged,
         uIce=100 + tagged,
         vIce=200 + tagged,
+        iceMask=jnp.ones_like(tagged),
+        fCori=jnp.ones_like(tagged),
     )
     diagnostics = SimpleNamespace(
         **{
@@ -74,7 +80,7 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
     payload = VerisPayload(
         state,
         diagnostics,
-        physical_constants=None,
+        physical_constants=original.physical_constants,
         interval_budget=VerisIntervalBudget(jnp.zeros((2, 3)), jnp.zeros((2, 3))),
         checked_native_steps=jnp.asarray(0, dtype=jnp.int32),
     )
@@ -99,7 +105,7 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
         datetime(2000, 1, 1),
         timedelta(seconds=600),
     )
-    frame = veris_output_provider().sample(context)
+    frame = veris_output_provider(owner.surface_state_fields).sample(context)
     np.testing.assert_array_equal(
         frame.variables["hSnowMean"].values, tagged[2:-2, 2:-2].T
     )
@@ -125,7 +131,14 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
     np.testing.assert_array_equal(frame.coordinates["x_face"].values, expected_x)
     np.testing.assert_array_equal(frame.coordinates["y_face"].values, expected_y)
     for name, value in canonical.items():
-        np.testing.assert_array_equal(frame.variables[name].values, value)
+        if name == "ice_surface_temperature":
+            value = state.TSurf[2:-2, 2:-2].T
+        elif name == "ice_surface_albedo":
+            value = jnp.full(grid.shape, original.physical_constants.wetSnowAlb)
+        if name == "ice_surface_albedo":
+            np.testing.assert_allclose(frame.variables[name].values, value, rtol=1e-14)
+        else:
+            np.testing.assert_array_equal(frame.variables[name].values, value)
         assert frame.variables[name].attrs["cell_methods"] == (
             "time: point" if name.startswith("ice_surface_") else "time: mean"
         )
@@ -148,17 +161,33 @@ def test_tagged_provider_preserves_native_axes_units_and_faces(
     }
 
 
-def test_provider_samples_current_canonical_ice_properties() -> None:
+@pytest.mark.fast_always
+def test_native_output_keeps_endpoint_properties_separate_from_exchange_means(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     from vercor.setups._external.veris_output import veris_output_provider
+    from tests.test_veris_feedback import _controlled_transition
+    from vercor.setups import VerisConfig
 
-    coupler, component, _, _ = small_coupler(steps=1)
-    result = coupler.run()
+    _controlled_transition(monkeypatch, state_fields=True)
+    config = VerisConfig(
+        model_timestep=timedelta(seconds=300),
+        custom_parameters={"nEVPsteps": 8},
+        initial_conditions={"Area": 0.5, "hIceMean": 0.25, "TSurf": 260.0},
+        output=OutputSpec(period=PeriodOutput(frequency="step")),
+    )
+    coupler, component, _, _ = small_coupler(steps=1, config=config)
+    result = coupler.run(output=OutputTarget(tmp_path))
     state = result.component("CICE")
-    frame = veris_output_provider().sample(
+    payload = native_payload(result)
+    wet = np.asarray(component.grid.binary_mask) > 0
+    frame = veris_output_provider(
+        component.spec.lifecycle.setup.__self__.surface_state_fields
+    ).sample(
         OutputContext(
             component,
             state,
-            native_payload(result),
+            payload,
             1,
             datetime(2000, 1, 1),
             timedelta(seconds=600),
@@ -166,10 +195,24 @@ def test_provider_samples_current_canonical_ice_properties() -> None:
     )
     for name, units in (("ice_surface_temperature", "K"), ("ice_surface_albedo", "1")):
         variable = frame.variables[name]
-        np.testing.assert_allclose(variable.values, state.field(name))
+        expected = (
+            274.0
+            if name == "ice_surface_temperature"
+            else float(payload.physical_constants.wetIceAlb)
+        )
+        np.testing.assert_allclose(np.asarray(variable.values)[wet], expected)
+        assert not np.allclose(
+            np.asarray(variable.values)[wet], np.asarray(state.field(name))[wet]
+        )
         assert variable.dims == ("y_center", "x_center")
         assert variable.attrs["units"] == units
         assert variable.attrs["cell_methods"] == "time: point"
+    for path in (*tmp_path.glob("cice.averages.*.nc"), tmp_path / "cice.snapshot.nc"):
+        with xr.open_dataset(path) as ds:
+            np.testing.assert_allclose(
+                np.asarray(ds["ice_surface_temperature"])[0][wet], 274.0
+            )
+            np.testing.assert_allclose(np.asarray(ds["Area"])[0][wet], 0.75)
 
 
 @pytest.mark.fast_always
@@ -187,7 +230,7 @@ def test_provider_requires_native_payload() -> None:
         timedelta(seconds=600),
     )
     with pytest.raises(ValueError, match="payload"):
-        veris_output_provider().sample(context)
+        veris_output_provider(lambda payload: {}).sample(context)
 
 
 @pytest.mark.slow
@@ -228,9 +271,7 @@ def test_shared_period_selection_and_snapshot_metadata(
             if variables
             else len(ds.data_vars) == 23
         )
-        np.testing.assert_allclose(
-            ds["Area"][0], final.component("CICE").field("ice_fraction")
-        )
+        np.testing.assert_allclose(ds["Area"][0], payload.state.Area[2:-2, 2:-2].T)
         np.testing.assert_allclose(
             ds["hIceMean"][0], payload.state.hIceMean[2:-2, 2:-2].T
         )
@@ -242,9 +283,7 @@ def test_shared_period_selection_and_snapshot_metadata(
             assert ds["uIce"].dims == ("time", "y_center", "x_face")
     with xr.open_dataset(tmp_path / "cice.snapshot.nc") as ds:
         assert ds.time.values[0] == np.datetime64("2000-01-01T00:20:00")
-        np.testing.assert_allclose(
-            ds["Area"][0], final.component("CICE").field("ice_fraction")
-        )
+        np.testing.assert_allclose(ds["Area"][0], payload.state.Area[2:-2, 2:-2].T)
         assert ds["forc_salt_surface"].attrs["units"] == "g kg-1 m s-1"
         assert ds["OceanStressV"].dims == ("time", "y_face", "x_center")
         assert ds["sea_surface_heat_flux"].attrs["units"] == "W m-2"

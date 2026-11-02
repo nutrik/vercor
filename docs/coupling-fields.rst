@@ -208,8 +208,14 @@ roles derived from actual component names. Configurable instance names such as
 Temporal support
 ----------------
 
-State and flux exports serve different purposes. Prognostic surface and air
-states represent native endpoints. An interval-mean rate represents the integral
+Evolving surface and air state exports are means of the canonical samples
+diagnosed after each native step in the coupling interval. With N equal native
+steps this is the sum of those N samples divided by N, excluding the initial
+instant. One native step therefore exports its endpoint. This discrete sampling
+convention does not claim exact continuous-time quadrature. Initialization
+diagnoses the initial instant without inventing a preceding averaging window.
+Nonlinear state diagnostics are computed before averaging.
+An interval-mean rate represents the integral
 of native rates divided by the coupling duration; it must be applied over that
 same duration to preserve the transferred quantity. ``quantity`` controls area
 normalization, while ``TransferPolicy.current`` sends a stored array. Neither
@@ -219,22 +225,29 @@ JCM requests every native step for heat, radiation and precipitation exchange,
 regardless of ``save_interval``. The common surface mapper diagnoses rain and
 snow for each native near-surface temperature and precipitation sample before
 averaging. It converts each native rate once and returns the full coupling mean.
-Air fields and their derived density, pressure and height use the final native
-dynamics state. The resumable native dynamics, physics cache, exact clock and
+Air fields and their derived density, pressure, potential temperature and height
+are diagnosed per native sample before averaging. The compiled native return
+retains only surface rates, surface pressure and bottom-level dynamics histories.
+The resumable native dynamics, physics cache, exact clock and
 categorical fields retain their endpoint values. Applied marine boundary fields
 use the final physics date, one native step before the dynamics endpoint.
 
-CAMulator retains the last native meteorology prediction and averages radiation
-rates across all native windows in the coupling block. Native FSNS/FLNS energies
+CAMulator averages every native window's mapped state and radiation fields
+across the coupling block. Native FSNS/FLNS energies
 are divided by the native duration; downward longwave is reconstructed using
 each prediction's surface emission before averaging. Prescribed CAMulator land
 still supplies the interval-start temperature. Native CREDIT checkpoint
 compatibility remains a separate validation requirement.
 
 Veris integrates total ocean heat, mass, salt and concentration-weighted face
-stress at every native step. Ice fraction, temperature and albedo are final
-state/diagnostic values. Veros holds received interval means through native
-substeps. Coupled surface-flux runs default to matching 1800-second momentum
+stress at every native step. Ice fraction, temperature and diagnosed albedo
+are native-step means; component and route coverage use the exported mean ice
+fraction. Existing spatial source weighting applies to these separate field
+means; it does not compute temporal covariances between independently averaged
+properties. Veros averages SST, salinity, currents, SSH and its open-water
+temperature contribution after native steps, retaining the endpoint payload.
+It holds received fields through native substeps.
+Coupled surface-flux runs default to matching 1800-second momentum
 and tracer steps; overriding only ``dt_mom`` also selects that implicit tracer
 step. An explicit ``custom_parameters['dt_tracer']`` retains deliberate native
 acceleration. This changes the default daily coupled run from one accelerated
@@ -248,7 +261,11 @@ the source. Current evolving feedback retains explicit sequential order. The
 external atmosphere/ocean state is still held through each component's native
 substeps; smaller native timesteps alone do not remove that coupling error.
 
-Native diagnostic output and exchanged rates have separate sampling meanings.
+Prescribed-data components retain their existing record selection and slab
+components take a single coupling-sized step. Third-party component authors own
+sampling and reduction inside their native adapters.
+
+Native diagnostic output and exchanged state/rate means have separate sampling meanings.
 JCM's native output provider samples endpoint physics, while exchanged surface
 fluxes are native-interval means. CAMulator period output retains every native
 prediction. A period mean of endpoint native diagnostics need not reproduce the

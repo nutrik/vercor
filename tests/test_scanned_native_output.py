@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, Callable, cast
@@ -232,22 +233,26 @@ def test_veros_numeric_extraction_selects_traced_tau_and_latest_native_values() 
     np.testing.assert_array_equal(numeric.coordinates["xt"].values, [0.0, 4.0])
 
 
-def _veris_payload(offset: Any) -> Any:
+def _veris_payload(offset: Any, template: Any) -> Any:
     from veris.model.diagnostics import DIAGNOSTICS
 
     native = jnp.arange(42.0).reshape(7, 6)
     return SimpleNamespace(
-        state=SimpleNamespace(
+        state=replace(
+            template.state,
             Area=jnp.full_like(native, 0.5),
             hIceMean=jnp.full_like(native, 0.25),
             hSnowMean=native + offset,
             TSurf=260.0 + native,
             uIce=100.0 + native + offset,
             vIce=200.0 + native,
+            iceMask=jnp.ones_like(native),
+            fCori=jnp.ones_like(native),
         ),
         diagnostics=SimpleNamespace(
             **{name: 300.0 + native + offset for name in DIAGNOSTICS}
         ),
+        physical_constants=template.physical_constants,
     )
 
 
@@ -270,7 +275,14 @@ def test_veris_numeric_extraction_keeps_halos_faces_and_canonical_fields() -> No
     from vercor.grids import RectilinearGrid
     from vercor.setups._external.veris_output import veris_output_provider
 
-    provider = veris_output_provider()
+    from tests.test_veris_component import small_coupler
+    from tests.test_veris_rollouts import native_payload
+
+    actual, actual_component, _, _ = small_coupler(steps=0)
+    template = native_payload(actual.initial_state())
+    provider = veris_output_provider(
+        actual_component.spec.lifecycle.setup.__self__.surface_state_fields
+    )
     numeric_sample = _numeric_method(provider)
     grid = RectilinearGrid(
         "ice-output",
@@ -282,7 +294,7 @@ def test_veris_numeric_extraction_keeps_halos_faces_and_canonical_fields() -> No
 
     def extract(offset: Any) -> Any:
         context = _numeric_context(
-            component, _veris_payload(offset), _ice_fields(offset)
+            component, _veris_payload(offset, template), _ice_fields(offset)
         )
         frame = numeric_sample(context)
         return (
@@ -301,7 +313,7 @@ def test_veris_numeric_extraction_keeps_halos_faces_and_canonical_fields() -> No
             stress, np.arange(6.0).reshape(2, 3) + 700 + offset
         )
     numeric_context, host_context = _contexts(
-        component, _veris_payload(3.0), _ice_fields(3.0)
+        component, _veris_payload(3.0, template), _ice_fields(3.0)
     )
     numeric = numeric_sample(numeric_context)
     _assert_host_frame_matches_numeric(numeric, provider.sample(host_context))
@@ -330,7 +342,7 @@ def test_numeric_native_provider_requires_its_runtime_payload(native: str) -> No
     else:
         from vercor.setups._external.veris_output import veris_output_provider
 
-        provider = veris_output_provider()
+        provider = veris_output_provider(lambda payload: {})
     numeric_sample = _numeric_method(provider)
     context, _ = _contexts(_component(), None)
     with pytest.raises(ValueError, match="payload|JCM state"):

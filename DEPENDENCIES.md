@@ -23,12 +23,19 @@ existing identity bypass. No module or dependency layer is added.
 
 Temporal exchange repair retains existing owners and layers. Layer 4's JCM
 surface mapper owns both single-sample conversion and phase-before-mean
-integration. The native step projects eight horizontal histories before its
-compiled return; runtime keeps endpoint state separately. CAMulator reuses its
-canonical mapper for all native radiation samples. Runtime dispatch consumes
+integration. The native step projects eight horizontal flux histories, surface
+pressure and four bottom-level dynamics histories before its compiled return;
+runtime maps samples before averaging and keeps endpoint state separately.
+CAMulator reuses its canonical mapper for all native prediction fields. Veros
+averages canonical surfaces in its existing native-loop owner; Veris adds
+surface state sums to its existing loop carry. Runtime dispatch consumes
 the existing field selector at recipient time, and pressure-mode Veros stepping
 refreshes the native SSH diagnostic after slot rotation. No module, public
 protocol, third-party dependency or import cycle is added.
+Veris output accepts a setup-bound pure endpoint diagnostic callback rather
+than importing the higher native-runtime layer or reading exchange means as
+instantaneous properties. The existing output/factory dependency order stays
+unchanged.
 
 Bilinear layer-1 geometry owns canonical degree/radian longitude phases.
 Layer-2 weights compare source candidates in each target's whole-turn frame

@@ -180,7 +180,7 @@ class JCMAtmosphereSetupState:
                 initial_step=state.step,
             )
 
-            # Every native rate is needed for interval integration; endpoint
+            # Every native sample is needed for interval integration; endpoint
             # state and exact continuation carry retain their own ownership.
             return (
                 JCMState(
@@ -197,8 +197,8 @@ class JCMAtmosphereSetupState:
                     time=native.time,
                     step=native.step,
                 ),
-                _jax_gcm_runtime._jcm_flux_samples(
-                    predictions.physics, component_name=self.name
+                _jax_gcm_runtime._jcm_exchange_samples(
+                    predictions.dynamics, predictions.physics, component_name=self.name
                 ),
             )
 
