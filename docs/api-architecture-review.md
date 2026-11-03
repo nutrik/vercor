@@ -177,6 +177,7 @@ following inventory is complete for `0.4.0` and documents responsibility,
 not import permission.
 
 ```text
+vercor._averaging
 vercor._field_names
 vercor._host_arrays
 vercor._interpolators
@@ -333,6 +334,9 @@ vercor.setups.config
 
 ### Foundations and numerical implementations
 
+- Shared averaging: `vercor._averaging` owns finite sums/counts, safe mean
+  division and the scalar-count native accumulator; sampling and selection stay
+  with the existing output and adapter owners.
 - Field/runtime helpers: `vercor._field_names`, `vercor._host_arrays`,
   `vercor._pytree`, and `vercor._run_order`.
 - Numerical safety: `vercor._numerical_safety` owns transform-safe finite,

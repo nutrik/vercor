@@ -9,6 +9,7 @@ from typing import Any, Callable, Literal, NamedTuple, cast
 import jax
 import jax.numpy as jnp
 
+from vercor._averaging import SampleMean
 from vercor._numerical_safety import replace_missing_nan
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor._host_arrays import runtime_array_to_host
@@ -294,18 +295,22 @@ def advance_veros_substeps(
     """
 
     updated_state = state
-    totals: dict[str, jax.Array] | None = None
+    accumulator: SampleMean | None = None
     for i in range(model_substeps):
         if logger is not None:
             logger.info(f"Veros sub-step {i+1} / {model_substeps}")
         updated_state = step_function(updated_state)
         sample = sample_fields(updated_state)
-        totals = sample if totals is None else jax.tree.map(jnp.add, totals, sample)
-    if totals is None:
+        accumulator = (
+            SampleMean.from_sample(sample)
+            if accumulator is None
+            else accumulator.add(sample)
+        )
+    if accumulator is None:
         raise ValueError(
             "Veros requires at least one native step per coupling interval"
         )
-    return updated_state, jax.tree.map(lambda value: value / model_substeps, totals)
+    return updated_state, cast(dict[str, jax.Array], accumulator.mean())
 
 
 __all__ = [

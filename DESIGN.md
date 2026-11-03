@@ -99,6 +99,18 @@ use one coupling-sized step. Plugin authors own internal native sampling.
 Native output samples and exchanged state/rate means have distinct meanings
 and are documented separately.
 
+Exchange and output reduction share `vercor/_averaging.py` numerical kernels.
+Sampling clocks and field selections stay independent: component contracts and
+native mappers own exchanges; `OutputSpec`/`PeriodOutput` own optional output.
+Required native samples use strict sums and a scalar equal-step count, preserving
+invalid-physics propagation with no field-sized count arrays. Output excludes
+missing diagnostic samples using per-cell int32 finite counts. Both divide only
+at their interval boundary; Veris retains its native duration-weighted integrals.
+JCM folds compact native samples into mapped totals in a cached numeric scan,
+without allocating a second mapped trajectory. Its native model still returns
+the compact raw history. Endpoint payloads and nonlinear diagnosis order remain
+owned by the adapters.
+
 Coupled pressure-mode Veros stepping synchronizes SSH to the rotated current
 pressure solution without changing prognostic state. Surface-flux setups use
 matching 1800-second momentum/tracer steps by default; custom momentum duration

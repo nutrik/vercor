@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 import jax
 import jax.numpy as jnp
 
+from vercor._averaging import SampleMean
 from vercor._numerical_safety import require_active_finite
 from vercor.components import (
     Component,
@@ -22,6 +23,7 @@ from vercor.exceptions import ComponentError, CouplerError
 from vercor.field_layout import validate_canonical_grid_field_shape
 from vercor._pytree import PyTreeNodeMixin
 from vercor.physics import PhysicalConstants
+from vercor.types import RuntimeArray
 from vercor.setups._external._jax_gcm_pytree import tree_as_runtime_dtype
 import vercor.setups._external.jax_gcm_fields as _jax_gcm_fields
 
@@ -280,19 +282,21 @@ def _map_jax_gcm_state_fields(
 ) -> dict[str, jax.Array]:
     """Map one diagnosed native snapshot with shared units and channel selection."""
     return _map_jcm_sample_fields(
-        state,
         _jcm_exchange_samples(
             jcm_state.dynamics, jcm_state.physics, component_name=state.name
         ),
         constants,
+        state.sigma_levels,
+        state.open_water_albedo,
         dtype,
     )
 
 
 def _map_jcm_sample_fields(
-    state: "JCMAtmosphereSetupState",
     sample: Mapping[str, jax.Array],
     constants: PhysicalConstants,
+    sigma_levels: RuntimeArray,
+    open_water_albedo: RuntimeArray,
     dtype: DTypePolicy,
 ) -> dict[str, jax.Array]:
     """Diagnose canonical fields before reducing any native sample axis."""
@@ -301,18 +305,73 @@ def _map_jcm_sample_fields(
         _jax_gcm_fields.map_jcm_output_fields(
             constants.latent_heat_of_vaporization,
             JCM_REFERENCE_PRESSURE,
-            state.sigma_levels,
+            sigma_levels,
             constants.dry_air_molecular_weight,
             constants.universal_gas_constant,
             constants.reference_pressure,
             constants.dry_air_kappa,
             **sample,
-            open_water_albedo=state.open_water_albedo,
+            open_water_albedo=open_water_albedo,
             snow_temperature=constants.precipitation_snow_temperature,
             rain_temperature=constants.precipitation_rain_temperature,
             dtype=dtype,
         ),
     )
+
+
+def _mean_jcm_sample_fields(
+    state: "JCMAtmosphereSetupState",
+    samples: Mapping[str, jax.Array],
+    constants: PhysicalConstants,
+    dtype: DTypePolicy,
+) -> dict[str, jax.Array]:
+    """Reduce native samples with a reusable numeric executable, without a mapped history."""
+    return cast(
+        dict[str, jax.Array],
+        _reduce_jcm_samples(
+            samples, constants, state.sigma_levels, state.open_water_albedo, dtype
+        ),
+    )
+
+
+@partial(jax.jit, static_argnames=("dtype",))
+def _reduce_jcm_samples(
+    samples: Mapping[str, jax.Array],
+    constants: PhysicalConstants,
+    sigma_levels: RuntimeArray,
+    open_water_albedo: RuntimeArray,
+    dtype: DTypePolicy,
+) -> dict[str, jax.Array]:
+    """Diagnose each native sample before folding it into fixed-size field totals.
+
+    The native API still owns its compact raw history. This scan returns only
+    the accumulator carry, so the larger mapped field trajectory is never built.
+    Physics values remain traced; only precision and array shapes are static.
+    """
+
+    def map_sample(sample: Any) -> dict[str, jax.Array]:
+        return _map_jcm_sample_fields(
+            sample, constants, sigma_levels, open_water_albedo, dtype
+        )
+
+    first = map_sample(jax.tree.map(lambda value: value[0], samples))
+    sample_count = next(iter(samples.values())).shape[0]
+    if sample_count == 1:
+        return first
+
+    def accumulate(carry: SampleMean, index: jax.Array) -> tuple[SampleMean, None]:
+        sample = jax.tree.map(
+            lambda value: jax.lax.dynamic_index_in_dim(value, index, keepdims=False),
+            samples,
+        )
+        return carry.add(map_sample(sample)), None
+
+    accumulator, _ = jax.lax.scan(
+        accumulate,
+        SampleMean.from_sample(first),
+        jnp.arange(1, sample_count, dtype=dtype.jax_index),
+    )
+    return cast(dict[str, jax.Array], accumulator.mean())
 
 
 def _jcm_exchange_samples(
@@ -526,12 +585,7 @@ def step_jax_gcm_runtime(
         component_name=state.name,
         stage="step output",
     )
-    mapped_fields = jax.tree.map(
-        lambda value: jnp.mean(value, axis=0),
-        jax.vmap(
-            lambda sample: _map_jcm_sample_fields(state, sample, constants, dtype)
-        )(exchange_samples),
-    )
+    mapped_fields = _mean_jcm_sample_fields(state, exchange_samples, constants, dtype)
 
     # Native JCM removes its transient _forcing_2d diagnostic from the carry.
     # Select the final native physics date independently of diagnostic saving;
