@@ -13,6 +13,7 @@ from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_real_array, jax_index_dtype
 from vercor._host_arrays import host_int64_array
 from vercor._numerical_safety import _require_zero
+from vercor._averaging import finite_sum_and_count
 from vercor.output import OutputVariable, PeriodOutput
 
 TIME_NAME = "time"
@@ -195,17 +196,8 @@ def _sample_sum_and_counts(
             counts.astype(jax_index_dtype()),
         )
 
-    try:
-        finite = jnp.isfinite(values)
-    except TypeError as exc:
-        raise ValueError(
-            f"Period average variable {name!r} must contain numeric values."
-        ) from exc
-
-    sum_values = jnp.where(finite, values, 0.0)
-    counts = finite.astype(jax_index_dtype())
-
     if summation_dim is None:
+        sum_values, counts = finite_sum_and_count(values)
         return dims, sum_values, counts
 
     if dims.count(summation_dim) != 1:
@@ -215,11 +207,8 @@ def _sample_sum_and_counts(
         )
     axis = dims.index(summation_dim)
     reduced_dims = dims[:axis] + dims[axis + 1 :]  # noqa: E203
-    return (
-        reduced_dims,
-        jnp.sum(sum_values, axis=axis),
-        jnp.sum(counts, axis=axis),
-    )
+    sum_values, counts = finite_sum_and_count(values, axis=axis)
+    return reduced_dims, sum_values, counts
 
 
 __all__ = [

@@ -37,6 +37,7 @@ from vercor.output._period import (
 from vercor._runtime.field_transfer import select_runtime_field
 from vercor._runtime.time import RuntimeStepInfo
 from vercor._pytree import PyTreeNodeMixin
+from vercor._averaging import mean_from_sum_and_count
 from vercor.state import ComponentState
 from vercor.types import RuntimeArray
 
@@ -225,13 +226,8 @@ class _OutputAccumulator(PyTreeNodeMixin):
 
         variables = {}
         for index, name in enumerate(self.names):
-            mean_dtype = jnp.result_type(self.sum_values[index].dtype, jnp.float32)
-            denominator = jnp.where(self.counts[index] > 0, self.counts[index], 1)
-            finite_means = self.sum_values[index] / denominator
-            mean_values = jnp.where(
-                self.counts[index] > 0,
-                finite_means,
-                jnp.full(self.sum_values[index].shape, jnp.nan, dtype=mean_dtype),
+            mean_values = mean_from_sum_and_count(
+                self.sum_values[index], self.counts[index]
             )
             variables[name] = OutputVariable(
                 self.dims[index],

@@ -16,6 +16,7 @@ from typing import Any, Literal, TypeAlias, cast
 import jax
 import jax.numpy as jnp
 
+from vercor._averaging import mean_from_sum_and_count
 from vercor.components import (
     Component,
     SetupContext,
@@ -237,11 +238,15 @@ def step_veris_runtime(
         (payload, totals, external, surfaces, jnp.asarray(True)),
     )
     duration = jnp.asarray(context.dt_seconds, dtype=context.dtype.jax_real)
-    means = jax.tree.map(lambda value: value / duration, totals)
-    surface_means = jax.tree.map(lambda value: value / duration, surfaces)
-    updated = replace(
-        updated, interval_budget=jax.tree.map(lambda value: value / duration, external)
-    )
+
+    def interval_mean(values: Any) -> Any:
+        return jax.tree.map(
+            lambda value: mean_from_sum_and_count(value, duration), values
+        )
+
+    means = interval_mean(totals)
+    surface_means = interval_mean(surfaces)
+    updated = replace(updated, interval_budget=interval_mean(external))
     valid = valid & _finite_leaves((means, surface_means, updated.interval_budget))
     _require_zero(
         jnp.count_nonzero(~valid),

@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import torch
 
 from vercor.components import StepContext, StepResult
+from vercor._averaging import SampleMean
 from vercor.output import OutputFrame
 from vercor.output._session import _OutputAccumulator
 from vercor.output._selection import selected_output_names
@@ -249,7 +250,7 @@ def step_camulator_runtime(
     block_start = payload.cursor.current_index()
     block_end = block_start + resources.model_substeps
 
-    mapped_totals: Mapping[str, RuntimeArray] | None = None
+    exchange_accumulator: SampleMean | None = None
     output_accumulator: _OutputAccumulator | None = None
     native_names: tuple[str, ...] = ()
     if sample_native_output and context.output_variables is not None:
@@ -260,7 +261,7 @@ def step_camulator_runtime(
         native_names = tuple(name for name in requested if name in channels)
 
     def accumulate_prediction(prediction: torch.Tensor) -> None:
-        nonlocal mapped_totals, output_accumulator
+        nonlocal exchange_accumulator, output_accumulator
         decoded_prediction = None
         if native_names and bool(
             resources.conf.get("predict", {}).get("climate_rescale_output", False)
@@ -284,10 +285,10 @@ def step_camulator_runtime(
             prediction=prediction,
             decoded_prediction=decoded_prediction,
         )
-        mapped_totals = (
-            mapped
-            if mapped_totals is None
-            else {name: mapped_totals[name] + value for name, value in mapped.items()}
+        exchange_accumulator = (
+            SampleMean.from_sample(mapped)
+            if exchange_accumulator is None
+            else exchange_accumulator.add(mapped)
         )
         if native_names:
             frame = OutputFrame(
@@ -319,10 +320,8 @@ def step_camulator_runtime(
         cursor=next_payload.cursor.advanced(),
         output_accumulator=output_accumulator,
     )
-    assert mapped_totals is not None
-    mapped_fields = {
-        name: value / resources.model_substeps for name, value in mapped_totals.items()
-    }
+    assert exchange_accumulator is not None
+    mapped_fields = exchange_accumulator.mean()
 
     return StepResult(
         fields={
