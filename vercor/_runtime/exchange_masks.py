@@ -59,6 +59,21 @@ def exchange_coverage(
     _, binary, fraction, overlap = exchange_mask_operands(
         state, exchange, context=context
     )
+    return coverage_from_operands(exchange, binary, fraction, overlap)
+
+
+def coverage_from_operands(
+    exchange: Exchange,
+    binary: RuntimeArray,
+    fraction: RuntimeArray,
+    overlap: RuntimeArray,
+) -> RuntimeArray:
+    """Derive diagnostic support from the same operands used to transfer fields.
+
+    Dispatch owns one resolution of current masks per route. Reusing those
+    operands for retained received support avoids a second remap, while full
+    diagnostic refreshes use this identical quantity-dependent formula.
+    """
     if exchange.quantity == "target_flux":
         return jnp.where(jnp.asarray(overlap) > 0, fraction, 0.0)
     return jnp.clip(jnp.asarray(overlap), 0.0, 1.0) * jnp.asarray(binary)
