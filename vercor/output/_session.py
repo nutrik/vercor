@@ -30,6 +30,8 @@ from vercor.output._dataset import grid_field_dims, time_coordinate_variable
 from vercor.output._selection import selected_output_names
 from vercor.output._netcdf import write_netcdf_dataset
 from vercor.output._period import (
+    _accumulate_output_samples,
+    _prepare_output_sample,
     _sample_sum_and_counts,
     period_mean_sample_to_output_variable,
     should_write_period_output,
@@ -184,10 +186,11 @@ class _OutputAccumulator(PyTreeNodeMixin):
             raise ValueError(
                 "Output provider coordinate schema changed across samples."
             )
-        sums: list[jax.Array] = []
-        counts: list[jax.Array] = []
+        samples: list[jax.Array] = []
+        reduction_counts: list[jax.Array | None] = []
+        axes: list[int | None] = []
         for index, name in enumerate(self.names):
-            dims, sample_sum, sample_counts = _sample_sum_and_counts(
+            dims, values, sample_counts, axis = _prepare_output_sample(
                 name,
                 frame.variables[name],
                 summation_dim=self.sample_dimension,
@@ -195,18 +198,31 @@ class _OutputAccumulator(PyTreeNodeMixin):
             )
             if dims != self.dims[index]:
                 raise ValueError(f"Output variable {name!r} dimensions changed.")
-            if sample_sum.shape != self.sum_values[index].shape:
+            shape = (
+                values.shape
+                if axis is None
+                else values.shape[:axis] + values.shape[axis + 1 :]  # noqa: E203
+            )
+            if shape != self.sum_values[index].shape:
                 raise ValueError(f"Output variable {name!r} shape changed.")
             if _value_dtype(frame.variables[name].values) != self.dtypes[index]:
                 raise ValueError(f"Output variable {name!r} dtype changed.")
             if tuple(frame.variables[name].attrs.items()) != self.attrs[index]:
                 raise ValueError(f"Output variable {name!r} attributes changed.")
-            sums.append(self.sum_values[index] + sample_sum)
-            counts.append(self.counts[index] + sample_counts)
+            samples.append(values)
+            reduction_counts.append(sample_counts)
+            axes.append(axis)
+        sums, counts = _accumulate_output_samples(
+            self.sum_values,
+            self.counts,
+            tuple(samples),
+            tuple(reduction_counts),
+            axes=tuple(axes),
+        )
         return replace(
             self,
-            sum_values=tuple(sums),
-            counts=tuple(counts),
+            sum_values=sums,
+            counts=counts,
             coordinate_shapes=_coordinate_shapes(coordinate_values),
             coordinate_dtypes=_coordinate_dtypes(coordinate_values),
             coordinate_values=coordinate_values,

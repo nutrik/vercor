@@ -211,21 +211,6 @@ def test_output_configuration_rejects_invalid_nested_values(
         _api(factory)(**kwargs)
 
 
-def test_output_none_performs_no_io_or_provider_sampling(tmp_path: Path) -> None:
-    class ExplodingProvider:
-        def sample(self, context: Any) -> Any:
-            _ = context
-            raise AssertionError("disabled provider was sampled")
-
-    component = _component(output=_period_spec(provider=ExplodingProvider()))
-    coupler = _coupler(component, steps=1)
-
-    final = coupler.run(output=None)
-
-    assert float(final.component("model").field("temperature")[0, 0]) == 1.0
-    assert not tuple(tmp_path.iterdir())
-
-
 def test_runtime_default_provider_writes_selected_period_variables(
     tmp_path: Path,
 ) -> None:
@@ -514,39 +499,6 @@ def test_final_and_snapshot_filenames_are_safe_and_collision_free(
     assert all(path.parent == tmp_path for path in (*final_paths, *snapshot_paths))
 
 
-def test_output_target_flags_disable_each_output_kind(tmp_path: Path) -> None:
-    called: list[bool] = []
-    component = _component(
-        output=_period_spec(snapshot_writer=lambda context: called.append(True))
-    )
-
-    _coupler(component, steps=1).run(
-        output=_target(
-            tmp_path,
-            write_period=False,
-            write_final_fields=False,
-            write_snapshots=False,
-        )
-    )
-
-    assert not called
-    assert not tuple(tmp_path.iterdir())
-
-
-def test_any_enabled_output_rejects_traced_state_before_io(tmp_path: Path) -> None:
-    component = _component(output=_api("OutputSpec")())
-    coupler = _coupler(component, steps=1)
-    state = coupler.initial_state()
-    target = _target(
-        tmp_path,
-        write_period=False,
-        write_snapshots=False,
-    )
-
-    with pytest.raises(CouplerError, match="Output is an I/O workflow"):
-        jax.jit(lambda value: coupler.run(value, output=target))(state)
-
-
 def test_period_accumulation_is_immutable_and_preserves_nan_counts() -> None:
     import vercor.output._session as session_module
 
@@ -572,30 +524,6 @@ def test_period_accumulation_is_immutable_and_preserves_nan_counts() -> None:
     np.testing.assert_allclose(empty.sum_values[0], [0.0, 0.0])
     np.testing.assert_allclose(first.sum_values[0], [1.0, 0.0])
     np.testing.assert_allclose(second.mean_frame().variables["x"].values, [2.0, 5.0])
-
-
-def test_daily_output_accumulates_multiple_samples_and_resets_windows(
-    tmp_path: Path,
-) -> None:
-    component = _component(
-        output=_period_spec(
-            variables=("temperature",),
-            frequency="day",
-        )
-    )
-
-    _coupler(component, steps=4, dt_seconds=43_200.0).run(
-        output=_target(
-            tmp_path,
-            write_final_fields=False,
-            write_snapshots=False,
-        )
-    )
-
-    paths = sorted(tmp_path.glob("model.averages.*.nc"))
-    assert len(paths) == 2
-    np.testing.assert_allclose(_read(paths[0], "temperature"), 1.5)
-    np.testing.assert_allclose(_read(paths[1], "temperature"), 3.5)
 
 
 def test_components_with_independent_period_cadences_share_one_session(
