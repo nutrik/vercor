@@ -1,0 +1,19 @@
+from pathlib import Path
+import json,sys
+from perfetto.trace_processor import TraceProcessor,TraceProcessorConfig
+from xprof.convert.raw_to_tool_data import xspace_to_tool_data
+root=Path('/private/tmp/vercor-exchange-profile')/sys.argv[1]; summary={}
+for case in ('remap_conservation','remap_fracarea','dispatch_intensive','dispatch_vector','coupled_host_intensive','coupled_jax_intensive'):
+    trace=next((root/case).rglob('perfetto_trace.json.gz'))
+    xspace=next((root/case).rglob('*.xplane.pb'))
+    with TraceProcessor(trace=str(trace),config=TraceProcessorConfig(bin_path='/private/tmp/vercor-output-profile/trace_processor_shell')) as tp:
+        rows=[vars(r) for r in tp.query("select name,count(*) as calls,sum(dur)/1e6 as total_ms from slice where name='CommonPjRtLoadedExecutable::ExecutePrepare' or name like '%backend_compile%' or name like 'PjitFunction(%' group by name order by calls desc")]
+    summary[case]={'perfetto':rows}
+    for tool in ('overview_page','framework_op_stats','trace_viewer'):
+        data,kind=xspace_to_tool_data([str(xspace)],tool,{})
+        if data is None: raise RuntimeError(f'XProf failed {case}/{tool}')
+        if isinstance(data,bytes): data=data.decode()
+        (root/f'{case}-xprof-{tool}.json').write_text(data)
+        summary[case][f'xprof_{tool}_bytes']=len(data)
+    print(case,[(r['name'],r['calls']) for r in rows if r['name']=='CommonPjRtLoadedExecutable::ExecutePrepare'],flush=True)
+(root/'trace-analysis.json').write_text(json.dumps(summary,indent=2))

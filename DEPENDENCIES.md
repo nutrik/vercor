@@ -210,3 +210,12 @@ Layer 1 adds `veros_host_state.py`: a native-state subclass that copies host
 diagnostics/timers while keying JAX kernels by static setup identity and actual
 settings. Layer 3 native copying uses it only for host-orchestrated JAX arrays.
 The stock driver stays host-only; no execution protocol or cycle is added.
+
+Exchange remapping profiling (2026-11-03) retains the existing dependency order:
+1. The conservative interpolator owns its private compiled sparse accumulator;
+   it consumes existing PyTree indices/weights and returns sums/areas before
+   the caller's shared numerical validation and division.
+2. Runtime exchange masks own the shared quantity-dependent coverage formula.
+3. Runtime exchange dispatch consumes that formula and its already resolved
+   operands, retaining dispatch-time support without a second coverage remap.
+No new runtime module, dependency, public surface or persistent cache is added.

@@ -1,0 +1,64 @@
+from __future__ import annotations
+import argparse, hashlib, json, platform, statistics, sys, time
+from datetime import datetime
+from pathlib import Path
+import jax
+import jax.numpy as jnp
+import numpy as np
+from vercor import Clock, Coupler, Exchange, RectilinearGrid, RuntimeOptions
+from vercor.components import CallableComponent, ComponentMaskSpec, ComponentSpec
+from vercor.dtypes import DTypePolicy
+from vercor.regridding import conservative, bilinear
+from vercor.fields import vector
+from vercor._runtime.exchange_dispatch import dispatch_component_exchanges
+from vercor._interpolators.conservative_remap_rectilinear import ConservativeRectilinearRemapper
+
+p=argparse.ArgumentParser(); p.add_argument('--label',required=True); p.add_argument('--trace',action='store_true'); p.add_argument('--dtype',choices=['float32','float64'],default='float64'); a=p.parse_args()
+jax.config.update('jax_enable_x64',a.dtype=='float64')
+root=Path('/private/tmp/vercor-exchange-profile')/a.label; root.mkdir(parents=True,exist_ok=True)
+arrays={}; results=[]
+def block(x):
+    jax.block_until_ready(x); jax.effects_barrier(); return x
+
+def measure(name,fn,seed,trace=False):
+    start=time.perf_counter(); final=block(fn(seed)); cold=time.perf_counter()-start
+    times=[]
+    for _ in range(9):
+        start=time.perf_counter(); final=block(fn(seed)); times.append(time.perf_counter()-start)
+    for i,v in enumerate(jax.tree.leaves(final)): arrays[f'{name}_{i}']=np.asarray(v)
+    if a.trace and trace:
+        with jax.profiler.trace(root/name,create_perfetto_trace=True):
+            with jax.profiler.TraceAnnotation(name): block(fn(seed))
+    results.append(dict(name=name,cold=cold,warm=times,median=statistics.median(times)))
+    print(name,round(cold*1000,3),round(statistics.median(times)*1000,3),flush=True)
+
+for mode in ('conservation','fracarea'):
+    remap=ConservativeRectilinearRemapper(jnp.linspace(0,360,33),jnp.linspace(-90,90,17),jnp.linspace(-15,345,25),jnp.linspace(-90,90,13),normalize=mode)
+    values=jnp.asarray(np.arange(512).reshape(16,32)/100+1).at[::3,::7].set(jnp.nan)
+    def run(x): return tuple(remap.apply_scalar(x+i) for i in range(12))
+    measure(f'remap_{mode}',run,values,trace=True)
+    measure(f'compiled_remap_{mode}',jax.jit(run),values)
+
+for quantity in ('intensive','source_flux','target_flux','vector'):
+    source=RectilinearGrid('src',longitude=jnp.arange(32)*11.25+5.625,latitude=jnp.arange(16)*11.25-84.375,longitude_edges=jnp.linspace(0,360,33),latitude_edges=jnp.linspace(-90,90,17))
+    wet=jnp.ones((12,24)).at[0,:].set(0)
+    target=RectilinearGrid('dst',longitude=jnp.arange(24)*15+7.5,latitude=jnp.arange(12)*15-82.5,longitude_edges=jnp.linspace(0,360,25),latitude_edges=jnp.linspace(-90,90,13),binary_mask=wet)
+    area=jnp.asarray(np.tile(np.linspace(.1,.9,32),(16,1))).at[::3,::7].set(0)
+    flux=jnp.asarray(np.arange(512).reshape(16,32)/100+1)
+    src=CallableComponent('SRC',source,lambda f:{'area':f['area']*.999,'flux':f['flux']+.01,'u':f['u']+.01,'v':f['v']-.02},spec=ComponentSpec(outputs=('area','flux','u','v'),initial_fields={'area':area,'flux':flux,'u':flux,'v':-2*flux},masks=ComponentMaskSpec(fractional_field='area')))
+    dst=CallableComponent('DST',target,lambda f:{'area':f['area']*.999},spec=ComponentSpec(inputs=('flux','u','v'),outputs=('area',),initial_fields={'area':.25*wet},masks=ComponentMaskSpec(fractional_field='area')))
+    route=Exchange('SRC','DST',fields=(vector('u','v'),) if quantity=='vector' else ('flux',),quantity='intensive' if quantity=='vector' else quantity,regridder_factory=bilinear if quantity=='vector' else conservative)
+    for backend in ('host','jax'):
+        coupler=Coupler(Clock(datetime(2001,1,1),60.,6),components=(src,dst),exchanges=(route,),run_order=('SRC','DST'),runtime=RuntimeOptions(backend=backend,dtype=DTypePolicy(enable_x64=a.dtype=='float64')),log_level='ERROR')
+        state=block(coupler.initial_state())
+        if backend=='host':
+            context=coupler._prepared.dispatch_context
+            def dispatch(s):
+                for _ in range(12): s=dispatch_component_exchanges(s,'DST',(route,),context=context)
+                return s
+            measure(f'dispatch_{quantity}',dispatch,state,trace=quantity in ('intensive','vector'))
+        measure(f'coupled_{backend}_{quantity}',coupler.run if backend=='host' else jax.jit(coupler.run),state,trace=quantity=='intensive')
+np.savez(root/'outputs.npz',**arrays)
+source_root=Path(__import__('vercor').__file__).resolve().parent.parent
+hashes={str(p.relative_to(source_root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in (source_root/'vercor').rglob('*.py')}
+(root/'results.json').write_text(json.dumps(dict(label=a.label,dtype=a.dtype,python=sys.version,jax=jax.__version__,numpy=np.__version__,platform=platform.platform(),source_sha256=hashes,results=results),indent=2))

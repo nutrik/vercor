@@ -13,3 +13,4 @@ connect them through explicit exchanges.
    jax-components
    coupling
    /output-profiling
+   /exchange-profiling

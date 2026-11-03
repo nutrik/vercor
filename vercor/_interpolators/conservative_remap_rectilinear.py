@@ -231,7 +231,7 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
         return rows, cols, jnp.deg2rad(values)
 
     def apply_scalar(self, field: Any) -> jax.Array:
-        """Apply conservative remapping to a scalar field."""
+        """Remap a scalar field, retaining eager shape and numerical validation."""
 
         field_array = as_jax_real_array(field)
         expected_shape = (self.n_src_lat, self.n_src_lon)
@@ -240,6 +240,27 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
                 f"Shape mismatch: {field_array.shape} vs grid {expected_shape}"
             )
 
+        weighted_sum, norm = self._accumulate(field_array)
+        result = safe_masked_divide(
+            weighted_sum,
+            norm,
+            where=norm > 1e-15,
+            inactive_value=jnp.nan,
+        )
+        result_grid = result.reshape((self.n_dst_lat, self.n_dst_lon))
+        if self._d_lat_flip:
+            result_grid = result_grid[::-1, :]
+        return result_grid
+
+    @jax.jit
+    def _accumulate(self, field_array: jax.Array) -> tuple[jax.Array, jax.Array]:
+        """Fuse sparse area-weighted sums and their normalization areas.
+
+        Grid indices and weights remain dynamic PyTree leaves. NaNs contribute
+        zero to both sums in fracarea mode, so the denominator follows each
+        field's current finite support. Division and its validation stay with
+        the caller to preserve direct eager exceptions and inactive gradients.
+        """
         if self._s_lat_flip:
             field_array = field_array[::-1, :]
 
@@ -263,15 +284,4 @@ class ConservativeRectilinearRemapper(PyTreeNodeMixin):
         else:
             norm = self.dst_areas
 
-        result = safe_masked_divide(
-            weighted_sum,
-            norm,
-            where=norm > 1e-15,
-            inactive_value=jnp.nan,
-        )
-        result_grid = result.reshape((self.n_dst_lat, self.n_dst_lon))
-
-        if self._d_lat_flip:
-            result_grid = result_grid[::-1, :]
-
-        return result_grid
+        return weighted_sum, norm

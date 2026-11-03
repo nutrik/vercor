@@ -5,7 +5,10 @@ from typing import TYPE_CHECKING, Any, Sequence
 import jax.numpy as jnp
 
 from vercor._numerical_safety import require_active_finite, safe_masked_divide
-from vercor._runtime.exchange_masks import exchange_coverage, exchange_mask_operands
+from vercor._runtime.exchange_masks import (
+    coverage_from_operands,
+    exchange_mask_operands,
+)
 from vercor._runtime.field_transfer import send_runtime_fields
 from vercor.exceptions import ExchangeError
 from vercor.exchanges import Exchange
@@ -13,6 +16,7 @@ from vercor.fields import VectorField
 from vercor.state import RunState
 from vercor._runtime.stores import FieldStore
 from vercor._runtime.time import RuntimeStepInfo
+from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor._runtime.dispatch_context import RuntimeDispatchContext
@@ -24,8 +28,8 @@ def _dispatch_quantity(
     source_fields: FieldStore,
     received_updates: dict[str, Any],
     context: RuntimeDispatchContext,
-) -> None:
-    """Remap covered source values once, then apply the declared area meaning."""
+) -> RuntimeArray:
+    """Transfer covered values and return their dispatch-time diagnostic support."""
     source_fraction, target_binary, target_fraction, overlap = exchange_mask_operands(
         state,
         exchange,
@@ -76,6 +80,7 @@ def _dispatch_quantity(
             store(field.v, v)
         else:
             store(field, regrid.regrid(weighted(field)))
+    return coverage_from_operands(exchange, target_binary, target_fraction, overlap)
 
 
 def dispatch_component_exchanges(
@@ -114,8 +119,9 @@ def dispatch_component_exchanges(
 
     destination_component = state._component_state(destination_name)
     received_updates: dict[str, Any] = {}
+    mask_updates: dict[str, RuntimeArray] = {}
     for exchange in exchanges:
-        _dispatch_quantity(
+        mask_updates[exchange.route_id] = _dispatch_quantity(
             state,
             exchange,
             state._component_state(exchange.source).sent,
@@ -126,10 +132,6 @@ def dispatch_component_exchanges(
         destination_component.received.set_many(received_updates)
     )
     result = state._with_component_state(destination_name, destination_component)
-    mask_updates = {
-        exchange.route_id: exchange_coverage(state, exchange, context=context)
-        for exchange in exchanges
-    }
     return result._with_received_masks(
         result._received_fractional_masks.replace_many(mask_updates)
     )

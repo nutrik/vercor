@@ -132,6 +132,54 @@ def _dispatch(
     )
 
 
+@pytest.mark.parametrize("quantity", ["intensive", "source_flux", "target_flux"])
+@pytest.mark.parametrize("vectors", [False, True])
+@pytest.mark.parametrize("source_coverage", ["component", "binary"])
+def test_dispatch_remaps_coverage_once_and_retains_current_support(
+    quantity: str,
+    vectors: bool,
+    source_coverage: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each dispatch shares one coverage remap without caching evolving masks."""
+    state, route, context = _scenario(
+        quantity, vectors=vectors, source_coverage=source_coverage
+    )
+    regridder = context.regridders[route.route_id]
+    original = regridder.regrid
+    calls = 0
+
+    def counted(field: Any) -> jax.Array:
+        nonlocal calls
+        calls += 1
+        return cast(jax.Array, original(field))
+
+    monkeypatch.setattr(regridder, "regrid", counted)
+    for area, target in ((0.5, 0.25), (0.25, 0.125), (0.0, 0.0)):
+        current = state.replace_fields("SRC", {"area": jnp.full((2, 2), area)})
+        current = current.replace_fields("DST", {"area": jnp.full((2, 2), target)})
+        calls = 0
+        result = _dispatch(current, route, context)
+        assert calls == (3 if vectors else 2), "ERROR coverage remapped twice"
+        coverage = 1.0 if source_coverage == "binary" else area
+        expected = target if quantity == "target_flux" and coverage > 0 else coverage
+        np.testing.assert_array_equal(
+            result._received_fractional_masks.get(route.route_id), expected
+        )
+        factor = 2.0 if vectors else 1.0
+        received = 6.0 * factor
+        if quantity == "source_flux":
+            received *= coverage
+        elif quantity == "target_flux":
+            received *= target
+        if coverage == 0:
+            received = 0.0
+        np.testing.assert_allclose(
+            result.component("DST").field("u" if vectors else "flux", scope="received"),
+            received,
+        )
+
+
 @pytest.mark.parametrize(
     "quantity,expected",
     QUANTITY_CASES,
