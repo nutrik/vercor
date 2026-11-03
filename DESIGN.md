@@ -111,6 +111,11 @@ without allocating a second mapped trajectory. Its native model still returns
 the compact raw history. Endpoint payloads and nonlinear diagnosis order remain
 owned by the adapters.
 
+Host output validates each selected field's schema and reduced counts before
+batching one frame's numeric reductions and accumulator updates in a pure JIT
+kernel. Tuple leaves preserve heterogeneous shapes and dtypes without stacking.
+Scanned output uses the same arithmetic inside its existing compiled executor.
+
 Coupled pressure-mode Veros stepping synchronizes SSH to the rotated current
 pressure solution without changing prognostic state. Surface-flux setups use
 matching 1800-second momentum/tracer steps by default; custom momentum duration

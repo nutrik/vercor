@@ -23,6 +23,9 @@ Layer 13's `vercor/output/_selection.py` owns pre-extraction name selection and
 canonical/native frame merging; layer 14 providers consume it. Output contexts
 carry selection before sampling, the driver supplies a static run-specific
 native request, and the shared accumulator merges optional reduced sums/counts.
+Layer 13's period owner separates schema/count preparation from a pure numeric
+frame accumulation kernel; layer 14 submits selected tuple leaves in one call.
+The shared averaging foundation and dependency layers are unchanged.
 CAMulator retains its endpoint and native output accumulator instead of a
 prediction history. This adds no layer or dependency cycle.
 
