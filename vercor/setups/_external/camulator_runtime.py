@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
@@ -11,6 +11,13 @@ import jax.numpy as jnp
 import torch
 
 from vercor.components import StepContext, StepResult
+from vercor.output import OutputFrame
+from vercor.output._session import _OutputAccumulator
+from vercor.output._selection import selected_output_names
+from vercor.setups._external.camulator_output import (
+    camulator_period_output_variables,
+    _prediction_channels,
+)
 from vercor.exceptions import ComponentError
 import vercor.setups._external.camulator_fields as _camulator_fields
 from vercor.setups._external.camulator_gcm_state import CAMulatorRuntimePayload
@@ -67,11 +74,11 @@ def run_camulator_prediction_block(
     block_start: int,
     block_end: int,
     logger: LoggerLike | None,
+    on_prediction: Callable[[torch.Tensor], None] | None = None,
 ) -> tuple[CAMulatorRuntimePayload, RuntimeArray]:
     """Run one CAMulator forcing block and return its next payload and final TS."""
 
     prediction = None
-    prediction_samples: list[torch.Tensor] = []
     last_total_surface_temperature: RuntimeArray | None = None
     ds_slice = resources.dynamic_ds.isel(time=slice(block_start, block_end))
     requested_steps = block_end - block_start
@@ -183,7 +190,8 @@ def run_camulator_prediction_block(
                 f"{forecast_hour}"
             ),
         )
-        prediction_samples.append(prediction)
+        if on_prediction is not None:
+            on_prediction(prediction)
 
         next_model_state = resources.stepper.shift_state_forward(
             model_state,
@@ -207,7 +215,7 @@ def run_camulator_prediction_block(
         model_state=model_state,
         forecast_hour=forecast_hour,
         output_prediction=cast(torch.Tensor, prediction),
-        output_prediction_samples=torch.cat(prediction_samples, dim=0),
+        output_accumulator=None,
     )
     return next_payload, last_total_surface_temperature
 
@@ -217,13 +225,16 @@ def step_camulator_runtime(
     fields: Mapping[str, Any],
     context: StepContext,
     payload: Any | None,
+    *,
+    sample_native_output: bool = True,
 ) -> StepResult:
     """Export mapped state and radiation means over all native windows.
 
     Every native forecast window has the same duration. Map each prediction
     before averaging so native J/m² normalization and nonlinear
     surface emission reconstruction occur at that prediction's temperature.
-    Native state and output history retain their original endpoint/samples.
+    Native continuation retains its endpoint. Native output retains only selected
+    finite sums/counts; no prediction trajectory survives a native step.
     """
 
     if not isinstance(payload, CAMulatorRuntimePayload):
@@ -238,18 +249,28 @@ def step_camulator_runtime(
     block_start = payload.cursor.current_index()
     block_end = block_start + resources.model_substeps
 
-    next_payload, last_total_surface_temperature = run_camulator_prediction_block(
-        resources,
-        fields,
-        payload,
-        block_start=block_start,
-        block_end=block_end,
-        logger=logger,
-    )
-    next_payload = replace(next_payload, cursor=next_payload.cursor.advanced())
-    predictions = cast(torch.Tensor, next_payload.output_prediction_samples)
-    mapped_samples = [
-        _camulator_fields.map_camulator_prediction_to_runtime_fields(
+    mapped_totals: Mapping[str, RuntimeArray] | None = None
+    output_accumulator: _OutputAccumulator | None = None
+    native_names: tuple[str, ...] = ()
+    if sample_native_output and context.output_variables is not None:
+        channels = _prediction_channels(resources.conf)
+        requested = selected_output_names(
+            dict.fromkeys((*channels, *fields)), context.output_variables
+        )
+        native_names = tuple(name for name in requested if name in channels)
+
+    def accumulate_prediction(prediction: torch.Tensor) -> None:
+        nonlocal mapped_totals, output_accumulator
+        decoded_prediction = None
+        if native_names and bool(
+            resources.conf.get("predict", {}).get("climate_rescale_output", False)
+        ):
+            # Exchange physics already requires this full-layout native decode.
+            # Reuse it for selected output rather than decode/transfer it again.
+            decoded_prediction = resources.state_transformer.inverse_transform(
+                prediction
+            )
+        mapped = _camulator_fields.map_camulator_prediction_to_runtime_fields(
             context.constants,
             camulator_reference_pressure=resources.P0,
             native_step_seconds=resources.model_timestep.total_seconds(),
@@ -261,12 +282,46 @@ def step_camulator_runtime(
             accessor_output=resources.accessor_output,
             state_transformer=resources.state_transformer,
             prediction=prediction,
+            decoded_prediction=decoded_prediction,
         )
-        for prediction in predictions.split(1, dim=0)
-    ]
+        mapped_totals = (
+            mapped
+            if mapped_totals is None
+            else {name: mapped_totals[name] + value for name, value in mapped.items()}
+        )
+        if native_names:
+            frame = OutputFrame(
+                camulator_period_output_variables(
+                    prediction,
+                    metadata=resources.metadata,
+                    conf=resources.conf,
+                    state_transformer=resources.state_transformer,
+                    variables=native_names,
+                    decoded_prediction=decoded_prediction,
+                ),
+                sample_dimension="time",
+            )
+            if output_accumulator is None:
+                output_accumulator = _OutputAccumulator.zeros_from_frame(frame)
+            output_accumulator = output_accumulator.add_frame(frame)
+
+    next_payload, last_total_surface_temperature = run_camulator_prediction_block(
+        resources,
+        fields,
+        payload,
+        block_start=block_start,
+        block_end=block_end,
+        logger=logger,
+        on_prediction=accumulate_prediction,
+    )
+    next_payload = replace(
+        next_payload,
+        cursor=next_payload.cursor.advanced(),
+        output_accumulator=output_accumulator,
+    )
+    assert mapped_totals is not None
     mapped_fields = {
-        name: jnp.mean(jnp.stack([sample[name] for sample in mapped_samples]), axis=0)
-        for name in mapped_samples[0]
+        name: value / resources.model_substeps for name, value in mapped_totals.items()
     }
 
     return StepResult(

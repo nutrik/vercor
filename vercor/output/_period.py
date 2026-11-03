@@ -12,6 +12,7 @@ import jax.numpy as jnp
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_real_array, jax_index_dtype
 from vercor._host_arrays import host_int64_array
+from vercor._numerical_safety import _require_zero
 from vercor.output import OutputVariable, PeriodOutput
 
 TIME_NAME = "time"
@@ -151,6 +152,7 @@ def _sample_sum_and_counts(
     sample: OutputVariable,
     *,
     summation_dim: str | None,
+    reduction_counts: Any | None = None,
 ) -> tuple[tuple[str, ...], jax.Array, jax.Array]:
     dims = sample.dims
     if not isinstance(dims, tuple) or not all(isinstance(dim, str) for dim in dims):
@@ -167,6 +169,30 @@ def _sample_sum_and_counts(
         raise ValueError(
             f"Period average variable {name!r} has shape {values.shape} "
             f"but dimensions {dims}."
+        )
+
+    if reduction_counts is not None:
+        counts = jnp.asarray(reduction_counts)
+        if counts.shape != values.shape:
+            raise ValueError(
+                f"Reduction counts for {name!r} must have the same shape as sums."
+            )
+        if not jnp.issubdtype(counts.dtype, jnp.integer):
+            raise TypeError(f"Reduction counts for {name!r} must be integer arrays.")
+        _require_zero(
+            jnp.count_nonzero(counts < 0),
+            f"Output variable {name!r}",
+            "nonnegative reduction counts",
+        )
+        _require_zero(
+            jnp.count_nonzero((counts > 0) & ~jnp.isfinite(values)),
+            f"Output variable {name!r}",
+            "finite reduced sums",
+        )
+        return (
+            dims,
+            jnp.where(counts > 0, values, 0.0),
+            counts.astype(jax_index_dtype()),
         )
 
     try:

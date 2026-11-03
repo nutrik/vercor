@@ -1129,10 +1129,19 @@ def test_output_signatures_pin_defaults_kinds_and_public_annotations() -> None:
         assert target_signature.parameters[name].default is True
 
     expected_parameters = {
-        "OutputContext": ("component", "state", "payload", "step", "time", "dt"),
+        "OutputContext": (
+            "component",
+            "state",
+            "payload",
+            "step",
+            "time",
+            "dt",
+            "variables",
+        ),
         "OutputFrame": (
             "variables",
             "coordinates",
+            "reduction_counts",
             "metadata",
             "sample_dimension",
             "time_dimension",

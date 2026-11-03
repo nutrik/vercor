@@ -52,10 +52,15 @@ def test_first_ice_step_uses_initialized_jcm(monkeypatch: pytest.MonkeyPatch) ->
     assert np.all(captured[0]["surface_pressure"][wet] > 80000)
 
 
+@pytest.mark.parametrize(
+    "execution", ["host", pytest.param("jax", marks=pytest.mark.veros_autodiff)]
+)
 def test_native_rollout_composes_current_surfaces_and_shared_output(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    execution: str,
 ) -> None:
-    coupler = native_coupler(monkeypatch, steps=2, output=True)
+    coupler = native_coupler(monkeypatch, steps=2, output=True, execution=execution)
     initial = coupler.initial_state()
     final = coupler.run(initial, output=OutputTarget(tmp_path))
     ice = final.component("CICE")

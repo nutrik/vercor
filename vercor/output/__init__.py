@@ -129,10 +129,15 @@ class OutputFrame:
     axis reduced into the period mean. ``time_dimension`` names the leading
     coordinate added to a written mean. ``dimension_order`` optionally gives
     the preferred NetCDF order; dimensions absent from it retain their sampled
-    order.
+    order. ``reduction_counts`` optionally supplies finite native-sample counts
+    for already reduced variables. For those entries, variable values are sums
+    with the same shape as their nonnegative integer counts; their dimensions
+    exclude ``sample_dimension``. The coordinator merges sums/counts and computes
+    means only at write boundaries. Other variables remain ordinary samples.
     """
 
     variables: Mapping[str, OutputVariable]
+    reduction_counts: Mapping[str, Any]
     coordinates: Mapping[str, OutputVariable]
     metadata: Mapping[str, Any]
     sample_dimension: str | None
@@ -144,6 +149,7 @@ class OutputFrame:
         variables: Mapping[str, OutputVariable],
         *,
         coordinates: Mapping[str, OutputVariable] | None = None,
+        reduction_counts: Mapping[str, Any] | None = None,
         metadata: Mapping[str, Any] | None = None,
         sample_dimension: str | None = None,
         time_dimension: str = "time",
@@ -171,7 +177,14 @@ class OutputFrame:
             raise ValueError(
                 f"OutputFrame name {sorted(overlap)[0]!r} is both a variable and coordinate"
             )
+        frozen_counts = _frozen_mapping(reduction_counts, label="reduction_counts")
+        unknown = next(
+            (name for name in frozen_counts if name not in frozen_variables), None
+        )
+        if unknown is not None:
+            raise ValueError(f"reduction_counts contains unknown variable {unknown!r}")
         object.__setattr__(self, "variables", frozen_variables)
+        object.__setattr__(self, "reduction_counts", frozen_counts)
         object.__setattr__(self, "coordinates", frozen_coordinates)
         object.__setattr__(
             self,
@@ -219,6 +232,7 @@ class OutputContext:
     step: int
     time: datetime | _ModelDateTime
     dt: timedelta
+    variables: tuple[str, ...] = ()
 
 
 @runtime_checkable
@@ -245,6 +259,7 @@ class JaxOutputContext:
     payload: Any | None
     step: int | _RuntimeArray
     dt_seconds: float
+    variables: tuple[str, ...] = ()
 
 
 @runtime_checkable
@@ -268,7 +283,9 @@ class PeriodOutput:
     """Mean-output cadence and uniform provider-variable selection policy.
 
     An empty ``variables`` tuple selects every variable returned by the
-    provider. A non-empty tuple selects that ordered subset, duplicate names
+    component, including native and canonical fields for bundled providers.
+    Providers receive this selection before sampling. A non-empty tuple selects
+    that ordered subset, duplicate names
     are removed, and unknown names fail with a component-scoped error.
     """
 

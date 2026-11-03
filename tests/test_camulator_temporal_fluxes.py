@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -16,6 +17,7 @@ import xarray as xr
 from tests.assertions import assert_allclose_compact
 from vercor.components import StepContext
 from vercor.output import OutputContext
+from vercor.output._session import _OutputAccumulator
 from vercor.physics import PhysicalConstants
 from vercor.setups._external.camulator_forcing import CamulatorRuntimeCursor
 from vercor.setups._external.camulator_gcm_state import CAMulatorRuntimePayload
@@ -194,9 +196,15 @@ def test_all_exports_average_every_native_window(
     )
 
 
-def test_interval_radiation_preserves_native_prediction_output_history() -> None:
-    # Catches replacing output history by an interval-mean native prediction.
+@pytest.mark.parametrize("variables,rescale", [((), False), (("TS", "FSNS"), True)])
+def test_interval_radiation_preserves_native_sums_and_endpoint(
+    variables: tuple[str, ...],
+    rescale: bool,
+) -> None:
+    # Native output sums/counts retain every decoded window without a history.
     resources, fields, context, payload = _native_window_case(3, 3600)
+    context = replace(context, output_variables=variables)
+    resources.conf["predict"]["climate_rescale_output"] = rescale
     result = step_camulator_runtime(resources, fields, context, payload)
     assert context.time is not None
 
@@ -208,15 +216,18 @@ def test_interval_radiation_preserves_native_prediction_output_history() -> None
             step=0,
             time=context.time,
             dt=timedelta(seconds=context.dt_seconds),
+            variables=variables,
         )
     )
 
-    assert_allclose_compact(
-        frame.variables["TS"].values[:, 0, 0], [200.0, 300.0, 400.0]
-    )
-    assert_allclose_compact(
-        frame.variables["FSNS"].values[:, 0, 0], [360000.0, 1080000.0, 2880000.0]
-    )
+    accumulator = _OutputAccumulator.zeros_from_frame(frame).add_frame(frame)
+    means = accumulator.mean_frame().variables
+    assert_allclose_compact(frame.variables["TS"].values, 900.0)
+    assert_allclose_compact(frame.variables["FSNS"].values, 4320000.0)
+    assert_allclose_compact(frame.reduction_counts["TS"], 3)
+    assert_allclose_compact(means["TS"].values, 300.0)
+    assert_allclose_compact(means["FSNS"].values, 1440000.0)
+    assert_allclose_compact(result.payload.output_prediction[0, 9, 0], 400.0)
     assert_allclose_compact(result.fields["net_shortwave_radiation_flux"], 400.0)
 
 

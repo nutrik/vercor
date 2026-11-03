@@ -27,6 +27,7 @@ from vercor.output import (
     PeriodOutput,
 )
 from vercor.output._dataset import grid_field_dims, time_coordinate_variable
+from vercor.output._selection import selected_output_names
 from vercor.output._netcdf import write_netcdf_dataset
 from vercor.output._period import (
     _sample_sum_and_counts,
@@ -56,6 +57,7 @@ class _OutputAccumulator(PyTreeNodeMixin):
     pytree_aux_data = (
         "names",
         "select_all",
+        "reduction_names",
         "dims",
         "dtypes",
         "attrs",
@@ -72,6 +74,7 @@ class _OutputAccumulator(PyTreeNodeMixin):
 
     names: tuple[str, ...]
     select_all: bool
+    reduction_names: tuple[str, ...]
     dims: tuple[tuple[str, ...], ...]
     dtypes: tuple[str, ...]
     attrs: tuple[tuple[tuple[str, Any], ...], ...]
@@ -108,6 +111,7 @@ class _OutputAccumulator(PyTreeNodeMixin):
                 name,
                 frame.variables[name],
                 summation_dim=frame.sample_dimension,
+                reduction_counts=frame.reduction_counts.get(name),
             )
             dims.append(sample_dims)
             dtypes.append(_value_dtype(frame.variables[name].values))
@@ -120,6 +124,9 @@ class _OutputAccumulator(PyTreeNodeMixin):
         return cls(
             names=names,
             select_all=not tuple(selected),
+            reduction_names=tuple(
+                name for name in names if name in frame.reduction_counts
+            ),
             dims=tuple(dims),
             dtypes=tuple(dtypes),
             attrs=tuple(attrs),
@@ -140,6 +147,11 @@ class _OutputAccumulator(PyTreeNodeMixin):
     def add_frame(self, frame: OutputFrame) -> "_OutputAccumulator":
         """Return a new accumulator containing one selected provider frame."""
 
+        if (
+            tuple(name for name in self.names if name in frame.reduction_counts)
+            != self.reduction_names
+        ):
+            raise ValueError("Output provider reduction schema changed across samples.")
         selected = _selected_names(frame, self.names)
         if selected != self.names or (
             self.select_all and tuple(frame.variables) != self.names
@@ -178,6 +190,7 @@ class _OutputAccumulator(PyTreeNodeMixin):
                 name,
                 frame.variables[name],
                 summation_dim=self.sample_dimension,
+                reduction_counts=frame.reduction_counts.get(name),
             )
             if dims != self.dims[index]:
                 raise ValueError(f"Output variable {name!r} dimensions changed.")
@@ -246,13 +259,9 @@ class _OutputAccumulator(PyTreeNodeMixin):
 def _selected_names(frame: OutputFrame, selected: Sequence[str]) -> tuple[str, ...]:
     """Apply the one provider-independent variable selection rule."""
 
-    names = tuple(selected) or tuple(frame.variables)
+    names = selected_output_names(frame.variables, selected)
     if not names:
         raise ValueError("Output provider returned no variables.")
-    missing = next((name for name in names if name not in frame.variables), None)
-    if missing is not None:
-        available = ", ".join(frame.variables) or "<none>"
-        raise KeyError(f"unknown output variable {missing!r}; available: {available}")
     return names
 
 
@@ -317,6 +326,7 @@ class _RuntimeFieldProvider:
                 context.payload,
                 context.step,
                 context.dt.total_seconds(),
+                context.variables,
             )
         )
 
@@ -330,14 +340,17 @@ class _RuntimeFieldProvider:
             ),
         )
         variables = {}
-        for name in self._component.spec.outputs:
-            values = select_runtime_field(
-                context.state.field(name, scope="state"),
-                self._component.spec.transfer,
-                step_info,
-                field_name=name,
-                masks=self._component.spec.masks,
-            )
+        names = selected_output_names(context.state.fields(), context.variables)
+        for name in names:
+            values = context.state.field(name, scope="state")
+            if name in self._component.spec.outputs:
+                values = select_runtime_field(
+                    values,
+                    self._component.spec.transfer,
+                    step_info,
+                    field_name=name,
+                    masks=self._component.spec.masks,
+                )
             variables[name] = OutputVariable(
                 grid_field_dims(
                     name,
@@ -472,6 +485,7 @@ def _sample_provider(
                 runtime_state.payload,
                 as_jax_index_array(step),
                 dt_seconds,
+                schema.period.variables,
             )
         )
     if host_time is None:
@@ -487,6 +501,7 @@ def _sample_provider(
                 cast(int, step),
                 time,
                 dt,
+                schema.period.variables,
             )
         ),
     )
@@ -511,7 +526,7 @@ def _accumulate_provider_frame(
             )
         )
         return current.add_frame(frame)
-    except (KeyError, TypeError, ValueError) as exc:
+    except (KeyError, TypeError, ValueError, CouplerError) as exc:
         raise ComponentError(
             f"Output provider for component {schema.component.name!r}: {exc}"
         ) from exc

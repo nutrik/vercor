@@ -268,7 +268,23 @@ Differentiated and outer-jitted callers use this path.
 
 An `OutputProvider.sample(OutputContext)` returns an immutable `OutputFrame` of
 named `OutputVariable` values, coordinates, dimensions, attributes, and
-metadata. `PeriodOutput.variables` uses identical empty/subset/unknown behavior
+metadata. Ordinary and numeric contexts carry `variables` before extraction.
+The default runtime provider samples all declared state (inputs and outputs),
+applying export transfer selection only to outputs. Bundled native providers
+combine all available native state/flux/diagnostic registry fields with canonical
+runtime fields; native names retain their meaning on collisions. Veros diagnostic
+arrays are namespaced by owner and are sampled only if initialized. Output does
+not schedule native diagnostic routines. Repeated native dimensions are uniquely
+named and implicit axes receive index coordinates.
+
+`OutputFrame.reduction_counts` permits already reduced native sums with matching
+nonnegative integer counts. The session merges these directly with ordinary
+samples and computes means only at completed write boundaries. The run-specific
+static `StepContext.output_variables` request is None when period output is off
+and an empty tuple when all variables are requested. CAMulator uses it to reduce
+selected native prediction output immediately while mandatory exchange mapping
+still diagnoses every native endpoint before averaging. The payload retains an
+endpoint prediction and fixed-size sums/counts, with no prediction history. `PeriodOutput.variables` uses identical empty/subset/unknown behavior
 for runtime, JCM, Veros, CAMulator, and third-party providers.
 Bundled slab and data factories default to `OutputSpec()` with no period
 policy, matching bundled external configuration defaults. They accept a

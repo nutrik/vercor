@@ -42,6 +42,31 @@ with ``PeriodOutput(frequency="step")`` for every-step period output, or use
 
    output = OutputSpec(period=PeriodOutput(frequency="month"))
 
+With the default empty ``variables`` tuple, period output includes every
+available state variable, flux and diagnostic. Bundled native providers combine
+the native registry with canonical component fields; native names retain their
+existing meaning where both expose the same name. For a subset, specify names
+in the desired order:
+
+.. code-block:: python
+
+   output = OutputSpec(
+       period=PeriodOutput("month", variables=("sea_surface_temperature",)),
+   )
+
+Providers receive the selection before extraction, so unselected arrays are
+not converted or diagnosed for output. The default runtime provider includes
+both inputs and outputs. Received inputs keep their current values; a component's
+climatological export policy applies only to its outputs. Custom providers own
+which variables they expose and should honor ``context.variables`` before
+extracting arrays. Unknown names raise a component-scoped error.
+
+Veris includes every initialized native state and diagnostic registry entry.
+Veros includes initialized diagnostic arrays with names such as ``energy.k_m``;
+output does not run or reset unscheduled native diagnostic routines. Repeated
+native axes have distinct dimension names, and implicit dimensions use index
+coordinates. Native endpoint snapshots retain their own temporal meaning.
+
 Enabled file output rejects traced runtime state because writing files is a
 host-side effect. Keep transformed runs output-free and write results from an
 ordinary Python call instead.
@@ -52,8 +77,8 @@ Use the same policy with every backend
 ``OutputSpec``, ``PeriodOutput`` and ``OutputTarget`` work the same way for
 all-JAX, forced-host, mixed-component and custom-backend runs. Each completed
 coupling step contributes a post-step sample. The shared coordinator selects
-variables, checks their schema, averages finite samples, writes complete
-periods and retains independent component cadences. Incomplete final periods
+variables, checks their schema, accumulates finite sums and per-cell counts,
+and computes means only when writing complete periods and retains independent component cadences. Incomplete final periods
 are not written.
 
 Providers may implement :class:`~vercor.output.JaxOutputProvider` in addition
@@ -77,3 +102,22 @@ lengths use single-step blocks. Numeric scalar coordinates use an explicit
 dtype inside the scan so period resets preserve the JAX input signature.
 Initial compilation is expected; new provider shapes, dtypes or static
 metadata require a new configuration.
+
+Streaming native samples
+------------------------
+
+The output session stores only fixed-size sums, finite counts and current
+coordinates. CAMulator reduces each decoded native prediction immediately and
+retains its endpoint separately for continuation and snapshots. It does not
+stack predictions. Nonlinear exchange diagnostics are still computed for each
+native prediction before their exchange mean is formed. When native output
+requires inverse scaling, period extraction reuses the decode already required
+for exchange physics and transfers only selected output channels.
+
+Providers that already reduced native samples can supply
+``OutputFrame(reduction_counts={...})``. For each counted variable, its values
+must be finite sums and its counts must be same-shaped nonnegative integers;
+no sample axis is included. The session merges those sums/counts directly.
+Uncounted variables retain ordinary sampling semantics, so canonical fields can
+share the same frame. A cell with no finite samples writes NaN. Incomplete final
+windows are retained only for the run and are not written.

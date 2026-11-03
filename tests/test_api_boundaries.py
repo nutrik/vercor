@@ -1465,7 +1465,22 @@ def test_camulator_gcm_factory_passes_runtime_step_directly() -> None:
         "import vercor.setups._external.camulator_runtime as _camulator_runtime"
         in gcm_source
     )
-    assert "partial(_camulator_runtime.step_camulator_runtime, resources)" in gcm_source
+    step_bindings = [
+        node
+        for node in ast.walk(ast.parse(gcm_source))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "partial"
+        and node.args
+        and isinstance(node.args[0], ast.Attribute)
+        and node.args[0].attr == "step_camulator_runtime"
+    ]
+    assert len(step_bindings) == 1
+    assert isinstance(step_bindings[0].args[1], ast.Name)
+    assert step_bindings[0].args[1].id == "resources"
+    assert {keyword.arg for keyword in step_bindings[0].keywords} == {
+        "sample_native_output"
+    }
     assert "LifecycleHooks(setup=resources.setup)" in gcm_source
     setup_attributes = {
         target.attr

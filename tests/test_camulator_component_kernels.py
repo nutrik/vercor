@@ -463,11 +463,28 @@ def _camulator_runtime_payload(
     prediction: torch.Tensor | None = None,
     prediction_samples: torch.Tensor | None = None,
 ) -> Any:
+    frame = (
+        OutputFrame(
+            camulator_output_module.camulator_period_output_variables(
+                prediction_samples,
+                metadata={},
+                conf=_camulator_output_conf(),
+                state_transformer=None,
+            ),
+            sample_dimension="time",
+        )
+        if prediction_samples is not None and prediction_samples.shape[1] == 8
+        else None
+    )
     return camulator_gcm_state_module.CAMulatorRuntimePayload(
         model_state=model_state,
         cursor=camulator_forcing_module.CamulatorRuntimeCursor(),
         output_prediction=prediction,
-        output_prediction_samples=prediction_samples,
+        output_accumulator=(
+            _OutputAccumulator.zeros_from_frame(frame).add_frame(frame)
+            if frame is not None
+            else None
+        ),
     )
 
 
@@ -612,12 +629,8 @@ def test_camulator_output_provider_returns_native_frame(
     )
 
     assert tuple(frame.variables) == ("U", "T", "PS", "FSNS")
-    assert frame.variables["T"].dims == (
-        "time",
-        "level",
-        "latitude",
-        "longitude",
-    )
+    assert frame.variables["T"].dims == ("level", "latitude", "longitude")
+    assert_allclose_compact(frame.reduction_counts["T"], np.ones((3, 2, 2), dtype=int))
     assert frame.variables["T"].attrs["units"] == "K"
     assert frame.variables["FSNS"].attrs["long_name"] == "surface net shortwave flux"
     assert_allclose_compact(frame.coordinates["latitude"].values, [-45.0, 45.0])
@@ -653,10 +666,13 @@ def test_camulator_output_provider_preserves_every_model_substep() -> None:
         )
     )
 
-    assert frame.variables["T"].values.shape == (2, 3, 2, 2)
+    accumulator = _OutputAccumulator.zeros_from_frame(frame).add_frame(frame)
     assert_allclose_compact(
-        frame.variables["T"].values,
-        predictions[:, 3:6, 0].numpy(),
+        accumulator.mean_frame().variables["T"].values,
+        predictions[:, 3:6, 0].numpy().mean(axis=0),
+    )
+    assert_allclose_compact(
+        accumulator.counts[accumulator.names.index("T")], np.full((3, 2, 2), 2)
     )
 
 
@@ -2184,11 +2200,7 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
         captured["runtime_prediction"],
         torch.full_like(captured["runtime_prediction"], 2.0),
     )
-    assert first.payload.output_prediction_samples.shape[0] == 2
-    assert_allclose_compact(
-        first.payload.output_prediction_samples[:, 0, 0, 0, 0],
-        np.asarray([1.0, 2.0]),
-    )
+    assert first.payload.output_accumulator is None  # This run disables period output.
 
     assert_allclose_compact(
         first.fields["net_shortwave_radiation_flux"], np.full((2, 2), 100.0)
@@ -2199,3 +2211,142 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
             (2, 2), step_context.constants.stefan_boltzmann_constant * 280.0**4 - 3.0
         ),
     )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("variables", [None, (), ("T",)])
+def test_camulator_streams_native_predictions_without_a_history(
+    variables: tuple[str, ...] | None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Native output/exchange reductions stay fixed-size and decode before mean."""
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.model_substeps = 2
+    resources.P0 = 100000.0
+    resources.water_vapor_variable = None
+    resources.hyai = resources.hybi = resources.hyam = resources.hybm = None
+    resources.accessor_output = None
+    resources.conf = {
+        "model": {"levels": 1},
+        "data": {"variables": [], "surface_variables": ["T"]},
+    }
+    resources.metadata = {}
+    resources.state_transformer = None
+
+    def mapped(constants: Any, **kwargs: Any) -> dict[str, Any]:
+        # Square each endpoint before averaging: (1^2 + 2^2)/2 = 2.5.
+        value = jnp.asarray(kwargs["prediction"].detach().cpu().numpy())[0, 0, 0]
+        return {"air_temperature": value**2}
+
+    monkeypatch.setattr(
+        camulator_fields_module, "map_camulator_prediction_to_runtime_fields", mapped
+    )
+    original_model = stepper.model
+
+    def model(value: torch.Tensor) -> torch.Tensor:
+        return original_model(value) * stepper.model_calls
+
+    stepper.model = model  # type: ignore[assignment, method-assign]
+
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("native prediction history allocated")
+
+    monkeypatch.setattr(torch, "cat", forbidden)
+    context = StepContext(
+        dt_seconds=43_200, time=datetime(2000, 1, 1), output_variables=variables
+    )
+    result = camulator_runtime_module.step_camulator_runtime(
+        resources, fields, context, payload
+    )
+    np.testing.assert_allclose(result.fields["air_temperature"], 2.5)
+    np.testing.assert_allclose(result.payload.output_prediction, 2.0)
+    assert result.payload.model_state.shape == payload.model_state.shape
+    assert not hasattr(result.payload, "output_prediction_samples")
+    assert payload.forecast_hour == 1 and payload.output_prediction is None
+    accumulator = result.payload.output_accumulator
+    if variables is None:
+        assert accumulator is None
+    else:
+        assert accumulator.names == ("T",)
+        np.testing.assert_allclose(accumulator.sum_values[0], 3.0)
+        np.testing.assert_array_equal(accumulator.counts[0], 2)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("rescale", [False, True])
+def test_camulator_channel_selection_precedes_host_array_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+    rescale: bool,
+) -> None:
+    prediction = _camulator_prediction(total_channels=8)
+    original = camulator_output_module._prediction_values
+
+    def chosen_only(value: torch.Tensor, **kwargs: Any) -> np.ndarray:
+        assert value.shape[1] == 3, "unselected channels transferred to host"
+        return original(value, **kwargs)
+
+    monkeypatch.setattr(camulator_output_module, "_prediction_values", chosen_only)
+    variables = camulator_output_module.camulator_period_output_variables(
+        prediction,
+        metadata={},
+        conf=_camulator_output_conf(climate_rescale_output=rescale),
+        state_transformer=None,
+        variables=("T",),
+        decoded_prediction=prediction if rescale else None,
+    )
+    assert tuple(variables) == ("T",)
+    np.testing.assert_array_equal(variables["T"].values, prediction[:, 3:6, 0].numpy())
+
+
+@pytest.mark.fast_always
+def test_camulator_rescaled_output_reuses_mandatory_native_decode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Period selection adds no full transform or transfer beyond exchange physics."""
+
+    class Transformer:
+        calls = 0
+
+        def inverse_transform(self, prediction: torch.Tensor) -> torch.Tensor:
+            self.calls += 1
+            return prediction * 10.0
+
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.model_substeps = 2
+    resources.P0 = 100000.0
+    resources.water_vapor_variable = None
+    resources.hyai = resources.hybi = resources.hyam = resources.hybm = None
+    resources.accessor_output = None
+    resources.state_transformer = Transformer()
+    resources.conf = {
+        "model": {"levels": 1},
+        "data": {"variables": [], "surface_variables": ["T"]},
+        "predict": {"climate_rescale_output": True},
+    }
+    resources.metadata = {}
+
+    def mapped(constants: Any, **kwargs: Any) -> dict[str, Any]:
+        decoded = kwargs.get("decoded_prediction")
+        if decoded is None:
+            decoded = kwargs["state_transformer"].inverse_transform(
+                kwargs["prediction"]
+            )
+        return {"air_temperature": jnp.asarray(decoded[0, 0, 0].numpy())}
+
+    monkeypatch.setattr(
+        camulator_fields_module, "map_camulator_prediction_to_runtime_fields", mapped
+    )
+    context = StepContext(
+        dt_seconds=43_200, time=datetime(2000, 1, 1), output_variables=("T",)
+    )
+    result = camulator_runtime_module.step_camulator_runtime(
+        resources, fields, context, payload
+    )
+    assert (
+        resources.state_transformer.calls == 2
+    )  # One mandatory decode per native prediction.
+    np.testing.assert_allclose(result.payload.output_accumulator.sum_values[0], 20.0)
+    np.testing.assert_array_equal(result.payload.output_accumulator.counts[0], 2)
+    np.testing.assert_allclose(result.fields["air_temperature"], 10.0)
