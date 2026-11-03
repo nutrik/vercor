@@ -72,7 +72,7 @@
 - [x] Run Black, strict repository flake8, mypy, compileall, whitespace, focused regression checks, fast/full stock suites, separate exact-fork AD and output smoke.
 - [x] Verify finalized source hashes match benchmark/validation evidence; remeasure if product changes affect the measured path.
 - [x] Update PROGRESS and plan with counts, timings, failed approaches and limitations.
-- [ ] Commit intended paths only after the full suite passes; authenticate Git with GitHub CLI, push `feat/veris-seaice`, and compare local/remote SHA.
+- [x] Commit intended paths only after the full suite passes; authenticate Git with GitHub CLI, push `feat/veris-seaice`, and compare local/remote SHA.
 
 ## Execution evidence
 
@@ -82,3 +82,5 @@
 - Final validation: fullstock2661/fast1701/exactforkAD17/focused24, zero failures/errors/skips; Black331/mypy331/repositoryflake8zero/compileall/strictSphinx/diff pass. Combined branch coverage 92.993125331 percent; new host-state module100 percent. All181production hashes match seven final benchmark lanes. NineNetCDFs reopen;68canonical fields and4native endpoint snapshots match exactly. Raw stock/AD/host-JAX coverage SHA256 values are preserved in the result JSON.
 - Independent whole-diff review found no blocking issue. Deferred minor: comparison CLI does not automatically check every source/device/thread provenance field; current evidence was independently verified to match. GPU/long climate behavior is unmeasured, and stock full scans remain outside the approved focused design.
 - Failed approaches: scipy3.14 Torch abort and old empty temporary overlays; initial nested-kernel cache check was insufficient; copying native JAX metadata invalidated real root kernels (ACC11.59s), corrected by owned host state/value-based configuration keys; old source-format literals and home asset locks corrected; incomplete native deepcopy test double corrected using its existing native variables property, with assertions retained. No numerical tolerances or model source were changed.
+
+- Delivery verified: source commit `d265173e120b905caecaa32d87649e296e047afe` and benchmark/evidence commit `092a2925a6047576f2786541fd28fca752cc8a64` pushed to `origin/feat/veris-seaice` using the GitHub CLI credential helper. `gh api` returned the exact benchmark commit SHA. This final receipt is a documentation-only follow-up; the final handoff verifies its remote SHA.
