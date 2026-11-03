@@ -74,6 +74,7 @@ def native_coupler(
         ),
         ocean_config=VerosConfig(
             execution=execution,
+            backend="numpy" if execution == "host" else "jax",
             surface_forcing="surface_fluxes",
             export_open_water_surface=True,
             output=period,

@@ -33,7 +33,10 @@ def test_prognostic_pair_initializes_one_ocean_on_one_grid(
     monkeypatch.setattr(
         veros_gcm_state, "_select_veros_setup_class", lambda *args: setup
     )
-    pair = make_veris_veros(config=VerisConfig(model_timestep=timedelta(seconds=300)))
+    pair = make_veris_veros(
+        config=VerisConfig(model_timestep=timedelta(seconds=300)),
+        ocean_config=VerosConfig(backend="numpy", surface_forcing="surface_fluxes"),
+    )
     assert len(calls) == 1
     assert pair.seaice.grid is pair.ocean.grid
     grid = pair.ocean.grid
@@ -214,6 +217,7 @@ def _prognostic_coupler(
         ),
         ocean_config=VerosConfig(
             execution=execution,
+            backend="numpy" if execution == "host" else "jax",
             surface_forcing="surface_fluxes",
             custom_parameters={"dt_mom": 600.0},
             export_open_water_surface=export_open_water_surface,

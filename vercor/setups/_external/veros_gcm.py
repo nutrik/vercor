@@ -53,7 +53,9 @@ def _initialize_veros_owner(config: VerosConfig) -> Any:
 
     from vercor.setups._external import veros_runtime_settings
 
-    veros_runtime_settings.configure_veros_runtime(config.execution)
+    veros_runtime_settings.configure_veros_runtime(
+        config.execution, backend=config.backend
+    )
     if config.execution == "jax":
         veros_runtime_settings.require_differentiable_veros_capabilities()
 

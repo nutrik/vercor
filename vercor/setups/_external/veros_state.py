@@ -104,6 +104,10 @@ def copy_state(
     if execution != "host":
         raise ValueError("execution must be 'host' or 'jax'")
 
+    if isinstance(getattr(tree.variables, "temp", None), jax.Array):
+        from vercor.setups._external.veros_host_state import copy_host_jax_state
+
+        return cast(VerosState, copy_host_jax_state(tree))
     setting_fields = tree.settings.__fields__
     return cast(
         VerosState,
@@ -251,6 +255,7 @@ def apply_veros_forcing_fields(
         state if execution == "host" else copy_state(state, execution=execution)
     )
     variables = updated_state.variables
+    native_jax = execution == "jax" or isinstance(variables.qnet, jax.Array)
     with variables.unlock():
         for variable_name, variable_value in zip(
             VerosForcingFields._fields,
@@ -264,12 +269,12 @@ def apply_veros_forcing_fields(
             setattr(
                 variables,
                 variable_name,
-                updated if execution == "jax" else runtime_array_to_host(updated),
+                updated if native_jax else runtime_array_to_host(updated),
             )
         if activate_coupled_feedback:
             active = jnp.ones_like(variables.coupled_feedback_active)
             variables.coupled_feedback_active = (
-                active if execution == "jax" else runtime_array_to_host(active)
+                active if native_jax else runtime_array_to_host(active)
             )
     return updated_state
 

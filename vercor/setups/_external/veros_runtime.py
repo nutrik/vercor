@@ -63,6 +63,11 @@ def step_veros_runtime(
     time = context.time
     if execution == "host" and time is None:
         return StepResult(payload=native_state)
+    if execution == "host" and isinstance(native_state.variables.temp, jax.Array):
+        # Native JAX PyTrees keep diagnostics/timers in static auxiliary data.
+        # The generic host tree copy owns variable containers, but those mutable
+        # native auxiliary owners need an adapter-local copy for each interval.
+        native_state = _veros_state.copy_state(native_state, execution="host")
 
     coupled = resources.surface_forcing == "surface_fluxes"
     if coupled:

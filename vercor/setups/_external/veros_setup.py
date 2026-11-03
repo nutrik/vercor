@@ -13,15 +13,16 @@ from veros.core.utilities import enforce_boundaries
 
 
 def _surface_tke_forcing(stress_x, stress_y, density):  # type: ignore[no-untyped-def]
-    """Return wind-work TKE forcing with a finite calm-stress JAX derivative."""
+    """Return native wind work, preserving the fork's finite calm derivative."""
 
     stress_squared = (stress_x / density) ** 2 + (stress_y / density) ** 2
     from veros import runtime_settings
 
     if runtime_settings.backend == "jax":
-        from veros.core.operators import safe_sqrt
+        from veros.core import operators
 
-        stress_norm = safe_sqrt(stress_squared)
+        # Only the differentiable fork provides a finite calm-stress derivative.
+        stress_norm = getattr(operators, "safe_sqrt", npx.sqrt)(stress_squared)
     else:
         stress_norm = npx.sqrt(stress_squared)
     return stress_norm**1.5

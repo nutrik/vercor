@@ -241,7 +241,9 @@ def test_public_coupled_runtime_uses_only_total_fluxes(
     monkeypatch.setattr(veros_fluxes, "compute_fluxes", forbidden_bulk)
     ocean = make_veros_gcm(
         config=VerosConfig(
-            surface_forcing="surface_fluxes", custom_parameters={"dt_mom": 600.0}
+            backend="numpy",
+            surface_forcing="surface_fluxes",
+            custom_parameters={"dt_mom": 600.0},
         )
     )
     assert tuple(ocean.spec.inputs) == tuple(
