@@ -4411,5 +4411,13 @@
       "combined": "aa0fc7ec11502edeb3b170c302b1128ef7219aa5e3fa8b521d9e3041bb890a52"
     }
   },
-  "implementation_commit": "d265173e120b905caecaa32d87649e296e047afe"
+  "implementation_commit": "d265173e120b905caecaa32d87649e296e047afe",
+  "delivery": {
+    "branch": "feat/veris-seaice",
+    "implementation_commit": "d265173e120b905caecaa32d87649e296e047afe",
+    "benchmark_commit": "092a2925a6047576f2786541fd28fca752cc8a64",
+    "remote_benchmark_sha_verified": true,
+    "authentication": "GitHub CLI credential helper",
+    "receipt_commit": "See final handoff for the documentation receipt head."
+  }
 }
