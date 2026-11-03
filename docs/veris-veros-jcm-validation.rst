@@ -12,6 +12,135 @@ The execution order is LND, CICE (native Veris), OCN (prognostic Veros), ATM
 (JCM). Source code, tests, native data and the shared output coordinator are
 reused; no additional model or integration loop was introduced.
 
+Released Veros numerical backend (2026-11-03)
+------------------------------------------------------------
+
+``VerosConfig.backend`` selects native NumPy or JAX independently of
+``execution``. Released Veros 1.7.0 runs JAX kernels with host orchestration;
+the existing pinned differentiable fork supplies the scanned execution path.
+Native JAX is the new configuration default following two independent coupled
+throughput comparisons. Explicit ``backend="numpy"`` remains available.
+
+The stock host-JAX adapter owns mutable native diagnostics/timers and shares
+immutable device buffers. A private native-state subclass keys compilation by
+static setup identity and actual settings, excluding host bookkeeping owners.
+Tests reproduce both the original owner sharing and the subsequent executable
+invalidation from ordinary deep copying. They verify unchanged-kernel reuse,
+changed-setting recompilation, independent continuation/reset, and analytical
+heat/salt source increments without changing native equations or tolerances.
+
+The benchmark uses the authentic global ``90 x 40 x 15`` ocean and Veris/JCM
+gallery, float64, packaged T31 atmosphere inputs, default sea-ice numerics,
+daily coupling and synchronous 1800-second ocean timesteps. Spinup and output
+are disabled for the primary compute timings. A separate output run verifies
+period/final/snapshot behavior. Each two-day block advances 96 ocean steps;
+reported ocean-steps/s includes all coupled work.
+
+Five warm repetitions in each of two fresh processes gave NumPy block medians
+``15.2613 s`` and ``14.5873 s``, versus JAX ``6.5643 s`` and ``6.6506 s``:
+speedups ``2.3249`` and ``2.1934``. The observed sample ranges do not overlap.
+The native ACC case separately shows a warm benefit, with appreciable JAX
+startup cost. Final measurements, dependency/device/source provenance, startup
+estimates and numerical summaries are provided in
+:download:`veros-backend-results.json`.
+
+The final source-matched pass reproduced a ``2.2019x`` coupled stock speedup
+and a ``1.8840x`` ACC speedup. Every cold/warm repetition matched its saved
+canonical/native-ocean fingerprint. Results below use an ARM64 macOS CPU with
+14 logical CPUs and float64; GPU throughput was not measured.
+
+.. list-table:: Final synchronized seconds per benchmark block
+   :header-rows: 1
+   :widths: 30 20 20 15 15
+
+   * - Setup/distribution
+     - Native backend
+     - Execution
+     - Cold
+     - Warm median
+   * - ACC / stock 1.7.0
+     - NumPy
+     - Host
+     - 0.180
+     - 0.139
+   * - ACC / stock 1.7.0
+     - JAX
+     - Host
+     - 3.046
+     - 0.074
+   * - Coupled / stock 1.7.0
+     - NumPy
+     - Host
+     - 19.878
+     - 14.682
+   * - Coupled / stock 1.7.0
+     - JAX
+     - Host
+     - 15.482
+     - 6.668
+   * - Coupled / fork 7a8c964
+     - JAX
+     - Forced host
+     - 12.354
+     - 5.050
+   * - Coupled / fork 7a8c964
+     - JAX
+     - Scanned JAX
+     - 409.551
+     - 6.149
+
+ACC blocks contain four native steps; coupled blocks contain two simulated
+days and 96 ocean steps. Cold time is the first synchronized invocation and
+includes compilation; setup is reported separately in the JSON. The scanned
+fork delivers ``0.8213x`` forced-host throughput here, with much higher startup
+cost, so host orchestration remains the default. The native-backend default
+decision follows the independent stock comparison, not a stock/fork timing ratio.
+
+The two-day stock comparison gives maximum surface-temperature difference
+``1.0264e-6 K``, full-depth temperature difference ``5.3717e-6 K``, and velocity
+difference approximately ``1.7e-8 m/s``. Turbulence diagnostics have larger
+relative differences on small reference scales; the full error summaries are
+retained. ACC native prognostic differences are at roundoff scale. Native
+source-oracle checks retain ``1e-12`` relative tolerances. These short runs
+assess implementation/performance and do not establish climate-run skill or
+bitwise trajectory reproducibility across numerical backends.
+
+Host versus scanned execution is compared within the exact same fork and
+physical setup. Stock 1.7.0 contains correctness changes absent from that fork,
+so stock-versus-fork speed differences are not execution-only evidence. Veros
+backend locks require separate processes. No installed model source is patched.
+
+The tested stock TDMA policy remains automatic, including its optional native
+extension. JAX/XLA emits legacy custom-call diagnostics when compiling that
+extension; forward runs complete with finite prognostic state. The exact fork
+uses its native pure-JAX TDMA policy. Package versions, native solver classes
+and policies are recorded alongside the timing results.
+
+Reproduce a lane from a verified environment with:
+
+.. code-block:: bash
+
+   python -m benchmarks.benchmark_veros --setup coupled --backend jax \
+       --execution host --steps 2 --repeats 5 --directory /tmp/veros-jax
+
+Run the NumPy lane in a separate interpreter, with a separate artifact directory.
+For the pinned fork, compare ``--execution forced-host`` with ``--execution jax``.
+The harness synchronizes device results/effects, preserves the same initial
+state for each repetition and verifies fingerprints of all canonical fields and
+native Veros variables outside the measured interval. Compare matching distributions with:
+
+.. code-block:: bash
+
+   python -m benchmarks.compare_veros /tmp/veros-numpy /tmp/veros-jax \
+       --output /tmp/veros-comparison.json
+
+Configure ``VEROS_ASSET_DIR`` to a writable cache when the default native asset
+directory is read-only. The local validation used checksum-verified copies of
+the two native forcing files and isolated Python 3.12 stock/fork targets, leaving
+installed environments unchanged. It retains the existing reviewed JCM 3.0.0 /
+JAX 0.11.2 dependency exception required by Veris 0.2.1; see
+:doc:`exchange-coverage` and ``tools/install_coupled_models.py``.
+
 Longitude-wrap geometry repair (2026-10-30)
 ------------------------------------------------------------
 
