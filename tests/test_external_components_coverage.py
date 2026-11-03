@@ -2168,7 +2168,8 @@ def test_veros_copy_state_host_deep_copies_the_complete_state(
 ) -> None:
     monkeypatch.setattr(veros_state_module, "VerosState", _ConstructedVerosState)
 
-    state = SimpleNamespace(
+    state = object.__new__(_ConstructedVerosState)
+    vars(state).update(
         _dimensions={"xt": [1, 2]},
         settings=_FakeSettings({"meta": {"precision": "x64"}}, {"dt_tracer": 600.0}),
         _plugin_interfaces={"plugins": ["tracer"]},
@@ -3011,7 +3012,7 @@ def test_veros_constructor_builds_jax_backed_grid(
     monkeypatch.setattr(
         veros_runtime_settings_module,
         "configure_veros_runtime",
-        lambda execution: None,
+        lambda execution, **kwargs: None,
     )
     component_solver = object()
     solver_states: list[Any] = []

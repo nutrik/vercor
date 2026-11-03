@@ -66,6 +66,10 @@ class VerosConfig:
     interval stress and tracer fluxes advance over the same duration. An explicit
     ``custom_parameters["dt_mom"]`` also sets the implicit tracer timestep;
     explicit ``dt_tracer`` preserves a deliberately accelerated native policy.
+    ``backend="jax"`` selects the native numerical kernels by default; host
+    orchestration works with released Veros 1.7.0. Explicit ``backend="numpy"``
+    retains NumPy kernels. ``execution="jax"`` requires the differentiable
+    fork and native JAX; explicit None retains execution-based selection.
     """
 
     name: str = "OCN"
@@ -81,6 +85,7 @@ class VerosConfig:
     )
 
     export_open_water_surface: bool = field(default=False, kw_only=True)
+    backend: Literal["numpy", "jax"] | None = field(default="jax", kw_only=True)
 
     def __post_init__(self) -> None:
         """Validate execution policy and copy caller mappings into owned state."""
@@ -95,6 +100,10 @@ class VerosConfig:
             raise ValueError("setup must be 'global_4deg' or 'acc'")
         if self.execution not in ("host", "jax"):
             raise ValueError("execution must be 'host' or 'jax'")
+        if self.backend not in (None, "numpy", "jax"):
+            raise ValueError("backend must be 'numpy', 'jax', or None")
+        if self.execution == "jax" and self.backend == "numpy":
+            raise ValueError("JAX execution requires the native JAX backend")
 
         if not isinstance(self.surface_forcing, str):
             raise TypeError("surface_forcing must be a string")

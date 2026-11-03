@@ -294,6 +294,7 @@ vercor.setups._external.veros_data
 vercor.setups._external.veros_fluxes
 vercor.setups._external.veros_gcm
 vercor.setups._external.veros_gcm_state
+vercor.setups._external.veros_host_state
 vercor.setups._external.veros_output
 vercor.setups._external.veros_runtime
 vercor.setups._external.veros_runtime_settings
