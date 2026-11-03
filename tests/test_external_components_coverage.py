@@ -126,7 +126,7 @@ class _FakePhysicsModule:
     def data_struct_to_dict(
         self,
         struct: Any,
-        nodal_shape: tuple[int, ...],
+        nodal_shape: tuple[int, ...] | None,
     ) -> dict[str, np.ndarray]:
         _ = struct, nodal_shape
         return self.physics_data
@@ -1583,7 +1583,9 @@ def test_jax_gcm_write_output_persists_mean_dataset(tmp_path: Path) -> None:
         "wvi_output": np.arange(12.0).reshape(1, 2, 2, 3),
         "hsg_output": np.arange(24.0).reshape(1, 4, 2, 3),
     }
-    physics_module = _FakePhysicsModule(physics_data=physics_data)
+    physics_module = _FakePhysicsModule(
+        physics_data={name: values[0] for name, values in physics_data.items()}
+    )
     predictions = [
         _PredictionValues(
             dynamics=_FakeDynamicsPrediction(
@@ -2641,17 +2643,23 @@ def test_veros_output_provider_exposes_active_native_variable_universe() -> None
         "surface_taux",
         "surface_tauy",
         "psi",
+        "line_psin",
+        "Ai_ez",
+        "sss_clim",
     )
-    assert "sss_clim" not in first_frame.variables
-    assert "line_psin" not in first_frame.variables
+    assert first_frame.variables["sss_clim"].dims == ("months", "yt", "xt")
+    assert len(set(first_frame.variables["line_psin"].dims)) == 2
     assert_allclose_compact(
         later_frame.variables["temp"].values,
         first_frame.variables["temp"].values + 1000.0,
     )
-    assert "Ai_ez" not in first_frame.variables
+    assert "Ai_ez" in first_frame.variables
     assert "time" not in first_frame.variables
     assert "time" in first_frame.coordinates
-    assert local_dimension_resolutions == 0
+    assert local_dimension_resolutions >= 2
+    np.testing.assert_array_equal(
+        first_frame.coordinates["months"].values, np.arange(12)
+    )
     assert first_frame.variables["temp"].dims == ("zt", "yt", "xt")
 
 

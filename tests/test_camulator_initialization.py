@@ -216,7 +216,7 @@ def test_native_bootstrap_maps_latest_input_without_advancing(native_case: Any) 
     assert result.payload.cursor.model_substeps == 1
     assert result.payload.forecast_hour == 1
     assert result.payload.output_prediction is None
-    assert result.payload.output_prediction_samples is None
+    assert result.payload.output_accumulator is None
     mapped = result.fields
     assert all(isinstance(value, jax.Array) for value in mapped.values())
     for key, expected in {

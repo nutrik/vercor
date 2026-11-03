@@ -309,8 +309,9 @@ def map_camulator_prediction_to_runtime_fields(
     accessor_output: StateVariableAccessor,
     state_transformer: Any,
     prediction: torch.Tensor,
+    decoded_prediction: torch.Tensor | None = None,
 ) -> dict[str, jax.Array]:
-    """Map a native prediction using its forecast-step duration in seconds."""
+    """Map one forecast, optionally reusing its already decoded native tensor."""
 
     require_strictly_positive(
         native_step_seconds, owner="CAMulator native step duration"
@@ -318,7 +319,11 @@ def map_camulator_prediction_to_runtime_fields(
     water_vapor_variable = _require_camulator_vapor_channel(
         accessor_output, water_vapor_variable, owner="CAMulator prediction"
     )
-    prediction_out = state_transformer.inverse_transform(prediction)
+    prediction_out = (
+        state_transformer.inverse_transform(prediction)
+        if decoded_prediction is None
+        else decoded_prediction
+    )
     return cast(
         dict[str, jax.Array],
         map_camulator_prediction_arrays(

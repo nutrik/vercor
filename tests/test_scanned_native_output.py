@@ -99,9 +99,9 @@ class _Physics:
         self.coords = coords
 
     def data_struct_to_dict(
-        self, struct: Any, nodal_shape: tuple[int, ...]
+        self, struct: Any, nodal_shape: tuple[int, ...] | None
     ) -> dict[str, Any]:
-        assert nodal_shape == (3, 2, 3)
+        assert nodal_shape == ()
         return dict(struct)
 
 

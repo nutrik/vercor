@@ -32,8 +32,31 @@ from vercor.output import (
 from vercor.output._dataset import time_coordinate_variable, used_dimension_names
 from vercor.output._netcdf import write_netcdf_dataset
 from vercor.output._period import period_mean_sample_to_output_variable
+from vercor.output._selection import component_output_names, with_runtime_fields
 
-_STATE_VARIABLES = ("Area", "hIceMean", "hSnowMean", "TSurf", "uIce", "vIce")
+
+def _native_names(payload: Any, fields: Mapping[str, RuntimeArray]) -> tuple[str, ...]:
+    """Enumerate initialized native registries and maintained derived fields."""
+    from veris.model.variables import VARIABLES
+    from veris.model.diagnostics import DIAGNOSTICS
+
+    return (
+        *(name for name in VARIABLES if hasattr(payload.state, name)),
+        *(name for name in DIAGNOSTICS if hasattr(payload.diagnostics, name)),
+        *(
+            name
+            for name in (
+                "sea_surface_heat_flux",
+                "sea_surface_mass_flux",
+                "sea_surface_salt_mass_flux",
+                "ocean_u_stress",
+                "ocean_v_stress",
+            )
+            if name in fields
+        ),
+        "ice_surface_temperature",
+        "ice_surface_albedo",
+    )
 
 
 def _sample(
@@ -42,20 +65,25 @@ def _sample(
     time: datetime | ModelDateTime | None,
     canonical_fields: Mapping[str, RuntimeArray],
     surface_state_fields: Callable[[Any], Mapping[str, RuntimeArray]],
+    selected: tuple[str, ...] | None = None,
 ) -> OutputFrame:
     """Build one frame from current payload arrays and native registry metadata."""
     if payload is None:
         raise ValueError("Veris output requires a native runtime payload")
-    endpoint_fields = surface_state_fields(payload)
     from veris.model.variables import VARIABLES
     from veris.model.diagnostics import DIAGNOSTICS
 
     variables = {}
-    for name, definition in {
-        **{name: VARIABLES[name] for name in _STATE_VARIABLES},
-        **DIAGNOSTICS,
-    }.items():
-        native = payload.state if name in _STATE_VARIABLES else payload.diagnostics
+    definitions = {**VARIABLES, **DIAGNOSTICS}
+    names = _native_names(payload, canonical_fields) if selected is None else selected
+    endpoint_fields = (
+        surface_state_fields(payload) if "ice_surface_albedo" in names else {}
+    )
+    for name in names:
+        if name not in definitions:
+            continue
+        definition = definitions[name]
+        native = payload.state if name in VARIABLES else payload.diagnostics
         variables[name] = OutputVariable(
             tuple(reversed(definition.dimensions)),
             jnp.asarray(getattr(native, name))[2:-2, 2:-2].T,
@@ -93,6 +121,8 @@ def _sample(
             "Northward total ocean surface stress",
         ),
     ):
+        if name not in names:
+            continue
         variables[name] = OutputVariable(
             dims,
             canonical_fields[name],
@@ -102,9 +132,15 @@ def _sample(
         ("ice_surface_temperature", "K", "Current per-ice-area surface temperature"),
         ("ice_surface_albedo", "1", "Current per-ice-area surface albedo"),
     ):
+        if name not in names:
+            continue
         variables[name] = OutputVariable(
             ("y_center", "x_center"),
-            endpoint_fields[name],
+            (
+                payload.state.TSurf[2:-2, 2:-2].T
+                if name == "ice_surface_temperature"
+                else endpoint_fields[name]
+            ),
             {"units": units, "long_name": description, "cell_methods": "time: point"},
         )
     x_edges = grid.longitude_edges
@@ -148,34 +184,34 @@ class _VerisOutputProvider:
         self._surface_state_fields = surface_state_fields
 
     def sample(self, context: OutputContext) -> OutputFrame:
-        """Sample current State/Diagnostics only when the coordinator requests it."""
-        grid = (
-            context.state.grid
-            if context.state.grid is not None
-            else context.component.grid
-        )
-        return _sample(
-            context.payload,
-            grid,
-            context.time,
-            context.state.fields(),
-            self._surface_state_fields,
-        )
+        """Sample selected native and canonical fields with a host timestamp."""
+        return self._sample_frame(context, context.time)
 
     def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
-        """Purely extract current sea-ice arrays without host calendar values."""
+        """Purely extract selected fields without host calendar values."""
+        return self._sample_frame(context, None)
 
+    def _sample_frame(
+        self,
+        context: OutputContext | JaxOutputContext,
+        time: datetime | ModelDateTime | None,
+    ) -> OutputFrame:
+        if context.payload is None:
+            raise ValueError("Veris output requires a native runtime payload")
         grid = (
             context.state.grid
             if context.state.grid is not None
             else context.component.grid
         )
-        return _sample(
-            context.payload,
-            grid,
-            None,
-            context.state.fields(),
-            self._surface_state_fields,
+        fields = context.state.fields()
+        native, canonical = component_output_names(
+            context, _native_names(context.payload, fields)
+        )
+        frame = _sample(
+            context.payload, grid, time, fields, self._surface_state_fields, native
+        )
+        return with_runtime_fields(
+            frame, context, canonical, horizontal_dims=("y_center", "x_center")
         )
 
 

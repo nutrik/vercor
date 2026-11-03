@@ -195,7 +195,7 @@ def test_direct_jcm_land_data_factory_accepts_output_spec(
     assert component.spec.output is custom_output
 
 
-def test_slab_period_file_contains_declared_outputs_only(tmp_path: Path) -> None:
+def test_slab_period_file_contains_all_declared_fields(tmp_path: Path) -> None:
     grid = make_test_grid(name="slab-period")
     component = make_slab_atmosphere(
         grid,
@@ -219,7 +219,7 @@ def test_slab_period_file_contains_declared_outputs_only(tmp_path: Path) -> None
 
     with h5netcdf.File(tmp_path / "atm.averages.2000-01-01.nc", "r") as dataset:
         field_variables = set(dataset.variables) - {"time", "latitude", "longitude"}
-        assert field_variables == set(component.spec.outputs)
+        assert field_variables == set((*component.spec.inputs, *component.spec.outputs))
 
 
 def test_slab_omitted_output_writes_no_period_files(tmp_path: Path) -> None:
@@ -319,7 +319,7 @@ def test_slab_month_output_averages_coupler_step_samples(tmp_path: Path) -> None
         )
 
 
-def test_data_period_file_contains_declared_outputs_only(tmp_path: Path) -> None:
+def test_data_period_file_contains_all_declared_fields(tmp_path: Path) -> None:
     grid = make_test_grid(name="data-period")
     component = time_interpolated_data_component(
         name="DATA",
@@ -348,7 +348,7 @@ def test_data_period_file_contains_declared_outputs_only(tmp_path: Path) -> None
     with h5netcdf.File(tmp_path / "data.averages.2000-01-01.nc", "r") as dataset:
         assert dataset.variables["air_temperature"].shape == (1, *grid.shape)
         np.testing.assert_allclose(dataset.variables["air_temperature"][0], 280.0)
-        assert "forcing" not in dataset.variables
+        np.testing.assert_allclose(dataset.variables["forcing"], 1.0)
 
 
 @pytest.mark.parametrize("backend", ["host", "jax"])

@@ -266,11 +266,15 @@ def test_shared_period_selection_and_snapshot_metadata(
     periods = sorted(tmp_path.glob("cice.averages.*.nc"))
     assert len(periods) == 2
     with xr.open_dataset(periods[-1]) as ds:
-        assert (
-            set(ds.data_vars) == set(variables)
-            if variables
-            else len(ds.data_vars) == 23
-        )
+        if variables:
+            assert set(ds.data_vars) == set(variables)
+        else:
+            from veris.model.variables import VARIABLES
+            from veris.model.diagnostics import DIAGNOSTICS
+
+            assert set(VARIABLES) | set(DIAGNOSTICS) | set(
+                final.component("CICE").fields()
+            ) <= set(ds.data_vars)
         np.testing.assert_allclose(ds["Area"][0], payload.state.Area[2:-2, 2:-2].T)
         np.testing.assert_allclose(
             ds["hIceMean"][0], payload.state.hIceMean[2:-2, 2:-2].T

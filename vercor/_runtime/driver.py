@@ -26,6 +26,7 @@ def step_runtime_component(
     time: datetime | ModelDateTime | None = None,
     logger: LoggerLike | None = None,
     step: int | RuntimeArray = 0,
+    write_period: bool = False,
 ) -> RunState:
     """Advance one component through dispatch, receive, step, and send phases."""
 
@@ -50,6 +51,11 @@ def step_runtime_component(
         time=time,
         logger=logger,
         step=step,
+        output_variables=(
+            component.spec.output.period.variables
+            if write_period and component.spec.output.period is not None
+            else None
+        ),
     )
     component_state = step_component_runtime_state(
         component,

@@ -108,6 +108,7 @@ def build_jax_runtime_step(
                 allow_host_runtime=False,
                 logger=context.logger,
                 step=step_index,
+                write_period=context.output is not None and context.output.write_period,
             )
             context.interrupts.scanned_checkpoint(label, step_index)
         context.interrupts.scanned_checkpoint(
@@ -304,6 +305,8 @@ class _RuntimeDriverAdapter:
                 time=time,
                 logger=self._context.logger,
                 step=step,
+                write_period=self._context.output is not None
+                and self._context.output.write_period,
             )
             _validate_state(
                 state,

@@ -35,7 +35,7 @@ def test_native_output_modules_return_output_frames() -> None:
 
     for source in (jax_output, veros_output, camulator_output):
         assert "def sample(self, context: OutputContext) -> OutputFrame:" in source
-        assert "return OutputFrame(" in source
+        assert "OutputFrame(" in source
 
 
 def test_camulator_native_period_output_uses_run_level_paths() -> None:

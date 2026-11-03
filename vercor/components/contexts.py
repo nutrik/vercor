@@ -40,7 +40,12 @@ class SetupContext:
 
 @dataclass(frozen=True)
 class StepContext:
-    """Minimal runtime step context passed to component step boundaries."""
+    """Runtime inputs and the run-specific native period sampling request.
+
+    ``output_variables=None`` disables native period extraction; an empty tuple
+    requests all available variables. The immutable request is static under JAX.
+    Physics and exchange fields are always advanced independently of output.
+    """
 
     dt_seconds: float
     constants: PhysicalConstants = field(default_factory=PhysicalConstants)
@@ -48,6 +53,7 @@ class StepContext:
     time: datetime | ModelDateTime | None = None
     logger: LoggerLike | None = None
     step: int | RuntimeArray = 0
+    output_variables: tuple[str, ...] | None = None
 
 
 __all__ = [

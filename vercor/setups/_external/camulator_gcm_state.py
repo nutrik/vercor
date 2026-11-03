@@ -16,6 +16,7 @@ from vercor.components import (
     SetupResult,
 )
 from vercor.dtypes import jax_ones
+from vercor.output._session import _OutputAccumulator
 from vercor.grids import RectilinearGrid
 from vercor.jax_logging import LoggerLike, get_default_logger
 from vercor.setups._time_helpers import (
@@ -35,7 +36,7 @@ class CAMulatorRuntimePayload:
     cursor: CamulatorRuntimeCursor
     forecast_hour: int = 1
     output_prediction: torch.Tensor | None = None
-    output_prediction_samples: torch.Tensor | None = None
+    output_accumulator: _OutputAccumulator | None = None
 
 
 class CAMulatorGCMSetupState:

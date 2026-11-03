@@ -249,6 +249,7 @@ vercor.output._netcdf
 vercor.output._period
 vercor.output._runtime
 vercor.output._scan
+vercor.output._selection
 vercor.output._session
 vercor.setups._data
 vercor.setups._data._component_helpers
@@ -377,7 +378,7 @@ calls.
 - Diagnostics: `vercor.diagnostics.fields`, `plotting`, and `tables`.
 - Fluxes: `vercor.fluxes.bulk_formula_cesm`, `utilities`, and
   `vertical_coordinates`.
-- Output: `vercor.output._dataset`, `_netcdf`, `_period`, `_runtime`, and
+- Output: `vercor.output._dataset`, `_netcdf`, `_period`, `_runtime`, `_selection`, and
   `_session`.
 
 The component adapter is the only declaration-to-runtime preparation
