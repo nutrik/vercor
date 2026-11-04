@@ -79,7 +79,6 @@ def _resources(model: Any, execution: Literal["host", "jax"]) -> Any:
     )
     return SimpleNamespace(
         execution=execution,
-        uses_bulk_meteorology=False,
         surface_forcing="surface_fluxes",
         export_open_water_surface=True,
         model_substeps=1,

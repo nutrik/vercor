@@ -204,8 +204,8 @@ in both host and JAX execution. The native callback applies the independent
 weights; ``qnec`` remains the raw heat-correction coefficient even when its
 contribution is disabled. Coupled heat and freshwater fluxes remain active.
 Replace uses of the former shared ``restore_to_climatology`` argument with
-the appropriate new argument(s). The ACC setup retains its native internal
-forcing.
+the appropriate new argument(s). VerCOR supports only ``global_4deg``; remove
+the former ``setup=`` argument from ``VerosConfig`` calls.
 
 JCM
 +++

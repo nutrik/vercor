@@ -155,21 +155,32 @@ def test_default_and_explicit_numpy_run_actual_native_backend(
 from datetime import datetime
 import jax
 import numpy as np
-from vercor import Clock, Coupler
+from vercor import Clock, Coupler, Exchange
+from vercor.components import DataComponent
+from vercor.regridding import bilinear
 from vercor.setups import VerosConfig, make_veros_gcm
 options = {{}} if {selection!r} == 'default' else {{'backend': 'numpy'}}
-ocean = make_veros_gcm(config=VerosConfig(setup='acc', **options))
+ocean = make_veros_gcm(config=VerosConfig(surface_forcing='surface_fluxes', **options))
 from veros import runtime_settings
 expected = 'jax' if {selection!r} == 'default' else 'numpy'
 assert runtime_settings.backend == expected, (runtime_settings.backend, expected)
 assert ocean.spec.execution == 'host'
-coupler = Coupler(Clock(datetime(2000,1,3),43200.,1), components=(ocean,), run_order=(ocean.name,), log_level='ERROR')
+assert ocean.grid.binary_mask.shape == (40, 90)
+forcing = DataComponent('FORCING', ocean.grid,
+                        fields={{name: np.zeros(ocean.grid.shape) for name in ocean.spec.inputs}})
+route = Exchange(source=forcing.name, target=ocean.name, fields=ocean.spec.inputs,
+                 quantity='intensive', regridder_factory=bilinear)
+coupler = Coupler(Clock(datetime(2000,1,3),1800.,1), components=(forcing,ocean),
+                   exchanges=(route,), run_order=(forcing.name,ocean.name), log_level='ERROR')
 initial = coupler.initial_state()
 payload = initial._component_state('OCN').payload
 assert isinstance(payload.variables.temp, jax.Array if expected == 'jax' else np.ndarray)
 final = coupler.run(initial)
 assert int(final._component_state('OCN').payload.variables.itt) == int(payload.variables.itt) + 1
 assert int(payload.variables.itt) == 0
+final_payload = final._component_state('OCN').payload
+for name in ('temp', 'salt', 'u', 'v', 'w'):
+    assert np.all(np.isfinite(np.asarray(getattr(final_payload.variables, name)))), name
 """
     result = subprocess.run(
         [sys.executable, "-c", code],

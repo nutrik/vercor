@@ -1935,7 +1935,6 @@ def test_veros_compute_fluxes_zeroes_qnec_for_large_negative_dqfldt(
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_bulk_meteorology = True
     component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
     component._veros_state = _make_flux_ready_veros_state()
@@ -2150,17 +2149,20 @@ def test_veros_runtime_conflict_requires_a_separate_process(
 
 
 def test_veros_config_uses_execution_as_the_only_native_mode() -> None:
-    config = VerosConfig(setup="acc", execution="jax")
+    config = VerosConfig(execution="jax")
 
-    assert config.setup == "acc"
+    assert not hasattr(config, "setup")
     assert config.execution == "jax"
     assert not hasattr(config, "jitted")
 
     with pytest.raises(TypeError, match="jitted"):
         VerosConfig(jitted=True)  # type: ignore[call-arg]
 
-    with pytest.raises(ValueError, match="setup must be 'global_4deg' or 'acc'"):
-        VerosConfig(setup=cast(Any, "unknown"))
+    for obsolete_setup in ("acc", "global_4deg", "unknown"):
+        with pytest.raises(TypeError, match="setup"):
+            VerosConfig(setup=obsolete_setup)  # type: ignore[call-arg]
+        with pytest.raises(ValueError, match="execution"):
+            VerosConfig("OCN", cast(Any, obsolete_setup))
     with pytest.raises(ValueError, match="execution must be 'host' or 'jax'"):
         VerosConfig(execution=cast(Any, "unknown"))
 
@@ -2912,7 +2914,6 @@ def test_veros_initialize_validates_timestep_multiple() -> None:
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_bulk_meteorology = True
     component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
     component.dt_tracer = 7.0
@@ -2933,7 +2934,6 @@ def test_veros_initialize_spinup_follows_enabled_only(
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_bulk_meteorology = True
     component.dt_tracer = 10.0
     component.do_spinup = do_spinup
     component.surface_forcing = "bulk_meteorology"
@@ -3095,7 +3095,6 @@ def test_veros_host_runtime_owns_one_complete_copy_before_forcing(
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_bulk_meteorology = True
     component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
     component.model_substeps = 2
@@ -3228,7 +3227,6 @@ def test_veros_step_requires_native_runtime_payload() -> None:
         veros_gcm_state_module.VerosGCMSetupState
     )
     resources.execution = "host"
-    resources.uses_bulk_meteorology = True
     resources.surface_forcing = "bulk_meteorology"
     resources.export_open_water_surface = False
     context = StepContext(dt_seconds=20.0, time=None, logger=None)
@@ -3240,21 +3238,23 @@ def test_veros_step_requires_native_runtime_payload() -> None:
 @pytest.mark.fast_always
 @pytest.mark.parametrize("execution", ["host", "jax"])
 @pytest.mark.parametrize("substeps", [1, 3])
-def test_veros_acc_step_uses_internal_forcing_without_substep_logging(
+@pytest.mark.parametrize("surface_forcing", ["bulk_meteorology", "surface_fluxes"])
+def test_veros_global_step_applies_forcing_without_substep_logging(
     monkeypatch: pytest.MonkeyPatch,
     execution: Literal["host", "jax"],
     substeps: int,
+    surface_forcing: Literal["bulk_meteorology", "surface_fluxes"],
 ) -> None:
     resources = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
     )
-    resources.surface_forcing = "bulk_meteorology"
+    resources.surface_forcing = surface_forcing
     resources.export_open_water_surface = False
     resources.name = "OCN"
     resources.execution = execution
-    resources.uses_bulk_meteorology = False
     resources.model_substeps = substeps
     stepped_states: list[Any] = []
+    forcing_modes: list[bool] = []
 
     def step_function(state: Any) -> Any:
         stepped_states.append(state)
@@ -3270,9 +3270,23 @@ def test_veros_acc_step_uses_internal_forcing_without_substep_logging(
     )
 
     monkeypatch.setattr(
+        veros_fluxes_module, "compute_fluxes", lambda *args: (jnp.zeros((4, 4)),) * 5
+    )
+    monkeypatch.setattr(
         veros_fluxes_module,
-        "compute_fluxes",
-        lambda *args, **kwargs: pytest.fail("ACC must use native internal forcing"),
+        "compute_coupled_fluxes",
+        lambda *args: (jnp.zeros((4, 4)),) * 4,
+    )
+
+    def apply_forcing(state: Any, fields: Any, **kwargs: Any) -> Any:
+        forcing_modes.append(kwargs.get("activate_coupled_feedback", False))
+        return state
+
+    monkeypatch.setattr(veros_state_module, "apply_veros_forcing_fields", apply_forcing)
+    monkeypatch.setattr(
+        veros_state_module,
+        "extract_veros_runtime_surface_fields",
+        lambda state, **kwargs: {"sea_surface_temperature": jnp.full((4, 4), 283.15)},
     )
 
     result = veros_runtime_module.step_veros_runtime(
@@ -3284,6 +3298,7 @@ def test_veros_acc_step_uses_internal_forcing_without_substep_logging(
 
     assert result.payload is native_state
     assert stepped_states == [native_state] * substeps
+    assert forcing_modes == [surface_forcing == "surface_fluxes"]
     assert logger.messages == []
 
 
@@ -3294,7 +3309,6 @@ def test_veros_step_nan_cleans_forcing_fields_before_apply(
         veros_gcm_state_module.VerosGCMSetupState
     )
     component.execution = "host"
-    component.uses_bulk_meteorology = True
     component.surface_forcing = "bulk_meteorology"
     component.export_open_water_surface = False
     component.model_substeps = 1

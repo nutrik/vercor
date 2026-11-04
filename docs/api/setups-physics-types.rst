@@ -116,7 +116,8 @@ Total feedback into Veros
 ``VerosConfig(surface_forcing="surface_fluxes")`` selects total ocean boundary inputs
 from ``SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS`` for the global setup. It requires pressure/
 free-surface execution (``enable_streamfunction=False``) to export actual native
-SSH; ACC retains internal forcing and rejects this mode. The default
+SSH. The sole ocean setup is ``global_4deg``; ``VerosConfig`` has no
+``setup`` argument. The default
 ``surface_forcing="bulk_meteorology"`` computes the existing CESM forcing from
 colocated air, radiation and precipitation. Surface-flux mode exports SST in K,
 SSS in native g/kg, actual east/north surface currents in m/s and native SSH in m. Streamfunction

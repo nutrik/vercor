@@ -60,6 +60,7 @@ def compare_lanes(reference: Path, candidate: Path) -> dict[str, Any]:
             "Model/dependency distributions differ; execution attribution is invalid"
         )
     for name in (
+        "case",
         "setup",
         "steps",
         "dtype",

@@ -61,7 +61,7 @@ outputs, initial fields, execution, lifecycle, transfer, output, and masks.
 | Prescribed Veros ocean | Setup-only native snapshot, read-only copied data, shared geometry | Monthly SST K, salinity g/kg, zero prescribed currents/SSH; no evolving native owner | Shared output; supports Veris forcing geometry, not prognostic feedback |
 | JCM land | Input-free DataComponent, static or daily selection | T K, dimensionless soil availability, explicit fractional land mask; static partner broadcast to daily records | Shared output; daily climatology contract is 365 records |
 | JCM atmosphere | CallableComponent, JAX; setup/prefill/validate; native construction at factory | Frozen native state/physics carry/forcing payload; Gregorian epoch and integer native substeps; ordinary intensive SST or explicit water/ice source products | Native provider and snapshot through shared coordinator; unnecessary host mirrors F7; deferred save-interval validation F8 |
-| Veros global / ACC | CallableComponent; host stock or capability-gated JAX fork; setup hook | Full native payload; generic host copy before mutation, fork copy for JAX. Global bulk meteorology or total-flux mode; ACC internal forcing | Shared native provider/snapshot. Process-wide backend lock and fixed native climatology need explicit compatibility limits |
+| Veros global | CallableComponent; host stock or capability-gated JAX fork; setup hook | Full native payload; generic host copy before mutation, fork copy for JAX. Global bulk meteorology or total-flux mode | Shared native provider/snapshot. Process-wide backend lock and fixed native climatology need explicit compatibility limits |
 | Veris | CallableComponent, JAX; setup hook and pure native advance | Frozen state/diagnostics/constants/budgets; static wet support, evolving Area; explicit face conversion and fresh forcing each substep | Shared native provider/snapshot; interval-mean total ocean fluxes and per-ice properties; endpoint native payload |
 | CAMulator atmosphere | CallableComponent, host; setup hook, no implemented spinup | Frozen payload with cloned Torch state, cursor, forecast hour, predictions; declared vapor channel; Gregorian datetime forcing | Shared native provider/snapshot; timestamp and partial-block defects F5/F6; native float32 is intentional |
 | CAMulator land | CallableComponent, host; setup hook | Immutable forcing cursor; selects prescribed TS at interval start; fractional land support | Default OutputSpec; unlike other land factories, no explicit output argument |
@@ -388,7 +388,7 @@ updated velocity at the new pressure slot but diagnosed SSH at the previous one.
 The coupled adapter refreshes only SSH after native slot rotation. Actual native
 replay verifies unchanged temperature, salinity, velocity, pressure and clocks.
 Default coupled momentum/tracer durations now match at1800s; explicit tracer
-acceleration remains supported, and bulk/ACC defaults retain their native policy.
+acceleration remains supported, and bulk defaults retain their native policy.
 
 Independent temporal regressions cover native-rate integrals, nonlinear phases,
 endpoint/categorical ownership, diagnostic-save independence, host/JAX/mixed/
