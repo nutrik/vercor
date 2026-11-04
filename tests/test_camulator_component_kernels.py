@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import jax
 import jax.numpy as jnp
@@ -106,20 +106,6 @@ def _make_coupler(start: datetime) -> SetupContext:
         run_order=(),
         logger=cast(Any, _RecordingLogger()),
     )
-
-
-def test_camulator_runtime_field_initializer_returns_jax_arrays() -> None:
-    fields = camulator_fields_module.initialize_camulator_runtime_fields((2, 3))
-
-    assert fields
-    assert all(isinstance(value, jax.Array) for value in fields.values())
-    assert {
-        "total_surface_temperature",
-        "temperature_3d",
-        "specific_humidity_3d",
-    } <= set(fields)
-    assert fields["temperature"].shape == (2, 3)
-    assert_allclose_compact(fields["temperature"], np.zeros((2, 3)))
 
 
 def test_wind_artifact_filter_config_raises_value_error_for_invalid_values() -> None:
@@ -407,15 +393,15 @@ def test_compiled_camulator_dynamic_forcing_rejects_nonfinite_source(
 def test_prepare_camulator_sst_input_supports_jit_and_shape() -> None:
     surface_temperature = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
 
-    prepared = jax.jit(camulator_fields_module.prepare_camulator_sst_input)(
-        surface_temperature
-    )
+    prepared = jax.jit(
+        camulator_fields_module.prepare_camulator_surface_temperature_input
+    )(surface_temperature)
 
     assert prepared.shape == (1, 1, 1, 2, 2)
     assert_allclose_compact(prepared[0, 0, 0], np.asarray(surface_temperature))
     assert_finite_jvp_vjp(
         lambda forcing: jnp.sum(
-            camulator_fields_module.prepare_camulator_sst_input(forcing)
+            camulator_fields_module.prepare_camulator_surface_temperature_input(forcing)
         ),
         surface_temperature,
         jnp.ones_like(surface_temperature),
@@ -477,11 +463,28 @@ def _camulator_runtime_payload(
     prediction: torch.Tensor | None = None,
     prediction_samples: torch.Tensor | None = None,
 ) -> Any:
+    frame = (
+        OutputFrame(
+            camulator_output_module.camulator_period_output_variables(
+                prediction_samples,
+                metadata={},
+                conf=_camulator_output_conf(),
+                state_transformer=None,
+            ),
+            sample_dimension="time",
+        )
+        if prediction_samples is not None and prediction_samples.shape[1] == 8
+        else None
+    )
     return camulator_gcm_state_module.CAMulatorRuntimePayload(
         model_state=model_state,
         cursor=camulator_forcing_module.CamulatorRuntimeCursor(),
         output_prediction=prediction,
-        output_prediction_samples=prediction_samples,
+        output_accumulator=(
+            _OutputAccumulator.zeros_from_frame(frame).add_frame(frame)
+            if frame is not None
+            else None
+        ),
     )
 
 
@@ -626,12 +629,8 @@ def test_camulator_output_provider_returns_native_frame(
     )
 
     assert tuple(frame.variables) == ("U", "T", "PS", "FSNS")
-    assert frame.variables["T"].dims == (
-        "time",
-        "level",
-        "latitude",
-        "longitude",
-    )
+    assert frame.variables["T"].dims == ("level", "latitude", "longitude")
+    assert_allclose_compact(frame.reduction_counts["T"], np.ones((3, 2, 2), dtype=int))
     assert frame.variables["T"].attrs["units"] == "K"
     assert frame.variables["FSNS"].attrs["long_name"] == "surface net shortwave flux"
     assert_allclose_compact(frame.coordinates["latitude"].values, [-45.0, 45.0])
@@ -667,10 +666,13 @@ def test_camulator_output_provider_preserves_every_model_substep() -> None:
         )
     )
 
-    assert frame.variables["T"].values.shape == (2, 3, 2, 2)
+    accumulator = _OutputAccumulator.zeros_from_frame(frame).add_frame(frame)
     assert_allclose_compact(
-        frame.variables["T"].values,
-        predictions[:, 3:6, 0].numpy(),
+        accumulator.mean_frame().variables["T"].values,
+        predictions[:, 3:6, 0].numpy().mean(axis=0),
+    )
+    assert_allclose_compact(
+        accumulator.counts[accumulator.names.index("T")], np.full((3, 2, 2), 2)
     )
 
 
@@ -903,9 +905,10 @@ def test_state_variable_accessor_uses_shared_index_map_builders() -> None:
     assert "def get_var_index(" in source
 
 
-def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions() -> (
-    None
-):
+@pytest.mark.parametrize("native_step_seconds", [3600.0, 10800.0, 21600.0])
+def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
+    native_step_seconds: float,
+) -> None:
     constants = PhysicalConstants()
     hyai = jnp.asarray([0.00, 0.05, 0.10])
     hybi = jnp.asarray([0.00, 0.20, 1.00])
@@ -926,8 +929,8 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
         ]
     )
     specific_humidity_3d = jnp.full((2, 2, 2), 0.002)
-    net_shortwave_accumulated = jnp.full((2, 2), 21600.0 * 8.0)
-    net_longwave_accumulated = jnp.full((2, 2), -21600.0 * 3.0)
+    net_shortwave_accumulated = jnp.full((2, 2), native_step_seconds * 100.0)
+    net_longwave_accumulated = jnp.full((2, 2), -native_step_seconds * 3.0)
     surface_pressure = jnp.full((2, 2), 100000.0)
 
     mapped_fields = jax.jit(camulator_fields_module.map_camulator_prediction_arrays)(
@@ -953,17 +956,22 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
         net_shortwave_accumulated,
         net_longwave_accumulated,
         surface_pressure,
+        native_step_seconds=native_step_seconds,
     )
 
-    assert_allclose_compact(mapped_fields["u_velocity"], np.asarray(u_wind[-1]))
-    assert_allclose_compact(mapped_fields["v_velocity"], np.asarray(v_wind[-1]))
+    assert_allclose_compact(mapped_fields["air_u_velocity"], np.asarray(u_wind[-1]))
+    assert_allclose_compact(mapped_fields["air_v_velocity"], np.asarray(v_wind[-1]))
     assert_allclose_compact(
-        mapped_fields["temperature"], np.asarray(temperature_3d[-1])
+        mapped_fields["air_temperature"], np.asarray(temperature_3d[-1])
     )
-    assert_allclose_compact(mapped_fields["specific_humidity"], np.full((2, 2), 0.002))
+    assert_allclose_compact(
+        mapped_fields["air_specific_humidity"], np.full((2, 2), 0.002)
+    )
+    assert mapped_fields["model_level_air_pressure"].shape == (2, 2)
+    assert_allclose_compact(mapped_fields["model_level_air_pressure"], 27500.0)
     assert_allclose_compact(
         mapped_fields["net_shortwave_radiation_flux"],
-        np.full((2, 2), 8.0),
+        np.full((2, 2), 100.0),
     )
     assert_allclose_compact(
         mapped_fields["downward_longwave_radiation_flux"],
@@ -971,8 +979,8 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
         - 3.0,
     )
     assert mapped_fields["model_level_height"].shape == (2, 2)
-    assert mapped_fields["density"].shape == (2, 2)
-    assert mapped_fields["potential_temperature"].shape == (2, 2)
+    assert mapped_fields["air_density"].shape == (2, 2)
+    assert mapped_fields["air_potential_temperature"].shape == (2, 2)
     pressure_interfaces = (
         hyai[:, jnp.newaxis, jnp.newaxis] * 100000.0
         + hybi[:, jnp.newaxis, jnp.newaxis] * surface_pressure[jnp.newaxis, :, :]
@@ -987,34 +995,44 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
         mapped_fields["model_level_height"], expected_model_level_height
     )
     assert np.all(np.isfinite(np.asarray(mapped_fields["model_level_height"])))
-    assert np.all(np.isfinite(np.asarray(mapped_fields["density"])))
-    assert np.all(np.isfinite(np.asarray(mapped_fields["potential_temperature"])))
+    assert np.all(np.isfinite(np.asarray(mapped_fields["air_density"])))
+    assert np.all(np.isfinite(np.asarray(mapped_fields["air_potential_temperature"])))
+
+    def mapped_arrays(
+        temperature_values: jax.Array,
+        radiation_perturbations: jax.Array,
+    ) -> dict[str, jax.Array]:
+        return cast(
+            dict[str, jax.Array],
+            camulator_fields_module.map_camulator_prediction_arrays(
+                constants.earth_radius,
+                constants.gravity,
+                constants.dry_air_gas_constant,
+                constants.water_vapor_mass_ratio_correction,
+                constants.dry_air_molecular_weight,
+                constants.universal_gas_constant,
+                constants.reference_pressure,
+                constants.dry_air_kappa,
+                constants.stefan_boltzmann_constant,
+                100000.0,
+                hyai,
+                hybi,
+                hyam,
+                hybm,
+                u_wind,
+                v_wind,
+                surface_temperature + radiation_perturbations[2],
+                temperature_values,
+                specific_humidity_3d,
+                net_shortwave_accumulated + radiation_perturbations[0],
+                net_longwave_accumulated + radiation_perturbations[1],
+                surface_pressure,
+                native_step_seconds=native_step_seconds + radiation_perturbations[3],
+            ),
+        )
 
     def mapped_objective(temperature_values: jax.Array) -> jax.Array:
-        fields = camulator_fields_module.map_camulator_prediction_arrays(
-            constants.earth_radius,
-            constants.gravity,
-            constants.dry_air_gas_constant,
-            constants.water_vapor_mass_ratio_correction,
-            constants.dry_air_molecular_weight,
-            constants.universal_gas_constant,
-            constants.reference_pressure,
-            constants.dry_air_kappa,
-            constants.stefan_boltzmann_constant,
-            100000.0,
-            hyai,
-            hybi,
-            hyam,
-            hybm,
-            u_wind,
-            v_wind,
-            surface_temperature,
-            temperature_values,
-            specific_humidity_3d,
-            net_shortwave_accumulated,
-            net_longwave_accumulated,
-            surface_pressure,
-        )
+        fields = mapped_arrays(temperature_values, jnp.zeros(4))
         return sum(
             (jnp.sum(value) for value in fields.values()),
             start=jnp.asarray(0.0),
@@ -1027,6 +1045,78 @@ def test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions(
         rtol=1e-5,
         atol=1e-7,
     )
+
+    def radiation_objective(perturbations: jax.Array) -> jax.Array:
+        fields = mapped_arrays(temperature_3d, perturbations)
+        return cast(
+            jax.Array,
+            jnp.sum(fields["net_shortwave_radiation_flux"])
+            + jnp.sum(fields["downward_longwave_radiation_flux"]),
+        )
+
+    zero_perturbation = jnp.zeros(4)
+    expected_gradient = jnp.asarray(
+        [
+            4.0 / native_step_seconds,
+            4.0 / native_step_seconds,
+            4.0 * constants.stefan_boltzmann_constant * jnp.sum(surface_temperature**3),
+            -4.0 * 97.0 / native_step_seconds,
+        ]
+    )
+    _, pullback = jax.vjp(radiation_objective, zero_perturbation)
+    assert_allclose_compact(pullback(jnp.asarray(1.0))[0], expected_gradient)
+    # Independently perturb each energy, TS and duration; radiation energy is held
+    # fixed while differentiating duration, so this checks the reciprocal rate.
+    steps = jnp.asarray(
+        [native_step_seconds * 1e-3, native_step_seconds * 1e-3, 1e-3, 1.0]
+    )
+    for index in range(4):
+        delta = jnp.eye(4)[index] * steps[index]
+        _, forward = jax.jvp(radiation_objective, (zero_perturbation,), (delta,))
+        finite_difference = (
+            radiation_objective(delta) - radiation_objective(-delta)
+        ) / (2.0 * steps[index])
+        assert_allclose_compact(
+            forward / steps[index], expected_gradient[index], rtol=1e-7, atol=1e-9
+        )
+        assert_allclose_compact(
+            finite_difference, expected_gradient[index], rtol=1e-7, atol=1e-9
+        )
+
+
+@pytest.mark.parametrize(
+    "native_step_seconds", [0.0, -3600.0, float("nan"), float("inf")]
+)
+@pytest.mark.parametrize("boundary", ["arrays", "runtime_fields"])
+def test_camulator_mapping_rejects_invalid_duration_before_array_arithmetic(
+    native_step_seconds: float,
+    boundary: str,
+) -> None:
+    # Invalid sentinels would fail tensor conversion if validation happened later.
+    unavailable = cast(Any, None)
+    with pytest.raises(
+        CouplerError, match="CAMulator native step duration.*strictly positive"
+    ):
+        if boundary == "arrays":
+            with jax.disable_jit():
+                camulator_fields_module.map_camulator_prediction_arrays(
+                    *([unavailable] * 22),
+                    native_step_seconds=native_step_seconds,
+                )
+        else:
+            camulator_fields_module.map_camulator_prediction_to_runtime_fields(
+                PhysicalConstants(),
+                camulator_reference_pressure=100000.0,
+                hyai=unavailable,
+                hybi=unavailable,
+                hyam=unavailable,
+                hybm=unavailable,
+                accessor_output=unavailable,
+                state_transformer=unavailable,
+                prediction=unavailable,
+                native_step_seconds=native_step_seconds,
+                water_vapor_variable="VAPOR",
+            )
 
 
 def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
@@ -1096,82 +1186,6 @@ def test_camulator_constructor_builds_jax_backed_grid(monkeypatch: Any) -> None:
     assert state_kwargs["time_alignment"] == "forcing_start"
 
 
-@pytest.mark.fast_always
-def test_camulator_gcm_setup_returns_initial_runtime_payload(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    start = datetime(2000, 1, 1)
-    initial_model_state = torch.zeros((1, 2, 1, 2, 2), dtype=torch.float32)
-    dynamic_forcing = xr.Dataset(
-        data_vars={
-            "F1": (
-                ("time", "lat", "lon"),
-                np.ones((1, 2, 2), dtype=np.float32),
-            )
-        },
-        coords={"time": [start]},
-    )
-    physics = xr.Dataset(
-        data_vars={
-            "hyai": (("interface",), np.asarray([0.0, 1.0])),
-            "hyam": (("level",), np.asarray([0.5, 1.0])),
-            "hybi": (("interface",), np.asarray([0.0, 1.0])),
-            "hybm": (("level",), np.asarray([0.5, 1.0])),
-            "LANDM_COSLAT": (
-                ("lat", "lon"),
-                np.zeros((2, 2), dtype=np.float32),
-            ),
-        }
-    )
-    resources = cast(
-        Any,
-        camulator_gcm_state_module.CAMulatorGCMSetupState.__new__(
-            camulator_gcm_state_module.CAMulatorGCMSetupState
-        ),
-    )
-    resources.initial_model_state = initial_model_state
-    resources.init_noise = None
-    resources.stepper = SimpleNamespace(model=lambda value: value)
-    resources.lead_time_periods = 6
-    resources.conf = {
-        "data": {"save_loc_physics": "physics.nc"},
-        "predict": {"start_datetime": start},
-    }
-    resources.forcing_ds_norm = dynamic_forcing
-    resources.df_vars = ["F1"]
-    resources.device = "cpu"
-    resources.time_alignment = "strict"
-
-    monkeypatch.setattr(
-        camulator_gcm_state_module.torch.jit,
-        "trace",
-        lambda model, dummy_input: model,
-    )
-    monkeypatch.setattr(
-        camulator_gcm_state_module.xr,
-        "open_dataset",
-        lambda path: physics,
-    )
-    monkeypatch.setattr(
-        camulator_tensors_module,
-        "StateVariableAccessor",
-        lambda conf, tensor_type: SimpleNamespace(tensor_type=tensor_type),
-    )
-
-    result = resources.setup(cast(Any, None), _make_coupler(start))
-
-    assert isinstance(
-        result.payload, camulator_gcm_state_module.CAMulatorRuntimePayload
-    )
-    assert result.payload.model_state is initial_model_state
-    assert result.payload.forecast_hour == 1
-    assert result.payload.output_prediction is None
-    assert result.payload.output_prediction_samples is None
-    assert result.payload.cursor.start_ix == 0
-    assert result.payload.cursor.model_substeps == 1
-    assert result.payload.cursor.timestep_counter == 0
-
-
 def test_camulator_default_snapshot_uses_native_provider_when_period_provider_is_custom(
     monkeypatch: Any,
     tmp_path: Path,
@@ -1213,7 +1227,9 @@ def test_camulator_default_snapshot_uses_native_provider_when_period_provider_is
         def sample(self, context: OutputContext) -> OutputFrame:
             samples.append(self.name)
             sample_payloads.append(context.payload)
-            return OutputFrame({"temperature": OutputVariable((), np.asarray(280.0))})
+            return OutputFrame(
+                {"air_temperature": OutputVariable((), np.asarray(280.0))}
+            )
 
     custom_provider = _Provider("custom")
     native_provider = _Provider("native")
@@ -1412,7 +1428,7 @@ def test_camulator_land_stores_jax_runtime_arrays(
 
     monkeypatch.setattr(
         camulator_land_module,
-        "create_lnd_mask_from_ocn",
+        "create_land_mask_from_ocean",
         lambda **kwargs: (jnp.ones((2, 2)), jnp.zeros((2, 2))),
     )
     monkeypatch.setattr(
@@ -1443,21 +1459,19 @@ def test_camulator_land_stores_jax_runtime_arrays(
         camulator_grid=camulator_grid,
         ocn_grid=ocean_grid,
     )
+    assert component.spec.masks is not None
+    assert component.spec.masks.fractional_field == "land_fraction"
 
     component = prepare_component(
         normalize_component(component),
         _make_coupler(start),
         DTypePolicy.from_jax_config(),
     )
-    assert component.spec.inputs == (
-        "net_shortwave_radiation_flux",
-        "downward_longwave_radiation_flux",
-    )
-    assert component.spec.outputs == ("land_surface_temperature",)
+    assert component.spec.inputs == ()
+    assert component.spec.outputs == ("land_surface_temperature", "land_fraction")
     assert set(component.spec.initial_fields) == {
         "land_surface_temperature",
-        "net_shortwave_radiation_flux",
-        "downward_longwave_radiation_flux",
+        "land_fraction",
     }
     assert isinstance(component._data["land_surface_temperature"], jax.Array)
     assert_allclose_compact(
@@ -1515,7 +1529,7 @@ def test_camulator_land_stores_jax_runtime_arrays(
 
 
 @pytest.mark.fast_always
-def test_camulator_land_declares_radiation_exchange_inputs(
+def test_camulator_land_rejects_unused_physical_feedback(
     monkeypatch: Any,
 ) -> None:
     start = datetime(2000, 1, 1, 0, 0, 0)
@@ -1530,7 +1544,7 @@ def test_camulator_land_declares_radiation_exchange_inputs(
     )
     monkeypatch.setattr(
         camulator_land_module,
-        "create_lnd_mask_from_ocn",
+        "create_land_mask_from_ocean",
         lambda **kwargs: (jnp.ones((2, 2)), jnp.zeros((2, 2))),
     )
     monkeypatch.setattr(
@@ -1567,17 +1581,18 @@ def test_camulator_land_declares_radiation_exchange_inputs(
         tuple(components),
         (
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="LND",
                 fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
             ),
         ),
-        validate_endpoints=True,
     )
 
+    assert land.spec.inputs == ()
     assert contracts["LND"].receives == radiation_fields
-    for name, component in components.items():
-        validate_exchange_fields_declared(component, contracts[name])
+    with pytest.raises(CouplerError, match="not declared"):
+        validate_exchange_fields_declared(land, contracts["LND"])
 
 
 class _FiniteCamulatorBoundaryStepper:
@@ -1705,6 +1720,7 @@ def _camulator_boundary_case(
     )
     resources = SimpleNamespace(
         dynamic_ds=dynamic_ds,
+        model_timestep=timedelta(hours=6),
         device="cpu",
         stepper=stepper,
         static_forcing=torch.zeros((1, 1, 1, 2, 2)),
@@ -1720,6 +1736,157 @@ def _camulator_boundary_case(
         cursor=camulator_forcing_module.CamulatorRuntimeCursor(),
     )
     return resources, fields, payload
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (
+            np.datetime64("2001-03-04T05:06:07.123456", "ns"),
+            datetime(2001, 3, 4, 5, 6, 7, 123456),
+        ),
+        (
+            np.datetime64("2001-03-04T05:06:07.123456", "us"),
+            datetime(2001, 3, 4, 5, 6, 7, 123456),
+        ),
+        (np.datetime64("2001-03-04T05:06:07", "s"), datetime(2001, 3, 4, 5, 6, 7)),
+        (datetime(2001, 3, 4, 5, 6, 7), datetime(2001, 3, 4, 5, 6, 7)),
+        (
+            np.asarray(np.datetime64("2001-03-04T05:06:07", "ns")),
+            datetime(2001, 3, 4, 5, 6, 7),
+        ),
+    ],
+)
+def test_camulator_forcing_datetime_preserves_supported_scalar_times(
+    value: Any, expected: datetime
+) -> None:
+    assert camulator_runtime_module.coerce_camulator_datetime(value) == expected
+
+
+@pytest.mark.parametrize("unit", ["ns", "us"])
+def test_camulator_forcing_datetime_rejects_nat(unit: Literal["ns", "us"]) -> None:
+    with pytest.raises(ValueError, match="CAMulator.*time"):
+        camulator_runtime_module.coerce_camulator_datetime(np.datetime64("NaT", unit))
+
+
+@pytest.mark.parametrize("available", [0, 1])
+def test_camulator_rejects_incomplete_forcing_before_native_mutation(
+    available: int,
+) -> None:
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.dynamic_ds = resources.dynamic_ds.isel(time=slice(0, available))
+    original = payload.model_state.clone()
+
+    with pytest.raises(ValueError, match="CAMulator forcing block"):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources, fields, payload, block_start=0, block_end=2, logger=None
+        )
+
+    assert stepper.model_calls == 0
+    assert torch.equal(payload.model_state, original)
+    assert payload.cursor.timestep_counter == 0
+    assert payload.forecast_hour == 1
+
+
+@pytest.mark.parametrize("block_start", [0, 1])
+def test_camulator_rejects_native_forcing_cadence_gaps_before_mutation(
+    block_start: int,
+) -> None:
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.dynamic_ds = resources.dynamic_ds.assign_coords(
+        time=[datetime(2000, 1, 1), datetime(2000, 1, 1, 12)]
+    )
+    original = payload.model_state.clone()
+
+    with pytest.raises(ValueError, match="CAMulator forcing.*timestep"):
+        camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=block_start,
+            block_end=2,
+            logger=None,
+        )
+
+    assert stepper.model_calls == 0
+    assert torch.equal(payload.model_state, original)
+    assert payload.cursor.timestep_counter == 0
+
+
+def test_camulator_prediction_block_accepts_nanosecond_forcing_coordinates() -> None:
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.dynamic_ds = resources.dynamic_ds.assign_coords(
+        time=np.asarray(["2000-01-01T00", "2000-01-01T06"], dtype="datetime64[ns]")
+    )
+
+    updated, _ = camulator_runtime_module.run_camulator_prediction_block(
+        resources, fields, payload, block_start=0, block_end=2, logger=None
+    )
+
+    assert stepper.model_calls == 2
+    assert updated.forecast_hour == 3
+    assert payload.forecast_hour == 1
+
+
+@pytest.mark.parametrize("shifted", [False, True])
+def test_camulator_forcing_block_checks_initialized_cursor_time_anchor(
+    shifted: bool,
+) -> None:
+    from dataclasses import replace
+
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.dynamic_ds = xr.concat(
+        [
+            resources.dynamic_ds,
+            resources.dynamic_ds.assign_coords(
+                time=[datetime(2000, 1, 1, 12), datetime(2000, 1, 1, 18)]
+            ),
+        ],
+        dim="time",
+    )
+    if shifted:
+        resources.dynamic_ds = resources.dynamic_ds.assign_coords(
+            time=[datetime(2000, 1, 1, hour) for hour in (0, 6, 18, 23)]
+        )
+    payload = replace(
+        payload,
+        cursor=camulator_forcing_module.CamulatorRuntimeCursor(
+            start_ix=1,
+            init_datetime=datetime(2000, 1, 1, 6),
+            model_substeps=1,
+            timestep_counter=1,
+        ),
+    )
+    original = payload.model_state.clone()
+    block_start = payload.cursor.current_index()
+    if shifted:
+        with pytest.raises(ValueError, match="CAMulator forcing.*timestep"):
+            camulator_runtime_module.run_camulator_prediction_block(
+                resources,
+                fields,
+                payload,
+                block_start=block_start,
+                block_end=block_start + 1,
+                logger=None,
+            )
+        assert stepper.model_calls == 0
+    else:
+        updated, _ = camulator_runtime_module.run_camulator_prediction_block(
+            resources,
+            fields,
+            payload,
+            block_start=block_start,
+            block_end=block_start + 1,
+            logger=None,
+        )
+        assert stepper.model_calls == 1
+        assert updated.forecast_hour == 2
+    assert torch.equal(payload.model_state, original)
+    assert payload.cursor.timestep_counter == 1
 
 
 def test_camulator_rejects_invalid_model_input_before_second_substep() -> None:
@@ -1826,7 +1993,7 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
                 ),
             ),
         },
-        coords={"time": [start, datetime(2000, 1, 1, 6, 0, 0)]},
+        coords={"time": [start, datetime(2000, 1, 1, 3, 0, 0)]},
     )
     captured: dict[str, torch.Tensor] = {}
 
@@ -1868,11 +2035,32 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
             state[:, first_sst_channel:, ...].copy_(value)
 
     class _OutputAccessor:
+        tensor_type = "output"
+
+        def get_var_index(self, name: str) -> Any:
+            assert name == "VAPOR"
+            return camulator_tensors_module.TensorVariableIndex.for_channels(
+                start_idx=0, n_channels=2, is_3d=True
+            )
+
         def get_state_var(
             self, state: torch.Tensor, variable_name: str
         ) -> torch.Tensor:
-            _ = state, variable_name
-            return torch.ones((1, 2, 2, 2), dtype=torch.float32)
+            _ = state
+            values = {
+                "U": 1.0,
+                "V": 2.0,
+                "T": 9.0,
+                "VAPOR": 0.002,
+                "TS": 280.0,
+                "PS": 100000.0,
+                "FSNS": 100.0 * 10800.0,
+                "FLNS": -3.0 * 10800.0,
+            }
+            shape = (
+                (1, 2, 2, 2) if variable_name in {"U", "V", "T", "VAPOR"} else (1, 2, 2)
+            )
+            return torch.full(shape, values[variable_name], dtype=torch.float32)
 
     component = cast(
         Any,
@@ -1881,6 +2069,8 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
         ),
     )
     component.model_substeps = 2
+    component.water_vapor_variable = "VAPOR"
+    component.model_timestep = timedelta(hours=3)
     cursor = camulator_forcing_module.CamulatorRuntimeCursor(
         start_ix=0,
         init_str="2000-01-01T00Z",
@@ -1899,10 +2089,10 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
         latitude=jnp.asarray([0.0, 1.0]),
     )
     component._dtype_policy = DTypePolicy()
-    component._data = camulator_fields_module.initialize_camulator_runtime_fields(
-        component.grid.shape,
-        component._dtype_policy,
-    )
+    component._data = {
+        name: jnp.zeros(component.grid.shape)
+        for name in camulator_contracts_module.CAMULATOR_RUNTIME_FIELD_NAMES
+    }
     component._data["sea_surface_temperature"] = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
     component._data["land_surface_temperature"] = jnp.asarray(
         [[10.0, 20.0], [30.0, 40.0]]
@@ -1925,15 +2115,16 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
         inverse_transform=lambda prediction: prediction
     )
     component.P0 = 100000.0
-    component.hyai = torch.ones((1, 2, 1, 1))
-    component.hybi = torch.ones((1, 2, 1, 1))
-    component.hyam = torch.ones((1, 2, 1, 1))
-    component.hybm = torch.ones((1, 2, 1, 1))
+    component.hyai = torch.tensor([0.0, 0.05, 0.10])
+    component.hybi = torch.tensor([0.0, 0.20, 1.0])
+    component.hyam = torch.tensor([0.015, 0.025])
+    component.hybm = torch.tensor([0.15, 0.25])
+    native_mapper = camulator_fields_module.map_camulator_prediction_to_runtime_fields
 
     def map_runtime_fields(*args: Any, **kwargs: Any) -> dict[str, jax.Array]:
         _ = args
         captured["runtime_prediction"] = kwargs["prediction"].detach().cpu()
-        return {"temperature": jnp.full((2, 2), 9.0)}
+        return native_mapper(*args, **kwargs)
 
     monkeypatch.setattr(
         camulator_fields_module,
@@ -1999,7 +2190,7 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
         np.asarray([[11.0, 283.0], [33.0, 44.0]]),
     )
     assert_allclose_compact(
-        component_state.fields.get("temperature"), np.full((2, 2), 9.0)
+        component_state.fields.get("air_temperature"), np.full((2, 2), 9.0)
     )
     assert_allclose_compact(
         first.payload.output_prediction,
@@ -2009,8 +2200,153 @@ def test_camulator_runtime_step_is_reproducible_from_one_payload(
         captured["runtime_prediction"],
         torch.full_like(captured["runtime_prediction"], 2.0),
     )
-    assert first.payload.output_prediction_samples.shape[0] == 2
+    assert first.payload.output_accumulator is None  # This run disables period output.
+
     assert_allclose_compact(
-        first.payload.output_prediction_samples[:, 0, 0, 0, 0],
-        np.asarray([1.0, 2.0]),
+        first.fields["net_shortwave_radiation_flux"], np.full((2, 2), 100.0)
     )
+    assert_allclose_compact(
+        first.fields["downward_longwave_radiation_flux"],
+        np.full(
+            (2, 2), step_context.constants.stefan_boltzmann_constant * 280.0**4 - 3.0
+        ),
+    )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("variables", [None, (), ("T",)])
+def test_camulator_streams_native_predictions_without_a_history(
+    variables: tuple[str, ...] | None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Native output/exchange reductions stay fixed-size and decode before mean."""
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.model_substeps = 2
+    resources.P0 = 100000.0
+    resources.water_vapor_variable = None
+    resources.hyai = resources.hybi = resources.hyam = resources.hybm = None
+    resources.accessor_output = None
+    resources.conf = {
+        "model": {"levels": 1},
+        "data": {"variables": [], "surface_variables": ["T"]},
+    }
+    resources.metadata = {}
+    resources.state_transformer = None
+
+    def mapped(constants: Any, **kwargs: Any) -> dict[str, Any]:
+        # Square each endpoint before averaging: (1^2 + 2^2)/2 = 2.5.
+        value = jnp.asarray(kwargs["prediction"].detach().cpu().numpy())[0, 0, 0]
+        return {"air_temperature": value**2}
+
+    monkeypatch.setattr(
+        camulator_fields_module, "map_camulator_prediction_to_runtime_fields", mapped
+    )
+    original_model = stepper.model
+
+    def model(value: torch.Tensor) -> torch.Tensor:
+        return original_model(value) * stepper.model_calls
+
+    stepper.model = model  # type: ignore[assignment, method-assign]
+
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("native prediction history allocated")
+
+    monkeypatch.setattr(torch, "cat", forbidden)
+    context = StepContext(
+        dt_seconds=43_200, time=datetime(2000, 1, 1), output_variables=variables
+    )
+    result = camulator_runtime_module.step_camulator_runtime(
+        resources, fields, context, payload
+    )
+    np.testing.assert_allclose(result.fields["air_temperature"], 2.5)
+    np.testing.assert_allclose(result.payload.output_prediction, 2.0)
+    assert result.payload.model_state.shape == payload.model_state.shape
+    assert not hasattr(result.payload, "output_prediction_samples")
+    assert payload.forecast_hour == 1 and payload.output_prediction is None
+    accumulator = result.payload.output_accumulator
+    if variables is None:
+        assert accumulator is None
+    else:
+        assert accumulator.names == ("T",)
+        np.testing.assert_allclose(accumulator.sum_values[0], 3.0)
+        np.testing.assert_array_equal(accumulator.counts[0], 2)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("rescale", [False, True])
+def test_camulator_channel_selection_precedes_host_array_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+    rescale: bool,
+) -> None:
+    prediction = _camulator_prediction(total_channels=8)
+    original = camulator_output_module._prediction_values
+
+    def chosen_only(value: torch.Tensor, **kwargs: Any) -> np.ndarray:
+        assert value.shape[1] == 3, "unselected channels transferred to host"
+        return original(value, **kwargs)
+
+    monkeypatch.setattr(camulator_output_module, "_prediction_values", chosen_only)
+    variables = camulator_output_module.camulator_period_output_variables(
+        prediction,
+        metadata={},
+        conf=_camulator_output_conf(climate_rescale_output=rescale),
+        state_transformer=None,
+        variables=("T",),
+        decoded_prediction=prediction if rescale else None,
+    )
+    assert tuple(variables) == ("T",)
+    np.testing.assert_array_equal(variables["T"].values, prediction[:, 3:6, 0].numpy())
+
+
+@pytest.mark.fast_always
+def test_camulator_rescaled_output_reuses_mandatory_native_decode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Period selection adds no full transform or transfer beyond exchange physics."""
+
+    class Transformer:
+        calls = 0
+
+        def inverse_transform(self, prediction: torch.Tensor) -> torch.Tensor:
+            self.calls += 1
+            return prediction * 10.0
+
+    stepper = _FiniteCamulatorBoundaryStepper()
+    resources, fields, payload = _camulator_boundary_case(stepper)
+    resources.model_substeps = 2
+    resources.P0 = 100000.0
+    resources.water_vapor_variable = None
+    resources.hyai = resources.hybi = resources.hyam = resources.hybm = None
+    resources.accessor_output = None
+    resources.state_transformer = Transformer()
+    resources.conf = {
+        "model": {"levels": 1},
+        "data": {"variables": [], "surface_variables": ["T"]},
+        "predict": {"climate_rescale_output": True},
+    }
+    resources.metadata = {}
+
+    def mapped(constants: Any, **kwargs: Any) -> dict[str, Any]:
+        decoded = kwargs.get("decoded_prediction")
+        if decoded is None:
+            decoded = kwargs["state_transformer"].inverse_transform(
+                kwargs["prediction"]
+            )
+        return {"air_temperature": jnp.asarray(decoded[0, 0, 0].numpy())}
+
+    monkeypatch.setattr(
+        camulator_fields_module, "map_camulator_prediction_to_runtime_fields", mapped
+    )
+    context = StepContext(
+        dt_seconds=43_200, time=datetime(2000, 1, 1), output_variables=("T",)
+    )
+    result = camulator_runtime_module.step_camulator_runtime(
+        resources, fields, context, payload
+    )
+    assert (
+        resources.state_transformer.calls == 2
+    )  # One mandatory decode per native prediction.
+    np.testing.assert_allclose(result.payload.output_accumulator.sum_values[0], 20.0)
+    np.testing.assert_array_equal(result.payload.output_accumulator.counts[0], 2)
+    np.testing.assert_allclose(result.fields["air_temperature"], 10.0)

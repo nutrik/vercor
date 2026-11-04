@@ -16,6 +16,7 @@ from vercor.components import (
     SetupResult,
 )
 from vercor.grids import RectilinearGrid
+from vercor.setups.config import VerosConfig
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
     run_logged_spinup,
@@ -26,12 +27,12 @@ from vercor.types import RuntimeArray
 
 VEROS_INPUT_FIELD_NAMES = (
     "model_level_height",
-    "u_velocity",
-    "v_velocity",
-    "potential_temperature",
-    "specific_humidity",
-    "density",
-    "temperature",
+    "air_u_velocity",
+    "air_v_velocity",
+    "air_potential_temperature",
+    "air_specific_humidity",
+    "air_density",
+    "air_temperature",
     "net_shortwave_radiation_flux",
     "downward_longwave_radiation_flux",
     "rain_rate",
@@ -41,27 +42,17 @@ VEROS_FIELD_DEFAULTS = {"sea_surface_temperature": 283.15}
 
 
 def _select_veros_setup_class(
-    setup: Literal["global_4deg", "acc"],
     execution: Literal["host", "jax"],
 ) -> type[Any]:
-    """Return the native setup class for one execution lane."""
+    """Return the global four-degree setup class for one execution lane."""
 
     if execution == "jax":
         from vercor.setups._external.veros_setup_jax import (
-            DifferentiableACCSetup,
             DifferentiableGlobalFourDegree,
         )
 
-        return (
-            DifferentiableGlobalFourDegree
-            if setup == "global_4deg"
-            else DifferentiableACCSetup
-        )
-    if setup == "global_4deg":
-        return _veros_setup.CustomGlobalFourDegree
-    from veros.setups.acc import ACCSetup
-
-    return cast(type[Any], ACCSetup)
+        return DifferentiableGlobalFourDegree
+    return _veros_setup.CustomGlobalFourDegree
 
 
 class VerosGCMSetupState:
@@ -78,32 +69,42 @@ class VerosGCMSetupState:
     def __init__(
         self,
         name: str = "OCN",
-        setup: Literal["global_4deg", "acc"] = "global_4deg",
         execution: Literal["host", "jax"] = "host",
         spinup_time: timedelta = timedelta(days=2),
         custom_parameters: Mapping[str, Any] | None = None,
-        restore_to_climatology_temp: bool = False,
-        restore_to_climatology_salt: bool = False,
+        restore_to_climatology_temp: bool = VerosConfig.restore_to_climatology_temp,
+        restore_to_climatology_salt: bool = VerosConfig.restore_to_climatology_salt,
         do_spinup: bool = False,
+        surface_forcing: Literal[
+            "bulk_meteorology", "surface_fluxes"
+        ] = "bulk_meteorology",
+        *,
+        export_open_water_surface: bool = False,
+        salinity_restoring_timescale: float = VerosConfig.salinity_restoring_timescale,
     ) -> None:
         """Build Veros model resources and the VerCOR ocean grid."""
 
         self.name = name
         self.execution = execution
-        self.uses_atmosphere_forcing = setup == "global_4deg"
+        self.surface_forcing = surface_forcing
+        self.export_open_water_surface = export_open_water_surface
         override = dict(custom_parameters or {})
-        if execution == "jax":
+        if execution == "jax" or surface_forcing == "surface_fluxes":
             override["enable_streamfunction"] = False
+        if surface_forcing == "surface_fluxes":
+            # The global native daily tracer step accelerates tracers relative
+            # to momentum (1800 s). Transient interval fluxes require the same
+            # physical duration for both. An explicit dt_tracer retains native
+            # acceleration for callers deliberately choosing that policy.
+            override.setdefault("dt_mom", 1800.0)
+            override.setdefault("dt_tracer", override["dt_mom"])
 
-        setup_class = _select_veros_setup_class(setup, execution)
-        self.model = (
-            setup_class(
-                override=override,
-                restore_to_climatology_temp=restore_to_climatology_temp,
-                restore_to_climatology_salt=restore_to_climatology_salt,
-            )
-            if self.uses_atmosphere_forcing
-            else setup_class(override=override)
+        setup_class = _select_veros_setup_class(execution)
+        self.model = setup_class(
+            override=override,
+            restore_to_climatology_temp=restore_to_climatology_temp,
+            restore_to_climatology_salt=restore_to_climatology_salt,
+            salinity_restoring_timescale=salinity_restoring_timescale,
         )
         self.model.setup()
         self._linear_solver = _veros_state.get_component_linear_solver(self.model.state)
@@ -118,6 +119,7 @@ class VerosGCMSetupState:
                 step=self.model.step,
                 linear_solver=self._linear_solver,
                 execution=execution,
+                synchronize_surface_height=surface_forcing == "surface_fluxes",
             ),
         )
         self._step_function = (
@@ -176,22 +178,39 @@ class VerosGCMSetupState:
             )
 
         _ = component
-        return SetupResult(
-            fields={
-                "sea_surface_temperature": _veros_state.extract_veros_runtime_sst(
-                    self._veros_state
-                )
-            },
-            payload=self._veros_state,
+        surface_fields = _veros_state.extract_veros_runtime_surface_fields(
+            self._veros_state, coupled=self.surface_forcing == "surface_fluxes"
         )
+        if self.export_open_water_surface:
+            from vercor.setups._external.veros_runtime import (
+                open_water_temperature_contribution,
+            )
+
+            surface_fields["open_water_temperature_contribution"] = (
+                open_water_temperature_contribution(
+                    surface_fields["sea_surface_temperature"],
+                    jnp.zeros_like(surface_fields["sea_surface_temperature"]),
+                    self.grid.binary_mask,
+                )
+            )
+        return SetupResult(fields=surface_fields, payload=self._veros_state)
 
 
-def veros_default_fields() -> dict[str, float]:
+def veros_default_fields(
+    *, coupled: bool = False, export_open_water_surface: bool = False
+) -> dict[str, float]:
     """Return scalar defaults for the Veros runtime output contract."""
 
+    names: tuple[str, ...] = ("sea_surface_temperature",)
+    if coupled:
+        from vercor.fields import _flatten_field_items
+        from vercor.recipes import OCEAN_TO_SEAICE_FORCING_FIELDS
+
+        names = tuple(_flatten_field_items(OCEAN_TO_SEAICE_FORCING_FIELDS))
+    if export_open_water_surface:
+        names += ("ice_fraction", "open_water_temperature_contribution")
     return {
-        field_name: VEROS_FIELD_DEFAULTS.get(field_name, 0.0)
-        for field_name in ("sea_surface_temperature",)
+        field_name: VEROS_FIELD_DEFAULTS.get(field_name, 0.0) for field_name in names
     }
 
 

@@ -1,0 +1,4423 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-03",
+  "decision": {
+    "native_veros_default": "jax",
+    "component_execution_default": "host",
+    "reason": "Repeated coupled throughput benefit with explicit NumPy escape hatch; same-fork scanned execution was slower on this CPU."
+  },
+  "lanes": {
+    "acc-numpy-final": {
+      "setup": "acc",
+      "backend": "numpy",
+      "execution": "host",
+      "steps": 4,
+      "repeats": 5,
+      "dtype": "float64",
+      "ocean_shape": [
+        30,
+        42,
+        15
+      ],
+      "dt_mom": 4800.0,
+      "dt_tracer": 43200.0,
+      "native_steps": 4,
+      "coupling_dt_seconds": 43200.0,
+      "native_solver": "SciPySolver",
+      "tdma": null,
+      "setup_seconds": 1.1243544580065645,
+      "cold_seconds": 0.17971624998608604,
+      "warm_seconds": [
+        0.13724904198898003,
+        0.14020766702014953,
+        0.13694741699146107,
+        0.1561995000229217,
+        0.1385202080127783
+      ],
+      "warm_median_seconds": 0.1385202080127783,
+      "warm_min_seconds": 0.13694741699146107,
+      "warm_max_seconds": 0.1561995000229217,
+      "native_steps_per_second": 28.87665314241374,
+      "simulated_days_per_second": 14.43832657120687,
+      "initial_sha256": "e77ac68204bffe2494bf0f7d71cf97e5fe0c9cc3a1637d2601b7ae698453bdd9",
+      "final_sha256": "60275bef3b4448db0dda49859f95c67712eebed2f69b52802ae0932461170368",
+      "repeat_final_sha256": [
+        "60275bef3b4448db0dda49859f95c67712eebed2f69b52802ae0932461170368",
+        "60275bef3b4448db0dda49859f95c67712eebed2f69b52802ae0932461170368",
+        "60275bef3b4448db0dda49859f95c67712eebed2f69b52802ae0932461170368",
+        "60275bef3b4448db0dda49859f95c67712eebed2f69b52802ae0932461170368",
+        "60275bef3b4448db0dda49859f95c67712eebed2f69b52802ae0932461170368",
+        "60275bef3b4448db0dda49859f95c67712eebed2f69b52802ae0932461170368"
+      ]
+    },
+    "acc-jax-final": {
+      "setup": "acc",
+      "backend": "jax",
+      "execution": "host",
+      "steps": 4,
+      "repeats": 5,
+      "dtype": "float64",
+      "ocean_shape": [
+        30,
+        42,
+        15
+      ],
+      "dt_mom": 4800.0,
+      "dt_tracer": 43200.0,
+      "native_steps": 4,
+      "coupling_dt_seconds": 43200.0,
+      "native_solver": "SciPySolver",
+      "tdma": null,
+      "setup_seconds": 3.8021095829899423,
+      "cold_seconds": 3.0461275419802405,
+      "warm_seconds": [
+        0.07502945797750726,
+        0.07308683398878202,
+        0.07352483400609344,
+        0.07394200004637241,
+        0.07285554200643674
+      ],
+      "warm_median_seconds": 0.07352483400609344,
+      "warm_min_seconds": 0.07285554200643674,
+      "warm_max_seconds": 0.07502945797750726,
+      "native_steps_per_second": 54.40338701979927,
+      "simulated_days_per_second": 27.201693509899634,
+      "initial_sha256": "383b1a4f79dbeba2ef6926dd475d2695cc96050af4aa5d95d7cc3441c1d3826b",
+      "final_sha256": "63602a158c4116acaae1e2250e9b22de73ab2dcaad71fecb6b8d415db4ea2bd0",
+      "repeat_final_sha256": [
+        "63602a158c4116acaae1e2250e9b22de73ab2dcaad71fecb6b8d415db4ea2bd0",
+        "63602a158c4116acaae1e2250e9b22de73ab2dcaad71fecb6b8d415db4ea2bd0",
+        "63602a158c4116acaae1e2250e9b22de73ab2dcaad71fecb6b8d415db4ea2bd0",
+        "63602a158c4116acaae1e2250e9b22de73ab2dcaad71fecb6b8d415db4ea2bd0",
+        "63602a158c4116acaae1e2250e9b22de73ab2dcaad71fecb6b8d415db4ea2bd0",
+        "63602a158c4116acaae1e2250e9b22de73ab2dcaad71fecb6b8d415db4ea2bd0"
+      ]
+    },
+    "coupled-numpy-final": {
+      "setup": "coupled",
+      "backend": "numpy",
+      "execution": "host",
+      "steps": 2,
+      "repeats": 5,
+      "dtype": "float64",
+      "ocean_shape": [
+        90,
+        40,
+        15
+      ],
+      "dt_mom": 1800.0,
+      "dt_tracer": 1800.0,
+      "native_steps": 96,
+      "coupling_dt_seconds": 86400.0,
+      "native_solver": "SciPySolver",
+      "tdma": null,
+      "setup_seconds": 14.595336166967172,
+      "cold_seconds": 19.87838270800421,
+      "warm_seconds": [
+        14.788997250027023,
+        14.681637750007212,
+        14.434984124964103,
+        15.006419542012736,
+        14.473456332983915
+      ],
+      "warm_median_seconds": 14.681637750007212,
+      "warm_min_seconds": 14.434984124964103,
+      "warm_max_seconds": 15.006419542012736,
+      "native_steps_per_second": 6.538780048564599,
+      "simulated_days_per_second": 0.1362245843450958,
+      "initial_sha256": "83d7d4116b8e917e3e81001d9d4fbec332aa5633cabd51a902b4ee1203084485",
+      "final_sha256": "e9afd9c238a099d30c96d169475dd2d460a5db9539afe85fed41ec3e6d3c63c4",
+      "repeat_final_sha256": [
+        "e9afd9c238a099d30c96d169475dd2d460a5db9539afe85fed41ec3e6d3c63c4",
+        "e9afd9c238a099d30c96d169475dd2d460a5db9539afe85fed41ec3e6d3c63c4",
+        "e9afd9c238a099d30c96d169475dd2d460a5db9539afe85fed41ec3e6d3c63c4",
+        "e9afd9c238a099d30c96d169475dd2d460a5db9539afe85fed41ec3e6d3c63c4",
+        "e9afd9c238a099d30c96d169475dd2d460a5db9539afe85fed41ec3e6d3c63c4",
+        "e9afd9c238a099d30c96d169475dd2d460a5db9539afe85fed41ec3e6d3c63c4"
+      ]
+    },
+    "coupled-jax-final": {
+      "setup": "coupled",
+      "backend": "jax",
+      "execution": "host",
+      "steps": 2,
+      "repeats": 5,
+      "dtype": "float64",
+      "ocean_shape": [
+        90,
+        40,
+        15
+      ],
+      "dt_mom": 1800.0,
+      "dt_tracer": 1800.0,
+      "native_steps": 96,
+      "coupling_dt_seconds": 86400.0,
+      "native_solver": "SciPySolver",
+      "tdma": null,
+      "setup_seconds": 15.974908542004414,
+      "cold_seconds": 15.481844083988108,
+      "warm_seconds": [
+        6.8760592909529805,
+        6.619553291995544,
+        6.6676309169852175,
+        6.6154813329922035,
+        6.694724500004668
+      ],
+      "warm_median_seconds": 6.6676309169852175,
+      "warm_min_seconds": 6.6154813329922035,
+      "warm_max_seconds": 6.8760592909529805,
+      "native_steps_per_second": 14.397917520516655,
+      "simulated_days_per_second": 0.29995661501076365,
+      "initial_sha256": "86b72d6ba0970f5ecb1ae3b84e1fea252cbb27562390fc9bf773a4ea964f7e1f",
+      "final_sha256": "bc453696ebfe4222eed5684ec01768df822b59cbfb339477501b937410ec9cda",
+      "repeat_final_sha256": [
+        "bc453696ebfe4222eed5684ec01768df822b59cbfb339477501b937410ec9cda",
+        "bc453696ebfe4222eed5684ec01768df822b59cbfb339477501b937410ec9cda",
+        "bc453696ebfe4222eed5684ec01768df822b59cbfb339477501b937410ec9cda",
+        "bc453696ebfe4222eed5684ec01768df822b59cbfb339477501b937410ec9cda",
+        "bc453696ebfe4222eed5684ec01768df822b59cbfb339477501b937410ec9cda",
+        "bc453696ebfe4222eed5684ec01768df822b59cbfb339477501b937410ec9cda"
+      ]
+    },
+    "coupled-fork-host-final": {
+      "setup": "coupled",
+      "backend": "jax",
+      "execution": "forced-host",
+      "steps": 2,
+      "repeats": 5,
+      "dtype": "float64",
+      "ocean_shape": [
+        90,
+        40,
+        15
+      ],
+      "dt_mom": 1800.0,
+      "dt_tracer": 1800.0,
+      "native_steps": 96,
+      "coupling_dt_seconds": 86400.0,
+      "native_solver": "JAXSciPySolver",
+      "tdma": false,
+      "setup_seconds": 16.468557749991305,
+      "cold_seconds": 12.353509917040356,
+      "warm_seconds": [
+        5.00594037497649,
+        5.049866874993313,
+        5.125653458992019,
+        5.1087122919852845,
+        5.01518520800164
+      ],
+      "warm_median_seconds": 5.049866874993313,
+      "warm_min_seconds": 5.00594037497649,
+      "warm_max_seconds": 5.125653458992019,
+      "native_steps_per_second": 19.0104021306754,
+      "simulated_days_per_second": 0.3960500443890708,
+      "initial_sha256": "b75466a27db361ee5b6ec58e0366dacd09220156e813ddd2b965d189a4213ba6",
+      "final_sha256": "4227d24c0b4da77f0a7fe1e08735bd6147e502dda9c6def48393890b1b2d39ea",
+      "repeat_final_sha256": [
+        "4227d24c0b4da77f0a7fe1e08735bd6147e502dda9c6def48393890b1b2d39ea",
+        "4227d24c0b4da77f0a7fe1e08735bd6147e502dda9c6def48393890b1b2d39ea",
+        "4227d24c0b4da77f0a7fe1e08735bd6147e502dda9c6def48393890b1b2d39ea",
+        "4227d24c0b4da77f0a7fe1e08735bd6147e502dda9c6def48393890b1b2d39ea",
+        "4227d24c0b4da77f0a7fe1e08735bd6147e502dda9c6def48393890b1b2d39ea",
+        "4227d24c0b4da77f0a7fe1e08735bd6147e502dda9c6def48393890b1b2d39ea"
+      ]
+    },
+    "coupled-fork-jax": {
+      "setup": "coupled",
+      "backend": "jax",
+      "execution": "jax",
+      "steps": 2,
+      "repeats": 5,
+      "dtype": "float64",
+      "ocean_shape": [
+        90,
+        40,
+        15
+      ],
+      "dt_mom": 1800.0,
+      "dt_tracer": 1800.0,
+      "native_steps": 96,
+      "coupling_dt_seconds": 86400.0,
+      "native_solver": "JAXSciPySolver",
+      "tdma": false,
+      "setup_seconds": 15.31392591696931,
+      "cold_seconds": 409.5513866250403,
+      "warm_seconds": [
+        6.148864042013884,
+        6.26353429100709,
+        6.643615957989823,
+        5.989902750006877,
+        5.976138208003249
+      ],
+      "warm_median_seconds": 6.148864042013884,
+      "warm_min_seconds": 5.976138208003249,
+      "warm_max_seconds": 6.643615957989823,
+      "native_steps_per_second": 15.61263988666075,
+      "simulated_days_per_second": 0.325263330972099,
+      "initial_sha256": "b75466a27db361ee5b6ec58e0366dacd09220156e813ddd2b965d189a4213ba6",
+      "final_sha256": "466cc2d2fe2fdbe91b2493650decced5a242894294745f719ed201098054c3cb",
+      "repeat_final_sha256": [
+        "466cc2d2fe2fdbe91b2493650decced5a242894294745f719ed201098054c3cb",
+        "466cc2d2fe2fdbe91b2493650decced5a242894294745f719ed201098054c3cb",
+        "466cc2d2fe2fdbe91b2493650decced5a242894294745f719ed201098054c3cb",
+        "466cc2d2fe2fdbe91b2493650decced5a242894294745f719ed201098054c3cb",
+        "466cc2d2fe2fdbe91b2493650decced5a242894294745f719ed201098054c3cb",
+        "466cc2d2fe2fdbe91b2493650decced5a242894294745f719ed201098054c3cb"
+      ]
+    },
+    "coupled-output-smoke": {
+      "setup": "coupled",
+      "backend": "jax",
+      "execution": "host",
+      "steps": 1,
+      "repeats": 1,
+      "dtype": "float64",
+      "ocean_shape": [
+        90,
+        40,
+        15
+      ],
+      "dt_mom": 1800.0,
+      "dt_tracer": 1800.0,
+      "native_steps": 48,
+      "coupling_dt_seconds": 86400.0,
+      "native_solver": "SciPySolver",
+      "tdma": null,
+      "setup_seconds": 16.316210583026987,
+      "cold_seconds": 12.11738091695588,
+      "warm_seconds": [
+        3.32694233302027
+      ],
+      "warm_median_seconds": 3.32694233302027,
+      "warm_min_seconds": 3.32694233302027,
+      "warm_max_seconds": 3.32694233302027,
+      "native_steps_per_second": 14.427662158010586,
+      "simulated_days_per_second": 0.30057629495855387,
+      "initial_sha256": "86b72d6ba0970f5ecb1ae3b84e1fea252cbb27562390fc9bf773a4ea964f7e1f",
+      "final_sha256": "1f83e0522671db0f91822a2a343fda2690b68b4327a47cabfed773954d0dd048",
+      "repeat_final_sha256": [
+        "1f83e0522671db0f91822a2a343fda2690b68b4327a47cabfed773954d0dd048",
+        "1f83e0522671db0f91822a2a343fda2690b68b4327a47cabfed773954d0dd048"
+      ]
+    }
+  },
+  "provenance": {
+    "acc-numpy-final": {
+      "versions": {
+        "veros": "1.7.0",
+        "jax": "0.11.2",
+        "jaxlib": "0.11.2",
+        "numpy": "2.4.2",
+        "scipy": "1.17.1",
+        "jcm": "3.0.0",
+        "veris": "0.2.1",
+        "flax": "0.12.10"
+      },
+      "python": "3.12.15",
+      "platform": "macOS-26.7.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "logical_cpus": 14,
+      "devices": [
+        "cpu:0"
+      ],
+      "veros_module": "/private/tmp/vercor-veros170-stack/veros/__init__.py",
+      "jax_module": "/private/tmp/vercor-veros170-stack/jax/__init__.py",
+      "veros_direct_url": null,
+      "threads": {
+        "OMP_NUM_THREADS": null,
+        "OPENBLAS_NUM_THREADS": null,
+        "MKL_NUM_THREADS": null,
+        "XLA_FLAGS": null
+      },
+      "git_head": "578fd8202bfdc087eb78beb4803f93bedc2876da",
+      "benchmark_sha256": "4d0162d919061a2e17dd186035d914e1369fdb92ec6a13aaaa1d18f4ce3438a8"
+    },
+    "acc-jax-final": {
+      "versions": {
+        "veros": "1.7.0",
+        "jax": "0.11.2",
+        "jaxlib": "0.11.2",
+        "numpy": "2.4.2",
+        "scipy": "1.17.1",
+        "jcm": "3.0.0",
+        "veris": "0.2.1",
+        "flax": "0.12.10"
+      },
+      "python": "3.12.15",
+      "platform": "macOS-26.7.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "logical_cpus": 14,
+      "devices": [
+        "cpu:0"
+      ],
+      "veros_module": "/private/tmp/vercor-veros170-stack/veros/__init__.py",
+      "jax_module": "/private/tmp/vercor-veros170-stack/jax/__init__.py",
+      "veros_direct_url": null,
+      "threads": {
+        "OMP_NUM_THREADS": null,
+        "OPENBLAS_NUM_THREADS": null,
+        "MKL_NUM_THREADS": null,
+        "XLA_FLAGS": null
+      },
+      "git_head": "578fd8202bfdc087eb78beb4803f93bedc2876da",
+      "benchmark_sha256": "4d0162d919061a2e17dd186035d914e1369fdb92ec6a13aaaa1d18f4ce3438a8"
+    },
+    "coupled-numpy-final": {
+      "versions": {
+        "veros": "1.7.0",
+        "jax": "0.11.2",
+        "jaxlib": "0.11.2",
+        "numpy": "2.4.2",
+        "scipy": "1.17.1",
+        "jcm": "3.0.0",
+        "veris": "0.2.1",
+        "flax": "0.12.10"
+      },
+      "python": "3.12.15",
+      "platform": "macOS-26.7.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "logical_cpus": 14,
+      "devices": [
+        "cpu:0"
+      ],
+      "veros_module": "/private/tmp/vercor-veros170-stack/veros/__init__.py",
+      "jax_module": "/private/tmp/vercor-veros170-stack/jax/__init__.py",
+      "veros_direct_url": null,
+      "threads": {
+        "OMP_NUM_THREADS": null,
+        "OPENBLAS_NUM_THREADS": null,
+        "MKL_NUM_THREADS": null,
+        "XLA_FLAGS": null
+      },
+      "git_head": "578fd8202bfdc087eb78beb4803f93bedc2876da",
+      "benchmark_sha256": "4d0162d919061a2e17dd186035d914e1369fdb92ec6a13aaaa1d18f4ce3438a8"
+    },
+    "coupled-jax-final": {
+      "versions": {
+        "veros": "1.7.0",
+        "jax": "0.11.2",
+        "jaxlib": "0.11.2",
+        "numpy": "2.4.2",
+        "scipy": "1.17.1",
+        "jcm": "3.0.0",
+        "veris": "0.2.1",
+        "flax": "0.12.10"
+      },
+      "python": "3.12.15",
+      "platform": "macOS-26.7.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "logical_cpus": 14,
+      "devices": [
+        "cpu:0"
+      ],
+      "veros_module": "/private/tmp/vercor-veros170-stack/veros/__init__.py",
+      "jax_module": "/private/tmp/vercor-veros170-stack/jax/__init__.py",
+      "veros_direct_url": null,
+      "threads": {
+        "OMP_NUM_THREADS": null,
+        "OPENBLAS_NUM_THREADS": null,
+        "MKL_NUM_THREADS": null,
+        "XLA_FLAGS": null
+      },
+      "git_head": "578fd8202bfdc087eb78beb4803f93bedc2876da",
+      "benchmark_sha256": "4d0162d919061a2e17dd186035d914e1369fdb92ec6a13aaaa1d18f4ce3438a8"
+    },
+    "coupled-fork-host-final": {
+      "versions": {
+        "veros": "0+untagged.1804.g7a8c964",
+        "jax": "0.11.2",
+        "jaxlib": "0.11.2",
+        "numpy": "2.4.2",
+        "scipy": "1.17.1",
+        "jcm": "3.0.0",
+        "veris": "0.2.1",
+        "flax": "0.12.10"
+      },
+      "python": "3.12.15",
+      "platform": "macOS-26.7.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "logical_cpus": 14,
+      "devices": [
+        "cpu:0"
+      ],
+      "veros_module": "/private/tmp/vercor-veros170-ad/veros/__init__.py",
+      "jax_module": "/private/tmp/vercor-veros170-stack/jax/__init__.py",
+      "veros_direct_url": {
+        "url": "https://github.com/Etienne-Meunier/veros.git",
+        "vcs_info": {
+          "commit_id": "7a8c964cf00b5aa0713c995edd760643a431b3c9",
+          "requested_revision": "7a8c964cf00b5aa0713c995edd760643a431b3c9",
+          "vcs": "git"
+        }
+      },
+      "threads": {
+        "OMP_NUM_THREADS": null,
+        "OPENBLAS_NUM_THREADS": null,
+        "MKL_NUM_THREADS": null,
+        "XLA_FLAGS": null
+      },
+      "git_head": "578fd8202bfdc087eb78beb4803f93bedc2876da",
+      "benchmark_sha256": "4d0162d919061a2e17dd186035d914e1369fdb92ec6a13aaaa1d18f4ce3438a8"
+    },
+    "coupled-fork-jax": {
+      "versions": {
+        "veros": "0+untagged.1804.g7a8c964",
+        "jax": "0.11.2",
+        "jaxlib": "0.11.2",
+        "numpy": "2.4.2",
+        "scipy": "1.17.1",
+        "jcm": "3.0.0",
+        "veris": "0.2.1",
+        "flax": "0.12.10"
+      },
+      "python": "3.12.15",
+      "platform": "macOS-26.7.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "logical_cpus": 14,
+      "devices": [
+        "cpu:0"
+      ],
+      "veros_module": "/private/tmp/vercor-veros170-ad/veros/__init__.py",
+      "jax_module": "/private/tmp/vercor-veros170-stack/jax/__init__.py",
+      "veros_direct_url": {
+        "url": "https://github.com/Etienne-Meunier/veros.git",
+        "vcs_info": {
+          "commit_id": "7a8c964cf00b5aa0713c995edd760643a431b3c9",
+          "requested_revision": "7a8c964cf00b5aa0713c995edd760643a431b3c9",
+          "vcs": "git"
+        }
+      },
+      "threads": {
+        "OMP_NUM_THREADS": null,
+        "OPENBLAS_NUM_THREADS": null,
+        "MKL_NUM_THREADS": null,
+        "XLA_FLAGS": null
+      },
+      "git_head": "578fd8202bfdc087eb78beb4803f93bedc2876da",
+      "benchmark_sha256": "4d0162d919061a2e17dd186035d914e1369fdb92ec6a13aaaa1d18f4ce3438a8"
+    },
+    "coupled-output-smoke": {
+      "versions": {
+        "veros": "1.7.0",
+        "jax": "0.11.2",
+        "jaxlib": "0.11.2",
+        "numpy": "2.4.2",
+        "scipy": "1.17.1",
+        "jcm": "3.0.0",
+        "veris": "0.2.1",
+        "flax": "0.12.10"
+      },
+      "python": "3.12.15",
+      "platform": "macOS-26.7.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "logical_cpus": 14,
+      "devices": [
+        "cpu:0"
+      ],
+      "veros_module": "/private/tmp/vercor-veros170-stack/veros/__init__.py",
+      "jax_module": "/private/tmp/vercor-veros170-stack/jax/__init__.py",
+      "veros_direct_url": null,
+      "threads": {
+        "OMP_NUM_THREADS": null,
+        "OPENBLAS_NUM_THREADS": null,
+        "MKL_NUM_THREADS": null,
+        "XLA_FLAGS": null
+      },
+      "git_head": "578fd8202bfdc087eb78beb4803f93bedc2876da",
+      "benchmark_sha256": "4d0162d919061a2e17dd186035d914e1369fdb92ec6a13aaaa1d18f4ce3438a8"
+    }
+  },
+  "source_sha256": {
+    "vercor/state.py": "de4e7ff506097a2f8f40e4422c3bc8c853dda13ecdbaab0d93c2aae1bab3e1d3",
+    "vercor/_numerical_safety.py": "948ef93ded4013e9cc20f0beb44af4ec123523c633ec406b8493f9432bc262c9",
+    "vercor/grid_masks.py": "2648be6b812e424e1cb97aed56eeb172aa9005ef83b2e51c566ae45d85aff624",
+    "vercor/jax_logging.py": "c0fc36a0d9687816c36ec1382309af7426be6b1d5d6c09eb79a1c2595f43961d",
+    "vercor/_run_order.py": "32e24f594b77b742de93582d08338893871870a63f2ee9f92ae0aa28fa34f489",
+    "vercor/forcing_index.py": "4185a4446358bef6c06653e03d6d44b20d63aed369bf1bd1681d9f8aefbfc6aa",
+    "vercor/exceptions.py": "567dd3245c59349424e3f3a8a47b41b9f18913bd1f34d10b967181cb659ada6e",
+    "vercor/_runtime/validation.py": "9c79716b213f14eaeaec028ed88794acfe57d8f318b42750c9d8a51f1224e59a",
+    "vercor/_runtime/state.py": "f63aa6cef0ad958bfc2d607296bd2bc0214afc190343f674a32368608c1e5465",
+    "vercor/_runtime/exchange_dispatch.py": "52d05ede350e33cba56994cb63d576b74e477c93dc241056e668719158f981bd",
+    "vercor/_runtime/component_state.py": "ba02b6136680cc37aede997d5348899ff9f25e6f91916ad697819c657ec9b2b1",
+    "vercor/_runtime/preparation.py": "8338bfd7ca827dfd03d014d64b823795cba5d68cc62305ecda1915430f736dd4",
+    "vercor/_runtime/driver.py": "7750b5bec04e7495e3642c71d1bc6d026310f36939e24626d60739f0f25bf4c6",
+    "vercor/_runtime/progress.py": "7e3caf2a31dee9365c9e0b541e37518b91ce039f20800d40abd49ba99f21bdf0",
+    "vercor/_runtime/interrupts.py": "ace15a864dbf151f28b9a002b96b99157a98d99abce9018d54f3ac25cebdb50c",
+    "vercor/_runtime/surface_masks.py": "2f9469040f0b08a9da561824cf60927f419b301564c521eba463dc82858d3c86",
+    "vercor/_runtime/exchange_masks.py": "9576731b1d0e9d8a27139db6e89f8ff52b1ee4b5e1060b6a58edf5eb85230637",
+    "vercor/_runtime/state_validation.py": "6e70ff3b41f9fdd75ebc34e30a3267db2d37d3d9e757b65249270e92ea890a96",
+    "vercor/_runtime/contracts.py": "dec1453251a2dec535cd4e57b2862d7f2a0b89989a304f75e7ae7857851825e4",
+    "vercor/_runtime/component_masks.py": "4d5ae57d1d375deaf85b3b59c8cc49819868acb57024c1e77b61cb167552aee8",
+    "vercor/_runtime/topology.py": "99a9c2fffdb23f3e71c80d868d008c714a53b93186133b652a723a4b1f474c1c",
+    "vercor/_runtime/topology_state.py": "f1966c32133a2b4488cb9fbd82e7f838662ed273cb1a34a0e10ab0e36b5866b2",
+    "vercor/_runtime/run_context.py": "900c98b61f61d00c8f7a81edc1c6e8d7e83b958263cb670507d12b042661ad33",
+    "vercor/_runtime/topology_policy.py": "32560478d099da0c946cffa094f3f6d3f3c8d0554fc4f24abee6bc1b7d51b1e2",
+    "vercor/_runtime/backends.py": "42850753d311f6454ced5baacdbd3144831d46408633940ded0a49efcb94eb1a",
+    "vercor/_runtime/initialization.py": "fabb359dc9255f8c20e67799e072a41803f51cda1947fd8fab10a67c1c04f728",
+    "vercor/_runtime/field_transfer.py": "584245c995da85e92e0e752a720e036f9aac16c08376e7ceed593ef21d8e4abc",
+    "vercor/_runtime/coupler_state.py": "a8efcf3963297852fd37bc4c11b02f081ae43a1686b9f5c8b2d25e10af94c325",
+    "vercor/_runtime/stores.py": "bf2074c834c0a900600ece79cd22a7880a77175bc6565ce0864e34c4cdb7396d",
+    "vercor/_runtime/__init__.py": "2deb94e83779e6f48d83784de02ba9fae8bfef460608fbc5efe1efef53bc457c",
+    "vercor/_runtime/dispatch_context.py": "c88f88cbcbab09891590dc15e46303744234c3a063d08becfd7db493742fdf67",
+    "vercor/_runtime/prepared.py": "ad67a4c412e188a39091ed4048a87316279d038bf2f917dede7c88f4c4503524",
+    "vercor/_runtime/execution.py": "83857dedb71bd7d32708458bd5cd2bdcf60f403d553e5e37a5a4ce079d3f34b8",
+    "vercor/_runtime/time.py": "988d27013a048dc90b07cb994cb2df525bcb836ff835d405e3847ea30a3b3c60",
+    "vercor/_runtime/facade.py": "33b282e006306eea70de9d6f35bee437f6d8ce94dad6e1bfdd0ee9b07e16b331",
+    "vercor/_runtime/exchange_topology.py": "585c0e73c7c8eb10ec90a671e9887517cd6fb2b2920d57fefd6827e3f06259d9",
+    "vercor/recipes.py": "ba8095555a0c7ecfd9c2a244802920dfb91b1cf50cd7e4125591ac8e45d62b17",
+    "vercor/topology.py": "cd1e1fb8441df3ca40b7e5cdf41f1471b2900a57c866312dbfad37b33f5e9be8",
+    "vercor/diagnostics/tables.py": "76b45bca095249b7ea2950ce7ffe5bfd58ed2a2a47ab5914fe2b6f2e3d9a94dd",
+    "vercor/diagnostics/__init__.py": "9307007cbb1e82cae2d3b26e312193a594ffc476e667b232df9db157bc62173c",
+    "vercor/diagnostics/plotting.py": "aeb23a3d984ee938c28868788db46f5fdaea5034f50f31a71a5ff62f69e2ef1f",
+    "vercor/diagnostics/fields.py": "bc95b93ff951ba7953418a2431dbe6079da0e8f878db30b1ad233b2ab76db2b7",
+    "vercor/setups/_data/jcm_land.py": "ca222d8f08e4ada718e9a584ed73cd5fdb52f80c8f10b180c53e00b750dd897d",
+    "vercor/setups/_data/era5_atmosphere.py": "ac1a02244955c7658d30a8d96a10477d60efd3c018d393e451bbb626b64e9523",
+    "vercor/setups/_data/veros_ocean.py": "364d244da7aa1d4a4d71065a5794143431c6b11b7bb8bfdb1a88d280ef014e37",
+    "vercor/setups/_data/_component_helpers.py": "45aa5e6d3499f8ca05cc443a330874073d4c7c35cb1fd31a76970a079c2a61d1",
+    "vercor/setups/_data/assets.py": "013c603436ff5d6e87da37ae71ec9089df304b0e59d0be548ac8b38c5c90fcb8",
+    "vercor/setups/_data/era5_land.py": "01c3f7029774ef6ed23aff9a1a7aa6db71001858fc208f0a884c02ffff97f7a1",
+    "vercor/setups/_data/__init__.py": "43c2040f85ebd89de7c15f40b5f9ebe73792e13ec97a51f6d939ba92882b71e2",
+    "vercor/setups/_data/era5_ocean.py": "1d613a0985b12ae760044ad546e7050a8d27e1f509db0ff81208289a4baf24dd",
+    "vercor/setups/_data/_field_helpers.py": "9063aabbaecba44595b9088e04ee73548e9dfd938baebec15271242b6e514e28",
+    "vercor/setups/_data/erainterim_ocean.py": "d2809e34fd9dffe8e2f9315cf1f7708fca1eae0d7af3eb5db27a01d03d6aa9df",
+    "vercor/setups/_time_helpers.py": "0cfa70c2eb48c1d20e00934bba7c4537c2855a5ad7b2451e0242a8bc896e14e9",
+    "vercor/setups/_external/veros_output.py": "92c85edc1663c87bcd7089b5a2de9d7ea6bcba5fb6b76a2515a80f1407d95d34",
+    "vercor/setups/_external/camulator_forcing.py": "586153bb08864043a367dea08fccc6983f27cdea5600c407e0d204f83bfdaba9",
+    "vercor/setups/_external/_jax_gcm_pytree.py": "e9e33db1f7146dce40b7bef1e03b0b94bc4bd491e02fb3cef65c59065854ef58",
+    "vercor/setups/_external/veros_data.py": "83c7978f546fdefa6b468d06c9ee9e06af7a05cba922bc1600fec4160097a6aa",
+    "vercor/setups/_external/veros_host_state.py": "09fee3b8552983501722ea3e58c84c0ca0b5757acfce915d48e827d0842a46f2",
+    "vercor/setups/_external/veros_setup.py": "8372d6a339979139b62e553f5fc4452020d1e85acd4c75c5741492e09f4cca7e",
+    "vercor/setups/_external/camulator_runtime_settings.py": "70d521ec0fd42e44404a5bcc6c4cd1346a04d5e3803870c5d33f56228d825565",
+    "vercor/setups/_external/jax_gcm_tools.py": "221e0a6ef7e808c2c458149179e5fe0d2ed3fa0a226c2010af6da8f7908d2625",
+    "vercor/setups/_external/jax_gcm_output.py": "0bf780a51a68847526abd6cefceb8975035bb879a270e36d9c553a6b3f7abe8f",
+    "vercor/setups/_external/veros_setup_jax.py": "9f3b64dde6388771ecdbc72784028cd3a04d5cb0798e469fa63f51bda18b7971",
+    "vercor/setups/_external/camulator.py": "eab0f0f96cf9436063f45e52d462413a0887051d53dc2edd511f0453b79c0504",
+    "vercor/setups/_external/jax_gcm_runtime.py": "c2b9bf707a1c2a23a4420849302ba933123e457acf3c15034e1e417cbecdffba",
+    "vercor/setups/_external/veros_state.py": "d853b558a8c0fc7919481c0db1cf27436f6b4d9ac4acd8c388b48bd53c67810c",
+    "vercor/setups/_external/veros_gcm.py": "7db35ed229e1af7202d00ca970f723c44e9022178944bc205988b0b66fa6926f",
+    "vercor/setups/_external/camulator_init.py": "2a059308a9a59c26375357f93184a2ec38231c8b164e1c0ae20b82cb89142c1b",
+    "vercor/setups/_external/_camulator_wind_filtering.py": "8ceb4f8403a975eddfb306e0bbf6612174972aac9003aec12cad4fd67ee57738",
+    "vercor/setups/_external/veris_fluxes.py": "bc1c40ad7bd8210cfc8c9acac5ddd505719e9a3fe19205fe1225406551717ce6",
+    "vercor/setups/_external/camulator_land.py": "4b5e2fe9d2c3bc4a99838be1ab7b8b844def2b30ea141785461680e50983b2dc",
+    "vercor/setups/_external/camulator_output.py": "9d156d7fe5e3758c4ffbfdb3300948544348983db0a317a4c36a53be646f23cb",
+    "vercor/setups/_external/veris_forcing.py": "42206fcbb5de62185cd9f7595686093cddca72d4b8640170447a6835e961e76a",
+    "vercor/setups/_external/veros_runtime_settings.py": "d286054fe8b3a340653e58099b64d5f59db49cd24d3620202d86eade6e72288d",
+    "vercor/setups/_external/camulator_gcm_state.py": "8f0fc7f4342eb39bddfcb6cb2313af4c229860223b69a7a438525e81f667c97f",
+    "vercor/setups/_external/veros_fluxes.py": "5ca848f5c5de4159d1ca7ed600939f21a356d11b260fc544ffbcecbdda9db4c4",
+    "vercor/setups/_external/jax_gcm_state.py": "709d67ad708960e0d3bc34a769f7662be5c9199b1fac4666a56d69ecadb7b1ed",
+    "vercor/setups/_external/camulator_contracts.py": "3d4d2829d746b2c95ea4f4f3a28e7fb77e151be74d0d41c1084137457a859fec",
+    "vercor/setups/_external/__init__.py": "5e66907071a4bd96aa21cc113f6f2bf65152af294734f2471da1637f06d142a4",
+    "vercor/setups/_external/veris_runtime.py": "fa877b2bb8a6a411f359167cf3daa1d29f960a4c95f483c266ca1b9ca297a10f",
+    "vercor/setups/_external/camulator_stepper.py": "f515d58cfd4dac63539842b6cd69306df255b5c516fbf18c1376ffcef1c014ee",
+    "vercor/setups/_external/camulator_fields.py": "fdddc15368f05747ee7b19bbc5bc8cd49174b8574089b3efc58633b8735213d5",
+    "vercor/setups/_external/camulator_wind_filter.py": "0f9f575ac7249f33f2c6f89d3ce0ecd6cf2b849803370df6bd6fd956c7a809eb",
+    "vercor/setups/_external/jax_gcm_surface.py": "7b396b42bec8998fd171d9b131f45a5758a8101006b44b0485eadf02f3fcdc0a",
+    "vercor/setups/_external/veris_output.py": "070ba90d28cd38b2d3c53f5eb35ecdeea3966372b9837b53fc42aa792bac13bb",
+    "vercor/setups/_external/veris_parameters.py": "c6c87c6a7ccea35680a5114b5997f9dfb5477b92ca9954eea1a88e6e9a452dda",
+    "vercor/setups/_external/camulator_imports.py": "a51a4bf56878d3707b1f3b72b0338c91ae72a92c9a6338e4f4ecdf038a75ef11",
+    "vercor/setups/_external/camulator_runtime.py": "aaa41ec4662ceae22c382cd7122eed3d3a59d9c654161ec3f36ab5a07c2f0c3a",
+    "vercor/setups/_external/jax_gcm.py": "55bd4d850748cd2c5534b51d41333de0600293bceaf6f4d83d673ca365650f1a",
+    "vercor/setups/_external/veros_gcm_state.py": "635d10ee6c9f56374575e0322d0bc16df343f0aefa0b55c056cc47b4d5603b18",
+    "vercor/setups/_external/veros_runtime.py": "8b3584fafb4c2e88b9c6d791a6e7a16f5c2051bad66e0a5f87428d2d7b1513b9",
+    "vercor/setups/_external/jax_gcm_fields.py": "5c67f0b3b266434dbec8ee3545e460c33673c3dcf93a2626b284405aea0389fd",
+    "vercor/setups/_external/veris.py": "8883a905344bdd0a5047ecb8934fcf78631503feabce85a6d0a09250d7501338",
+    "vercor/setups/_external/camulator_tensors.py": "ee4704a00965f2f9b6093d5b56b1dd549efecf5aad6c5d1c763dc63f043fe3c9",
+    "vercor/setups/_lazy_imports.py": "861dbddbd13331a476380ed018c9a2c5eda8867c346bb80c3848ebb287d6f014",
+    "vercor/setups/_surface_fluxes.py": "d30e5d48e6aad698e423eefc2363d2e15e2053fb504782bd29eb17da91c6cb54",
+    "vercor/setups/__init__.py": "d08905b330302f982b3a64eb9b3436d23523f651295dbf1f00cb48cf5c02f4cd",
+    "vercor/setups/_veris.py": "0c4f2c1b392e16262b2a4bb7f7832ff24016638dd6c688ae5dda4162f02f8046",
+    "vercor/setups/gallery/run_veros_with_era5data.py": "3895bb0a3e8e118704fad3cbedae724bb1132059e95d8a1b32008d03d33e563b",
+    "vercor/setups/gallery/run_jcm_with_verosdata.py": "a3f8caafd5d371ed68670493c85e8c4879375a5884cf70da1e702808ae4f83a1",
+    "vercor/setups/gallery/run_veris_calibration.py": "0facea1efca2335b90b618daf9ffbf848ebd12f89d9b15fd5174afafea6957b1",
+    "vercor/setups/gallery/run_jcm_with_era5data.py": "13ec4b01266aa9f1f24675d2d33354f1f18786dd665c66df7f207b8c2df82230",
+    "vercor/setups/gallery/run_veris_dataveros_era5.py": "baa7b79157e26ebe09fa7830c1a65f70a49ddeeeb5ba2e4710f15e2f6a226685",
+    "vercor/setups/gallery/profile_runtime.py": "72378b30d2de12ddee3500200fd2692aee33c053dde441d29134a630fdd46985",
+    "vercor/setups/gallery/run_jcm_with_slab.py": "e400ccf1758693224f3a39b68c6f0b8e141d693f93958a1a752a8988b98d07f3",
+    "vercor/setups/gallery/run_veris_veros_era5.py": "1d1bcf360a15e595c3c67e7cb3299cef18793ef583992f03d3056164fb47e600",
+    "vercor/setups/gallery/run_slab_driver.py": "840eb799fb951f66445575821d2d990cf6025c1953464b36e635620ee0659fc1",
+    "vercor/setups/gallery/custom_component_wrapping.py": "107a1401acde62639ba7f6ab9617610e7f79a36fe7add408b72c1580c0e541e5",
+    "vercor/setups/gallery/__init__.py": "69655e0f2b4b39975c1f382937e645796885f3d0ed54e1d24c599504ecb55b67",
+    "vercor/setups/gallery/run_data_driver.py": "5e2ac70373062632304dfd93338822140383f1727b75a9a9e00d8d37edd7443d",
+    "vercor/setups/gallery/run_jcm_with_veros.py": "56bb488f84c74da376837a5f6c0f2ab0051b67d4ede0b532ff27f46f523602ba",
+    "vercor/setups/gallery/run_veris_veros_jcm.py": "6154e2b036fba3114158f512c2e2c875b2b25f36e78b2321909add8c8c0c3e93",
+    "vercor/setups/gallery/run_camulator_with_veros.py": "fc81423b96e70a26686ba51660a2c14085250fd842041a6166cd73196ae72774",
+    "vercor/setups/config.py": "b6a33c459365029d910528c9247ae823611ce97afd3a11a53e0e6c23ba7d9607",
+    "vercor/setups/_slab/land.py": "c9683639544c71cfa4787b896564024a3ae068550ae8e97ba707effbdd812b53",
+    "vercor/setups/_slab/atmosphere.py": "dec2adde70ac8fdfb376333195c161d1a337826700dbcfc39c7f913f0b660d2e",
+    "vercor/setups/_slab/seaice.py": "8172e9e773aecad8cd1f0c34e1f82819f5f10610fa1938c11a5cb6382c66aefa",
+    "vercor/setups/_slab/ocean.py": "0767289553d9f544097492682899ecd0e7021cedec39fcefb030141b36e40e30",
+    "vercor/setups/_slab/__init__.py": "008326af1f4f632c1dcae5490960716fa7ceabc625fa25a24f178030d5478aa0",
+    "vercor/setups/_jcm.py": "30d7d3474e84e2d4e73f4aed16890aee0a989d86476f352f55ef054f5105f63e",
+    "vercor/setups/_output.py": "6975278e874fda31fb3c5e6dd41a882080a8ee5919242a3c0ae78e7934f1c411",
+    "vercor/_interpolators/bilinear_rectilinear.py": "8083d1c1a962dd554b29fbe5cb7ac1a701599f32f6bcb93d279240069e27715b",
+    "vercor/_interpolators/_bilinear_extrapolation.py": "43985389ed5424d770bd5fb1550851fb3b609a2985c777501caed4f12be0ee56",
+    "vercor/_interpolators/__init__.py": "1fcc5b838ddb6582ab04a0b7bf1b516a7bac0043d15c3a48b20da1e169d39356",
+    "vercor/_interpolators/_bilinear_geometry.py": "02b0c0004caa63b488c28182cd9649a79a6f102b1ab30b3e37897c601effdc70",
+    "vercor/_interpolators/_bilinear_weights.py": "4c7be30368b88f5312b5b3d0e471d92f5ec1d96800eb551c71d8b0285c2fd252",
+    "vercor/_interpolators/conservative_remap_rectilinear.py": "f697fa6fe4605f2b55b530a3aa002461c1e61d774504f6970de74bd88fecfc60",
+    "vercor/assets.py": "36ad0c89503c577d10d867dfcff5b83e1a82920642c8b84bd49bcc46742c3724",
+    "vercor/_field_names.py": "02a698aa124ab2cd443088b3351c7ddbcb24aa76599c61750dd525efe7c6cfdb",
+    "vercor/coupler.py": "6ba96769703930ab9f7874bdf2139f798ce3b8ac6c3863125752b886c73e1664",
+    "vercor/cli.py": "e6bb97d00539776715758ea69270af749776a2d7b296bae743fcef2e86ada9aa",
+    "vercor/components/data.py": "9e6bd35b60e28593f918655510513f20127e48f8559ac77988ae8831ea8b9028",
+    "vercor/components/base.py": "3960cf776398ec6a7499c33d6769a900a6adb8ec03ca180ad596015bd66e5d90",
+    "vercor/components/setup_validation.py": "44e6a293af8b6bc07cc04654c07a32db180a6a99d4f4e9f203cffa3d42c9dfb3",
+    "vercor/components/_contracts.py": "ea791bf07a5a2db10baa4286c32e4ef90e46247169d4100c2b7ed33074e0a8a2",
+    "vercor/components/runtime_execution.py": "caf22fbf06f1254c9f702dcc83f766ef872a47c7246ce60f7ba862d918e056fc",
+    "vercor/components/contexts.py": "fc1789e7669894d81cb40e3fb22c3d4a04af95e11db2768fdb5bb5526bde527a",
+    "vercor/components/contracts.py": "e0ca43345eb20e3f5ebbd2f13a31cb4484c87105ce522b9c7b47f2d3a103c1fe",
+    "vercor/components/_protocol.py": "219227e101a8b23f9284e34940b0367ab9e2e1ab5e8156fddb4daeac95cc1266",
+    "vercor/components/__init__.py": "6e45a67f40680807d2a0fcc5ffaf05d3e7744f14ce604b8badfc805f93354fa5",
+    "vercor/components/_callable_wrappers.py": "4a3c4df3380890b2a79945a1c7aad052d253a378617340d19ea168d4f2c8d1eb",
+    "vercor/components/_adapter.py": "9256bdc7a8f825713c92f936a12b75359b63988e05f04938d3c10cc8eae782b7",
+    "vercor/components/_runtime_fields.py": "78cb76aeff769463cf5e85fed54024fd08fc1582151f1b5db78cd54438bda1f0",
+    "vercor/calendar.py": "9a5dc377e1999425df6d7d09cc433a2f98fe0a53b5f1853d45e53d120b4e9cd3",
+    "vercor/physics.py": "ae166b40a26e3e5058a6bd1342848f65f10b70bcd16ad569b1ab24b10b4de88d",
+    "vercor/_regridders/base.py": "7e09fb5d077c6f1169e33776a7bb75fa82b985bc26ee04719706952d1aebc58e",
+    "vercor/_regridders/__init__.py": "afa3372d908375793ed7d1431b6d8cb873d70fbe2f8043800ba5d187594634b0",
+    "vercor/_regridders/bilinear.py": "bd8ce4a0222a17b113bc0d274b9139830bc94d06f6f36923bcfa981f9bbf68da",
+    "vercor/_regridders/conservative.py": "4d307b56647ad0b452211b5869dc0bed5d5b10aa684b24c68aae38a7bb68aaeb",
+    "vercor/types.py": "69d0c76777a520292499527c64d5fe630386f97afc03f8b778ec595a5d798f26",
+    "vercor/dtypes.py": "fe539b79dda7aba84d95f86721c2e69fb1ecb07cd8b94f53eef085bb43fcdd94",
+    "vercor/__init__.py": "647216ade1586fd9d4c2489feed4cb748e92be44e13835d90ce7d3a8524dc94e",
+    "vercor/regridding.py": "9f91b2dcef34d08c8867694d9dc76fa4c48427a815bedbeaadad74770b071e97",
+    "vercor/fields.py": "294b60c82a2369a06a1dde8743302798bf5954c29335202ab69893cb160379bd",
+    "vercor/_host_arrays.py": "88c027c05da9932d9b36ed5f66e20d17e8fe5a34ec218185cfd03b6b86fb7c50",
+    "vercor/field_layout.py": "2f51d73cce26e60074296fb055b10b0ae1b1dd06265c2ab7d98a658f89fe3c36",
+    "vercor/grids.py": "1c04db891080fe378094e2b26eec7e60d1c34b6bdf13079b26e881dc6835bb46",
+    "vercor/_pytree.py": "1167427194b44ff3408bc405502d46dfda94f0516ea64b1b477d9923bcc020bd",
+    "vercor/time_selection.py": "83b76ee932d8412d512f4c7dec19c3960f4fcd4836a2b3ec93c2540ef2333c75",
+    "vercor/exchanges.py": "c959e28ea6ca6783f29574c537062a8d240f4d3a585fd76d921761378bd050bc",
+    "vercor/forcing_data.py": "fca57e78e874eae5bde39e482a10aef53a46319762106c18db23f25f2ee41826",
+    "vercor/clock.py": "7a19c1f156f738b0f77ce29eac9f116b48fcb0626d8dfa46619cd85bbee5ce15",
+    "vercor/_setup_runner.py": "c0fd21cee88048b216c85295c66ebf7db6a7f806f0d3914b7dec446dcb1d3cc1",
+    "vercor/grid_geometry.py": "3276a1e2744c051f67ed8424be7c84c32dbe2638b8d16e7388301789eb03ec90",
+    "vercor/output/_dataset.py": "8bc6161d68bd9704fbe394fc6702cb7f7338bca44d53b933295d4215ae85cc1d",
+    "vercor/output/_period.py": "e04697b47f4a2ed0076de85c36631384062c6387e3ccf266243a8905ce06d159",
+    "vercor/output/_session.py": "d1e6c77280f4693a89abb619fbde33b6574b11dc224eb879e7a70380f8ad8517",
+    "vercor/output/_runtime.py": "3e7ff1431f45172cc618dd43d00bdca967e41eda7420546744a51ea0058abcca",
+    "vercor/output/_netcdf.py": "82b6cdd138062148085ac7fa91b353fd49b598a9bf4ff88d6d8549f5b089a236",
+    "vercor/output/__init__.py": "bc4dd6f4bfef8752b25185a27268c6f5a5f0eb50a709edd532861ccd90bc56ce",
+    "vercor/output/_scan.py": "6c4d003395711e9facebda51c4a631cc20cf1c4764af9db15329bfc1c0f314f3",
+    "vercor/runtime/__init__.py": "cfeb0525c6517904f967cf350b334106c8a767db861560fc0420fcc0ac48ea8c",
+    "vercor/_logging/protocols.py": "0a11e6b231062c77a08f309114e1c80880ebe28353c2dcf205d78c03bfdc2a8f",
+    "vercor/_logging/config.py": "679b49647f0242bccd24d4264fc59ab31065a946138281506ca4679583a546e7",
+    "vercor/_logging/callback.py": "e84f09e2074879df67e967f6a07ddf3eb37eb738aa44594088e726c4d54979ed",
+    "vercor/_logging/host.py": "8996a4188647e02c2a2775ee09d8da4f11b83cf3afe066322a69bd2efa6ddf65",
+    "vercor/_logging/__init__.py": "f00e69ac50a677daaa8642f2bdf1d8897e64d8c5182638879faa8cbc408a015c",
+    "vercor/fluxes/utilities.py": "97864ec05dc5feed3d58efea24187d02f16624cbde733729818abfc5fa093326",
+    "vercor/fluxes/vertical_coordinates.py": "84ba15a7ad6207c519a133577904edd06d9b439af0754c926f685e94c58ce12f",
+    "vercor/fluxes/__init__.py": "566a3ac96469b9e870d5d0ed65826e34b275ad28fd96889ab6bf2b056c67a57a",
+    "vercor/fluxes/bulk_formula_cesm.py": "042252962afeb5c1c9af61803513034a8f5f836332c6da1ade1cc1d5f9c4af55"
+  },
+  "source_hashes_verified": true,
+  "comparisons": {
+    "acc": {
+      "reference": "/private/tmp/vercor-veros-bench/acc-numpy-final",
+      "candidate": "/private/tmp/vercor-veros-bench/acc-jax-final",
+      "warm_speedup": 1.8839921216455697,
+      "observed_speedup_bounds": [
+        1.8252486514365585,
+        2.1439618143136125
+      ],
+      "startup_difference_seconds": 5.544166416977532,
+      "estimated_break_even_native_steps": 348,
+      "estimated_break_even_simulated_days": 174.0,
+      "initial": {
+        "arrays_compared": 128,
+        "arrays_identical": 109,
+        "changed": {
+          "native.cost": {
+            "max_abs": 1.1102230246251565e-16,
+            "reference_scale": 0.9998476951563913,
+            "scale_relative": 1.110392142726799e-16
+          },
+          "native.cosu": {
+            "max_abs": 1.1102230246251565e-16,
+            "reference_scale": 1.0,
+            "scale_relative": 1.1102230246251565e-16
+          },
+          "native.tantr": {
+            "max_abs": 2.6469779601696886e-23,
+            "reference_scale": 1.5698587127158553e-07,
+            "scale_relative": 1.6861249606280919e-16
+          },
+          "native.coriolis_t": {
+            "max_abs": 2.0328790734103208e-20,
+            "reference_scale": 0.0001031261997622758,
+            "scale_relative": 1.9712537435651347e-16
+          },
+          "native.beta": {
+            "max_abs": 4.8467614016778965e-26,
+            "reference_scale": 2.2887071695779224e-11,
+            "scale_relative": 2.117685244360782e-15
+          },
+          "native.area_t": {
+            "max_abs": 7.62939453125e-06,
+            "reference_scale": 49434192109.98692,
+            "scale_relative": 1.5433436262648407e-16
+          },
+          "native.area_u": {
+            "max_abs": 7.62939453125e-06,
+            "reference_scale": 49434192109.98692,
+            "scale_relative": 1.5433436262648407e-16
+          },
+          "native.area_v": {
+            "max_abs": 3.814697265625e-06,
+            "reference_scale": 49441722323.773186,
+            "scale_relative": 7.71554283777604e-17
+          },
+          "native.rho": {
+            "max_abs": 8.881784197001252e-16,
+            "reference_scale": 10.452091230839756,
+            "scale_relative": 8.497614497273826e-17
+          },
+          "native.int_drhodT": {
+            "max_abs": 1.4210854715202004e-14,
+            "reference_scale": 171.85216757921432,
+            "scale_relative": 8.269232163540555e-17
+          },
+          "native.Nsqr": {
+            "max_abs": 2.371692252312041e-20,
+            "reference_scale": 1.7726258278822675e-05,
+            "scale_relative": 1.3379542456207298e-15
+          },
+          "native.Hd": {
+            "max_abs": 7.105427357601002e-15,
+            "reference_scale": 97.44154629188397,
+            "scale_relative": 7.291989534235072e-17
+          },
+          "native.forc_temp_surface": {
+            "max_abs": 1.3552527156068805e-20,
+            "reference_scale": 9.632401248254906e-05,
+            "scale_relative": 1.406972862402727e-16
+          },
+          "native.p_hydro": {
+            "max_abs": 1.1102230246251565e-16,
+            "reference_scale": 90.05711386059778,
+            "scale_relative": 1.2327988062594427e-18
+          },
+          "native.surface_taux": {
+            "max_abs": 5.551115123125783e-17,
+            "reference_scale": 0.2,
+            "scale_relative": 2.7755575615628914e-16
+          },
+          "native.psin": {
+            "max_abs": 5.88418203051333e-15,
+            "reference_scale": 1.0,
+            "scale_relative": 5.88418203051333e-15
+          },
+          "native.line_psin": {
+            "max_abs": 1.6154612370034016e-17,
+            "reference_scale": 0.0008003939474836922,
+            "scale_relative": 2.0183326499183904e-14
+          },
+          "native.forc_tke_surface": {
+            "max_abs": 1.2705494208814505e-21,
+            "reference_scale": 2.7295751678464234e-06,
+            "scale_relative": 4.654751537338637e-16
+          },
+          "native.t_star": {
+            "max_abs": 1.7763568394002505e-15,
+            "reference_scale": 15.0,
+            "scale_relative": 1.1842378929335003e-16
+          }
+        }
+      },
+      "final": {
+        "arrays_compared": 128,
+        "arrays_identical": 46,
+        "changed": {
+          "canonical.OCN.sea_surface_temperature": {
+            "max_abs": 5.684341886080802e-14,
+            "reference_scale": 288.04097374085774,
+            "scale_relative": 1.9734490590893648e-16
+          },
+          "native.cost": {
+            "max_abs": 1.1102230246251565e-16,
+            "reference_scale": 0.9998476951563913,
+            "scale_relative": 1.110392142726799e-16
+          },
+          "native.cosu": {
+            "max_abs": 1.1102230246251565e-16,
+            "reference_scale": 1.0,
+            "scale_relative": 1.1102230246251565e-16
+          },
+          "native.tantr": {
+            "max_abs": 2.6469779601696886e-23,
+            "reference_scale": 1.5698587127158553e-07,
+            "scale_relative": 1.6861249606280919e-16
+          },
+          "native.coriolis_t": {
+            "max_abs": 2.0328790734103208e-20,
+            "reference_scale": 0.0001031261997622758,
+            "scale_relative": 1.9712537435651347e-16
+          },
+          "native.beta": {
+            "max_abs": 4.8467614016778965e-26,
+            "reference_scale": 2.2887071695779224e-11,
+            "scale_relative": 2.117685244360782e-15
+          },
+          "native.area_t": {
+            "max_abs": 7.62939453125e-06,
+            "reference_scale": 49434192109.98692,
+            "scale_relative": 1.5433436262648407e-16
+          },
+          "native.area_u": {
+            "max_abs": 7.62939453125e-06,
+            "reference_scale": 49434192109.98692,
+            "scale_relative": 1.5433436262648407e-16
+          },
+          "native.area_v": {
+            "max_abs": 3.814697265625e-06,
+            "reference_scale": 49441722323.773186,
+            "scale_relative": 7.71554283777604e-17
+          },
+          "native.rho": {
+            "max_abs": 7.216449660063518e-14,
+            "reference_scale": 10.452165806841304,
+            "scale_relative": 6.904262516903532e-15
+          },
+          "native.prho": {
+            "max_abs": 7.216449660063518e-14,
+            "reference_scale": 1.2614649297696992,
+            "scale_relative": 5.720689881866948e-14
+          },
+          "native.int_drhodT": {
+            "max_abs": 8.526512829121202e-14,
+            "reference_scale": 171.85216757921432,
+            "scale_relative": 4.961539298124333e-16
+          },
+          "native.Nsqr": {
+            "max_abs": 3.111152015265045e-17,
+            "reference_scale": 1.940264446403226e-05,
+            "scale_relative": 1.6034680329438376e-12
+          },
+          "native.Hd": {
+            "max_abs": 4.547473508864641e-13,
+            "reference_scale": 97.44234714657854,
+            "scale_relative": 4.666834946026149e-15
+          },
+          "native.dHd": {
+            "max_abs": 4.911599953992866e-19,
+            "reference_scale": 4.396053440087295e-07,
+            "scale_relative": 1.1172748513938295e-12
+          },
+          "native.temp": {
+            "max_abs": 1.2079226507921703e-13,
+            "reference_scale": 14.890973740857763,
+            "scale_relative": 8.111777455344506e-15
+          },
+          "native.dtemp": {
+            "max_abs": 5.409843924158056e-20,
+            "reference_scale": 1.2249208402394106e-07,
+            "scale_relative": 4.416484515930599e-13
+          },
+          "native.salt": {
+            "max_abs": 9.947598300641403e-14,
+            "reference_scale": 35.00000000000009,
+            "scale_relative": 2.8421709430403934e-15
+          },
+          "native.dsalt": {
+            "max_abs": 3.2721837300831563e-20,
+            "reference_scale": 2.318752693108647e-19,
+            "scale_relative": 0.14111827189713308
+          },
+          "native.dtemp_vmix": {
+            "max_abs": 2.1382023264454727e-18,
+            "reference_scale": 2.014778299750386e-06,
+            "scale_relative": 1.0612593587643751e-12
+          },
+          "native.dsalt_vmix": {
+            "max_abs": 1.809252336426181e-18,
+            "reference_scale": 1.6447748512965283e-18,
+            "scale_relative": 1.0999999999999999
+          },
+          "native.dtemp_iso": {
+            "max_abs": 8.333792972683469e-20,
+            "reference_scale": 5.873094313178348e-10,
+            "scale_relative": 1.4189782299227988e-10
+          },
+          "native.dsalt_iso": {
+            "max_abs": 3.295151024117586e-19,
+            "reference_scale": 1.6695187347678637e-19,
+            "scale_relative": 1.973713115939221
+          },
+          "native.forc_temp_surface": {
+            "max_abs": 9.317362419797304e-19,
+            "reference_scale": 9.381597347760602e-05,
+            "scale_relative": 9.931530926363375e-15
+          },
+          "native.u": {
+            "max_abs": 1.087602230498419e-13,
+            "reference_scale": 0.13478527491811162,
+            "scale_relative": 8.069147250389097e-13
+          },
+          "native.v": {
+            "max_abs": 3.864963904476326e-14,
+            "reference_scale": 0.08114290330058416,
+            "scale_relative": 4.763157031932948e-13
+          },
+          "native.w": {
+            "max_abs": 1.0372765472076162e-17,
+            "reference_scale": 1.7354174483813723e-05,
+            "scale_relative": 5.977101061044917e-13
+          },
+          "native.du": {
+            "max_abs": 1.0867432713272673e-18,
+            "reference_scale": 9.775389495455905e-06,
+            "scale_relative": 1.1117135249009163e-13
+          },
+          "native.dv": {
+            "max_abs": 3.2509124515620047e-18,
+            "reference_scale": 7.521849800140762e-06,
+            "scale_relative": 4.3219587441126087e-13
+          },
+          "native.du_cor": {
+            "max_abs": 1.0664144805931641e-18,
+            "reference_scale": 4.593490744803291e-06,
+            "scale_relative": 2.32157751008777e-13
+          },
+          "native.dv_cor": {
+            "max_abs": 3.2559946492455305e-18,
+            "reference_scale": 7.170241998248261e-06,
+            "scale_relative": 4.540982926435387e-13
+          },
+          "native.du_mix": {
+            "max_abs": 1.4306386479125133e-17,
+            "reference_scale": 8.79091088197877e-06,
+            "scale_relative": 1.6274066102129418e-12
+          },
+          "native.dv_mix": {
+            "max_abs": 3.074835477651517e-18,
+            "reference_scale": 5.224267777087028e-06,
+            "scale_relative": 5.885677397964463e-13
+          },
+          "native.du_adv": {
+            "max_abs": 6.120805660647384e-20,
+            "reference_scale": 3.8613052618551494e-08,
+            "scale_relative": 1.5851649236627994e-12
+          },
+          "native.dv_adv": {
+            "max_abs": 1.8581785280391214e-20,
+            "reference_scale": 1.8874750401843463e-08,
+            "scale_relative": 9.844784638093209e-13
+          },
+          "native.p_hydro": {
+            "max_abs": 8.526512829121202e-14,
+            "reference_scale": 90.08664404139586,
+            "scale_relative": 9.464791279385622e-16
+          },
+          "native.kappaM": {
+            "max_abs": 2.0237284070745432e-13,
+            "reference_scale": 0.0834344604155639,
+            "scale_relative": 2.4255306464438234e-12
+          },
+          "native.kappaH": {
+            "max_abs": 2.0237284070745432e-13,
+            "reference_scale": 0.0834344604155639,
+            "scale_relative": 2.4255306464438234e-12
+          },
+          "native.surface_taux": {
+            "max_abs": 5.551115123125783e-17,
+            "reference_scale": 0.2,
+            "scale_relative": 2.7755575615628914e-16
+          },
+          "native.forc_rho_surface": {
+            "max_abs": 2.1599340154984659e-19,
+            "reference_scale": 2.050809236764997e-05,
+            "scale_relative": 1.0532105945190716e-14
+          },
+          "native.psi": {
+            "max_abs": 5.21540641784668e-08,
+            "reference_scale": 4043848.2149930065,
+            "scale_relative": 1.2897136936322174e-14
+          },
+          "native.dpsi": {
+            "max_abs": 4.192202140984591e-13,
+            "reference_scale": 113.1394385399432,
+            "scale_relative": 3.7053411216147756e-15
+          },
+          "native.psin": {
+            "max_abs": 5.88418203051333e-15,
+            "reference_scale": 1.0,
+            "scale_relative": 5.88418203051333e-15
+          },
+          "native.dpsin": {
+            "max_abs": 2.3305801732931286e-12,
+            "reference_scale": 183.79206445855095,
+            "scale_relative": 1.2680526660163416e-14
+          },
+          "native.line_psin": {
+            "max_abs": 1.6154612370034016e-17,
+            "reference_scale": 0.0008003939474836922,
+            "scale_relative": 2.0183326499183904e-14
+          },
+          "native.K_gm": {
+            "max_abs": 4.569500333673204e-11,
+            "reference_scale": 86.09615221589156,
+            "scale_relative": 5.307438504586003e-13
+          },
+          "native.K_iso": {
+            "max_abs": 4.569500333673204e-11,
+            "reference_scale": 86.09615221589156,
+            "scale_relative": 5.307438504586003e-13
+          },
+          "native.K_diss_v": {
+            "max_abs": 4.6663045064239406e-18,
+            "reference_scale": 1.7471665966332964e-06,
+            "scale_relative": 2.6707839512360634e-12
+          },
+          "native.K_diss_bot": {
+            "max_abs": 1.5218830801268595e-23,
+            "reference_scale": 2.1527771199158326e-11,
+            "scale_relative": 7.069394532520676e-13
+          },
+          "native.K_diss_h": {
+            "max_abs": 4.1931853201844355e-21,
+            "reference_scale": 3.832614900068246e-09,
+            "scale_relative": 1.0940794808551649e-12
+          },
+          "native.P_diss_v": {
+            "max_abs": 7.275417446873402e-19,
+            "reference_scale": 1.9635024347426102e-07,
+            "scale_relative": 3.705326419840735e-12
+          },
+          "native.P_diss_nonlin": {
+            "max_abs": 2.4382637480103086e-19,
+            "reference_scale": 1.1251536389509135e-07,
+            "scale_relative": 2.167049604251141e-12
+          },
+          "native.P_diss_iso": {
+            "max_abs": 1.865296320274912e-23,
+            "reference_scale": 1.5956285094904704e-12,
+            "scale_relative": 1.1690041317139378e-11
+          },
+          "native.P_diss_skew": {
+            "max_abs": 1.7023845526610138e-23,
+            "reference_scale": 2.866966004117403e-12,
+            "scale_relative": 5.937930726126952e-12
+          },
+          "native.P_diss_adv": {
+            "max_abs": 3.9569673526576674e-19,
+            "reference_scale": 3.705916162600247e-07,
+            "scale_relative": 1.06774335388129e-12
+          },
+          "native.u_wgrid": {
+            "max_abs": 3.8843928074072664e-14,
+            "reference_scale": 0.12587171693918164,
+            "scale_relative": 3.085993344544682e-13
+          },
+          "native.v_wgrid": {
+            "max_abs": 7.844419558367122e-15,
+            "reference_scale": 0.07114692025068517,
+            "scale_relative": 1.1025662854734147e-13
+          },
+          "native.w_wgrid": {
+            "max_abs": 6.506589463452315e-18,
+            "reference_scale": 1.5210609244175906e-05,
+            "scale_relative": 4.2776652525891866e-13
+          },
+          "native.K_11": {
+            "max_abs": 5.684341886080802e-14,
+            "reference_scale": 500.0,
+            "scale_relative": 1.1368683772161603e-16
+          },
+          "native.K_22": {
+            "max_abs": 5.684341886080802e-14,
+            "reference_scale": 500.0,
+            "scale_relative": 1.1368683772161603e-16
+          },
+          "native.K_33": {
+            "max_abs": 2.1045804123953973e-17,
+            "reference_scale": 1.8470863406886895e-06,
+            "scale_relative": 1.1394055416005624e-11
+          },
+          "native.Ai_ez": {
+            "max_abs": 5.451986857308612e-16,
+            "reference_scale": 5.619284122498824e-05,
+            "scale_relative": 9.702280109809046e-12
+          },
+          "native.Ai_nz": {
+            "max_abs": 2.017971293538645e-15,
+            "reference_scale": 0.00040131146768204463,
+            "scale_relative": 5.0284416371013475e-12
+          },
+          "native.Ai_bx": {
+            "max_abs": 5.451986857308612e-16,
+            "reference_scale": 5.619284122498824e-05,
+            "scale_relative": 9.702280109809046e-12
+          },
+          "native.Ai_by": {
+            "max_abs": 2.017971293538645e-15,
+            "reference_scale": 0.00040131146768204463,
+            "scale_relative": 5.0284416371013475e-12
+          },
+          "native.B1_gm": {
+            "max_abs": 2.775731033910489e-14,
+            "reference_scale": 0.005358211485262818,
+            "scale_relative": 5.180331238408259e-12
+          },
+          "native.B2_gm": {
+            "max_abs": 6.222444142505223e-15,
+            "reference_scale": 0.0006057173482725722,
+            "scale_relative": 1.0272851124787545e-11
+          },
+          "native.tke": {
+            "max_abs": 1.2961636972064206e-15,
+            "reference_scale": 0.0007006926334385943,
+            "scale_relative": 1.8498320595231587e-12
+          },
+          "native.sqrttke": {
+            "max_abs": 6.269464114527779e-14,
+            "reference_scale": 0.02602798493620822,
+            "scale_relative": 2.4087397199182183e-12
+          },
+          "native.Prandtlnumber": {
+            "max_abs": 1.8636647780567728e-11,
+            "reference_scale": 10.0,
+            "scale_relative": 1.863664778056773e-12
+          },
+          "native.mxl": {
+            "max_abs": 3.9179326449811924e-11,
+            "reference_scale": 32.20198231728971,
+            "scale_relative": 1.2166743669310064e-12
+          },
+          "native.forc_tke_surface": {
+            "max_abs": 1.2705494208814505e-21,
+            "reference_scale": 2.7295751678464234e-06,
+            "scale_relative": 4.654751537338637e-16
+          },
+          "native.tke_diss": {
+            "max_abs": 1.379922550195662e-18,
+            "reference_scale": 1.0142328356587845e-06,
+            "scale_relative": 1.36055795245413e-12
+          },
+          "native.tke_surf_corr": {
+            "max_abs": 2.5212465070616284e-21,
+            "reference_scale": 2.6497669614148257e-08,
+            "scale_relative": 9.514974500683733e-14
+          },
+          "native.eke": {
+            "max_abs": 1.9426192425509026e-16,
+            "reference_scale": 0.0002487047052356672,
+            "scale_relative": 7.81094688462013e-13
+          },
+          "native.deke": {
+            "max_abs": 3.04153463052503e-23,
+            "reference_scale": 3.3590797011971454e-11,
+            "scale_relative": 9.05466645950989e-13
+          },
+          "native.sqrteke": {
+            "max_abs": 7.049048844631756e-15,
+            "reference_scale": 0.010046930532749979,
+            "scale_relative": 7.016121811187976e-13
+          },
+          "native.L_rossby": {
+            "max_abs": 1.8044374883174896e-09,
+            "reference_scale": 220362.121482041,
+            "scale_relative": 8.188510240243566e-15
+          },
+          "native.L_rhines": {
+            "max_abs": 2.0860170479863882e-08,
+            "reference_scale": 21458.713443255056,
+            "scale_relative": 9.721072297752636e-13
+          },
+          "native.eke_len": {
+            "max_abs": 2.0860170479863882e-08,
+            "reference_scale": 21458.713443255056,
+            "scale_relative": 9.721072297752636e-13
+          },
+          "native.eke_diss_iw": {
+            "max_abs": 3.7113267639781546e-23,
+            "reference_scale": 5.822140100406903e-11,
+            "scale_relative": 6.374506109392273e-13
+          },
+          "native.t_star": {
+            "max_abs": 1.7763568394002505e-15,
+            "reference_scale": 15.0,
+            "scale_relative": 1.1842378929335003e-16
+          }
+        }
+      }
+    },
+    "stock_first": {
+      "reference": "/private/tmp/vercor-veros-bench/coupled-numpy-1",
+      "candidate": "/private/tmp/vercor-veros-bench/coupled-jax-1",
+      "warm_speedup": 2.324887608663902,
+      "observed_speedup_bounds": [
+        2.173113344233639,
+        2.41209749545644
+      ],
+      "startup_difference_seconds": -1.438019250985235,
+      "estimated_break_even_native_steps": 96,
+      "estimated_break_even_simulated_days": 2.0,
+      "initial": {
+        "arrays_compared": 193,
+        "arrays_identical": 177,
+        "changed": {
+          "native.cost": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 0.9993908270190958,
+            "scale_relative": 2.2217995094804747e-16
+          },
+          "native.cosu": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 1.0,
+            "scale_relative": 2.220446049250313e-16
+          },
+          "native.tantr": {
+            "max_abs": 6.776263578034403e-21,
+            "reference_scale": 2.245002552074081e-06,
+            "scale_relative": 3.018376781698553e-15
+          },
+          "native.coriolis_t": {
+            "max_abs": 2.710505431213761e-20,
+            "reference_scale": 0.00014548720541207664,
+            "scale_relative": 1.8630541589802005e-16
+          },
+          "native.beta": {
+            "max_abs": 3.2311742677852644e-26,
+            "reference_scale": 2.2862677914188064e-11,
+            "scale_relative": 1.4132965000482599e-15
+          },
+          "native.area_t": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_u": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_v": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197766889295.09274,
+            "scale_relative": 2.3146628513328123e-16
+          },
+          "native.rho": {
+            "max_abs": 6.821210263296962e-13,
+            "reference_scale": 25.758994805160228,
+            "scale_relative": 2.6480886831540832e-14
+          },
+          "native.int_drhodT": {
+            "max_abs": 4.177195478405338e-09,
+            "reference_scale": 681.0958742089075,
+            "scale_relative": 6.133050627060615e-12
+          },
+          "native.int_drhodS": {
+            "max_abs": 5.220499588176608e-10,
+            "reference_scale": 3947.6638896234863,
+            "scale_relative": 1.3224275759389738e-13
+          },
+          "native.Nsqr": {
+            "max_abs": 2.9043425684458033e-16,
+            "reference_scale": 0.0013007041223534166,
+            "scale_relative": 2.2329002565094193e-13
+          },
+          "native.Hd": {
+            "max_abs": 2.162323653465137e-10,
+            "reference_scale": 680.6023506318597,
+            "scale_relative": 3.1770734430430224e-13
+          },
+          "native.forc_temp_surface": {
+            "max_abs": 1.3552527156068805e-20,
+            "reference_scale": 0.00010420829582136701,
+            "scale_relative": 1.3005228661737673e-16
+          },
+          "native.forc_tke_surface": {
+            "max_abs": 4.235164736271502e-22,
+            "reference_scale": 5.520188207751033e-06,
+            "scale_relative": 7.672138298337006e-17
+          },
+          "native.qnet": {
+            "max_abs": 8.881784197001252e-16,
+            "reference_scale": 441.6922239601776,
+            "scale_relative": 2.0108536476752693e-18
+          }
+        }
+      },
+      "final": {
+        "arrays_compared": 193,
+        "arrays_identical": 53,
+        "changed": {
+          "canonical.CICE.ice_fraction": {
+            "max_abs": 6.756734061141856e-12,
+            "reference_scale": 0.15666387752614164,
+            "scale_relative": 4.312885757608289e-11
+          },
+          "canonical.CICE.ice_surface_temperature": {
+            "max_abs": 4.083739213456283e-08,
+            "reference_scale": 273.15000000000003,
+            "scale_relative": 1.495053711680865e-10
+          },
+          "canonical.CICE.ice_surface_albedo": {
+            "max_abs": 3.4638958368304884e-14,
+            "reference_scale": 0.750329543724683,
+            "scale_relative": 4.616499331261158e-14
+          },
+          "canonical.CICE.sea_surface_heat_flux": {
+            "max_abs": 3.025685748525575e-05,
+            "reference_scale": 826.0335948464859,
+            "scale_relative": 3.662908830103796e-08
+          },
+          "canonical.CICE.sea_surface_mass_flux": {
+            "max_abs": 6.276000186667026e-12,
+            "reference_scale": 0.00037844928041902724,
+            "scale_relative": 1.658346444659137e-08
+          },
+          "canonical.CICE.ocean_u_stress": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "canonical.CICE.ocean_v_stress": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "canonical.CICE.air_u_velocity": {
+            "max_abs": 2.4217819305505373e-08,
+            "reference_scale": 30.46930037415952,
+            "scale_relative": 7.948268915962402e-10
+          },
+          "canonical.CICE.air_v_velocity": {
+            "max_abs": 4.688249610751427e-08,
+            "reference_scale": 26.286258946559176,
+            "scale_relative": 1.7835362651957403e-09
+          },
+          "canonical.CICE.air_specific_humidity": {
+            "max_abs": 1.2767251730654017e-10,
+            "reference_scale": 0.00856245994675381,
+            "scale_relative": 1.491072870419011e-08
+          },
+          "canonical.CICE.model_level_height": {
+            "max_abs": 2.747318035289936e-07,
+            "reference_scale": 443.41549699345046,
+            "scale_relative": 6.195809695236059e-10
+          },
+          "canonical.CICE.air_density": {
+            "max_abs": 6.881573089145832e-10,
+            "reference_scale": 1.2501641700564252,
+            "scale_relative": 5.504535527390164e-10
+          },
+          "canonical.CICE.air_potential_temperature": {
+            "max_abs": 1.6644230527163018e-07,
+            "reference_scale": 303.61772889513577,
+            "scale_relative": 5.481969247227866e-10
+          },
+          "canonical.CICE.air_temperature": {
+            "max_abs": 1.6062762142610154e-07,
+            "reference_scale": 293.8040043788099,
+            "scale_relative": 5.467169236366151e-10
+          },
+          "canonical.CICE.surface_pressure": {
+            "max_abs": 3.657492925412953e-06,
+            "reference_scale": 107687.36415001593,
+            "scale_relative": 3.3963993401471066e-11
+          },
+          "canonical.CICE.downward_shortwave_radiation_flux": {
+            "max_abs": 5.454579934394133e-07,
+            "reference_scale": 385.3393669793086,
+            "scale_relative": 1.415526261215617e-09
+          },
+          "canonical.CICE.downward_longwave_radiation_flux": {
+            "max_abs": 2.293510277695532e-06,
+            "reference_scale": 283.74775053289176,
+            "scale_relative": 8.082919682669591e-09
+          },
+          "canonical.CICE.sea_surface_temperature": {
+            "max_abs": 1.393277273109561e-06,
+            "reference_scale": 302.98674079545873,
+            "scale_relative": 4.598476056911478e-09
+          },
+          "canonical.CICE.sea_surface_salinity": {
+            "max_abs": 1.0100971366000522e-06,
+            "reference_scale": 37.576115057262314,
+            "scale_relative": 2.6881361605923424e-08
+          },
+          "canonical.CICE.ocean_u_velocity": {
+            "max_abs": 2.539479751484386e-09,
+            "reference_scale": 0.15912571876645035,
+            "scale_relative": 1.5958952274783396e-08
+          },
+          "canonical.CICE.ocean_v_velocity": {
+            "max_abs": 3.0892771396562324e-09,
+            "reference_scale": 0.15327265241527313,
+            "scale_relative": 2.0155436021856144e-08
+          },
+          "canonical.CICE.sea_surface_height": {
+            "max_abs": 7.523518240695748e-09,
+            "reference_scale": 0.9528121301320747,
+            "scale_relative": 7.896119290224475e-09
+          },
+          "canonical.OCN.sea_surface_temperature": {
+            "max_abs": 1.0264092793477175e-06,
+            "reference_scale": 302.98725853119123,
+            "scale_relative": 3.3876318242671353e-09
+          },
+          "canonical.OCN.sea_surface_salinity": {
+            "max_abs": 3.970030491018406e-07,
+            "reference_scale": 37.54466162769758,
+            "scale_relative": 1.0574154404123385e-08
+          },
+          "canonical.OCN.ocean_u_velocity": {
+            "max_abs": 7.022805916662156e-09,
+            "reference_scale": 0.23216960008266485,
+            "scale_relative": 3.024860237585653e-08
+          },
+          "canonical.OCN.ocean_v_velocity": {
+            "max_abs": 3.961377450026338e-09,
+            "reference_scale": 0.21237525608726615,
+            "scale_relative": 1.865272594844376e-08
+          },
+          "canonical.OCN.sea_surface_height": {
+            "max_abs": 2.555373163071195e-09,
+            "reference_scale": 1.3013317790581913,
+            "scale_relative": 1.9636600013876453e-09
+          },
+          "canonical.OCN.ice_fraction": {
+            "max_abs": 6.756734061141856e-12,
+            "reference_scale": 0.15666387752614164,
+            "scale_relative": 4.312885757608289e-11
+          },
+          "canonical.OCN.open_water_temperature_contribution": {
+            "max_abs": 1.0264092793477175e-06,
+            "reference_scale": 302.98725853119123,
+            "scale_relative": 3.3876318242671353e-09
+          },
+          "canonical.OCN.sea_surface_heat_flux": {
+            "max_abs": 3.025685748525575e-05,
+            "reference_scale": 826.0335948464859,
+            "scale_relative": 3.662908830103796e-08
+          },
+          "canonical.OCN.sea_surface_mass_flux": {
+            "max_abs": 6.276000186667026e-12,
+            "reference_scale": 0.00037844928041902724,
+            "scale_relative": 1.658346444659137e-08
+          },
+          "canonical.OCN.ocean_u_stress": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "canonical.OCN.ocean_v_stress": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "canonical.ATM.downward_shortwave_radiation_flux": {
+            "max_abs": 7.034808504613466e-07,
+            "reference_scale": 513.1265474016475,
+            "scale_relative": 1.3709695084450584e-09
+          },
+          "canonical.ATM.surface_pressure": {
+            "max_abs": 5.346446414478123e-06,
+            "reference_scale": 111118.74930079073,
+            "scale_relative": 4.811471014676078e-11
+          },
+          "canonical.ATM.air_u_velocity": {
+            "max_abs": 4.221829108530528e-08,
+            "reference_scale": 24.60714386052718,
+            "scale_relative": 1.715692456003742e-09
+          },
+          "canonical.ATM.air_v_velocity": {
+            "max_abs": 7.33948155584585e-08,
+            "reference_scale": 19.904644343171235,
+            "scale_relative": 3.687321124310285e-09
+          },
+          "canonical.ATM.air_temperature": {
+            "max_abs": 2.5908343559422065e-07,
+            "reference_scale": 295.9495602848032,
+            "scale_relative": 8.754310543489068e-10
+          },
+          "canonical.ATM.air_specific_humidity": {
+            "max_abs": 1.293791033508962e-10,
+            "reference_scale": 0.013574505027389628,
+            "scale_relative": 9.531036534285756e-09
+          },
+          "canonical.ATM.sensible_heat_flux": {
+            "max_abs": 1.4156230907502731e-06,
+            "reference_scale": 190.0657930847539,
+            "scale_relative": 7.448068733330781e-09
+          },
+          "canonical.ATM.latent_heat_flux": {
+            "max_abs": 3.727710009115981e-06,
+            "reference_scale": 652.2143138145481,
+            "scale_relative": 5.715467953032269e-09
+          },
+          "canonical.ATM.net_shortwave_radiation_flux": {
+            "max_abs": 5.927522863657941e-07,
+            "reference_scale": 379.82064778639125,
+            "scale_relative": 1.5606110142257307e-09
+          },
+          "canonical.ATM.downward_longwave_radiation_flux": {
+            "max_abs": 2.2074864602927846e-06,
+            "reference_scale": 366.7412461107779,
+            "scale_relative": 6.019193324183642e-09
+          },
+          "canonical.ATM.air_density": {
+            "max_abs": 1.0891225699083407e-09,
+            "reference_scale": 1.3168617455063498,
+            "scale_relative": 8.270591606331152e-10
+          },
+          "canonical.ATM.air_potential_temperature": {
+            "max_abs": 2.6975970968123875e-07,
+            "reference_scale": 331.83947616201147,
+            "scale_relative": 8.129222984595601e-10
+          },
+          "canonical.ATM.model_level_height": {
+            "max_abs": 4.1558161001375993e-07,
+            "reference_scale": 447.8302501193812,
+            "scale_relative": 9.279891429910674e-10
+          },
+          "canonical.ATM.rain_rate": {
+            "max_abs": 8.222446974594927e-15,
+            "reference_scale": 2.7240547231451495e-05,
+            "scale_relative": 3.0184588087501496e-10
+          },
+          "canonical.ATM.snow_rate": {
+            "max_abs": 1.103080889756408e-19,
+            "reference_scale": 1.1922449180262665e-10,
+            "scale_relative": 9.25213329139228e-10
+          },
+          "canonical.ATM.sea_surface_temperature": {
+            "max_abs": 6.409669026652409e-07,
+            "reference_scale": 302.9872585311912,
+            "scale_relative": 2.115491277661289e-09
+          },
+          "canonical.ATM.total_surface_temperature": {
+            "max_abs": 5.297815732774325e-07,
+            "reference_scale": 309.9266357421875,
+            "scale_relative": 1.709377356382274e-09
+          },
+          "canonical.ATM.air_pressure_3d": {
+            "max_abs": 5.079127731733024e-06,
+            "reference_scale": 105562.81183575118,
+            "scale_relative": 4.8114744609454075e-11
+          },
+          "canonical.ATM.open_water_temperature_contribution": {
+            "max_abs": 5.297815732774325e-07,
+            "reference_scale": 302.91310638388325,
+            "scale_relative": 1.748955598527446e-09
+          },
+          "canonical.ATM.ice_surface_temperature": {
+            "max_abs": 9.240253007192223e-10,
+            "reference_scale": 39.041722456183706,
+            "scale_relative": 2.366763663555701e-11
+          },
+          "canonical.ATM.ice_surface_albedo": {
+            "max_abs": 2.9789365418864122e-12,
+            "reference_scale": 0.11026577368567222,
+            "scale_relative": 2.7015967351558073e-11
+          },
+          "canonical.ATM.ice_fraction": {
+            "max_abs": 3.969033435247127e-12,
+            "reference_scale": 0.1469836293970833,
+            "scale_relative": 2.7003234656320763e-11
+          },
+          "canonical.ATM.marine_surface_albedo": {
+            "max_abs": 4.5998760356269486e-12,
+            "reference_scale": 0.5994257964818709,
+            "scale_relative": 7.673803934739516e-12
+          },
+          "canonical.ATM.marine_ice_fraction": {
+            "max_abs": 6.7567618167174714e-12,
+            "reference_scale": 0.9989165971356053,
+            "scale_relative": 6.764090051254024e-12
+          },
+          "native.cost": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 0.9993908270190958,
+            "scale_relative": 2.2217995094804747e-16
+          },
+          "native.cosu": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 1.0,
+            "scale_relative": 2.220446049250313e-16
+          },
+          "native.tantr": {
+            "max_abs": 6.776263578034403e-21,
+            "reference_scale": 2.245002552074081e-06,
+            "scale_relative": 3.018376781698553e-15
+          },
+          "native.coriolis_t": {
+            "max_abs": 2.710505431213761e-20,
+            "reference_scale": 0.00014548720541207664,
+            "scale_relative": 1.8630541589802005e-16
+          },
+          "native.beta": {
+            "max_abs": 3.2311742677852644e-26,
+            "reference_scale": 2.2862677914188064e-11,
+            "scale_relative": 1.4132965000482599e-15
+          },
+          "native.area_t": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_u": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_v": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197766889295.09274,
+            "scale_relative": 2.3146628513328123e-16
+          },
+          "native.rho": {
+            "max_abs": 4.4232706386537757e-07,
+            "reference_scale": 25.75882365324901,
+            "scale_relative": 1.7171865835945736e-08
+          },
+          "native.prho": {
+            "max_abs": 4.415467174112564e-07,
+            "reference_scale": 4.035194178812162,
+            "scale_relative": 1.0942390820489195e-07
+          },
+          "native.int_drhodT": {
+            "max_abs": 1.1420946805174026e-05,
+            "reference_scale": 681.0974292930359,
+            "scale_relative": 1.6768447969373068e-08
+          },
+          "native.int_drhodS": {
+            "max_abs": 2.7069603447671398e-06,
+            "reference_scale": 3947.6638896234863,
+            "scale_relative": 6.85711960403326e-10
+          },
+          "native.Nsqr": {
+            "max_abs": 2.015632494353943e-10,
+            "reference_scale": 0.0012622789011275694,
+            "scale_relative": 1.5968202372339564e-07
+          },
+          "native.Hd": {
+            "max_abs": 5.190226488593908e-07,
+            "reference_scale": 680.5977974784691,
+            "scale_relative": 7.625981905646853e-10
+          },
+          "native.dHd": {
+            "max_abs": 1.182351834880691e-12,
+            "reference_scale": 7.3993043447083e-05,
+            "scale_relative": 1.5979229665370688e-08
+          },
+          "native.temp": {
+            "max_abs": 5.371708708956646e-06,
+            "reference_scale": 29.819236293471047,
+            "scale_relative": 1.801423972126606e-07
+          },
+          "native.dtemp": {
+            "max_abs": 3.828546673703611e-13,
+            "reference_scale": 9.01113276735515e-06,
+            "scale_relative": 4.248685234750264e-08
+          },
+          "native.salt": {
+            "max_abs": 5.418285553560054e-07,
+            "reference_scale": 37.59679183918792,
+            "scale_relative": 1.4411563563017794e-08
+          },
+          "native.dsalt": {
+            "max_abs": 2.000603876498373e-13,
+            "reference_scale": 1.6165291774653323e-05,
+            "scale_relative": 1.2375921847790326e-08
+          },
+          "native.dtemp_vmix": {
+            "max_abs": 3.143342169271819e-10,
+            "reference_scale": 8.055248265215142e-05,
+            "scale_relative": 3.902228790198393e-06
+          },
+          "native.dsalt_vmix": {
+            "max_abs": 3.163941010423361e-11,
+            "reference_scale": 1.7600080981338017e-05,
+            "scale_relative": 1.7976854843896451e-06
+          },
+          "native.dtemp_iso": {
+            "max_abs": 4.394980914291083e-13,
+            "reference_scale": 1.8329902729665242e-06,
+            "scale_relative": 2.397710985764379e-07
+          },
+          "native.dsalt_iso": {
+            "max_abs": 1.099057784524401e-13,
+            "reference_scale": 8.510712782959101e-07,
+            "scale_relative": 1.2913815946474323e-07
+          },
+          "native.forc_temp_surface": {
+            "max_abs": 7.401976397807854e-12,
+            "reference_scale": 0.00020207918727084708,
+            "scale_relative": 3.6629088318169906e-08
+          },
+          "native.forc_salt_surface": {
+            "max_abs": 2.1777720677346852e-13,
+            "reference_scale": 1.3132190030540246e-05,
+            "scale_relative": 1.6583464469140748e-08
+          },
+          "native.u": {
+            "max_abs": 1.6010854312492606e-08,
+            "reference_scale": 0.22461240351522166,
+            "scale_relative": 7.128214676447097e-08
+          },
+          "native.v": {
+            "max_abs": 1.7055957000911004e-08,
+            "reference_scale": 0.2273998230591334,
+            "scale_relative": 7.500426680840357e-08
+          },
+          "native.w": {
+            "max_abs": 2.1223196428223198e-11,
+            "reference_scale": 0.0005716564059670171,
+            "scale_relative": 3.712579130871791e-08
+          },
+          "native.du": {
+            "max_abs": 1.5301749481351013e-12,
+            "reference_scale": 9.937663401370145e-06,
+            "scale_relative": 1.5397733715997364e-07
+          },
+          "native.dv": {
+            "max_abs": 1.4855116320275737e-12,
+            "reference_scale": 1.609104340389997e-05,
+            "scale_relative": 9.231916133341184e-08
+          },
+          "native.du_cor": {
+            "max_abs": 8.2571769771466e-13,
+            "reference_scale": 9.905706438067983e-06,
+            "scale_relative": 8.335777997028031e-08
+          },
+          "native.dv_cor": {
+            "max_abs": 1.1506978244301585e-12,
+            "reference_scale": 1.5410153375497883e-05,
+            "scale_relative": 7.467140633783477e-08
+          },
+          "native.du_mix": {
+            "max_abs": 7.957218278178954e-13,
+            "reference_scale": 5.046192235651975e-06,
+            "scale_relative": 1.5768757721832748e-07
+          },
+          "native.dv_mix": {
+            "max_abs": 2.0234528022470226e-12,
+            "reference_scale": 3.5382425992382495e-06,
+            "scale_relative": 5.718807417791683e-07
+          },
+          "native.du_adv": {
+            "max_abs": 2.65130258779793e-15,
+            "reference_scale": 7.227760344803839e-08,
+            "scale_relative": 3.668221497830925e-08
+          },
+          "native.dv_adv": {
+            "max_abs": 9.095202345421844e-16,
+            "reference_scale": 5.324921512845325e-08,
+            "scale_relative": 1.7080443952988713e-08
+          },
+          "native.p_hydro": {
+            "max_abs": 1.8507230037378974e-07,
+            "reference_scale": 693.0816584634872,
+            "scale_relative": 2.670281316981925e-10
+          },
+          "native.kappaM": {
+            "max_abs": 5.1838687538108275e-06,
+            "reference_scale": 4.159272729062022,
+            "scale_relative": 1.246340187694272e-06
+          },
+          "native.kappaH": {
+            "max_abs": 5.1838687538108275e-06,
+            "reference_scale": 4.159272729062022,
+            "scale_relative": 1.246340187694272e-06
+          },
+          "native.surface_taux": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "native.surface_tauy": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "native.forc_rho_surface": {
+            "max_abs": 2.3494480964674977e-12,
+            "reference_scale": 6.493671340058023e-05,
+            "scale_relative": 3.6180582191991635e-08
+          },
+          "native.ssh": {
+            "max_abs": 1.1270828714771142e-09,
+            "reference_scale": 1.4590206309458225,
+            "scale_relative": 7.724927582048467e-10
+          },
+          "native.psi": {
+            "max_abs": 1.1056683568710923e-08,
+            "reference_scale": 14.31299238957852,
+            "scale_relative": 7.724928000912962e-10
+          },
+          "native.K_gm": {
+            "max_abs": 0.0004465191655071976,
+            "reference_scale": 10000.0,
+            "scale_relative": 4.465191655071976e-08
+          },
+          "native.K_diss_v": {
+            "max_abs": 1.9643845422682895e-14,
+            "reference_scale": 6.791613644389221e-08,
+            "scale_relative": 2.892367918912957e-07
+          },
+          "native.K_diss_h": {
+            "max_abs": 9.011473888011391e-15,
+            "reference_scale": 8.162949369956559e-07,
+            "scale_relative": 1.1039482764866576e-08
+          },
+          "native.P_diss_v": {
+            "max_abs": 1.6754057982687908e-11,
+            "reference_scale": 1.7333691313270586e-06,
+            "scale_relative": 9.665603061628936e-06
+          },
+          "native.P_diss_nonlin": {
+            "max_abs": 2.364502810363675e-12,
+            "reference_scale": 3.60736824972635e-06,
+            "scale_relative": 6.554647728418198e-07
+          },
+          "native.P_diss_iso": {
+            "max_abs": 1.0475332893077664e-14,
+            "reference_scale": 1.8283952056894268e-08,
+            "scale_relative": 5.729249814526704e-07
+          },
+          "native.P_diss_skew": {
+            "max_abs": 3.3033339639672917e-14,
+            "reference_scale": 5.249759595534157e-08,
+            "scale_relative": 6.292352828455911e-07
+          },
+          "native.P_diss_adv": {
+            "max_abs": 2.1263374870258197e-13,
+            "reference_scale": 2.3961578829987152e-05,
+            "scale_relative": 8.873945669910432e-09
+          },
+          "native.u_wgrid": {
+            "max_abs": 1.4258856262383546e-08,
+            "reference_scale": 0.516288609841433,
+            "scale_relative": 2.7617995033364864e-08
+          },
+          "native.v_wgrid": {
+            "max_abs": 1.0883364126579309e-08,
+            "reference_scale": 0.4849621551770329,
+            "scale_relative": 2.2441677170884384e-08
+          },
+          "native.w_wgrid": {
+            "max_abs": 1.9931692299917205e-11,
+            "reference_scale": 0.000562631081123558,
+            "scale_relative": 3.5425864245029246e-08
+          },
+          "native.K_11": {
+            "max_abs": 1.1368683772161603e-13,
+            "reference_scale": 1000.0,
+            "scale_relative": 1.1368683772161603e-16
+          },
+          "native.K_22": {
+            "max_abs": 1.1368683772161603e-13,
+            "reference_scale": 1000.0,
+            "scale_relative": 1.1368683772161603e-16
+          },
+          "native.K_33": {
+            "max_abs": 2.2434952974808436e-08,
+            "reference_scale": 0.0051298105338115855,
+            "scale_relative": 4.373446704695089e-06
+          },
+          "native.Ai_ez": {
+            "max_abs": 1.5469695891412363e-08,
+            "reference_scale": 0.000809347661985666,
+            "scale_relative": 1.9113783381370093e-05
+          },
+          "native.Ai_nz": {
+            "max_abs": 9.473028327695518e-09,
+            "reference_scale": 0.0008093474815338105,
+            "scale_relative": 1.1704525613328645e-05
+          },
+          "native.Ai_bx": {
+            "max_abs": 1.5469695891412363e-08,
+            "reference_scale": 0.000809347661985666,
+            "scale_relative": 1.9113783381370093e-05
+          },
+          "native.Ai_by": {
+            "max_abs": 9.473028327695518e-09,
+            "reference_scale": 0.0008093474815338105,
+            "scale_relative": 1.1704525613328645e-05
+          },
+          "native.B1_gm": {
+            "max_abs": 2.0203693795739497e-06,
+            "reference_scale": 2.0929348152692984,
+            "scale_relative": 9.653283823433308e-07
+          },
+          "native.B2_gm": {
+            "max_abs": 2.6299844225752267e-06,
+            "reference_scale": 2.618972197412908,
+            "scale_relative": 1.0042047888760318e-06
+          },
+          "native.tke": {
+            "max_abs": 1.516150187443662e-07,
+            "reference_scale": 0.0060888386259040205,
+            "scale_relative": 2.4900482351321254e-05
+          },
+          "native.sqrttke": {
+            "max_abs": 4.612145269866641e-07,
+            "reference_scale": 0.07682383375749036,
+            "scale_relative": 6.00353437765914e-06
+          },
+          "native.dtke": {
+            "max_abs": 6.475016084625209e-14,
+            "reference_scale": 3.2712433129350953e-09,
+            "scale_relative": 1.9793746490888674e-05
+          },
+          "native.Prandtlnumber": {
+            "max_abs": 0.00010669762142700989,
+            "reference_scale": 10.0,
+            "scale_relative": 1.066976214270099e-05
+          },
+          "native.mxl": {
+            "max_abs": 0.00023350798819876672,
+            "reference_scale": 688.4288803721677,
+            "scale_relative": 3.391897040585097e-07
+          },
+          "native.forc_tke_surface": {
+            "max_abs": 6.023951519474913e-15,
+            "reference_scale": 5.529370401064107e-06,
+            "scale_relative": 1.0894461905311364e-09
+          },
+          "native.tke_diss": {
+            "max_abs": 4.9661385413899133e-11,
+            "reference_scale": 1.2138449535942646e-06,
+            "scale_relative": 4.0912461897912846e-05
+          },
+          "native.tke_surf_corr": {
+            "max_abs": 1.7276054571633723e-09,
+            "reference_scale": 2.685042562959635e-06,
+            "scale_relative": 0.0006434182761181591
+          },
+          "native.eke": {
+            "max_abs": 4.139089060210821e-09,
+            "reference_scale": 0.09284955355799776,
+            "scale_relative": 4.4578448701160104e-08
+          },
+          "native.deke": {
+            "max_abs": 1.5732863543118788e-15,
+            "reference_scale": 1.3128241519375192e-07,
+            "scale_relative": 1.1983983932577405e-08
+          },
+          "native.sqrteke": {
+            "max_abs": 3.4170938870148326e-08,
+            "reference_scale": 0.3035991758228184,
+            "scale_relative": 1.1255280511726623e-07
+          },
+          "native.L_rossby": {
+            "max_abs": 0.002302324148331536,
+            "reference_scale": 285712.9635284633,
+            "scale_relative": 8.0581718095622e-09
+          },
+          "native.L_rhines": {
+            "max_abs": 0.020038536065840162,
+            "reference_scale": 157668.2764761052,
+            "scale_relative": 1.2709301143960322e-07
+          },
+          "native.eke_len": {
+            "max_abs": 0.004604648296663072,
+            "reference_scale": 107054.1707953729,
+            "scale_relative": 4.301232042107503e-08
+          },
+          "native.eke_diss_iw": {
+            "max_abs": 5.399781424621172e-15,
+            "reference_scale": 7.454444435275913e-07,
+            "scale_relative": 7.243707390276239e-09
+          },
+          "native.qnet": {
+            "max_abs": 3.025685748525575e-05,
+            "reference_scale": 826.0335948464859,
+            "scale_relative": 3.662908830103796e-08
+          },
+          "native.taux": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "native.tauy": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "native.coupled_salt_flux": {
+            "max_abs": 2.1777720677346852e-13,
+            "reference_scale": 1.3132190030540246e-05,
+            "scale_relative": 1.6583464469140748e-08
+          }
+        }
+      }
+    },
+    "stock_second": {
+      "reference": "/private/tmp/vercor-veros-bench/coupled-numpy-2",
+      "candidate": "/private/tmp/vercor-veros-bench/coupled-jax-2",
+      "warm_speedup": 2.193362884323485,
+      "observed_speedup_bounds": [
+        2.1511806722453395,
+        2.277409906417689
+      ],
+      "startup_difference_seconds": -13.557653042022139,
+      "estimated_break_even_native_steps": 96,
+      "estimated_break_even_simulated_days": 2.0,
+      "initial": {
+        "arrays_compared": 193,
+        "arrays_identical": 177,
+        "changed": {
+          "native.cost": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 0.9993908270190958,
+            "scale_relative": 2.2217995094804747e-16
+          },
+          "native.cosu": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 1.0,
+            "scale_relative": 2.220446049250313e-16
+          },
+          "native.tantr": {
+            "max_abs": 6.776263578034403e-21,
+            "reference_scale": 2.245002552074081e-06,
+            "scale_relative": 3.018376781698553e-15
+          },
+          "native.coriolis_t": {
+            "max_abs": 2.710505431213761e-20,
+            "reference_scale": 0.00014548720541207664,
+            "scale_relative": 1.8630541589802005e-16
+          },
+          "native.beta": {
+            "max_abs": 3.2311742677852644e-26,
+            "reference_scale": 2.2862677914188064e-11,
+            "scale_relative": 1.4132965000482599e-15
+          },
+          "native.area_t": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_u": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_v": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197766889295.09274,
+            "scale_relative": 2.3146628513328123e-16
+          },
+          "native.rho": {
+            "max_abs": 6.821210263296962e-13,
+            "reference_scale": 25.758994805160228,
+            "scale_relative": 2.6480886831540832e-14
+          },
+          "native.int_drhodT": {
+            "max_abs": 4.177195478405338e-09,
+            "reference_scale": 681.0958742089075,
+            "scale_relative": 6.133050627060615e-12
+          },
+          "native.int_drhodS": {
+            "max_abs": 5.220499588176608e-10,
+            "reference_scale": 3947.6638896234863,
+            "scale_relative": 1.3224275759389738e-13
+          },
+          "native.Nsqr": {
+            "max_abs": 2.9043425684458033e-16,
+            "reference_scale": 0.0013007041223534166,
+            "scale_relative": 2.2329002565094193e-13
+          },
+          "native.Hd": {
+            "max_abs": 2.162323653465137e-10,
+            "reference_scale": 680.6023506318597,
+            "scale_relative": 3.1770734430430224e-13
+          },
+          "native.forc_temp_surface": {
+            "max_abs": 1.3552527156068805e-20,
+            "reference_scale": 0.00010420829582136701,
+            "scale_relative": 1.3005228661737673e-16
+          },
+          "native.forc_tke_surface": {
+            "max_abs": 4.235164736271502e-22,
+            "reference_scale": 5.520188207751033e-06,
+            "scale_relative": 7.672138298337006e-17
+          },
+          "native.qnet": {
+            "max_abs": 8.881784197001252e-16,
+            "reference_scale": 441.6922239601776,
+            "scale_relative": 2.0108536476752693e-18
+          }
+        }
+      },
+      "final": {
+        "arrays_compared": 193,
+        "arrays_identical": 53,
+        "changed": {
+          "canonical.CICE.ice_fraction": {
+            "max_abs": 6.756734061141856e-12,
+            "reference_scale": 0.15666387752614164,
+            "scale_relative": 4.312885757608289e-11
+          },
+          "canonical.CICE.ice_surface_temperature": {
+            "max_abs": 4.083739213456283e-08,
+            "reference_scale": 273.15000000000003,
+            "scale_relative": 1.495053711680865e-10
+          },
+          "canonical.CICE.ice_surface_albedo": {
+            "max_abs": 3.4638958368304884e-14,
+            "reference_scale": 0.750329543724683,
+            "scale_relative": 4.616499331261158e-14
+          },
+          "canonical.CICE.sea_surface_heat_flux": {
+            "max_abs": 3.025685748525575e-05,
+            "reference_scale": 826.0335948464859,
+            "scale_relative": 3.662908830103796e-08
+          },
+          "canonical.CICE.sea_surface_mass_flux": {
+            "max_abs": 6.276000186667026e-12,
+            "reference_scale": 0.00037844928041902724,
+            "scale_relative": 1.658346444659137e-08
+          },
+          "canonical.CICE.ocean_u_stress": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "canonical.CICE.ocean_v_stress": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "canonical.CICE.air_u_velocity": {
+            "max_abs": 2.4217819305505373e-08,
+            "reference_scale": 30.46930037415952,
+            "scale_relative": 7.948268915962402e-10
+          },
+          "canonical.CICE.air_v_velocity": {
+            "max_abs": 4.688249610751427e-08,
+            "reference_scale": 26.286258946559176,
+            "scale_relative": 1.7835362651957403e-09
+          },
+          "canonical.CICE.air_specific_humidity": {
+            "max_abs": 1.2767251730654017e-10,
+            "reference_scale": 0.00856245994675381,
+            "scale_relative": 1.491072870419011e-08
+          },
+          "canonical.CICE.model_level_height": {
+            "max_abs": 2.747318035289936e-07,
+            "reference_scale": 443.41549699345046,
+            "scale_relative": 6.195809695236059e-10
+          },
+          "canonical.CICE.air_density": {
+            "max_abs": 6.881573089145832e-10,
+            "reference_scale": 1.2501641700564252,
+            "scale_relative": 5.504535527390164e-10
+          },
+          "canonical.CICE.air_potential_temperature": {
+            "max_abs": 1.6644230527163018e-07,
+            "reference_scale": 303.61772889513577,
+            "scale_relative": 5.481969247227866e-10
+          },
+          "canonical.CICE.air_temperature": {
+            "max_abs": 1.6062762142610154e-07,
+            "reference_scale": 293.8040043788099,
+            "scale_relative": 5.467169236366151e-10
+          },
+          "canonical.CICE.surface_pressure": {
+            "max_abs": 3.657492925412953e-06,
+            "reference_scale": 107687.36415001593,
+            "scale_relative": 3.3963993401471066e-11
+          },
+          "canonical.CICE.downward_shortwave_radiation_flux": {
+            "max_abs": 5.454579934394133e-07,
+            "reference_scale": 385.3393669793086,
+            "scale_relative": 1.415526261215617e-09
+          },
+          "canonical.CICE.downward_longwave_radiation_flux": {
+            "max_abs": 2.293510277695532e-06,
+            "reference_scale": 283.74775053289176,
+            "scale_relative": 8.082919682669591e-09
+          },
+          "canonical.CICE.sea_surface_temperature": {
+            "max_abs": 1.393277273109561e-06,
+            "reference_scale": 302.98674079545873,
+            "scale_relative": 4.598476056911478e-09
+          },
+          "canonical.CICE.sea_surface_salinity": {
+            "max_abs": 1.0100971366000522e-06,
+            "reference_scale": 37.576115057262314,
+            "scale_relative": 2.6881361605923424e-08
+          },
+          "canonical.CICE.ocean_u_velocity": {
+            "max_abs": 2.539479751484386e-09,
+            "reference_scale": 0.15912571876645035,
+            "scale_relative": 1.5958952274783396e-08
+          },
+          "canonical.CICE.ocean_v_velocity": {
+            "max_abs": 3.0892771396562324e-09,
+            "reference_scale": 0.15327265241527313,
+            "scale_relative": 2.0155436021856144e-08
+          },
+          "canonical.CICE.sea_surface_height": {
+            "max_abs": 7.523518240695748e-09,
+            "reference_scale": 0.9528121301320747,
+            "scale_relative": 7.896119290224475e-09
+          },
+          "canonical.OCN.sea_surface_temperature": {
+            "max_abs": 1.0264092793477175e-06,
+            "reference_scale": 302.98725853119123,
+            "scale_relative": 3.3876318242671353e-09
+          },
+          "canonical.OCN.sea_surface_salinity": {
+            "max_abs": 3.970030491018406e-07,
+            "reference_scale": 37.54466162769758,
+            "scale_relative": 1.0574154404123385e-08
+          },
+          "canonical.OCN.ocean_u_velocity": {
+            "max_abs": 7.022805916662156e-09,
+            "reference_scale": 0.23216960008266485,
+            "scale_relative": 3.024860237585653e-08
+          },
+          "canonical.OCN.ocean_v_velocity": {
+            "max_abs": 3.961377450026338e-09,
+            "reference_scale": 0.21237525608726615,
+            "scale_relative": 1.865272594844376e-08
+          },
+          "canonical.OCN.sea_surface_height": {
+            "max_abs": 2.555373163071195e-09,
+            "reference_scale": 1.3013317790581913,
+            "scale_relative": 1.9636600013876453e-09
+          },
+          "canonical.OCN.ice_fraction": {
+            "max_abs": 6.756734061141856e-12,
+            "reference_scale": 0.15666387752614164,
+            "scale_relative": 4.312885757608289e-11
+          },
+          "canonical.OCN.open_water_temperature_contribution": {
+            "max_abs": 1.0264092793477175e-06,
+            "reference_scale": 302.98725853119123,
+            "scale_relative": 3.3876318242671353e-09
+          },
+          "canonical.OCN.sea_surface_heat_flux": {
+            "max_abs": 3.025685748525575e-05,
+            "reference_scale": 826.0335948464859,
+            "scale_relative": 3.662908830103796e-08
+          },
+          "canonical.OCN.sea_surface_mass_flux": {
+            "max_abs": 6.276000186667026e-12,
+            "reference_scale": 0.00037844928041902724,
+            "scale_relative": 1.658346444659137e-08
+          },
+          "canonical.OCN.ocean_u_stress": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "canonical.OCN.ocean_v_stress": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "canonical.ATM.downward_shortwave_radiation_flux": {
+            "max_abs": 7.034808504613466e-07,
+            "reference_scale": 513.1265474016475,
+            "scale_relative": 1.3709695084450584e-09
+          },
+          "canonical.ATM.surface_pressure": {
+            "max_abs": 5.346446414478123e-06,
+            "reference_scale": 111118.74930079073,
+            "scale_relative": 4.811471014676078e-11
+          },
+          "canonical.ATM.air_u_velocity": {
+            "max_abs": 4.221829108530528e-08,
+            "reference_scale": 24.60714386052718,
+            "scale_relative": 1.715692456003742e-09
+          },
+          "canonical.ATM.air_v_velocity": {
+            "max_abs": 7.33948155584585e-08,
+            "reference_scale": 19.904644343171235,
+            "scale_relative": 3.687321124310285e-09
+          },
+          "canonical.ATM.air_temperature": {
+            "max_abs": 2.5908343559422065e-07,
+            "reference_scale": 295.9495602848032,
+            "scale_relative": 8.754310543489068e-10
+          },
+          "canonical.ATM.air_specific_humidity": {
+            "max_abs": 1.293791033508962e-10,
+            "reference_scale": 0.013574505027389628,
+            "scale_relative": 9.531036534285756e-09
+          },
+          "canonical.ATM.sensible_heat_flux": {
+            "max_abs": 1.4156230907502731e-06,
+            "reference_scale": 190.0657930847539,
+            "scale_relative": 7.448068733330781e-09
+          },
+          "canonical.ATM.latent_heat_flux": {
+            "max_abs": 3.727710009115981e-06,
+            "reference_scale": 652.2143138145481,
+            "scale_relative": 5.715467953032269e-09
+          },
+          "canonical.ATM.net_shortwave_radiation_flux": {
+            "max_abs": 5.927522863657941e-07,
+            "reference_scale": 379.82064778639125,
+            "scale_relative": 1.5606110142257307e-09
+          },
+          "canonical.ATM.downward_longwave_radiation_flux": {
+            "max_abs": 2.2074864602927846e-06,
+            "reference_scale": 366.7412461107779,
+            "scale_relative": 6.019193324183642e-09
+          },
+          "canonical.ATM.air_density": {
+            "max_abs": 1.0891225699083407e-09,
+            "reference_scale": 1.3168617455063498,
+            "scale_relative": 8.270591606331152e-10
+          },
+          "canonical.ATM.air_potential_temperature": {
+            "max_abs": 2.6975970968123875e-07,
+            "reference_scale": 331.83947616201147,
+            "scale_relative": 8.129222984595601e-10
+          },
+          "canonical.ATM.model_level_height": {
+            "max_abs": 4.1558161001375993e-07,
+            "reference_scale": 447.8302501193812,
+            "scale_relative": 9.279891429910674e-10
+          },
+          "canonical.ATM.rain_rate": {
+            "max_abs": 8.222446974594927e-15,
+            "reference_scale": 2.7240547231451495e-05,
+            "scale_relative": 3.0184588087501496e-10
+          },
+          "canonical.ATM.snow_rate": {
+            "max_abs": 1.103080889756408e-19,
+            "reference_scale": 1.1922449180262665e-10,
+            "scale_relative": 9.25213329139228e-10
+          },
+          "canonical.ATM.sea_surface_temperature": {
+            "max_abs": 6.409669026652409e-07,
+            "reference_scale": 302.9872585311912,
+            "scale_relative": 2.115491277661289e-09
+          },
+          "canonical.ATM.total_surface_temperature": {
+            "max_abs": 5.297815732774325e-07,
+            "reference_scale": 309.9266357421875,
+            "scale_relative": 1.709377356382274e-09
+          },
+          "canonical.ATM.air_pressure_3d": {
+            "max_abs": 5.079127731733024e-06,
+            "reference_scale": 105562.81183575118,
+            "scale_relative": 4.8114744609454075e-11
+          },
+          "canonical.ATM.open_water_temperature_contribution": {
+            "max_abs": 5.297815732774325e-07,
+            "reference_scale": 302.91310638388325,
+            "scale_relative": 1.748955598527446e-09
+          },
+          "canonical.ATM.ice_surface_temperature": {
+            "max_abs": 9.240253007192223e-10,
+            "reference_scale": 39.041722456183706,
+            "scale_relative": 2.366763663555701e-11
+          },
+          "canonical.ATM.ice_surface_albedo": {
+            "max_abs": 2.9789365418864122e-12,
+            "reference_scale": 0.11026577368567222,
+            "scale_relative": 2.7015967351558073e-11
+          },
+          "canonical.ATM.ice_fraction": {
+            "max_abs": 3.969033435247127e-12,
+            "reference_scale": 0.1469836293970833,
+            "scale_relative": 2.7003234656320763e-11
+          },
+          "canonical.ATM.marine_surface_albedo": {
+            "max_abs": 4.5998760356269486e-12,
+            "reference_scale": 0.5994257964818709,
+            "scale_relative": 7.673803934739516e-12
+          },
+          "canonical.ATM.marine_ice_fraction": {
+            "max_abs": 6.7567618167174714e-12,
+            "reference_scale": 0.9989165971356053,
+            "scale_relative": 6.764090051254024e-12
+          },
+          "native.cost": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 0.9993908270190958,
+            "scale_relative": 2.2217995094804747e-16
+          },
+          "native.cosu": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 1.0,
+            "scale_relative": 2.220446049250313e-16
+          },
+          "native.tantr": {
+            "max_abs": 6.776263578034403e-21,
+            "reference_scale": 2.245002552074081e-06,
+            "scale_relative": 3.018376781698553e-15
+          },
+          "native.coriolis_t": {
+            "max_abs": 2.710505431213761e-20,
+            "reference_scale": 0.00014548720541207664,
+            "scale_relative": 1.8630541589802005e-16
+          },
+          "native.beta": {
+            "max_abs": 3.2311742677852644e-26,
+            "reference_scale": 2.2862677914188064e-11,
+            "scale_relative": 1.4132965000482599e-15
+          },
+          "native.area_t": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_u": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_v": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197766889295.09274,
+            "scale_relative": 2.3146628513328123e-16
+          },
+          "native.rho": {
+            "max_abs": 4.4232706386537757e-07,
+            "reference_scale": 25.75882365324901,
+            "scale_relative": 1.7171865835945736e-08
+          },
+          "native.prho": {
+            "max_abs": 4.415467174112564e-07,
+            "reference_scale": 4.035194178812162,
+            "scale_relative": 1.0942390820489195e-07
+          },
+          "native.int_drhodT": {
+            "max_abs": 1.1420946805174026e-05,
+            "reference_scale": 681.0974292930359,
+            "scale_relative": 1.6768447969373068e-08
+          },
+          "native.int_drhodS": {
+            "max_abs": 2.7069603447671398e-06,
+            "reference_scale": 3947.6638896234863,
+            "scale_relative": 6.85711960403326e-10
+          },
+          "native.Nsqr": {
+            "max_abs": 2.015632494353943e-10,
+            "reference_scale": 0.0012622789011275694,
+            "scale_relative": 1.5968202372339564e-07
+          },
+          "native.Hd": {
+            "max_abs": 5.190226488593908e-07,
+            "reference_scale": 680.5977974784691,
+            "scale_relative": 7.625981905646853e-10
+          },
+          "native.dHd": {
+            "max_abs": 1.182351834880691e-12,
+            "reference_scale": 7.3993043447083e-05,
+            "scale_relative": 1.5979229665370688e-08
+          },
+          "native.temp": {
+            "max_abs": 5.371708708956646e-06,
+            "reference_scale": 29.819236293471047,
+            "scale_relative": 1.801423972126606e-07
+          },
+          "native.dtemp": {
+            "max_abs": 3.828546673703611e-13,
+            "reference_scale": 9.01113276735515e-06,
+            "scale_relative": 4.248685234750264e-08
+          },
+          "native.salt": {
+            "max_abs": 5.418285553560054e-07,
+            "reference_scale": 37.59679183918792,
+            "scale_relative": 1.4411563563017794e-08
+          },
+          "native.dsalt": {
+            "max_abs": 2.000603876498373e-13,
+            "reference_scale": 1.6165291774653323e-05,
+            "scale_relative": 1.2375921847790326e-08
+          },
+          "native.dtemp_vmix": {
+            "max_abs": 3.143342169271819e-10,
+            "reference_scale": 8.055248265215142e-05,
+            "scale_relative": 3.902228790198393e-06
+          },
+          "native.dsalt_vmix": {
+            "max_abs": 3.163941010423361e-11,
+            "reference_scale": 1.7600080981338017e-05,
+            "scale_relative": 1.7976854843896451e-06
+          },
+          "native.dtemp_iso": {
+            "max_abs": 4.394980914291083e-13,
+            "reference_scale": 1.8329902729665242e-06,
+            "scale_relative": 2.397710985764379e-07
+          },
+          "native.dsalt_iso": {
+            "max_abs": 1.099057784524401e-13,
+            "reference_scale": 8.510712782959101e-07,
+            "scale_relative": 1.2913815946474323e-07
+          },
+          "native.forc_temp_surface": {
+            "max_abs": 7.401976397807854e-12,
+            "reference_scale": 0.00020207918727084708,
+            "scale_relative": 3.6629088318169906e-08
+          },
+          "native.forc_salt_surface": {
+            "max_abs": 2.1777720677346852e-13,
+            "reference_scale": 1.3132190030540246e-05,
+            "scale_relative": 1.6583464469140748e-08
+          },
+          "native.u": {
+            "max_abs": 1.6010854312492606e-08,
+            "reference_scale": 0.22461240351522166,
+            "scale_relative": 7.128214676447097e-08
+          },
+          "native.v": {
+            "max_abs": 1.7055957000911004e-08,
+            "reference_scale": 0.2273998230591334,
+            "scale_relative": 7.500426680840357e-08
+          },
+          "native.w": {
+            "max_abs": 2.1223196428223198e-11,
+            "reference_scale": 0.0005716564059670171,
+            "scale_relative": 3.712579130871791e-08
+          },
+          "native.du": {
+            "max_abs": 1.5301749481351013e-12,
+            "reference_scale": 9.937663401370145e-06,
+            "scale_relative": 1.5397733715997364e-07
+          },
+          "native.dv": {
+            "max_abs": 1.4855116320275737e-12,
+            "reference_scale": 1.609104340389997e-05,
+            "scale_relative": 9.231916133341184e-08
+          },
+          "native.du_cor": {
+            "max_abs": 8.2571769771466e-13,
+            "reference_scale": 9.905706438067983e-06,
+            "scale_relative": 8.335777997028031e-08
+          },
+          "native.dv_cor": {
+            "max_abs": 1.1506978244301585e-12,
+            "reference_scale": 1.5410153375497883e-05,
+            "scale_relative": 7.467140633783477e-08
+          },
+          "native.du_mix": {
+            "max_abs": 7.957218278178954e-13,
+            "reference_scale": 5.046192235651975e-06,
+            "scale_relative": 1.5768757721832748e-07
+          },
+          "native.dv_mix": {
+            "max_abs": 2.0234528022470226e-12,
+            "reference_scale": 3.5382425992382495e-06,
+            "scale_relative": 5.718807417791683e-07
+          },
+          "native.du_adv": {
+            "max_abs": 2.65130258779793e-15,
+            "reference_scale": 7.227760344803839e-08,
+            "scale_relative": 3.668221497830925e-08
+          },
+          "native.dv_adv": {
+            "max_abs": 9.095202345421844e-16,
+            "reference_scale": 5.324921512845325e-08,
+            "scale_relative": 1.7080443952988713e-08
+          },
+          "native.p_hydro": {
+            "max_abs": 1.8507230037378974e-07,
+            "reference_scale": 693.0816584634872,
+            "scale_relative": 2.670281316981925e-10
+          },
+          "native.kappaM": {
+            "max_abs": 5.1838687538108275e-06,
+            "reference_scale": 4.159272729062022,
+            "scale_relative": 1.246340187694272e-06
+          },
+          "native.kappaH": {
+            "max_abs": 5.1838687538108275e-06,
+            "reference_scale": 4.159272729062022,
+            "scale_relative": 1.246340187694272e-06
+          },
+          "native.surface_taux": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "native.surface_tauy": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "native.forc_rho_surface": {
+            "max_abs": 2.3494480964674977e-12,
+            "reference_scale": 6.493671340058023e-05,
+            "scale_relative": 3.6180582191991635e-08
+          },
+          "native.ssh": {
+            "max_abs": 1.1270828714771142e-09,
+            "reference_scale": 1.4590206309458225,
+            "scale_relative": 7.724927582048467e-10
+          },
+          "native.psi": {
+            "max_abs": 1.1056683568710923e-08,
+            "reference_scale": 14.31299238957852,
+            "scale_relative": 7.724928000912962e-10
+          },
+          "native.K_gm": {
+            "max_abs": 0.0004465191655071976,
+            "reference_scale": 10000.0,
+            "scale_relative": 4.465191655071976e-08
+          },
+          "native.K_diss_v": {
+            "max_abs": 1.9643845422682895e-14,
+            "reference_scale": 6.791613644389221e-08,
+            "scale_relative": 2.892367918912957e-07
+          },
+          "native.K_diss_h": {
+            "max_abs": 9.011473888011391e-15,
+            "reference_scale": 8.162949369956559e-07,
+            "scale_relative": 1.1039482764866576e-08
+          },
+          "native.P_diss_v": {
+            "max_abs": 1.6754057982687908e-11,
+            "reference_scale": 1.7333691313270586e-06,
+            "scale_relative": 9.665603061628936e-06
+          },
+          "native.P_diss_nonlin": {
+            "max_abs": 2.364502810363675e-12,
+            "reference_scale": 3.60736824972635e-06,
+            "scale_relative": 6.554647728418198e-07
+          },
+          "native.P_diss_iso": {
+            "max_abs": 1.0475332893077664e-14,
+            "reference_scale": 1.8283952056894268e-08,
+            "scale_relative": 5.729249814526704e-07
+          },
+          "native.P_diss_skew": {
+            "max_abs": 3.3033339639672917e-14,
+            "reference_scale": 5.249759595534157e-08,
+            "scale_relative": 6.292352828455911e-07
+          },
+          "native.P_diss_adv": {
+            "max_abs": 2.1263374870258197e-13,
+            "reference_scale": 2.3961578829987152e-05,
+            "scale_relative": 8.873945669910432e-09
+          },
+          "native.u_wgrid": {
+            "max_abs": 1.4258856262383546e-08,
+            "reference_scale": 0.516288609841433,
+            "scale_relative": 2.7617995033364864e-08
+          },
+          "native.v_wgrid": {
+            "max_abs": 1.0883364126579309e-08,
+            "reference_scale": 0.4849621551770329,
+            "scale_relative": 2.2441677170884384e-08
+          },
+          "native.w_wgrid": {
+            "max_abs": 1.9931692299917205e-11,
+            "reference_scale": 0.000562631081123558,
+            "scale_relative": 3.5425864245029246e-08
+          },
+          "native.K_11": {
+            "max_abs": 1.1368683772161603e-13,
+            "reference_scale": 1000.0,
+            "scale_relative": 1.1368683772161603e-16
+          },
+          "native.K_22": {
+            "max_abs": 1.1368683772161603e-13,
+            "reference_scale": 1000.0,
+            "scale_relative": 1.1368683772161603e-16
+          },
+          "native.K_33": {
+            "max_abs": 2.2434952974808436e-08,
+            "reference_scale": 0.0051298105338115855,
+            "scale_relative": 4.373446704695089e-06
+          },
+          "native.Ai_ez": {
+            "max_abs": 1.5469695891412363e-08,
+            "reference_scale": 0.000809347661985666,
+            "scale_relative": 1.9113783381370093e-05
+          },
+          "native.Ai_nz": {
+            "max_abs": 9.473028327695518e-09,
+            "reference_scale": 0.0008093474815338105,
+            "scale_relative": 1.1704525613328645e-05
+          },
+          "native.Ai_bx": {
+            "max_abs": 1.5469695891412363e-08,
+            "reference_scale": 0.000809347661985666,
+            "scale_relative": 1.9113783381370093e-05
+          },
+          "native.Ai_by": {
+            "max_abs": 9.473028327695518e-09,
+            "reference_scale": 0.0008093474815338105,
+            "scale_relative": 1.1704525613328645e-05
+          },
+          "native.B1_gm": {
+            "max_abs": 2.0203693795739497e-06,
+            "reference_scale": 2.0929348152692984,
+            "scale_relative": 9.653283823433308e-07
+          },
+          "native.B2_gm": {
+            "max_abs": 2.6299844225752267e-06,
+            "reference_scale": 2.618972197412908,
+            "scale_relative": 1.0042047888760318e-06
+          },
+          "native.tke": {
+            "max_abs": 1.516150187443662e-07,
+            "reference_scale": 0.0060888386259040205,
+            "scale_relative": 2.4900482351321254e-05
+          },
+          "native.sqrttke": {
+            "max_abs": 4.612145269866641e-07,
+            "reference_scale": 0.07682383375749036,
+            "scale_relative": 6.00353437765914e-06
+          },
+          "native.dtke": {
+            "max_abs": 6.475016084625209e-14,
+            "reference_scale": 3.2712433129350953e-09,
+            "scale_relative": 1.9793746490888674e-05
+          },
+          "native.Prandtlnumber": {
+            "max_abs": 0.00010669762142700989,
+            "reference_scale": 10.0,
+            "scale_relative": 1.066976214270099e-05
+          },
+          "native.mxl": {
+            "max_abs": 0.00023350798819876672,
+            "reference_scale": 688.4288803721677,
+            "scale_relative": 3.391897040585097e-07
+          },
+          "native.forc_tke_surface": {
+            "max_abs": 6.023951519474913e-15,
+            "reference_scale": 5.529370401064107e-06,
+            "scale_relative": 1.0894461905311364e-09
+          },
+          "native.tke_diss": {
+            "max_abs": 4.9661385413899133e-11,
+            "reference_scale": 1.2138449535942646e-06,
+            "scale_relative": 4.0912461897912846e-05
+          },
+          "native.tke_surf_corr": {
+            "max_abs": 1.7276054571633723e-09,
+            "reference_scale": 2.685042562959635e-06,
+            "scale_relative": 0.0006434182761181591
+          },
+          "native.eke": {
+            "max_abs": 4.139089060210821e-09,
+            "reference_scale": 0.09284955355799776,
+            "scale_relative": 4.4578448701160104e-08
+          },
+          "native.deke": {
+            "max_abs": 1.5732863543118788e-15,
+            "reference_scale": 1.3128241519375192e-07,
+            "scale_relative": 1.1983983932577405e-08
+          },
+          "native.sqrteke": {
+            "max_abs": 3.4170938870148326e-08,
+            "reference_scale": 0.3035991758228184,
+            "scale_relative": 1.1255280511726623e-07
+          },
+          "native.L_rossby": {
+            "max_abs": 0.002302324148331536,
+            "reference_scale": 285712.9635284633,
+            "scale_relative": 8.0581718095622e-09
+          },
+          "native.L_rhines": {
+            "max_abs": 0.020038536065840162,
+            "reference_scale": 157668.2764761052,
+            "scale_relative": 1.2709301143960322e-07
+          },
+          "native.eke_len": {
+            "max_abs": 0.004604648296663072,
+            "reference_scale": 107054.1707953729,
+            "scale_relative": 4.301232042107503e-08
+          },
+          "native.eke_diss_iw": {
+            "max_abs": 5.399781424621172e-15,
+            "reference_scale": 7.454444435275913e-07,
+            "scale_relative": 7.243707390276239e-09
+          },
+          "native.qnet": {
+            "max_abs": 3.025685748525575e-05,
+            "reference_scale": 826.0335948464859,
+            "scale_relative": 3.662908830103796e-08
+          },
+          "native.taux": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "native.tauy": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "native.coupled_salt_flux": {
+            "max_abs": 2.1777720677346852e-13,
+            "reference_scale": 1.3132190030540246e-05,
+            "scale_relative": 1.6583464469140748e-08
+          }
+        }
+      }
+    },
+    "stock_final": {
+      "reference": "/private/tmp/vercor-veros-bench/coupled-numpy-final",
+      "candidate": "/private/tmp/vercor-veros-bench/coupled-jax-final",
+      "warm_speedup": 2.201927181153204,
+      "observed_speedup_bounds": [
+        2.0993105955262203,
+        2.268379092413716
+      ],
+      "startup_difference_seconds": -3.0169662489788607,
+      "estimated_break_even_native_steps": 96,
+      "estimated_break_even_simulated_days": 2.0,
+      "initial": {
+        "arrays_compared": 193,
+        "arrays_identical": 177,
+        "changed": {
+          "native.cost": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 0.9993908270190958,
+            "scale_relative": 2.2217995094804747e-16
+          },
+          "native.cosu": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 1.0,
+            "scale_relative": 2.220446049250313e-16
+          },
+          "native.tantr": {
+            "max_abs": 6.776263578034403e-21,
+            "reference_scale": 2.245002552074081e-06,
+            "scale_relative": 3.018376781698553e-15
+          },
+          "native.coriolis_t": {
+            "max_abs": 2.710505431213761e-20,
+            "reference_scale": 0.00014548720541207664,
+            "scale_relative": 1.8630541589802005e-16
+          },
+          "native.beta": {
+            "max_abs": 3.2311742677852644e-26,
+            "reference_scale": 2.2862677914188064e-11,
+            "scale_relative": 1.4132965000482599e-15
+          },
+          "native.area_t": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_u": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_v": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197766889295.09274,
+            "scale_relative": 2.3146628513328123e-16
+          },
+          "native.rho": {
+            "max_abs": 6.821210263296962e-13,
+            "reference_scale": 25.758994805160228,
+            "scale_relative": 2.6480886831540832e-14
+          },
+          "native.int_drhodT": {
+            "max_abs": 4.177195478405338e-09,
+            "reference_scale": 681.0958742089075,
+            "scale_relative": 6.133050627060615e-12
+          },
+          "native.int_drhodS": {
+            "max_abs": 5.220499588176608e-10,
+            "reference_scale": 3947.6638896234863,
+            "scale_relative": 1.3224275759389738e-13
+          },
+          "native.Nsqr": {
+            "max_abs": 2.9043425684458033e-16,
+            "reference_scale": 0.0013007041223534166,
+            "scale_relative": 2.2329002565094193e-13
+          },
+          "native.Hd": {
+            "max_abs": 2.162323653465137e-10,
+            "reference_scale": 680.6023506318597,
+            "scale_relative": 3.1770734430430224e-13
+          },
+          "native.forc_temp_surface": {
+            "max_abs": 1.3552527156068805e-20,
+            "reference_scale": 0.00010420829582136701,
+            "scale_relative": 1.3005228661737673e-16
+          },
+          "native.forc_tke_surface": {
+            "max_abs": 4.235164736271502e-22,
+            "reference_scale": 5.520188207751033e-06,
+            "scale_relative": 7.672138298337006e-17
+          },
+          "native.qnet": {
+            "max_abs": 8.881784197001252e-16,
+            "reference_scale": 441.6922239601776,
+            "scale_relative": 2.0108536476752693e-18
+          }
+        }
+      },
+      "final": {
+        "arrays_compared": 193,
+        "arrays_identical": 53,
+        "changed": {
+          "canonical.CICE.ice_fraction": {
+            "max_abs": 6.756734061141856e-12,
+            "reference_scale": 0.15666387752614164,
+            "scale_relative": 4.312885757608289e-11
+          },
+          "canonical.CICE.ice_surface_temperature": {
+            "max_abs": 4.083739213456283e-08,
+            "reference_scale": 273.15000000000003,
+            "scale_relative": 1.495053711680865e-10
+          },
+          "canonical.CICE.ice_surface_albedo": {
+            "max_abs": 3.4638958368304884e-14,
+            "reference_scale": 0.750329543724683,
+            "scale_relative": 4.616499331261158e-14
+          },
+          "canonical.CICE.sea_surface_heat_flux": {
+            "max_abs": 3.025685748525575e-05,
+            "reference_scale": 826.0335948464859,
+            "scale_relative": 3.662908830103796e-08
+          },
+          "canonical.CICE.sea_surface_mass_flux": {
+            "max_abs": 6.276000186667026e-12,
+            "reference_scale": 0.00037844928041902724,
+            "scale_relative": 1.658346444659137e-08
+          },
+          "canonical.CICE.ocean_u_stress": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "canonical.CICE.ocean_v_stress": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "canonical.CICE.air_u_velocity": {
+            "max_abs": 2.4217819305505373e-08,
+            "reference_scale": 30.46930037415952,
+            "scale_relative": 7.948268915962402e-10
+          },
+          "canonical.CICE.air_v_velocity": {
+            "max_abs": 4.688249610751427e-08,
+            "reference_scale": 26.286258946559176,
+            "scale_relative": 1.7835362651957403e-09
+          },
+          "canonical.CICE.air_specific_humidity": {
+            "max_abs": 1.2767251730654017e-10,
+            "reference_scale": 0.00856245994675381,
+            "scale_relative": 1.491072870419011e-08
+          },
+          "canonical.CICE.model_level_height": {
+            "max_abs": 2.747318035289936e-07,
+            "reference_scale": 443.41549699345046,
+            "scale_relative": 6.195809695236059e-10
+          },
+          "canonical.CICE.air_density": {
+            "max_abs": 6.881573089145832e-10,
+            "reference_scale": 1.2501641700564252,
+            "scale_relative": 5.504535527390164e-10
+          },
+          "canonical.CICE.air_potential_temperature": {
+            "max_abs": 1.6644230527163018e-07,
+            "reference_scale": 303.61772889513577,
+            "scale_relative": 5.481969247227866e-10
+          },
+          "canonical.CICE.air_temperature": {
+            "max_abs": 1.6062762142610154e-07,
+            "reference_scale": 293.8040043788099,
+            "scale_relative": 5.467169236366151e-10
+          },
+          "canonical.CICE.surface_pressure": {
+            "max_abs": 3.657492925412953e-06,
+            "reference_scale": 107687.36415001593,
+            "scale_relative": 3.3963993401471066e-11
+          },
+          "canonical.CICE.downward_shortwave_radiation_flux": {
+            "max_abs": 5.454579934394133e-07,
+            "reference_scale": 385.3393669793086,
+            "scale_relative": 1.415526261215617e-09
+          },
+          "canonical.CICE.downward_longwave_radiation_flux": {
+            "max_abs": 2.293510277695532e-06,
+            "reference_scale": 283.74775053289176,
+            "scale_relative": 8.082919682669591e-09
+          },
+          "canonical.CICE.sea_surface_temperature": {
+            "max_abs": 1.393277273109561e-06,
+            "reference_scale": 302.98674079545873,
+            "scale_relative": 4.598476056911478e-09
+          },
+          "canonical.CICE.sea_surface_salinity": {
+            "max_abs": 1.0100971366000522e-06,
+            "reference_scale": 37.576115057262314,
+            "scale_relative": 2.6881361605923424e-08
+          },
+          "canonical.CICE.ocean_u_velocity": {
+            "max_abs": 2.539479751484386e-09,
+            "reference_scale": 0.15912571876645035,
+            "scale_relative": 1.5958952274783396e-08
+          },
+          "canonical.CICE.ocean_v_velocity": {
+            "max_abs": 3.0892771396562324e-09,
+            "reference_scale": 0.15327265241527313,
+            "scale_relative": 2.0155436021856144e-08
+          },
+          "canonical.CICE.sea_surface_height": {
+            "max_abs": 7.523518240695748e-09,
+            "reference_scale": 0.9528121301320747,
+            "scale_relative": 7.896119290224475e-09
+          },
+          "canonical.OCN.sea_surface_temperature": {
+            "max_abs": 1.0264092793477175e-06,
+            "reference_scale": 302.98725853119123,
+            "scale_relative": 3.3876318242671353e-09
+          },
+          "canonical.OCN.sea_surface_salinity": {
+            "max_abs": 3.970030491018406e-07,
+            "reference_scale": 37.54466162769758,
+            "scale_relative": 1.0574154404123385e-08
+          },
+          "canonical.OCN.ocean_u_velocity": {
+            "max_abs": 7.022805916662156e-09,
+            "reference_scale": 0.23216960008266485,
+            "scale_relative": 3.024860237585653e-08
+          },
+          "canonical.OCN.ocean_v_velocity": {
+            "max_abs": 3.961377450026338e-09,
+            "reference_scale": 0.21237525608726615,
+            "scale_relative": 1.865272594844376e-08
+          },
+          "canonical.OCN.sea_surface_height": {
+            "max_abs": 2.555373163071195e-09,
+            "reference_scale": 1.3013317790581913,
+            "scale_relative": 1.9636600013876453e-09
+          },
+          "canonical.OCN.ice_fraction": {
+            "max_abs": 6.756734061141856e-12,
+            "reference_scale": 0.15666387752614164,
+            "scale_relative": 4.312885757608289e-11
+          },
+          "canonical.OCN.open_water_temperature_contribution": {
+            "max_abs": 1.0264092793477175e-06,
+            "reference_scale": 302.98725853119123,
+            "scale_relative": 3.3876318242671353e-09
+          },
+          "canonical.OCN.sea_surface_heat_flux": {
+            "max_abs": 3.025685748525575e-05,
+            "reference_scale": 826.0335948464859,
+            "scale_relative": 3.662908830103796e-08
+          },
+          "canonical.OCN.sea_surface_mass_flux": {
+            "max_abs": 6.276000186667026e-12,
+            "reference_scale": 0.00037844928041902724,
+            "scale_relative": 1.658346444659137e-08
+          },
+          "canonical.OCN.ocean_u_stress": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "canonical.OCN.ocean_v_stress": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "canonical.ATM.downward_shortwave_radiation_flux": {
+            "max_abs": 7.034808504613466e-07,
+            "reference_scale": 513.1265474016475,
+            "scale_relative": 1.3709695084450584e-09
+          },
+          "canonical.ATM.surface_pressure": {
+            "max_abs": 5.346446414478123e-06,
+            "reference_scale": 111118.74930079073,
+            "scale_relative": 4.811471014676078e-11
+          },
+          "canonical.ATM.air_u_velocity": {
+            "max_abs": 4.221829108530528e-08,
+            "reference_scale": 24.60714386052718,
+            "scale_relative": 1.715692456003742e-09
+          },
+          "canonical.ATM.air_v_velocity": {
+            "max_abs": 7.33948155584585e-08,
+            "reference_scale": 19.904644343171235,
+            "scale_relative": 3.687321124310285e-09
+          },
+          "canonical.ATM.air_temperature": {
+            "max_abs": 2.5908343559422065e-07,
+            "reference_scale": 295.9495602848032,
+            "scale_relative": 8.754310543489068e-10
+          },
+          "canonical.ATM.air_specific_humidity": {
+            "max_abs": 1.293791033508962e-10,
+            "reference_scale": 0.013574505027389628,
+            "scale_relative": 9.531036534285756e-09
+          },
+          "canonical.ATM.sensible_heat_flux": {
+            "max_abs": 1.4156230907502731e-06,
+            "reference_scale": 190.0657930847539,
+            "scale_relative": 7.448068733330781e-09
+          },
+          "canonical.ATM.latent_heat_flux": {
+            "max_abs": 3.727710009115981e-06,
+            "reference_scale": 652.2143138145481,
+            "scale_relative": 5.715467953032269e-09
+          },
+          "canonical.ATM.net_shortwave_radiation_flux": {
+            "max_abs": 5.927522863657941e-07,
+            "reference_scale": 379.82064778639125,
+            "scale_relative": 1.5606110142257307e-09
+          },
+          "canonical.ATM.downward_longwave_radiation_flux": {
+            "max_abs": 2.2074864602927846e-06,
+            "reference_scale": 366.7412461107779,
+            "scale_relative": 6.019193324183642e-09
+          },
+          "canonical.ATM.air_density": {
+            "max_abs": 1.0891225699083407e-09,
+            "reference_scale": 1.3168617455063498,
+            "scale_relative": 8.270591606331152e-10
+          },
+          "canonical.ATM.air_potential_temperature": {
+            "max_abs": 2.6975970968123875e-07,
+            "reference_scale": 331.83947616201147,
+            "scale_relative": 8.129222984595601e-10
+          },
+          "canonical.ATM.model_level_height": {
+            "max_abs": 4.1558161001375993e-07,
+            "reference_scale": 447.8302501193812,
+            "scale_relative": 9.279891429910674e-10
+          },
+          "canonical.ATM.rain_rate": {
+            "max_abs": 8.222446974594927e-15,
+            "reference_scale": 2.7240547231451495e-05,
+            "scale_relative": 3.0184588087501496e-10
+          },
+          "canonical.ATM.snow_rate": {
+            "max_abs": 1.103080889756408e-19,
+            "reference_scale": 1.1922449180262665e-10,
+            "scale_relative": 9.25213329139228e-10
+          },
+          "canonical.ATM.sea_surface_temperature": {
+            "max_abs": 6.409669026652409e-07,
+            "reference_scale": 302.9872585311912,
+            "scale_relative": 2.115491277661289e-09
+          },
+          "canonical.ATM.total_surface_temperature": {
+            "max_abs": 5.297815732774325e-07,
+            "reference_scale": 309.9266357421875,
+            "scale_relative": 1.709377356382274e-09
+          },
+          "canonical.ATM.air_pressure_3d": {
+            "max_abs": 5.079127731733024e-06,
+            "reference_scale": 105562.81183575118,
+            "scale_relative": 4.8114744609454075e-11
+          },
+          "canonical.ATM.open_water_temperature_contribution": {
+            "max_abs": 5.297815732774325e-07,
+            "reference_scale": 302.91310638388325,
+            "scale_relative": 1.748955598527446e-09
+          },
+          "canonical.ATM.ice_surface_temperature": {
+            "max_abs": 9.240253007192223e-10,
+            "reference_scale": 39.041722456183706,
+            "scale_relative": 2.366763663555701e-11
+          },
+          "canonical.ATM.ice_surface_albedo": {
+            "max_abs": 2.9789365418864122e-12,
+            "reference_scale": 0.11026577368567222,
+            "scale_relative": 2.7015967351558073e-11
+          },
+          "canonical.ATM.ice_fraction": {
+            "max_abs": 3.969033435247127e-12,
+            "reference_scale": 0.1469836293970833,
+            "scale_relative": 2.7003234656320763e-11
+          },
+          "canonical.ATM.marine_surface_albedo": {
+            "max_abs": 4.5998760356269486e-12,
+            "reference_scale": 0.5994257964818709,
+            "scale_relative": 7.673803934739516e-12
+          },
+          "canonical.ATM.marine_ice_fraction": {
+            "max_abs": 6.7567618167174714e-12,
+            "reference_scale": 0.9989165971356053,
+            "scale_relative": 6.764090051254024e-12
+          },
+          "native.cost": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 0.9993908270190958,
+            "scale_relative": 2.2217995094804747e-16
+          },
+          "native.cosu": {
+            "max_abs": 2.220446049250313e-16,
+            "reference_scale": 1.0,
+            "scale_relative": 2.220446049250313e-16
+          },
+          "native.tantr": {
+            "max_abs": 6.776263578034403e-21,
+            "reference_scale": 2.245002552074081e-06,
+            "scale_relative": 3.018376781698553e-15
+          },
+          "native.coriolis_t": {
+            "max_abs": 2.710505431213761e-20,
+            "reference_scale": 0.00014548720541207664,
+            "scale_relative": 1.8630541589802005e-16
+          },
+          "native.beta": {
+            "max_abs": 3.2311742677852644e-26,
+            "reference_scale": 2.2862677914188064e-11,
+            "scale_relative": 1.4132965000482599e-15
+          },
+          "native.area_t": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_u": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197646415049.6167,
+            "scale_relative": 2.3160737408775367e-16
+          },
+          "native.area_v": {
+            "max_abs": 4.57763671875e-05,
+            "reference_scale": 197766889295.09274,
+            "scale_relative": 2.3146628513328123e-16
+          },
+          "native.rho": {
+            "max_abs": 4.4232706386537757e-07,
+            "reference_scale": 25.75882365324901,
+            "scale_relative": 1.7171865835945736e-08
+          },
+          "native.prho": {
+            "max_abs": 4.415467174112564e-07,
+            "reference_scale": 4.035194178812162,
+            "scale_relative": 1.0942390820489195e-07
+          },
+          "native.int_drhodT": {
+            "max_abs": 1.1420946805174026e-05,
+            "reference_scale": 681.0974292930359,
+            "scale_relative": 1.6768447969373068e-08
+          },
+          "native.int_drhodS": {
+            "max_abs": 2.7069603447671398e-06,
+            "reference_scale": 3947.6638896234863,
+            "scale_relative": 6.85711960403326e-10
+          },
+          "native.Nsqr": {
+            "max_abs": 2.015632494353943e-10,
+            "reference_scale": 0.0012622789011275694,
+            "scale_relative": 1.5968202372339564e-07
+          },
+          "native.Hd": {
+            "max_abs": 5.190226488593908e-07,
+            "reference_scale": 680.5977974784691,
+            "scale_relative": 7.625981905646853e-10
+          },
+          "native.dHd": {
+            "max_abs": 1.182351834880691e-12,
+            "reference_scale": 7.3993043447083e-05,
+            "scale_relative": 1.5979229665370688e-08
+          },
+          "native.temp": {
+            "max_abs": 5.371708708956646e-06,
+            "reference_scale": 29.819236293471047,
+            "scale_relative": 1.801423972126606e-07
+          },
+          "native.dtemp": {
+            "max_abs": 3.828546673703611e-13,
+            "reference_scale": 9.01113276735515e-06,
+            "scale_relative": 4.248685234750264e-08
+          },
+          "native.salt": {
+            "max_abs": 5.418285553560054e-07,
+            "reference_scale": 37.59679183918792,
+            "scale_relative": 1.4411563563017794e-08
+          },
+          "native.dsalt": {
+            "max_abs": 2.000603876498373e-13,
+            "reference_scale": 1.6165291774653323e-05,
+            "scale_relative": 1.2375921847790326e-08
+          },
+          "native.dtemp_vmix": {
+            "max_abs": 3.143342169271819e-10,
+            "reference_scale": 8.055248265215142e-05,
+            "scale_relative": 3.902228790198393e-06
+          },
+          "native.dsalt_vmix": {
+            "max_abs": 3.163941010423361e-11,
+            "reference_scale": 1.7600080981338017e-05,
+            "scale_relative": 1.7976854843896451e-06
+          },
+          "native.dtemp_iso": {
+            "max_abs": 4.394980914291083e-13,
+            "reference_scale": 1.8329902729665242e-06,
+            "scale_relative": 2.397710985764379e-07
+          },
+          "native.dsalt_iso": {
+            "max_abs": 1.099057784524401e-13,
+            "reference_scale": 8.510712782959101e-07,
+            "scale_relative": 1.2913815946474323e-07
+          },
+          "native.forc_temp_surface": {
+            "max_abs": 7.401976397807854e-12,
+            "reference_scale": 0.00020207918727084708,
+            "scale_relative": 3.6629088318169906e-08
+          },
+          "native.forc_salt_surface": {
+            "max_abs": 2.1777720677346852e-13,
+            "reference_scale": 1.3132190030540246e-05,
+            "scale_relative": 1.6583464469140748e-08
+          },
+          "native.u": {
+            "max_abs": 1.6010854312492606e-08,
+            "reference_scale": 0.22461240351522166,
+            "scale_relative": 7.128214676447097e-08
+          },
+          "native.v": {
+            "max_abs": 1.7055957000911004e-08,
+            "reference_scale": 0.2273998230591334,
+            "scale_relative": 7.500426680840357e-08
+          },
+          "native.w": {
+            "max_abs": 2.1223196428223198e-11,
+            "reference_scale": 0.0005716564059670171,
+            "scale_relative": 3.712579130871791e-08
+          },
+          "native.du": {
+            "max_abs": 1.5301749481351013e-12,
+            "reference_scale": 9.937663401370145e-06,
+            "scale_relative": 1.5397733715997364e-07
+          },
+          "native.dv": {
+            "max_abs": 1.4855116320275737e-12,
+            "reference_scale": 1.609104340389997e-05,
+            "scale_relative": 9.231916133341184e-08
+          },
+          "native.du_cor": {
+            "max_abs": 8.2571769771466e-13,
+            "reference_scale": 9.905706438067983e-06,
+            "scale_relative": 8.335777997028031e-08
+          },
+          "native.dv_cor": {
+            "max_abs": 1.1506978244301585e-12,
+            "reference_scale": 1.5410153375497883e-05,
+            "scale_relative": 7.467140633783477e-08
+          },
+          "native.du_mix": {
+            "max_abs": 7.957218278178954e-13,
+            "reference_scale": 5.046192235651975e-06,
+            "scale_relative": 1.5768757721832748e-07
+          },
+          "native.dv_mix": {
+            "max_abs": 2.0234528022470226e-12,
+            "reference_scale": 3.5382425992382495e-06,
+            "scale_relative": 5.718807417791683e-07
+          },
+          "native.du_adv": {
+            "max_abs": 2.65130258779793e-15,
+            "reference_scale": 7.227760344803839e-08,
+            "scale_relative": 3.668221497830925e-08
+          },
+          "native.dv_adv": {
+            "max_abs": 9.095202345421844e-16,
+            "reference_scale": 5.324921512845325e-08,
+            "scale_relative": 1.7080443952988713e-08
+          },
+          "native.p_hydro": {
+            "max_abs": 1.8507230037378974e-07,
+            "reference_scale": 693.0816584634872,
+            "scale_relative": 2.670281316981925e-10
+          },
+          "native.kappaM": {
+            "max_abs": 5.1838687538108275e-06,
+            "reference_scale": 4.159272729062022,
+            "scale_relative": 1.246340187694272e-06
+          },
+          "native.kappaH": {
+            "max_abs": 5.1838687538108275e-06,
+            "reference_scale": 4.159272729062022,
+            "scale_relative": 1.246340187694272e-06
+          },
+          "native.surface_taux": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "native.surface_tauy": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "native.forc_rho_surface": {
+            "max_abs": 2.3494480964674977e-12,
+            "reference_scale": 6.493671340058023e-05,
+            "scale_relative": 3.6180582191991635e-08
+          },
+          "native.ssh": {
+            "max_abs": 1.1270828714771142e-09,
+            "reference_scale": 1.4590206309458225,
+            "scale_relative": 7.724927582048467e-10
+          },
+          "native.psi": {
+            "max_abs": 1.1056683568710923e-08,
+            "reference_scale": 14.31299238957852,
+            "scale_relative": 7.724928000912962e-10
+          },
+          "native.K_gm": {
+            "max_abs": 0.0004465191655071976,
+            "reference_scale": 10000.0,
+            "scale_relative": 4.465191655071976e-08
+          },
+          "native.K_diss_v": {
+            "max_abs": 1.9643845422682895e-14,
+            "reference_scale": 6.791613644389221e-08,
+            "scale_relative": 2.892367918912957e-07
+          },
+          "native.K_diss_h": {
+            "max_abs": 9.011473888011391e-15,
+            "reference_scale": 8.162949369956559e-07,
+            "scale_relative": 1.1039482764866576e-08
+          },
+          "native.P_diss_v": {
+            "max_abs": 1.6754057982687908e-11,
+            "reference_scale": 1.7333691313270586e-06,
+            "scale_relative": 9.665603061628936e-06
+          },
+          "native.P_diss_nonlin": {
+            "max_abs": 2.364502810363675e-12,
+            "reference_scale": 3.60736824972635e-06,
+            "scale_relative": 6.554647728418198e-07
+          },
+          "native.P_diss_iso": {
+            "max_abs": 1.0475332893077664e-14,
+            "reference_scale": 1.8283952056894268e-08,
+            "scale_relative": 5.729249814526704e-07
+          },
+          "native.P_diss_skew": {
+            "max_abs": 3.3033339639672917e-14,
+            "reference_scale": 5.249759595534157e-08,
+            "scale_relative": 6.292352828455911e-07
+          },
+          "native.P_diss_adv": {
+            "max_abs": 2.1263374870258197e-13,
+            "reference_scale": 2.3961578829987152e-05,
+            "scale_relative": 8.873945669910432e-09
+          },
+          "native.u_wgrid": {
+            "max_abs": 1.4258856262383546e-08,
+            "reference_scale": 0.516288609841433,
+            "scale_relative": 2.7617995033364864e-08
+          },
+          "native.v_wgrid": {
+            "max_abs": 1.0883364126579309e-08,
+            "reference_scale": 0.4849621551770329,
+            "scale_relative": 2.2441677170884384e-08
+          },
+          "native.w_wgrid": {
+            "max_abs": 1.9931692299917205e-11,
+            "reference_scale": 0.000562631081123558,
+            "scale_relative": 3.5425864245029246e-08
+          },
+          "native.K_11": {
+            "max_abs": 1.1368683772161603e-13,
+            "reference_scale": 1000.0,
+            "scale_relative": 1.1368683772161603e-16
+          },
+          "native.K_22": {
+            "max_abs": 1.1368683772161603e-13,
+            "reference_scale": 1000.0,
+            "scale_relative": 1.1368683772161603e-16
+          },
+          "native.K_33": {
+            "max_abs": 2.2434952974808436e-08,
+            "reference_scale": 0.0051298105338115855,
+            "scale_relative": 4.373446704695089e-06
+          },
+          "native.Ai_ez": {
+            "max_abs": 1.5469695891412363e-08,
+            "reference_scale": 0.000809347661985666,
+            "scale_relative": 1.9113783381370093e-05
+          },
+          "native.Ai_nz": {
+            "max_abs": 9.473028327695518e-09,
+            "reference_scale": 0.0008093474815338105,
+            "scale_relative": 1.1704525613328645e-05
+          },
+          "native.Ai_bx": {
+            "max_abs": 1.5469695891412363e-08,
+            "reference_scale": 0.000809347661985666,
+            "scale_relative": 1.9113783381370093e-05
+          },
+          "native.Ai_by": {
+            "max_abs": 9.473028327695518e-09,
+            "reference_scale": 0.0008093474815338105,
+            "scale_relative": 1.1704525613328645e-05
+          },
+          "native.B1_gm": {
+            "max_abs": 2.0203693795739497e-06,
+            "reference_scale": 2.0929348152692984,
+            "scale_relative": 9.653283823433308e-07
+          },
+          "native.B2_gm": {
+            "max_abs": 2.6299844225752267e-06,
+            "reference_scale": 2.618972197412908,
+            "scale_relative": 1.0042047888760318e-06
+          },
+          "native.tke": {
+            "max_abs": 1.516150187443662e-07,
+            "reference_scale": 0.0060888386259040205,
+            "scale_relative": 2.4900482351321254e-05
+          },
+          "native.sqrttke": {
+            "max_abs": 4.612145269866641e-07,
+            "reference_scale": 0.07682383375749036,
+            "scale_relative": 6.00353437765914e-06
+          },
+          "native.dtke": {
+            "max_abs": 6.475016084625209e-14,
+            "reference_scale": 3.2712433129350953e-09,
+            "scale_relative": 1.9793746490888674e-05
+          },
+          "native.Prandtlnumber": {
+            "max_abs": 0.00010669762142700989,
+            "reference_scale": 10.0,
+            "scale_relative": 1.066976214270099e-05
+          },
+          "native.mxl": {
+            "max_abs": 0.00023350798819876672,
+            "reference_scale": 688.4288803721677,
+            "scale_relative": 3.391897040585097e-07
+          },
+          "native.forc_tke_surface": {
+            "max_abs": 6.023951519474913e-15,
+            "reference_scale": 5.529370401064107e-06,
+            "scale_relative": 1.0894461905311364e-09
+          },
+          "native.tke_diss": {
+            "max_abs": 4.9661385413899133e-11,
+            "reference_scale": 1.2138449535942646e-06,
+            "scale_relative": 4.0912461897912846e-05
+          },
+          "native.tke_surf_corr": {
+            "max_abs": 1.7276054571633723e-09,
+            "reference_scale": 2.685042562959635e-06,
+            "scale_relative": 0.0006434182761181591
+          },
+          "native.eke": {
+            "max_abs": 4.139089060210821e-09,
+            "reference_scale": 0.09284955355799776,
+            "scale_relative": 4.4578448701160104e-08
+          },
+          "native.deke": {
+            "max_abs": 1.5732863543118788e-15,
+            "reference_scale": 1.3128241519375192e-07,
+            "scale_relative": 1.1983983932577405e-08
+          },
+          "native.sqrteke": {
+            "max_abs": 3.4170938870148326e-08,
+            "reference_scale": 0.3035991758228184,
+            "scale_relative": 1.1255280511726623e-07
+          },
+          "native.L_rossby": {
+            "max_abs": 0.002302324148331536,
+            "reference_scale": 285712.9635284633,
+            "scale_relative": 8.0581718095622e-09
+          },
+          "native.L_rhines": {
+            "max_abs": 0.020038536065840162,
+            "reference_scale": 157668.2764761052,
+            "scale_relative": 1.2709301143960322e-07
+          },
+          "native.eke_len": {
+            "max_abs": 0.004604648296663072,
+            "reference_scale": 107054.1707953729,
+            "scale_relative": 4.301232042107503e-08
+          },
+          "native.eke_diss_iw": {
+            "max_abs": 5.399781424621172e-15,
+            "reference_scale": 7.454444435275913e-07,
+            "scale_relative": 7.243707390276239e-09
+          },
+          "native.qnet": {
+            "max_abs": 3.025685748525575e-05,
+            "reference_scale": 826.0335948464859,
+            "scale_relative": 3.662908830103796e-08
+          },
+          "native.taux": {
+            "max_abs": 2.717263879181697e-10,
+            "reference_scale": 0.324915934229361,
+            "scale_relative": 8.362975135788683e-10
+          },
+          "native.tauy": {
+            "max_abs": 7.390998299494633e-10,
+            "reference_scale": 0.21868777616986707,
+            "scale_relative": 3.379703442479396e-09
+          },
+          "native.coupled_salt_flux": {
+            "max_abs": 2.1777720677346852e-13,
+            "reference_scale": 1.3132190030540246e-05,
+            "scale_relative": 1.6583464469140748e-08
+          }
+        }
+      }
+    },
+    "fork_execution": {
+      "reference": "/private/tmp/vercor-veros-bench/coupled-fork-host-final",
+      "candidate": "/private/tmp/vercor-veros-bench/coupled-fork-jax",
+      "warm_speedup": 0.8212682603629945,
+      "observed_speedup_bounds": [
+        0.7534963499743219,
+        0.8576865662390036
+      ],
+      "startup_difference_seconds": 396.043244874978,
+      "estimated_break_even_native_steps": null,
+      "estimated_break_even_simulated_days": null,
+      "initial": {
+        "arrays_compared": 197,
+        "arrays_identical": 197,
+        "changed": {}
+      },
+      "final": {
+        "arrays_compared": 197,
+        "arrays_identical": 66,
+        "changed": {
+          "canonical.CICE.ice_fraction": {
+            "max_abs": 8.360367953486048e-12,
+            "reference_scale": 0.15666489081546497,
+            "scale_relative": 5.3364655667067716e-11
+          },
+          "canonical.CICE.ice_surface_temperature": {
+            "max_abs": 4.861209390583099e-08,
+            "reference_scale": 273.15000000000003,
+            "scale_relative": 1.7796849315698695e-10
+          },
+          "canonical.CICE.ice_surface_albedo": {
+            "max_abs": 4.163336342344337e-14,
+            "reference_scale": 0.7503295724112387,
+            "scale_relative": 5.5486768687060444e-14
+          },
+          "canonical.CICE.sea_surface_heat_flux": {
+            "max_abs": 3.6082623694255744e-05,
+            "reference_scale": 825.9953479453678,
+            "scale_relative": 4.3683809822912325e-08
+          },
+          "canonical.CICE.sea_surface_mass_flux": {
+            "max_abs": 7.485384179357381e-12,
+            "reference_scale": 0.00037845861201359586,
+            "scale_relative": 1.977860707021901e-08
+          },
+          "canonical.CICE.ocean_u_stress": {
+            "max_abs": 3.232666287433794e-10,
+            "reference_scale": 0.3249292751137293,
+            "scale_relative": 9.948830514893804e-10
+          },
+          "canonical.CICE.ocean_v_stress": {
+            "max_abs": 8.988517152808129e-10,
+            "reference_scale": 0.21869180015319725,
+            "scale_relative": 4.11012993926225e-09
+          },
+          "canonical.CICE.air_u_velocity": {
+            "max_abs": 2.8847279232024903e-08,
+            "reference_scale": 30.469238394031844,
+            "scale_relative": 9.467673218138382e-10
+          },
+          "canonical.CICE.air_v_velocity": {
+            "max_abs": 5.5445260827013954e-08,
+            "reference_scale": 26.286281919267797,
+            "scale_relative": 2.109285025447919e-09
+          },
+          "canonical.CICE.air_specific_humidity": {
+            "max_abs": 1.516810242945671e-10,
+            "reference_scale": 0.008562441142770534,
+            "scale_relative": 1.771469394830642e-08
+          },
+          "canonical.CICE.model_level_height": {
+            "max_abs": 3.2649381864757743e-07,
+            "reference_scale": 443.41549404639954,
+            "scale_relative": 7.363157648555526e-10
+          },
+          "canonical.CICE.air_density": {
+            "max_abs": 8.178946409032051e-10,
+            "reference_scale": 1.250166406813013,
+            "scale_relative": 6.542286182430891e-10
+          },
+          "canonical.CICE.air_potential_temperature": {
+            "max_abs": 1.9781299442911404e-07,
+            "reference_scale": 303.61770199240067,
+            "scale_relative": 6.51519964517962e-10
+          },
+          "canonical.CICE.air_temperature": {
+            "max_abs": 1.90899527297006e-07,
+            "reference_scale": 293.80402346628216,
+            "scale_relative": 6.49751235686921e-10
+          },
+          "canonical.CICE.surface_pressure": {
+            "max_abs": 4.350469680503011e-06,
+            "reference_scale": 107687.37287467037,
+            "scale_relative": 4.0399069680771314e-11
+          },
+          "canonical.CICE.downward_shortwave_radiation_flux": {
+            "max_abs": 6.48676291348238e-07,
+            "reference_scale": 385.3360650684947,
+            "scale_relative": 1.6834040468880943e-09
+          },
+          "canonical.CICE.downward_longwave_radiation_flux": {
+            "max_abs": 2.725609562048703e-06,
+            "reference_scale": 283.74753344794885,
+            "scale_relative": 9.605755965271479e-09
+          },
+          "canonical.CICE.open_water_albedo": {
+            "max_abs": 1.3877787807814457e-17,
+            "reference_scale": 0.07000000000000003,
+            "scale_relative": 1.9825411154020644e-16
+          },
+          "canonical.CICE.sea_surface_temperature": {
+            "max_abs": 1.6603570429651882e-06,
+            "reference_scale": 302.9862001444967,
+            "scale_relative": 5.479975794849236e-09
+          },
+          "canonical.CICE.sea_surface_salinity": {
+            "max_abs": 1.2029885709807786e-06,
+            "reference_scale": 37.57591722540124,
+            "scale_relative": 3.201488239833467e-08
+          },
+          "canonical.CICE.ocean_u_velocity": {
+            "max_abs": 2.8658187004038105e-09,
+            "reference_scale": 0.1590957744807292,
+            "scale_relative": 1.8013166658621338e-08
+          },
+          "canonical.CICE.ocean_v_velocity": {
+            "max_abs": 3.6234994449380054e-09,
+            "reference_scale": 0.1532298659039424,
+            "scale_relative": 2.364747514175549e-08
+          },
+          "canonical.CICE.sea_surface_height": {
+            "max_abs": 8.952343914792049e-09,
+            "reference_scale": 0.9526811331771105,
+            "scale_relative": 9.396999271872578e-09
+          },
+          "canonical.OCN.sea_surface_temperature": {
+            "max_abs": 7.643408252988593e-07,
+            "reference_scale": 302.9857262389965,
+            "scale_relative": 2.5226958206471542e-09
+          },
+          "canonical.OCN.sea_surface_salinity": {
+            "max_abs": 4.420884991418461e-07,
+            "reference_scale": 37.544080281882785,
+            "scale_relative": 1.1775185217552917e-08
+          },
+          "canonical.OCN.ocean_u_velocity": {
+            "max_abs": 1.0649543675904372e-07,
+            "reference_scale": 0.23209379994688445,
+            "scale_relative": 4.588465386986451e-07
+          },
+          "canonical.OCN.ocean_v_velocity": {
+            "max_abs": 1.2144065656208292e-07,
+            "reference_scale": 0.21230127691036016,
+            "scale_relative": 5.720203775004082e-07
+          },
+          "canonical.OCN.sea_surface_height": {
+            "max_abs": 2.0292461561099984e-07,
+            "reference_scale": 1.3012611255345952,
+            "scale_relative": 1.5594457686395006e-07
+          },
+          "canonical.OCN.ice_fraction": {
+            "max_abs": 8.360367953486048e-12,
+            "reference_scale": 0.15666489081546497,
+            "scale_relative": 5.3364655667067716e-11
+          },
+          "canonical.OCN.open_water_temperature_contribution": {
+            "max_abs": 7.643408252988593e-07,
+            "reference_scale": 302.9857262389965,
+            "scale_relative": 2.5226958206471542e-09
+          },
+          "canonical.OCN.sea_surface_heat_flux": {
+            "max_abs": 3.6082623694255744e-05,
+            "reference_scale": 825.9953479453678,
+            "scale_relative": 4.3683809822912325e-08
+          },
+          "canonical.OCN.sea_surface_mass_flux": {
+            "max_abs": 7.485384179357381e-12,
+            "reference_scale": 0.00037845861201359586,
+            "scale_relative": 1.977860707021901e-08
+          },
+          "canonical.OCN.ocean_u_stress": {
+            "max_abs": 3.232666287433794e-10,
+            "reference_scale": 0.3249292751137293,
+            "scale_relative": 9.948830514893804e-10
+          },
+          "canonical.OCN.ocean_v_stress": {
+            "max_abs": 8.988517152808129e-10,
+            "reference_scale": 0.21869180015319725,
+            "scale_relative": 4.11012993926225e-09
+          },
+          "canonical.ATM.downward_shortwave_radiation_flux": {
+            "max_abs": 8.37207608128665e-07,
+            "reference_scale": 513.1216630709721,
+            "scale_relative": 1.6315966921335519e-09
+          },
+          "canonical.ATM.surface_pressure": {
+            "max_abs": 6.369969923980534e-06,
+            "reference_scale": 111118.71029341294,
+            "scale_relative": 5.7325808652389867e-11
+          },
+          "canonical.ATM.air_u_velocity": {
+            "max_abs": 5.011371806418197e-08,
+            "reference_scale": 24.607694163847913,
+            "scale_relative": 2.036506050932879e-09
+          },
+          "canonical.ATM.air_v_velocity": {
+            "max_abs": 8.695805631120379e-08,
+            "reference_scale": 19.904970421528215,
+            "scale_relative": 4.368660413438964e-09
+          },
+          "canonical.ATM.air_temperature": {
+            "max_abs": 3.083681576754316e-07,
+            "reference_scale": 295.94972982334946,
+            "scale_relative": 1.0419612745025805e-09
+          },
+          "canonical.ATM.air_specific_humidity": {
+            "max_abs": 1.5345092210794498e-10,
+            "reference_scale": 0.01357450622104844,
+            "scale_relative": 1.1304346516119027e-08
+          },
+          "canonical.ATM.sensible_heat_flux": {
+            "max_abs": 1.3623751815572405e-06,
+            "reference_scale": 190.06888851107183,
+            "scale_relative": 7.16779685633759e-09
+          },
+          "canonical.ATM.latent_heat_flux": {
+            "max_abs": 4.420235313773446e-06,
+            "reference_scale": 652.2473874759986,
+            "scale_relative": 6.776930653380505e-09
+          },
+          "canonical.ATM.net_shortwave_radiation_flux": {
+            "max_abs": 7.054619857171929e-07,
+            "reference_scale": 379.81077652070746,
+            "scale_relative": 1.8574038161308748e-09
+          },
+          "canonical.ATM.downward_longwave_radiation_flux": {
+            "max_abs": 2.621365723598501e-06,
+            "reference_scale": 366.7454656778459,
+            "scale_relative": 7.147643171957151e-09
+          },
+          "canonical.ATM.air_density": {
+            "max_abs": 1.2963596862647364e-09,
+            "reference_scale": 1.3168584997869157,
+            "scale_relative": 9.844335488395326e-10
+          },
+          "canonical.ATM.air_potential_temperature": {
+            "max_abs": 3.2107777769851964e-07,
+            "reference_scale": 331.8327575469878,
+            "scale_relative": 9.675891556699454e-10
+          },
+          "canonical.ATM.model_level_height": {
+            "max_abs": 4.945177920490096e-07,
+            "reference_scale": 447.8306576859046,
+            "scale_relative": 1.1042517602621345e-09
+          },
+          "canonical.ATM.rain_rate": {
+            "max_abs": 8.292181503076479e-15,
+            "reference_scale": 2.724142541139537e-05,
+            "scale_relative": 3.043960210543085e-10
+          },
+          "canonical.ATM.snow_rate": {
+            "max_abs": 9.580232663648413e-20,
+            "reference_scale": 1.1915085224781682e-10,
+            "scale_relative": 8.040423113149784e-10
+          },
+          "canonical.ATM.sea_surface_temperature": {
+            "max_abs": 7.643408252988593e-07,
+            "reference_scale": 302.98572623899645,
+            "scale_relative": 2.5226958206471547e-09
+          },
+          "canonical.ATM.total_surface_temperature": {
+            "max_abs": 3.517744744385709e-07,
+            "reference_scale": 309.9266357421875,
+            "scale_relative": 1.135024982916262e-09
+          },
+          "canonical.ATM.air_pressure_3d": {
+            "max_abs": 6.0514576034620404e-06,
+            "reference_scale": 105562.77477874226,
+            "scale_relative": 5.732567769410941e-11
+          },
+          "canonical.ATM.open_water_temperature_contribution": {
+            "max_abs": 3.517744744385709e-07,
+            "reference_scale": 302.9116953578512,
+            "scale_relative": 1.1613103086792162e-09
+          },
+          "canonical.ATM.ice_surface_temperature": {
+            "max_abs": 1.123712678463562e-09,
+            "reference_scale": 39.053749390297426,
+            "scale_relative": 2.8773490279597558e-11
+          },
+          "canonical.ATM.ice_surface_albedo": {
+            "max_abs": 3.6186192930998118e-12,
+            "reference_scale": 0.11030162804890342,
+            "scale_relative": 3.2806580982607595e-11
+          },
+          "canonical.ATM.ice_fraction": {
+            "max_abs": 4.8211989955859735e-12,
+            "reference_scale": 0.14703139285142106,
+            "scale_relative": 3.2790269493385794e-11
+          },
+          "canonical.ATM.marine_surface_albedo": {
+            "max_abs": 5.691641602467712e-12,
+            "reference_scale": 0.5994257964818709,
+            "scale_relative": 9.495156257660077e-12
+          },
+          "canonical.ATM.marine_ice_fraction": {
+            "max_abs": 8.360395709061663e-12,
+            "reference_scale": 0.9989165971356053,
+            "scale_relative": 8.369463209476255e-12
+          },
+          "native.rho": {
+            "max_abs": 1.0769051641545957e-06,
+            "reference_scale": 25.758815626696105,
+            "scale_relative": 4.180724687661901e-08
+          },
+          "native.prho": {
+            "max_abs": 9.879577191895805e-07,
+            "reference_scale": 4.034287104629129,
+            "scale_relative": 2.4489028509050626e-07
+          },
+          "native.int_drhodT": {
+            "max_abs": 5.750128487136408e-06,
+            "reference_scale": 681.0968806108442,
+            "scale_relative": 8.44245312352537e-09
+          },
+          "native.int_drhodS": {
+            "max_abs": 1.2741835178076144e-06,
+            "reference_scale": 3947.6638896235336,
+            "scale_relative": 3.2276899792730987e-10
+          },
+          "native.Nsqr": {
+            "max_abs": 3.405791395568814e-10,
+            "reference_scale": 0.0012618340123321191,
+            "scale_relative": 2.6990803562777935e-07
+          },
+          "native.Hd": {
+            "max_abs": 1.2960257871341696e-06,
+            "reference_scale": 680.5975684364718,
+            "scale_relative": 1.9042468666344393e-09
+          },
+          "native.dHd": {
+            "max_abs": 7.259900285466443e-12,
+            "reference_scale": 7.39331023140683e-05,
+            "scale_relative": 9.819553161216393e-08
+          },
+          "native.temp": {
+            "max_abs": 4.7003291729907914e-06,
+            "reference_scale": 29.817296717193663,
+            "scale_relative": 1.5763766975831926e-07
+          },
+          "native.dtemp": {
+            "max_abs": 1.943671670050553e-11,
+            "reference_scale": 9.011094154563397e-06,
+            "scale_relative": 2.156976319092437e-06
+          },
+          "native.salt": {
+            "max_abs": 5.717777753488917e-07,
+            "reference_scale": 37.596033986215915,
+            "scale_relative": 1.5208459901874926e-08
+          },
+          "native.dsalt": {
+            "max_abs": 6.037856956767466e-11,
+            "reference_scale": 1.6164431802615436e-05,
+            "scale_relative": 3.7352732409626237e-06
+          },
+          "native.dtemp_vmix": {
+            "max_abs": 9.493475832615196e-11,
+            "reference_scale": 7.863578738167815e-05,
+            "scale_relative": 1.2072716696453073e-06
+          },
+          "native.dsalt_vmix": {
+            "max_abs": 4.975642613974005e-12,
+            "reference_scale": 1.7584056454897418e-05,
+            "scale_relative": 2.8296329841390015e-07
+          },
+          "native.dtemp_iso": {
+            "max_abs": 2.765573687114873e-13,
+            "reference_scale": 1.8356315858558725e-06,
+            "scale_relative": 1.5066060686820282e-07
+          },
+          "native.dsalt_iso": {
+            "max_abs": 4.0693273398430683e-14,
+            "reference_scale": 8.514508972611045e-07,
+            "scale_relative": 4.7792859845858795e-08
+          },
+          "native.forc_temp_surface": {
+            "max_abs": 8.827180048649914e-12,
+            "reference_scale": 0.0002020698306263452,
+            "scale_relative": 4.3683809806188136e-08
+          },
+          "native.forc_salt_surface": {
+            "max_abs": 2.597428311524501e-13,
+            "reference_scale": 1.3132513836871778e-05,
+            "scale_relative": 1.9778607080022844e-08
+          },
+          "native.u": {
+            "max_abs": 6.30708613953701e-07,
+            "reference_scale": 0.22449598767723453,
+            "scale_relative": 2.809442700866851e-06
+          },
+          "native.v": {
+            "max_abs": 5.053043833583987e-07,
+            "reference_scale": 0.22728852550111794,
+            "scale_relative": 2.2231847483031572e-06
+          },
+          "native.w": {
+            "max_abs": 2.446274126501097e-10,
+            "reference_scale": 0.0005709868932283629,
+            "scale_relative": 4.284291207929223e-07
+          },
+          "native.du": {
+            "max_abs": 4.607305269511012e-11,
+            "reference_scale": 9.919235053544114e-06,
+            "scale_relative": 4.644819126314418e-06
+          },
+          "native.dv": {
+            "max_abs": 5.573202223349444e-11,
+            "reference_scale": 1.6081821399977137e-05,
+            "scale_relative": 3.465529236232761e-06
+          },
+          "native.du_cor": {
+            "max_abs": 3.541974012063183e-11,
+            "reference_scale": 9.88555022554348e-06,
+            "scale_relative": 3.58298115051907e-06
+          },
+          "native.dv_cor": {
+            "max_abs": 5.1999824021446754e-11,
+            "reference_scale": 1.5400379380661135e-05,
+            "scale_relative": 3.3765287682941753e-06
+          },
+          "native.du_mix": {
+            "max_abs": 1.3852882642591335e-11,
+            "reference_scale": 5.0382201472457275e-06,
+            "scale_relative": 2.7495588199265906e-06
+          },
+          "native.dv_mix": {
+            "max_abs": 9.860700893803415e-12,
+            "reference_scale": 3.536109405241055e-06,
+            "scale_relative": 2.7885734754666663e-06
+          },
+          "native.du_adv": {
+            "max_abs": 7.119316570117244e-14,
+            "reference_scale": 7.218806613133517e-08,
+            "scale_relative": 9.862179376248608e-07
+          },
+          "native.dv_adv": {
+            "max_abs": 5.72739098785827e-14,
+            "reference_scale": 5.311405870969379e-08,
+            "scale_relative": 1.0783192109574127e-06
+          },
+          "native.p_hydro": {
+            "max_abs": 3.013409042296189e-07,
+            "reference_scale": 693.0801182924537,
+            "scale_relative": 4.3478509378112675e-10
+          },
+          "native.kappaM": {
+            "max_abs": 1.5095699293213305e-05,
+            "reference_scale": 5.070232226261432,
+            "scale_relative": 2.9773191087825607e-06
+          },
+          "native.kappaH": {
+            "max_abs": 1.5095699293213305e-05,
+            "reference_scale": 5.070232226261432,
+            "scale_relative": 2.9773191087825607e-06
+          },
+          "native.surface_taux": {
+            "max_abs": 3.232666287433794e-10,
+            "reference_scale": 0.3249292751137293,
+            "scale_relative": 9.948830514893804e-10
+          },
+          "native.surface_tauy": {
+            "max_abs": 8.988517152808129e-10,
+            "reference_scale": 0.21869180015319725,
+            "scale_relative": 4.11012993926225e-09
+          },
+          "native.forc_rho_surface": {
+            "max_abs": 2.803866317455713e-12,
+            "reference_scale": 6.493485790059602e-05,
+            "scale_relative": 4.317967895991926e-08
+          },
+          "native.ssh": {
+            "max_abs": 8.054436786975039e-07,
+            "reference_scale": 1.4589326496044095,
+            "scale_relative": 5.520773552609851e-07
+          },
+          "native.psi": {
+            "max_abs": 7.901402488297293e-06,
+            "reference_scale": 14.31212929261926,
+            "scale_relative": 5.520773552801841e-07
+          },
+          "native.K_gm": {
+            "max_abs": 0.02886578757954794,
+            "reference_scale": 10000.0,
+            "scale_relative": 2.886578757954794e-06
+          },
+          "native.K_diss_v": {
+            "max_abs": 6.356337694539684e-14,
+            "reference_scale": 6.767503477172943e-08,
+            "scale_relative": 9.392440973218355e-07
+          },
+          "native.K_diss_h": {
+            "max_abs": 1.773762240766399e-13,
+            "reference_scale": 8.152108926103903e-07,
+            "scale_relative": 2.1758323604909488e-07
+          },
+          "native.P_diss_v": {
+            "max_abs": 1.5084867408894673e-11,
+            "reference_scale": 3.580615411455447e-06,
+            "scale_relative": 4.212925901126863e-06
+          },
+          "native.P_diss_nonlin": {
+            "max_abs": 2.2008325498897332e-13,
+            "reference_scale": 3.29887644685412e-06,
+            "scale_relative": 6.671460981779098e-08
+          },
+          "native.P_diss_iso": {
+            "max_abs": 3.84211181251852e-15,
+            "reference_scale": 2.4202888557303315e-08,
+            "scale_relative": 1.587460027104553e-07
+          },
+          "native.P_diss_skew": {
+            "max_abs": 2.14719320431709e-14,
+            "reference_scale": 5.682152151333079e-08,
+            "scale_relative": 3.778837924664409e-07
+          },
+          "native.P_diss_adv": {
+            "max_abs": 1.4010576214278612e-12,
+            "reference_scale": 2.3828760570450247e-05,
+            "scale_relative": 5.8796915487299646e-08
+          },
+          "native.u_wgrid": {
+            "max_abs": 7.89109912587016e-07,
+            "reference_scale": 0.5158413087682612,
+            "scale_relative": 1.5297532383966542e-06
+          },
+          "native.v_wgrid": {
+            "max_abs": 5.878846759399536e-07,
+            "reference_scale": 0.4847166865172011,
+            "scale_relative": 1.2128418358444348e-06
+          },
+          "native.w_wgrid": {
+            "max_abs": 1.0955893005610288e-10,
+            "reference_scale": 0.0005620035202341569,
+            "scale_relative": 1.949434943226966e-07
+          },
+          "native.K_33": {
+            "max_abs": 1.042495662711973e-08,
+            "reference_scale": 0.005162447062122214,
+            "scale_relative": 2.0193827658998147e-06
+          },
+          "native.Ai_ez": {
+            "max_abs": 9.577502948924024e-09,
+            "reference_scale": 0.0008093461088939012,
+            "scale_relative": 1.1833630684915739e-05
+          },
+          "native.Ai_nz": {
+            "max_abs": 5.316401690137317e-09,
+            "reference_scale": 0.0008093476187047179,
+            "scale_relative": 6.568749406646431e-06
+          },
+          "native.Ai_bx": {
+            "max_abs": 9.577502948924024e-09,
+            "reference_scale": 0.0008093461088939012,
+            "scale_relative": 1.1833630684915739e-05
+          },
+          "native.Ai_by": {
+            "max_abs": 5.316401690137317e-09,
+            "reference_scale": 0.0008093476187047179,
+            "scale_relative": 6.568749406646431e-06
+          },
+          "native.B1_gm": {
+            "max_abs": 1.2785038540075178e-06,
+            "reference_scale": 2.1095134548684733,
+            "scale_relative": 6.060657499277394e-07
+          },
+          "native.B2_gm": {
+            "max_abs": 2.5560079121578205e-06,
+            "reference_scale": 2.6436291723029193,
+            "scale_relative": 9.668556917652825e-07
+          },
+          "native.tke": {
+            "max_abs": 1.1754776738429323e-07,
+            "reference_scale": 0.0081237031306436,
+            "scale_relative": 1.4469727105227257e-05
+          },
+          "native.sqrttke": {
+            "max_abs": 2.1160477124328864e-06,
+            "reference_scale": 0.07922237853533487,
+            "scale_relative": 2.6710226978215303e-05
+          },
+          "native.dtke": {
+            "max_abs": 6.181122867099405e-14,
+            "reference_scale": 3.269841796345574e-09,
+            "scale_relative": 1.8903430967233717e-05
+          },
+          "native.Prandtlnumber": {
+            "max_abs": 0.0001550313580782614,
+            "reference_scale": 10.0,
+            "scale_relative": 1.550313580782614e-05
+          },
+          "native.mxl": {
+            "max_abs": 0.0007274501701188263,
+            "reference_scale": 687.8211148880889,
+            "scale_relative": 1.0576153513943596e-06
+          },
+          "native.forc_tke_surface": {
+            "max_abs": 7.325094738089784e-15,
+            "reference_scale": 5.529576704904008e-06,
+            "scale_relative": 1.3247116604049252e-09
+          },
+          "native.tke_diss": {
+            "max_abs": 2.2621787993960133e-10,
+            "reference_scale": 1.295471915024873e-06,
+            "scale_relative": 0.0001746219870272201
+          },
+          "native.tke_surf_corr": {
+            "max_abs": 7.869098633794825e-09,
+            "reference_scale": 2.6778592738142292e-06,
+            "scale_relative": 0.002938578106304449
+          },
+          "native.eke": {
+            "max_abs": 2.4217911274559273e-07,
+            "reference_scale": 0.09278397642816016,
+            "scale_relative": 2.6101394019591813e-06
+          },
+          "native.deke": {
+            "max_abs": 2.711355610947351e-14,
+            "reference_scale": 1.3120508873294943e-07,
+            "scale_relative": 2.0665018690440858e-07
+          },
+          "native.sqrteke": {
+            "max_abs": 1.8137726900263607e-06,
+            "reference_scale": 0.30349312368788806,
+            "scale_relative": 5.976322191377365e-06
+          },
+          "native.L_rossby": {
+            "max_abs": 0.010600253157463158,
+            "reference_scale": 285708.39173048065,
+            "scale_relative": 3.7101651418985167e-08
+          },
+          "native.L_rhines": {
+            "max_abs": 0.8994380334479501,
+            "reference_scale": 157790.03038183128,
+            "scale_relative": 5.700220928226121e-06
+          },
+          "native.eke_len": {
+            "max_abs": 0.08411661980790086,
+            "reference_scale": 106991.46669125152,
+            "scale_relative": 7.861993335472137e-07
+          },
+          "native.eke_diss_iw": {
+            "max_abs": 2.753499807710384e-13,
+            "reference_scale": 7.447115356254141e-07,
+            "scale_relative": 3.697404533149839e-07
+          },
+          "native.qnet": {
+            "max_abs": 3.6082623694255744e-05,
+            "reference_scale": 825.9953479453678,
+            "scale_relative": 4.3683809822912325e-08
+          },
+          "native.taux": {
+            "max_abs": 3.232666287433794e-10,
+            "reference_scale": 0.3249292751137293,
+            "scale_relative": 9.948830514893804e-10
+          },
+          "native.tauy": {
+            "max_abs": 8.988517152808129e-10,
+            "reference_scale": 0.21869180015319725,
+            "scale_relative": 4.11012993926225e-09
+          },
+          "native.coupled_salt_flux": {
+            "max_abs": 2.597428311524501e-13,
+            "reference_scale": 1.3132513836871778e-05,
+            "scale_relative": 1.9778607080022844e-08
+          }
+        }
+      }
+    }
+  },
+  "output_smoke": {
+    "readable_netcdf_files": 9,
+    "files": [
+      "atm.averages.2000-01-03.nc",
+      "atm.runtime_fields.nc",
+      "atm.snapshot.nc",
+      "cice.runtime_fields.nc",
+      "cice.snapshot.nc",
+      "lnd.runtime_fields.nc",
+      "ocn.averages.2000-01-03.nc",
+      "ocn.runtime_fields.nc",
+      "ocn.snapshot.nc"
+    ],
+    "canonical_fields_exactly_matched": {
+      "ocn": 12,
+      "atm": 27,
+      "cice": 26,
+      "lnd": 3
+    },
+    "native_endpoint_snapshot_fields_exactly_matched": [
+      "temp",
+      "salt",
+      "u",
+      "v"
+    ]
+  },
+  "limits": [
+    "CPU/float64 short-run measurements; GPU and long climate throughput/skill are untested.",
+    "Numerical summaries cover every canonical field and native Veros variable; two-day coupled trajectories differ at microkelvin scale.",
+    "Stock and exact fork comparisons remain separate; releases differ in correctness changes and native TDMA policy.",
+    "Initial two stock repetitions preceded the explicit-backend default and docstring change; final lanes use the identical verified settled source.",
+    "Native TDMA emits legacy XLA custom-call diagnostics on this tested stack."
+  ],
+  "dependency_exception": "Existing reviewed coupled-stack exception: JCM3.0.0 declares JAX>=0.10,<0.11, while Veris0.2.1 requires JAX>=0.11.2; validation uses the reviewed JAX0.11.2 stack without modifying model source.",
+  "hardware_model": "CPU brand query denied by the sandbox; ARM64 platform and logical CPU count are recorded.",
+  "independent_review": {
+    "critical_findings": 0,
+    "important_findings": 0,
+    "production_source_hashes_verified": 181,
+    "deferred_minor": "Comparison CLI checks distribution versions and physical configuration but does not automatically enforce every source/device/thread provenance field; all recorded final runs were independently verified to match these fields."
+  },
+  "validation": {
+    "full_stock_passed": 2661,
+    "fast_stock_passed": 1701,
+    "exact_fork_autodiff_passed": 17,
+    "focused_passed": 24,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "black_files": 331,
+    "mypy_files": 331,
+    "repository_flake8_errors": 0,
+    "compileall": "passed",
+    "strict_sphinx": "passed",
+    "diff_check": "passed",
+    "coverage_totals": {
+      "covered_lines": 8827,
+      "num_statements": 9302,
+      "percent_covered": 92.99312533051295,
+      "percent_covered_display": "93",
+      "missing_lines": 475,
+      "excluded_lines": 129,
+      "percent_statements_covered": 94.89357127499463,
+      "percent_statements_covered_display": "95",
+      "num_branches": 2044,
+      "num_partial_branches": 266,
+      "covered_branches": 1724,
+      "missing_branches": 320,
+      "percent_branches_covered": 84.34442270058709,
+      "percent_branches_covered_display": "84"
+    },
+    "native_host_state_statement_branch_coverage_percent": 100.0,
+    "raw_coverage_sha256": {
+      "stock": "075244513ea80bbd70ffc0c1efed4dd2ee239e78301def19ce7e07f6e76d23a7",
+      "autodiff": "92dca3bda96569f84ca122979267c5fb532ff582bdbceb45a4a141b9154a845b",
+      "native_host_jax": "3c5877db900b0d3869d5b42a2a9ec5768461787c2b060e03fa997d62b8d810ad",
+      "combined": "aa0fc7ec11502edeb3b170c302b1128ef7219aa5e3fa8b521d9e3041bb890a52"
+    }
+  },
+  "implementation_commit": "d265173e120b905caecaa32d87649e296e047afe",
+  "delivery": {
+    "branch": "feat/veris-seaice",
+    "implementation_commit": "d265173e120b905caecaa32d87649e296e047afe",
+    "benchmark_commit": "092a2925a6047576f2786541fd28fca752cc8a64",
+    "remote_benchmark_sha_verified": true,
+    "authentication": "GitHub CLI credential helper",
+    "receipt_commit": "See final handoff for the documentation receipt head."
+  }
+}

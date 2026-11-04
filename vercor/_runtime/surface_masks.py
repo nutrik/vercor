@@ -8,8 +8,8 @@ import jax.numpy as jnp
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.grid_masks import (
     check_remap_conservation,
-    check_total_lnd_ocn_mask_sum,
-    compute_ocn_lnd_masks_on_atm_grid,
+    check_land_ocean_fraction_sum,
+    compute_ocean_land_masks_on_atmosphere_grid,
 )
 from vercor.grid_geometry import grids_identical
 from vercor.jax_logging import LoggerLike
@@ -103,45 +103,55 @@ def create_surface_exchange_masks(
         )
 
     (
-        ocn_fmask_on_atm_grid,
-        lnd_fmask_on_atm_grid,
-        lnd_bmask_on_atm_grid,
-    ) = compute_ocn_lnd_masks_on_atm_grid(ocean_binary_mask, regridder)
+        ocean_fraction_on_atmosphere_grid,
+        land_fraction_on_atmosphere_grid,
+        land_binary_mask_on_atmosphere_grid,
+    ) = compute_ocean_land_masks_on_atmosphere_grid(ocean_binary_mask, regridder)
 
     check_remap_conservation(
         regridder,
         ocean_binary_mask,
-        ocn_fmask_on_atm_grid,
+        ocean_fraction_on_atmosphere_grid,
         logger=logger,
     )
 
-    check_total_lnd_ocn_mask_sum(lnd_fmask_on_atm_grid, ocn_fmask_on_atm_grid)
+    check_land_ocean_fraction_sum(
+        land_fraction_on_atmosphere_grid, ocean_fraction_on_atmosphere_grid
+    )
     return (
-        ocn_fmask_on_atm_grid,
-        lnd_fmask_on_atm_grid,
-        lnd_bmask_on_atm_grid,
+        ocean_fraction_on_atmosphere_grid,
+        land_fraction_on_atmosphere_grid,
+        land_binary_mask_on_atmosphere_grid,
     )
 
 
 def validate_land_mask_consistency(
     components: Mapping[str, _SurfaceRoleComponent],
-    lnd_bmask_on_atm_grid: RuntimeArray,
+    land_binary_mask_on_atmosphere_grid: RuntimeArray,
     *,
     policy: SurfaceMaskPolicy,
 ) -> None:
     """Validate that a component land mask matches the remapped exchange mask."""
 
     land_component = _require_surface_role(components, policy.land)
-    lnd_mask_from_component = land_component.grid.binary_mask
-    if lnd_mask_from_component is not None:
-        component_mask = jnp.asarray(lnd_mask_from_component)
-        remapped_mask = jnp.asarray(lnd_bmask_on_atm_grid)
+    land_mask_from_component = land_component.grid.binary_mask
+    if land_mask_from_component is not None:
+        component_mask = jnp.asarray(land_mask_from_component)
+        remapped_mask = jnp.asarray(land_binary_mask_on_atmosphere_grid)
         if component_mask.shape != remapped_mask.shape:
             raise CouplerError(
                 "Land binary mask read from component does not match atmospheric grid shape"
             )
-        if not bool(jnp.all(component_mask == remapped_mask)):
-            mismatch = int(jnp.count_nonzero(component_mask != remapped_mask))
+        covered = jnp.ones_like(remapped_mask, dtype=bool)
+        if policy.ocean in components and policy.atmosphere in components:
+            ocean = components[policy.ocean]
+            atmosphere = components[policy.atmosphere]
+            regridder = ConservativeRectilinearRegridder(ocean.grid, atmosphere.grid)
+            footprint = regridder.regrid(jnp.ones(ocean.grid.shape))
+            covered = jnp.asarray(footprint) >= 1.0 - 0.001
+        disagreements = covered & (component_mask != remapped_mask)
+        if bool(jnp.any(disagreements)):
+            mismatch = int(jnp.count_nonzero(disagreements))
             raise CouplerError(
                 "Land binary mask created from remapped ocean mask does not match component-provided mask "
                 f"(mismatched points: {mismatch})"
@@ -155,9 +165,9 @@ def build_surface_mask_topology_patch(
     """Return topology patches from temporary derived surface masks."""
 
     (
-        ocn_fmask_on_atm_grid,
-        lnd_fmask_on_atm_grid,
-        lnd_bmask_on_atm_grid,
+        _,
+        _,
+        land_binary_mask_on_atmosphere_grid,
     ) = create_surface_exchange_masks(
         context.components,
         policy=policy,
@@ -165,23 +175,23 @@ def build_surface_mask_topology_patch(
     )
     validate_land_mask_consistency(
         context.components,
-        lnd_bmask_on_atm_grid,
+        land_binary_mask_on_atmosphere_grid,
         policy=policy,
     )
+    # Native terrain may retain marine tiles outside a regional ocean domain.
+    # Route support must follow the actual land component there.
+    component_land_mask = context.components[policy.land].grid.binary_mask
+    if component_land_mask is not None:
+        land_binary_mask_on_atmosphere_grid = component_land_mask
     binary_masks = {}
-    fractional_masks = {}
     for exchange in context.exchanges:
         source = exchange.source
         destination = exchange.target
         route_id = exchange.route_id
-        if source == policy.ocean and destination == policy.atmosphere:
-            fractional_masks[route_id] = ocn_fmask_on_atm_grid
-        elif source == policy.land and destination == policy.atmosphere:
-            binary_masks[route_id] = lnd_bmask_on_atm_grid
-            fractional_masks[route_id] = lnd_fmask_on_atm_grid
+        if source == policy.land and destination == policy.atmosphere:
+            binary_masks[route_id] = land_binary_mask_on_atmosphere_grid
     return ExchangeTopologyPatch(
         binary_masks=binary_masks,
-        fractional_masks=fractional_masks,
     )
 
 

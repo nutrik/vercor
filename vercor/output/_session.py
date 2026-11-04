@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 import re
@@ -14,9 +14,12 @@ import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.clock import Clock
+from vercor.dtypes import as_jax_index_array
 from vercor.exceptions import ComponentError, CouplerError
 from vercor.jax_logging import LoggerLike
 from vercor.output import (
+    JaxOutputContext,
+    JaxOutputProvider,
     OutputContext,
     OutputFrame,
     OutputTarget,
@@ -24,8 +27,11 @@ from vercor.output import (
     PeriodOutput,
 )
 from vercor.output._dataset import grid_field_dims, time_coordinate_variable
+from vercor.output._selection import selected_output_names
 from vercor.output._netcdf import write_netcdf_dataset
 from vercor.output._period import (
+    _accumulate_output_samples,
+    _prepare_output_sample,
     _sample_sum_and_counts,
     period_mean_sample_to_output_variable,
     should_write_period_output,
@@ -33,7 +39,9 @@ from vercor.output._period import (
 from vercor._runtime.field_transfer import select_runtime_field
 from vercor._runtime.time import RuntimeStepInfo
 from vercor._pytree import PyTreeNodeMixin
+from vercor._averaging import mean_from_sum_and_count
 from vercor.state import ComponentState
+from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components._adapter import _ComponentBinding
@@ -52,6 +60,7 @@ class _OutputAccumulator(PyTreeNodeMixin):
     pytree_aux_data = (
         "names",
         "select_all",
+        "reduction_names",
         "dims",
         "dtypes",
         "attrs",
@@ -68,6 +77,7 @@ class _OutputAccumulator(PyTreeNodeMixin):
 
     names: tuple[str, ...]
     select_all: bool
+    reduction_names: tuple[str, ...]
     dims: tuple[tuple[str, ...], ...]
     dtypes: tuple[str, ...]
     attrs: tuple[tuple[tuple[str, Any], ...], ...]
@@ -104,6 +114,7 @@ class _OutputAccumulator(PyTreeNodeMixin):
                 name,
                 frame.variables[name],
                 summation_dim=frame.sample_dimension,
+                reduction_counts=frame.reduction_counts.get(name),
             )
             dims.append(sample_dims)
             dtypes.append(_value_dtype(frame.variables[name].values))
@@ -116,6 +127,9 @@ class _OutputAccumulator(PyTreeNodeMixin):
         return cls(
             names=names,
             select_all=not tuple(selected),
+            reduction_names=tuple(
+                name for name in names if name in frame.reduction_counts
+            ),
             dims=tuple(dims),
             dtypes=tuple(dtypes),
             attrs=tuple(attrs),
@@ -136,6 +150,11 @@ class _OutputAccumulator(PyTreeNodeMixin):
     def add_frame(self, frame: OutputFrame) -> "_OutputAccumulator":
         """Return a new accumulator containing one selected provider frame."""
 
+        if (
+            tuple(name for name in self.names if name in frame.reduction_counts)
+            != self.reduction_names
+        ):
+            raise ValueError("Output provider reduction schema changed across samples.")
         selected = _selected_names(frame, self.names)
         if selected != self.names or (
             self.select_all and tuple(frame.variables) != self.names
@@ -167,28 +186,43 @@ class _OutputAccumulator(PyTreeNodeMixin):
             raise ValueError(
                 "Output provider coordinate schema changed across samples."
             )
-        sums: list[jax.Array] = []
-        counts: list[jax.Array] = []
+        samples: list[jax.Array] = []
+        reduction_counts: list[jax.Array | None] = []
+        axes: list[int | None] = []
         for index, name in enumerate(self.names):
-            dims, sample_sum, sample_counts = _sample_sum_and_counts(
+            dims, values, sample_counts, axis = _prepare_output_sample(
                 name,
                 frame.variables[name],
                 summation_dim=self.sample_dimension,
+                reduction_counts=frame.reduction_counts.get(name),
             )
             if dims != self.dims[index]:
                 raise ValueError(f"Output variable {name!r} dimensions changed.")
-            if sample_sum.shape != self.sum_values[index].shape:
+            shape = (
+                values.shape
+                if axis is None
+                else values.shape[:axis] + values.shape[axis + 1 :]  # noqa: E203
+            )
+            if shape != self.sum_values[index].shape:
                 raise ValueError(f"Output variable {name!r} shape changed.")
             if _value_dtype(frame.variables[name].values) != self.dtypes[index]:
                 raise ValueError(f"Output variable {name!r} dtype changed.")
             if tuple(frame.variables[name].attrs.items()) != self.attrs[index]:
                 raise ValueError(f"Output variable {name!r} attributes changed.")
-            sums.append(self.sum_values[index] + sample_sum)
-            counts.append(self.counts[index] + sample_counts)
+            samples.append(values)
+            reduction_counts.append(sample_counts)
+            axes.append(axis)
+        sums, counts = _accumulate_output_samples(
+            self.sum_values,
+            self.counts,
+            tuple(samples),
+            tuple(reduction_counts),
+            axes=tuple(axes),
+        )
         return replace(
             self,
-            sum_values=tuple(sums),
-            counts=tuple(counts),
+            sum_values=sums,
+            counts=counts,
             coordinate_shapes=_coordinate_shapes(coordinate_values),
             coordinate_dtypes=_coordinate_dtypes(coordinate_values),
             coordinate_values=coordinate_values,
@@ -208,13 +242,8 @@ class _OutputAccumulator(PyTreeNodeMixin):
 
         variables = {}
         for index, name in enumerate(self.names):
-            mean_dtype = jnp.result_type(self.sum_values[index].dtype, jnp.float32)
-            denominator = jnp.where(self.counts[index] > 0, self.counts[index], 1)
-            finite_means = self.sum_values[index] / denominator
-            mean_values = jnp.where(
-                self.counts[index] > 0,
-                finite_means,
-                jnp.full(self.sum_values[index].shape, jnp.nan, dtype=mean_dtype),
+            mean_values = mean_from_sum_and_count(
+                self.sum_values[index], self.counts[index]
             )
             variables[name] = OutputVariable(
                 self.dims[index],
@@ -242,13 +271,9 @@ class _OutputAccumulator(PyTreeNodeMixin):
 def _selected_names(frame: OutputFrame, selected: Sequence[str]) -> tuple[str, ...]:
     """Apply the one provider-independent variable selection rule."""
 
-    names = tuple(selected) or tuple(frame.variables)
+    names = selected_output_names(frame.variables, selected)
     if not names:
         raise ValueError("Output provider returned no variables.")
-    missing = next((name for name in names if name not in frame.variables), None)
-    if missing is not None:
-        available = ", ".join(frame.variables) or "<none>"
-        raise KeyError(f"unknown output variable {missing!r}; available: {available}")
     return names
 
 
@@ -278,7 +303,7 @@ def _coordinate_parts(
 def _coordinate_shapes(values: tuple[Any, ...]) -> tuple[tuple[int, ...], ...]:
     """Return coordinate shapes without moving their values out of PyTree leaves."""
 
-    return tuple(tuple(jnp.shape(value)) for value in values)
+    return tuple(tuple(jnp.asarray(value).shape) for value in values)
 
 
 def _coordinate_dtypes(values: tuple[Any, ...]) -> tuple[str, ...]:
@@ -305,6 +330,20 @@ class _RuntimeFieldProvider:
         self._step_infos = step_infos
 
     def sample(self, context: OutputContext) -> OutputFrame:
+        """Return time-selected runtime fields using the ordinary public context."""
+        return self.sample_jax(
+            JaxOutputContext(
+                context.component,
+                context.state,
+                context.payload,
+                context.step,
+                context.dt.total_seconds(),
+                context.variables,
+            )
+        )
+
+    def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
+        """Select fields with the traced absolute index and fixed grid schema."""
         step_info = cast(
             RuntimeStepInfo,
             jax.tree_util.tree_map(
@@ -313,12 +352,17 @@ class _RuntimeFieldProvider:
             ),
         )
         variables = {}
-        for name in self._component.spec.outputs:
-            values = select_runtime_field(
-                context.state.field(name, scope="state"),
-                self._component.spec.transfer,
-                step_info,
-            )
+        names = selected_output_names(context.state.fields(), context.variables)
+        for name in names:
+            values = context.state.field(name, scope="state")
+            if name in self._component.spec.outputs:
+                values = select_runtime_field(
+                    values,
+                    self._component.spec.transfer,
+                    step_info,
+                    field_name=name,
+                    masks=self._component.spec.masks,
+                )
             variables[name] = OutputVariable(
                 grid_field_dims(
                     name,
@@ -359,11 +403,14 @@ class _OutputPlan:
     target: OutputTarget
 
 
+@jax.tree_util.register_pytree_node_class
 @dataclass(frozen=True)
-class _OutputSession:
+class _OutputSession(PyTreeNodeMixin):
     """Immutable per-run optional accumulator bundle."""
 
     accumulators: tuple[_OutputAccumulator | None, ...]
+    pytree_children = ("accumulators",)
+    pytree_aux_data = ()
 
     def accumulate(
         self,
@@ -374,41 +421,127 @@ class _OutputSession:
         time: _Time,
         dt: timedelta,
     ) -> "_OutputSession":
-        accumulated: list[_OutputAccumulator] = []
+        """Sample every provider's supported capability after one concrete step."""
+        return self._accumulate(
+            plan, state, step=step, dt_seconds=dt.total_seconds(), host_time=(time, dt)
+        )
+
+    def accumulate_jax(
+        self,
+        plan: _OutputPlan,
+        state: "RunState",
+        *,
+        step: int | RuntimeArray,
+        dt_seconds: float,
+    ) -> "_OutputSession":
+        """Accumulate one pure numeric sample inside a fixed-shape JAX scan."""
+        return self._accumulate(plan, state, step=step, dt_seconds=dt_seconds)
+
+    def _accumulate(
+        self,
+        plan: _OutputPlan,
+        state: "RunState",
+        *,
+        step: int | RuntimeArray,
+        dt_seconds: float,
+        host_time: tuple[_Time, timedelta] | None = None,
+    ) -> "_OutputSession":
+        """Share provider selection, frame checks and reduction on every backend."""
+        accumulated = []
         for schema, accumulator in zip(plan.schemas, self.accumulators, strict=True):
-            runtime_state = state._component_state(schema.component.name)
-            context = OutputContext(
-                component=schema.component._component,
-                state=ComponentState._from_runtime(
-                    schema.component.name,
-                    schema.component.grid,
-                    runtime_state,
+            current = _accumulate_provider_frame(
+                schema,
+                accumulator,
+                lambda: _sample_provider(
+                    schema, state, step=step, dt_seconds=dt_seconds, host_time=host_time
                 ),
-                payload=runtime_state.payload,
-                step=step,
-                time=time,
-                dt=dt,
             )
-            try:
-                frame = schema.provider.sample(context)
-                if not isinstance(frame, OutputFrame):
-                    raise TypeError(
-                        "must return OutputFrame; " f"got {type(frame).__name__}"
-                    )
-                current = (
-                    _OutputAccumulator.zeros_from_frame(
-                        frame,
-                        selected=schema.period.variables,
-                    )
-                    if accumulator is None
-                    else accumulator
+            if host_time is None:
+                current = replace(
+                    current,
+                    coordinate_values=tuple(
+                        # Abstract zero allocation uses explicit dtypes. Match
+                        # that strong typing when providers return weak scalars.
+                        jnp.asarray(value, dtype=jnp.asarray(value).dtype)
+                        for value in current.coordinate_values
+                    ),
                 )
-                accumulated.append(current.add_frame(frame))
-            except (KeyError, TypeError, ValueError) as exc:
-                raise ComponentError(
-                    f"Output provider for component {schema.component.name!r}: {exc}"
-                ) from exc
+            accumulated.append(current)
         return _OutputSession(tuple(accumulated))
+
+
+def _sample_provider(
+    schema: _OutputSchema,
+    state: "RunState",
+    *,
+    step: int | RuntimeArray,
+    dt_seconds: float,
+    host_time: tuple[_Time, timedelta] | None,
+) -> OutputFrame:
+    """Prefer numeric extraction per provider, independently of runtime backend.
+
+    Concrete host sampling does not trace component payloads or coerce their
+    coordinates. Only ordinary providers require calendar time and a Python
+    step index; scan eligibility is checked before abstract preparation.
+    """
+    runtime_state = state._component_state(schema.component.name)
+    view = ComponentState._from_runtime(
+        schema.component.name, schema.component.grid, runtime_state
+    )
+    provider = schema.provider
+    if isinstance(provider, JaxOutputProvider):
+        return provider.sample_jax(
+            JaxOutputContext(
+                schema.component._component,
+                view,
+                runtime_state.payload,
+                as_jax_index_array(step),
+                dt_seconds,
+                schema.period.variables,
+            )
+        )
+    if host_time is None:
+        raise TypeError("scanned output requires a JaxOutputProvider")
+    time, dt = host_time
+    return cast(
+        OutputFrame,
+        provider.sample(
+            OutputContext(
+                schema.component._component,
+                view,
+                runtime_state.payload,
+                cast(int, step),
+                time,
+                dt,
+                schema.period.variables,
+            )
+        ),
+    )
+
+
+def _accumulate_provider_frame(
+    schema: _OutputSchema,
+    accumulator: _OutputAccumulator | None,
+    sample: Callable[[], OutputFrame],
+) -> _OutputAccumulator:
+    """Apply the same frame validation and reduction to both sampling lanes."""
+    try:
+        frame = sample()
+        if not isinstance(frame, OutputFrame):
+            raise TypeError(f"must return OutputFrame; got {type(frame).__name__}")
+        current = (
+            accumulator
+            if accumulator is not None
+            else _OutputAccumulator.zeros_from_frame(
+                frame,
+                selected=schema.period.variables,
+            )
+        )
+        return current.add_frame(frame)
+    except (KeyError, TypeError, ValueError, CouplerError) as exc:
+        raise ComponentError(
+            f"Output provider for component {schema.component.name!r}: {exc}"
+        ) from exc
 
 
 def has_period_output(

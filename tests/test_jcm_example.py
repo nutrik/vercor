@@ -15,22 +15,22 @@ from typing import Any, cast
 
 import pytest
 
-from vercor import Clock, RuntimeOptions
+from vercor import Clock, Exchange, RuntimeOptions
 from vercor.dtypes import DTypePolicy
 from vercor.setups import JCMInputs
 
 GALLERY_DIRECTORY = (
     Path(__file__).resolve().parents[1] / "vercor" / "setups" / "gallery"
 )
-GALLERY_MODULE = "vercor.setups.gallery.run_jcm_with_era5data"
+GALLERY_MODULE = "vercor.setups.gallery.jcm_with_era5data"
 
 
 class _FakeCoupler:
     def __init__(self, *args: object, **kwargs: object) -> None:
         self.args = args
         self.kwargs = kwargs
-        self.exchanges: tuple[object, ...] = tuple(
-            cast(Iterable[object], kwargs.get("exchanges", ()))
+        self.exchanges: tuple[Exchange, ...] = tuple(
+            cast(Iterable[Exchange], kwargs.get("exchanges", ()))
         )
 
 
@@ -47,7 +47,7 @@ def blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
     return real_import(name, globals, locals, fromlist, level)
 
 builtins.__import__ = blocked_import
-from vercor.setups.gallery import run_jcm_with_era5data as example
+from vercor.setups.gallery import jcm_with_era5data as example
 assert callable(example.build_coupler)
 """
     environment = os.environ.copy()
@@ -74,7 +74,7 @@ def test_build_coupler_uses_injected_ocean_inputs_and_clock(
         start=datetime(2001, 2, 3),
         dt_seconds=3600.0,
         steps=4,
-        calendar="noleap",
+        calendar="gregorian",
     )
     setup = SimpleNamespace(
         land=SimpleNamespace(name="LND"),
@@ -115,7 +115,11 @@ def test_build_coupler_uses_injected_ocean_inputs_and_clock(
     assert coupler.args[0] is clock
     assert coupler.kwargs["components"] == [ocean, setup.land, setup.atmosphere]
     assert setup_calls == [(ocean.grid, jcm_inputs)]
-    assert len(coupler.exchanges) == 4
+    assert len(coupler.exchanges) == 2
+    assert {(route.source, route.target) for route in coupler.exchanges} == {
+        ("OCN", "ATM"),
+        ("LND", "ATM"),
+    }
     assert coupler.kwargs["log_level"] == "warning"
     runtime = cast(RuntimeOptions, coupler.kwargs["runtime"])
     assert runtime.dtype == DTypePolicy(enable_x64=True)
@@ -162,7 +166,7 @@ def test_build_coupler_enables_dtype_before_jcm_construction(
 
 
 @pytest.mark.fast_always
-def test_build_coupler_default_workflow_keeps_historic_clock(
+def test_build_coupler_default_workflow_uses_gregorian_century(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     example = importlib.import_module(GALLERY_MODULE)
@@ -184,8 +188,8 @@ def test_build_coupler_default_workflow_keeps_historic_clock(
     assert isinstance(clock, Clock)
     assert clock.start == datetime(2000, 1, 3)
     assert clock.dt_seconds == 86400.0
-    assert clock.steps == 365 * 100 - 2
-    assert clock.calendar == "noleap"
+    assert clock.steps == (datetime(2100, 1, 1) - datetime(2000, 1, 3)).days
+    assert clock.calendar == "gregorian"
 
 
 class _RecordingRunCoupler:

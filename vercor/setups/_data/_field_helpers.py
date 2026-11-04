@@ -14,23 +14,6 @@ def positive_binary_mask(values: ArrayLike) -> jax.Array:
     return jnp.where(as_jax_real_array(values) > 0.0, 1.0, 0.0)
 
 
-def canonicalize_surface_field(field: ArrayLike) -> jax.Array:
-    """Convert a surface field to VerCOR's trailing-grid layout.
-
-    Two-dimensional ``(nLon, nLat)`` fields become ``(nLat, nLon)``. Time-last
-    ``(nLon, nLat, nTime)`` fields become ``(nTime, nLat, nLon)``.
-    """
-
-    field_array = as_jax_real_array(field)
-    if field_array.ndim == 2:
-        return field_array.T
-    if field_array.ndim == 3:
-        return canonicalize_time_last_surface_field(field_array)
-    raise ValueError(
-        "Expected a surface field with shape (nLon, nLat) or " "(nLon, nLat, nTime)."
-    )
-
-
 def mask_time_last_surface_field(
     surface_field: ArrayLike,
     binary_mask: ArrayLike,

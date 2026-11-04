@@ -1,8 +1,8 @@
 import importlib
 from inspect import signature
-from pathlib import Path
 from typing import Any
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -15,8 +15,8 @@ from vercor._interpolators.conservative_remap_rectilinear import (
 from vercor._regridders.base import _BaseRegridder
 from vercor._regridders.conservative import (
     ConservativeRectilinearRegridder,
-    conservative,
 )
+from vercor.regridding import conservative
 from vercor.regridding import conservative as public_conservative
 
 
@@ -86,6 +86,7 @@ def test_regridder_constructor_uses_provided_edges_when_available() -> None:
     regridder = ConservativeRectilinearRegridder(
         src, dst, normalize="fracarea", radius=10.0
     )
+    assert isinstance(regridder, ConservativeRectilinearRegridder)
     interp = regridder.interpolator
     assert interp is not None
 
@@ -169,16 +170,6 @@ def test_identical_grid_regridder_remains_scalar_only() -> None:
         )
 
 
-def test_regridder_has_identical_grids_true_for_equal_coords() -> None:
-    lon = np.array([0.5, 1.5])
-    lat = np.array([0.5, 1.5])
-    src = _grid("src", lon.copy(), lat.copy())
-    dst = _grid("dst", lon.copy(), lat.copy())
-
-    regridder = ConservativeRectilinearRegridder(src, dst)
-    assert regridder.has_identical_grids is True
-
-
 def test_regridder_identical_grid_skips_remapper_construction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -197,19 +188,11 @@ def test_regridder_identical_grid_skips_remapper_construction(
     src = _grid("src", lon.copy(), lat.copy())
     dst = _grid("dst", lon.copy(), lat.copy())
 
-    regridder = ConservativeRectilinearRegridder(src, dst)
+    regridder = conservative(src, dst)
 
     assert regridder.has_identical_grids is True
+    assert isinstance(regridder, ConservativeRectilinearRegridder)
     assert regridder.interpolator is None
-
-
-def test_regridder_identical_grid_passthrough_does_not_use_identity_helper() -> None:
-    base_source = Path("vercor/_regridders/base.py").read_text(encoding="utf-8")
-    conservative_source = Path("vercor/_regridders/conservative.py").read_text(
-        encoding="utf-8"
-    )
-    assert "_IdentityInterpolator" not in base_source
-    assert "_IdentityInterpolator" not in conservative_source
 
 
 def test_regridder_non_identical_grid_constructs_remapper(
@@ -233,14 +216,6 @@ def test_regridder_non_identical_grid_constructs_remapper(
 
     assert regridder.has_identical_grids is False
     assert len(calls) == 1
-
-
-def test_regridder_has_identical_grids_false_for_different_coords() -> None:
-    src = _grid("src", np.array([0.5, 1.5]), np.array([0.5, 1.5]))
-    dst = _grid("dst", np.array([0.5, 1.5, 2.5]), np.array([0.5, 1.5, 2.5]))
-
-    regridder = ConservativeRectilinearRegridder(src, dst)
-    assert regridder.has_identical_grids is False
 
 
 def test_regridder_identical_grid_scalar_short_circuit_returns_input_object() -> None:
@@ -353,9 +328,10 @@ def test_conservative_factory_forwards_remapper_options() -> None:
         dst,
         source_mask=source_mask,
         normalize="fracarea",
-        radius=10.0,
+        radius_km=10.0,
     )
 
+    assert isinstance(regridder, ConservativeRectilinearRegridder)
     interp = regridder.interpolator
     assert isinstance(interp, ConservativeRectilinearRemapper)
     assert interp.normalize == "fracarea"
@@ -364,3 +340,120 @@ def test_conservative_factory_forwards_remapper_options() -> None:
     out = np.asarray(regridder.regrid(np.array([[1.0, 2.0], [3.0, 4.0]])))
     assert np.all(np.isnan(out[0:2, 0:2]))
     assert_allclose_compact(out[0:2, 2:4], 2.0, rtol=0.0, atol=1e-14)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+@pytest.mark.parametrize("axis", ["longitude", "latitude"])
+def test_same_centers_with_different_edges_remap_actual_cell_areas(
+    enable_x64: bool, axis: str
+) -> None:
+    """A point-coordinate identity must not bypass unequal conservative cells."""
+    with jax.enable_x64(enable_x64):
+        longitude = np.array([0.0, 2.0])
+        latitude = np.array([-1.0, 1.0])
+        source = _grid(
+            "source", longitude, latitude, [-1.0, 1.0, 3.0], [-2.0, 0.0, 2.0]
+        )
+        target = _grid(
+            "target",
+            longitude,
+            latitude,
+            [-1.0, 0.5, 3.0] if axis == "longitude" else [-1.0, 1.0, 3.0],
+            [-2.0, -0.5, 2.0] if axis == "latitude" else [-2.0, 0.0, 2.0],
+        )
+        source_field = jnp.asarray([[0.0, 10.0], [0.0, 10.0]])
+        expected = np.array([[0.0, 8.0], [0.0, 8.0]])
+        if axis == "latitude":
+            source_field = source_field.T
+            # The upper target spans [-0.5, 2] degrees and receives nonzero
+            # flux only over [0, 2], whose spherical area scales with sin(lat).
+            upper = (
+                10.0
+                * np.sin(np.deg2rad(2.0))
+                / (np.sin(np.deg2rad(2.0)) + np.sin(np.deg2rad(0.5)))
+            )
+            expected = np.array([[0.0, 0.0], [upper, upper]])
+
+        regridder = conservative(source, target)
+        assert_allclose_compact(
+            regridder.regrid(source_field), expected, rtol=2e-6, atol=1e-7
+        )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+@pytest.mark.parametrize("partial_grid", ["source", "target"])
+@pytest.mark.parametrize("axis", ["longitude", "latitude"])
+def test_single_explicit_edge_axis_is_retained(
+    enable_x64: bool, partial_grid: str, axis: str
+) -> None:
+    """Only infer a missing axis instead of discarding the declared other axis."""
+    with jax.enable_x64(enable_x64):
+        partial = _grid(
+            "partial",
+            [0.0, 2.0],
+            [-1.0, 1.0],
+            [-1.0, 0.5, 3.0] if axis == "longitude" else None,
+            [-2.0, -0.5, 2.0] if axis == "latitude" else None,
+        )
+        complete = _grid(
+            "complete",
+            [-0.25, 1.75] if axis == "longitude" else [0.0, 2.0],
+            [-1.25, 0.75] if axis == "latitude" else [-1.0, 1.0],
+            [-1.0, 0.5, 3.0] if axis == "longitude" else [-1.0, 1.0, 3.0],
+            [-2.0, -0.5, 2.0] if axis == "latitude" else [-2.0, 0.0, 2.0],
+        )
+        source, target = (
+            (partial, complete) if partial_grid == "source" else (complete, partial)
+        )
+        field = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
+        # Both declared geometries have identical effective cell boundaries.
+        assert_allclose_compact(
+            conservative(source, target).regrid(field), field, rtol=2e-6, atol=1e-7
+        )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+@pytest.mark.parametrize("normalize", ["conservation", "fracarea"])
+def test_identical_grid_applies_explicit_source_exclusion_mask(
+    enable_x64: bool, normalize: str
+) -> None:
+    """The conservative identity path must not expose excluded source values."""
+    with jax.enable_x64(enable_x64):
+        grid = _grid("grid", [0.0, 2.0], [-1.0, 1.0])
+        regridder = conservative(
+            grid,
+            grid,
+            source_mask=np.array([[True, False], [False, False]]),
+            normalize=normalize,
+        )
+        excluded = 0.0 if normalize == "conservation" else np.nan
+        assert_allclose_compact(
+            regridder.regrid(jnp.asarray([[1.0, 2.0], [3.0, 4.0]])),
+            np.array([[excluded, 2.0], [3.0, 4.0]]),
+            rtol=2e-6,
+            atol=1e-7,
+        )
+
+
+@pytest.mark.fast_always
+def test_identical_grid_rejects_invalid_conservative_normalization() -> None:
+    grid = _grid("grid", [0.0, 2.0], [-1.0, 1.0])
+    with pytest.raises(ValueError, match="normalize must be"):
+        conservative(grid, grid, normalize="unsupported")
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+def test_equivalent_explicit_and_inferred_edges_preserve_identity(
+    enable_x64: bool,
+) -> None:
+    with jax.enable_x64(enable_x64):
+        source = _grid("source", [0.0, 2.0], [-1.0, 1.0])
+        target = _grid(
+            "target", [0.0, 2.0], [-1.0, 1.0], [-1.0, 1.0, 3.0], [-2.0, 0.0, 2.0]
+        )
+        field = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
+        assert conservative(source, target).regrid(field) is field

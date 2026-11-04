@@ -9,7 +9,8 @@ import jax
 import jax.numpy as jnp
 
 from vercor.dtypes import DTypePolicy, as_jax_real_array
-from vercor.fluxes.bulk_formula_cesm import compute_ocean_surface_fluxes
+from vercor._numerical_safety import replace_missing_nan
+from vercor.setups._surface_fluxes import compute_surface_fluxes
 from vercor.physics import PhysicalConstants
 from vercor.types import RuntimeArray
 
@@ -77,62 +78,67 @@ def compute_fluxes(
 
     temp = as_jax_real_array(vs.temp[2:-2, 2:-2, -1, vs.tau], dtype).T + 273.15
 
-    (
-        senf,
-        latf,
-        lwup,
-        evap,
-        taux,
-        tauy,
-        tref,
-        qref,
-        duu10n,
-        ustar,
-        tstar,
-        qstar,
-        dqfldt,
-    ) = compute_ocean_surface_fluxes(
-        constants,
-        as_jax_real_array(vs.maskT[2:-2, 2:-2, -1], dtype).T,
-        as_jax_real_array(runtime_fields["model_level_height"], dtype),
-        as_jax_real_array(runtime_fields["u_velocity"], dtype),
-        as_jax_real_array(runtime_fields["v_velocity"], dtype),
-        as_jax_real_array(runtime_fields["potential_temperature"], dtype),
-        as_jax_real_array(runtime_fields["specific_humidity"], dtype),
-        as_jax_real_array(runtime_fields["density"], dtype),
-        as_jax_real_array(runtime_fields["temperature"], dtype),
-        u_tgrid[1:-2, :].T,
-        v_tgrid[:, 1:-2].T,
-        temp,
+    bulk = compute_surface_fluxes(
+        runtime_fields,
+        sea_surface_temperature=temp,
+        u_ocean=u_tgrid[1:-2, :].T,
+        v_ocean=v_tgrid[:, 1:-2].T,
+        ocean_mask=as_jax_real_array(vs.maskT[2:-2, 2:-2, -1], dtype).T,
+        constants=constants,
+        dtype=dtype,
     )
-    _ = tref, qref, duu10n, ustar, tstar, qstar
-
-    qnet = (
-        as_jax_real_array(runtime_fields.get("net_shortwave_radiation_flux"), dtype)
-        + as_jax_real_array(
-            runtime_fields.get("downward_longwave_radiation_flux"), dtype
-        )
-        + lwup
-        + senf
-        + latf
-    )
-    qnec = -jnp.where(dqfldt <= -1e10, 0.0, dqfldt)
     salt_flux = _compute_virtual_salt_flux(
         constants,
         as_jax_real_array(runtime_fields["rain_rate"], dtype),
         as_jax_real_array(runtime_fields["snow_rate"], dtype),
-        as_jax_real_array(evap, dtype),
+        as_jax_real_array(bulk.evap, dtype),
         as_jax_real_array(vs.maskT[2:-2, 2:-2, -1], dtype).T,
         dtype=dtype,
     )
 
     return (
-        as_jax_real_array(taux, dtype),
-        as_jax_real_array(tauy, dtype),
-        as_jax_real_array(qnet, dtype),
-        as_jax_real_array(qnec, dtype),
+        as_jax_real_array(bulk.taux, dtype),
+        as_jax_real_array(bulk.tauy, dtype),
+        as_jax_real_array(bulk.qnet, dtype),
+        as_jax_real_array(bulk.qnec, dtype),
         as_jax_real_array(salt_flux, dtype),
     )
 
 
-__all__ = ["compute_fluxes"]
+@partial(jax.jit, static_argnames=("dtype",))
+def compute_coupled_fluxes(
+    fields: Mapping[str, RuntimeArray],
+    constants: PhysicalConstants,
+    dtype: DTypePolicy,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    """Convert total downward heat/mass/salt and canonical face stresses once.
+
+    Salinity forcing is (-S_ref*M + 1000*J)/rho_fw in (g/kg)*m/s.
+    M is total bulk mass, J actual salt mass, both kg/m2/s. Fixed-reference
+    Boussinesq virtual salt differs from physical inventory at other salinities.
+    Missing inactive values are neutralized before parameter arithmetic; the
+    component's receive boundary rejects missing values on its active domain.
+    Native tracer kernels own rho_0, heat capacity, timestep and layer depth.
+    """
+
+    def clean(name: str) -> jax.Array:
+        return replace_missing_nan(
+            as_jax_real_array(fields[name], dtype),
+            owner=f"Veros total feedback '{name}'",
+        )
+
+    mass = clean("sea_surface_mass_flux")
+    salt = clean("sea_surface_salt_mass_flux")
+    virtual = (
+        -as_jax_real_array(constants.surface_salinity_reference, dtype) * mass
+        + as_jax_real_array(1000.0, dtype) * salt
+    ) / as_jax_real_array(constants.freshwater_density, dtype)
+    return (
+        clean("ocean_u_stress"),
+        clean("ocean_v_stress"),
+        clean("sea_surface_heat_flux"),
+        virtual,
+    )
+
+
+__all__ = ["compute_fluxes", "compute_coupled_fluxes"]

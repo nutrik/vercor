@@ -3,14 +3,18 @@
 Setup gallery
 =============
 
+Case names match their Python filenames without ``.py``. The former ``run_``
+filename prefix has been removed; for example, ``jcm_with_veros`` copies
+``jcm_with_veros.py``.
+
 This page gives an overview of the available model setups. To copy the setup file to the current working directory, you can make use of the ``vercor copy-setup`` command.
 
 Example:
 
 .. code-block:: console
 
-   vercor copy-setup run_jcm_with_veros \
-     --to ~/vercor-setups/run_jcm_with_veros
+   vercor copy-setup jcm_with_veros \
+     --to ~/vercor-setups/jcm_with_veros
 
 
 .. list-table:: Available setups
@@ -29,35 +33,51 @@ Example:
      - Profile a synthetic slab coupling run.
      - None
      - No
-   * - ``run_slab_driver``
+   * - ``slab_driver``
      - Run and plot the bundled slab topology.
      - Matplotlib
      - No
-   * - ``run_data_driver``
+   * - ``data_driver``
      - Couple ERA data components and plot diagnostics.
      - Matplotlib
      - Yes
-   * - ``run_jcm_with_slab``
+   * - ``jcm_with_slab``
      - Couple JCM to slab ocean and land components.
      - JCM, Matplotlib
      - Yes
-   * - ``run_jcm_with_era5data``
+   * - ``jcm_with_era5data``
      - Couple JCM to ERA5 ocean forcing.
      - JCM
      - Yes
-   * - ``run_jcm_with_veros``
+   * - ``jcm_with_veros``
      - Couple JCM atmosphere/land to Veros.
      - JCM, Veros
      - Yes
-   * - ``run_jcm_with_verosdata``
+   * - ``jcm_with_verosdata``
      - Couple JCM to Veros-format ocean data.
      - JCM
      - Yes
-   * - ``run_veros_with_era5data``
+   * - ``veros_with_era5data``
      - Couple Veros to ERA5 atmosphere and land data.
      - Veros
      - Yes
-   * - ``run_camulator_with_veros``
+   * - ``veris_dataveros_era5``
+     - Run Veris with prescribed Veros ocean and ERA5 data.
+     - Veris, Veros
+     - Yes
+   * - ``veris_veros_era5``
+     - Couple prognostic Veris and Veros with prescribed ERA5 air.
+     - Veris, Veros
+     - Yes
+   * - ``veris_veros_jcm``
+     - Couple JCM land/atmosphere, prognostic Veros and native Veris sea ice.
+     - JCM, Veris, Veros
+     - Yes
+   * - ``veris_calibration``
+     - Recover native h0 from synthetic concentration with a cold-forcing holdout.
+     - Veris
+     - No
+   * - ``camulator_with_veros``
      - Couple CAMulator atmosphere/land to Veros.
      - CAMulator, Veros
      - Yes
@@ -111,12 +131,14 @@ and rain is ``P - snow``. Their sum and hence their contribution to virtual
 salt flux are preserved. The split does not introduce snow storage or
 melting-energy terms.
 
-The wrapper calls ``surface_flux.t0`` ``temperature_2m`` for phase diagnosis;
-SPEEDY documents it as near-surface temperature without specifying a 2 m
-height. Exported ``temperature``, ``specific_humidity``, winds, density, and
-potential temperature still describe the bottom model level at the exported
-``model_level_height``. Their local names use ``*_bottom`` to distinguish
-them from t0; radiative fluxes are surface quantities.
+The mapper's phase-only ``near_surface_air_temperature`` argument receives
+``surface_flux.t0``. SPEEDY documents it as near-surface temperature without
+specifying a 2 m height. Exported ``air_temperature``, ``air_specific_humidity``,
+``air_u_velocity``, ``air_v_velocity``, ``air_density`` and
+``air_potential_temperature`` describe the bottom model level at
+``model_level_height``. JCM's ``air_pressure_3d`` retains the full sigma-level
+pressure array in Pa. Radiative fluxes are surface quantities. See
+:doc:`coupling-fields` for the field, recipe and configuration migration.
 
 VerCOR combines these rates with bulk evaporation on the ocean grid and
 computes a virtual salt flux using the fixed reference salinity:
@@ -135,10 +157,28 @@ depth. This follows the freshwater term of the
 `rigid-lid conversion in Veros PR 81 <https://github.com/nutrik/veros/pull/81>`_,
 implemented entirely in the VerCOR adapter.
 
-The examples disable both climatological restoring terms by default.
 ``VerosConfig.restore_to_climatology_temp`` controls the SST correction,
 and ``VerosConfig.restore_to_climatology_salt`` independently controls
-30-day surface salinity restoring. Both default to ``False``.
+surface salinity restoring. Salinity restoring defaults to ``True`` and
+temperature restoring to ``False``, including in the gallery examples.
+``VerosConfig.salinity_restoring_timescale`` sets the salinity relaxation
+duration in seconds, independently of the enable flag. Its default is
+``4 * 365 * 86400.0`` = 126,144,000 seconds (four 365-day model years).
+It must be a positive, finite real number, even when restoring is disabled.
+
+The additive salinity restoring flux is
+
+.. math::
+
+   F_{S,\mathrm{restore}} = w_S\,h_{\mathrm{top}}
+       \frac{S_{\mathrm{clim}} - S_{\mathrm{surface}}}{\tau_S},
+
+where ``w_S`` is the salinity enable weight, ``h_top`` is the top-cell depth
+in metres, and ``tau_S`` is ``salinity_restoring_timescale`` in seconds.
+The result has units m (g/kg)/s and is added to the coupled virtual salt
+flux before native tracer advancement. To retain the previous 30-day strength,
+set ``VerosConfig(salinity_restoring_timescale=30 * 86400.0)``; to disable
+the term, set ``restore_to_climatology_salt=False``.
 
 .. list-table:: Independent global Veros restoring controls
    :header-rows: 1
@@ -164,8 +204,8 @@ in both host and JAX execution. The native callback applies the independent
 weights; ``qnec`` remains the raw heat-correction coefficient even when its
 contribution is disabled. Coupled heat and freshwater fluxes remain active.
 Replace uses of the former shared ``restore_to_climatology`` argument with
-the appropriate new argument(s). The ACC setup retains its native internal
-forcing.
+the appropriate new argument(s). VerCOR supports only ``global_4deg``; remove
+the former ``setup=`` argument from ``VerosConfig`` calls.
 
 JCM
 +++
@@ -186,4 +226,190 @@ CAMulator achieves these results with a 350 times speedup over CAM6, making it a
 
 CAMulator configuration paths and checkpoint paths are machine-specific.
 Reconfigure those paths, their associated data, and the checkpoint before
-running a CAMulator driver.
+running a CAMulator driver. The coupled gallery additionally requires
+``VERCOR_CAMULATOR_WATER_VAPOR_VARIABLE`` naming a real vapor-specific
+prognostic variable in the selected model's input and prediction layouts, and
+``VERCOR_CAMULATOR_INITIAL_DIAGNOSTICS`` pointing to native initial-condition
+NetCDF data with ``time``, ``latitude``, ``longitude`` and ``TS/FSNS/FLNS``.
+It selects the exact configured native start time and uses a Gregorian clock.
+The published ``Qtot``-only configuration represents total water and cannot
+supply vapor humidity; it fails explicitly. There is no known locally tested
+vapor-trained checkpoint, and setting an invented channel name does not make
+that checkpoint compatible.
+
+``CAMulatorConfig.initial_diagnostics`` owns a defensive copy of supplied
+setup values. Its ``time`` must equal the effective initial cursor time
+(including explicit ``time_alignment="forcing_start"``). Missing input
+``TS`` is kelvin; ``FSNS`` and ``FLNS`` are downward-positive J/m² accumulated
+over the configured native forecast step. These required absent-input
+channels cannot be reconstructed from a prediction without advancing time.
+Setup decodes only the latest normalized history frame with CREDIT's separate
+``inverse_transform_input``. The pure meteorology kernel is shared with
+prediction mapping and uses traced physical constants for humidity, lowest-level
+pressure, height, density, potential temperature and winds. There is no
+reference-weather or total-water partition fallback.
+
+CAMulator uses the same six ``air_*`` exchange keys as the other bulk-forcing
+producers. Its horizontal ``model_level_air_pressure`` is the lowest hybrid
+level pressure in Pa, distinct from JCM's full-column ``air_pressure_3d``.
+The private ``prepare_camulator_surface_temperature_input`` packs rescaled
+combined land/ocean surface temperature into the native input tensor.
+
+Initial exports are evaluated before existing inference tracing and do not
+advance native prognostic state or cursor or resample initialization noise.
+The immutable runtime payload retains the same initialized model-state sample.
+Host-boundary stand-ins verify startup, energy conversion and finite bulk
+forcing; unavailable CREDIT, model weights and native data prevent a native
+climate or tracing-performance certification.
+
+Veris forcing conventions
+-------------------------
+
+The Veris adapter reuses the Veros CESM bulk calculation. ``ATemp`` uses
+``tref`` and ``aqh`` uses ``qref`` at
+``PhysicalConstants.air_temperature_reference_height`` (2 m by default).
+The bulk inputs retain colocated model-level temperature, humidity, wind,
+density and height. These diagnostics use open-ocean similarity beneath
+prescribed ice; they are not observed ERA5 near-surface values.
+
+ERA5 separately supplies actual ``u10/v10`` winds, downward shortwave
+``msdwswrf`` and downward longwave ``msdwlwrf``. Net shortwave ``msnswrf``
+remains distinct. Native ``Qnet`` and ``Qsw`` negate VerCOR's downward-positive
+heat fluxes. Separate rain and snow mass rates and signed CESM evaporation
+convert to water-equivalent m/s using the traced freshwater density; runoff
+and the prescribed ocean currents/height anomaly are explicitly zero.
+Forcing is reapplied before each native substep because native thermodynamics
+replaces heat inputs with residual coupling fluxes.
+
+Veris with prescribed ocean
+---------------------------
+
+The standalone `Veris sea-ice model <https://github.com/team-ocean/veris>`_
+uses the existing global 4-degree Veros ocean grid and its binary wet mask.
+The example schedules ``LND -> CICE -> OCN -> ATM`` each day. Both incoming
+ice routes are intensive, so wet cells with zero concentration still receive
+forcing and can form ice. Concentration ``Area`` evolves as ``ice_fraction``
+without rebuilding ocean geometry or remappers.
+
+From a source checkout containing this integration, install and copy the setup:
+
+.. code-block:: console
+
+   python -m pip install ".[veris,veros]"
+   vercor copy-setup veris_dataveros_era5 --to ~/vercor-setups/veris_dataveros_era5
+   vercor run ~/vercor-setups/veris_dataveros_era5/veris_dataveros_era5.py --loglevel info --float-type float64
+
+The native revision is pinned by the ``veris`` extra. Native integration uses
+one-hour coupled dynamics/thermodynamics steps inside daily coupling intervals.
+The default experiment starts with native zero ice and writes monthly native
+ice variables plus final runtime/snapshot files. ``VerisConfig.initial_conditions``
+accepts native physical (x, y) arrays, and ``VerisConfig.output`` selects period
+variables/cadence. Thickness outputs remain volume per total grid-cell area.
+
+The ocean provides monthly Veros SST/SSS climatology with explicitly zero
+currents and height anomaly. Runoff is also prescribed zero. Land and atmosphere
+are ERA5 data components; CICE sends no feedback to these prescribed components.
+CESM reference-air diagnostics and heat/freshwater conventions are described
+above. Numerical conservation, spherical operators, extended trajectories and local
+derivatives are measured in :doc:`veris-validation`; these checks do not
+establish observed climate skill.
+
+Prognostic sea ice and ocean
+----------------------------
+
+``veris_veros_era5`` uses ``make_veris_veros`` to initialize one native ocean
+and share its exact geometry with sea ice. The daily ``LND -> CICE -> OCN -> ATM``
+sequence is explicitly lagged: ice receives the latest ocean/air state, ocean
+receives the current ice interval means, then ERA5 advances. Heat, total bulk
+mass and actual salt mass use a conservative scalar route. Stress uses the
+vector-capable shared-grid identity route. Both outgoing routes use binary
+source support and together carry ``SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS``; concentration
+is not applied twice. This same-grid proof does not establish different-grid
+staggered stress conservation.
+
+Synthetic parameter recovery
+-----------------------------
+
+``veris_calibration`` needs no external data assets. It fits h0 (m) from
+synthetic concentration using public state replacement, a fixed wet observation
+mask including ice-free cells, and a residual scale of 1e-3. Its reusable
+``calibrate_lead_closing_thickness`` accepts a Coupler, fixed initial RunState,
+observed_fraction, optional weights, initial_h0, positive bounds and a component
+name. The default bounds are 0.25--0.8 m. Invalid observations/weights, all-dry
+weights and an insensitive observation window fail before minimization.
+
+The JAX-jitted value/gradient drives SciPy L-BFGS-B with ftol=1e-14, gtol=1e-10
+and maxiter=100. The frozen PyTree result contains fitted h0, scaled loss and
+gradient, optimizer iteration/evaluation counts and convergence. The example
+prints recovery of truth 0.43 m and a distinct cold-forcing holdout error.
+This validates numerical recovery rather than observed climate skill; float32
+concentration quantization limits recovery accuracy relative to float64.
+
+Coupled Veris, Veros and JCM
+----------------------------
+
+Copy ``veris_veros_jcm`` with the standard CLI, or import its public
+``build_coupler`` function. The default is 365 daily Gregorian intervals starting
+2000-01-03, after two days of native JCM climatological spinup. The builder
+selects precision before constructing models, initializes the ocean once, and
+reuses ``make_veris_veros`` and ``make_jcm_land_atmosphere``. Optional models
+remain lazy imports. Inject ``clock``, native ``jcm_inputs`` or an already built
+``pair`` for shorter runs; pair configuration overrides cannot accompany a pair.
+
+The execution order is ``LND -> CICE -> OCN -> ATM``. Veris uses the latest
+available ocean and atmospheric fields; its interval-mean total ocean heat,
+mass, salt and stress enter Veros once. There is no direct ATM-to-OCN route.
+JCM then receives current Veris ice temperature/albedo/concentration and
+post-advance Veros open-water SST contributions. JCM land supplies separate
+land temperature and soil availability. Land remains prescribed and declares
+no heat-flux feedback input. Route endpoints, execution order, state lookup
+and surface-policy roles use the actual component names; the default labels
+above do not constrain custom instance names.
+
+For wet mask W and current ice fraction A, conservative remapping transfers
+``R(W*(1-A)*SST)``, ``R(W*A*Tice)``, ``R(W*A*alpha_ice)`` and ``R(W*A)``.
+Products are formed on their source grid, preserving covariance. With native
+land fraction fl, ocean fraction fo=1-fl and remapped ice fraction fi, JCM uses
+marine temperature ``(water_temperature_contribution+ice_temperature_contribution)/fo``
+and marine albedo ``((fo-fi)*alpha_water+ice_albedo_contribution)/fo``.
+Concentration supplied to native JCM is ``fi/fo``. The configured native
+open-water albedo is used wherever water is free of ice. Absent branches use
+finite reference temperatures and zero inactive contributions. The existing
+static mask helper's 0.001 threshold defines absent land/ocean support.
+
+Enable the three explicit policies when supplying configurations:
+``VerisConfig(atmosphere_forcing="model_level")``,
+``VerosConfig(surface_forcing="surface_fluxes", export_open_water_surface=True)`` and
+``JCMAtmosphereConfig(seaice_coupling=True)``. Incompatible supplied modes fail early.
+The builder requires a Gregorian clock; coupled JCM preserves native time/step
+carry, including leap days. Its epoch adapter requires whole-second dates and
+enabled spinup aligned to coupling intervals.
+Initial air/radiation is evaluated from initialized native JCM physics without
+advancing its dycore or cross-step carry. Its initial boundary is the native
+climatology; subsequent ATM intervals use the incoming coupled surfaces. Thus
+the first CICE interval has physical air/radiation and the explicit air lag is
+retained. JCM model-level winds are converted to actual 10 m vectors using the
+same CESM bulk solution that diagnoses temperature/humidity for Veris.
+
+JCM's SPEEDY scheme has one effective marine temperature. This coupling does
+not resolve separate marine turbulent fluxes over ice and water. Raw downward
+shortwave radiation is exported separately: Veris applies the configured water
+albedo to its open-water branch and native ice albedo to ice. JCM 3 exports
+grid-mean downward-positive turbulent heat fluxes, with no separate land/marine
+channels. Dynamic surface weighting never adds another concentration or
+ocean-area factor.
+
+Shared JCM period files add canonical ``sea_surface_temperature`` (K),
+``marine_surface_albedo`` (1) and ``marine_ice_fraction`` (1) on ``lat, lon``;
+native diagnostics remain available. Output is owned by the existing shared
+coordinator. The two-day global smoke and smooth native AD tests establish
+functional coupling and derivative behavior, not long-term climate accuracy.
+
+Source and coupling audit
+-------------------------
+
+The maintained :doc:`source-coupling-audit` records the current gallery route
+owners and removed no-op recipes. Prescribed producers declare no physical
+feedback inputs; the data gallery declares and displays diagnostic imports
+explicitly. Native geometry, vapor species and timing requirements remain part
+of each model boundary.

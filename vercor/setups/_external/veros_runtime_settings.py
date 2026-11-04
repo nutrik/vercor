@@ -21,14 +21,26 @@ def _set_runtime_setting(runtime_settings: Any, name: str, value: Any) -> None:
         ) from None
 
 
-def configure_veros_runtime(execution: Literal["host", "jax"] = "host") -> None:
-    """Configure Veros for one immutable host or differentiable JAX lane."""
+def configure_veros_runtime(
+    execution: Literal["host", "jax"] = "host",
+    *,
+    backend: Literal["numpy", "jax"] | None = None,
+) -> None:
+    """Select native operators independently of host or scanned execution.
 
-    from veros import runtime_settings  # type: ignore[import]
-
+    Stock Veros supports JAX kernels under host orchestration. Scanned execution
+    additionally requires the differentiable fork and cannot use NumPy kernels.
+    None preserves the execution-based native choice.
+    """
     if execution not in ("host", "jax"):
         raise ValueError("execution must be 'host' or 'jax'")
-    backend = "numpy" if execution == "host" else "jax"
+    if backend not in (None, "numpy", "jax"):
+        raise ValueError("backend must be 'numpy', 'jax', or None")
+    if execution == "jax" and backend == "numpy":
+        raise ValueError("JAX execution requires the native JAX backend")
+    from veros import runtime_settings  # type: ignore[import]
+
+    backend = backend or ("numpy" if execution == "host" else "jax")
     linear_solver = "best" if execution == "host" else "scipy_jax"
     _set_runtime_setting(runtime_settings, "backend", backend)
     _set_runtime_setting(runtime_settings, "linear_solver", linear_solver)

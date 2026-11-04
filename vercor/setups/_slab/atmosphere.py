@@ -11,12 +11,7 @@ from vercor.output import OutputSpec
 from vercor.setups._output import resolve_output
 
 _REFERENCE_SURFACE_TEMPERATURE = 273.15 + 15.0
-_ATMOSPHERE_INPUTS = (
-    "sea_surface_temperature",
-    "land_surface_temperature",
-    "soil_moisture",
-    "ice_fraction",
-)
+_ATMOSPHERE_INPUTS = ("sea_surface_temperature",)
 _ATMOSPHERE_OUTPUTS = (
     "temperature_2m",
     "sensible_heat_flux",
@@ -26,9 +21,6 @@ _ATMOSPHERE_OUTPUTS = (
 )
 _ATMOSPHERE_DEFAULT_FIELDS = {
     "sea_surface_temperature": _REFERENCE_SURFACE_TEMPERATURE,
-    "land_surface_temperature": _REFERENCE_SURFACE_TEMPERATURE,
-    "soil_moisture": 0.0,
-    "ice_fraction": 0.0,
     "temperature_2m": _REFERENCE_SURFACE_TEMPERATURE,
     "sensible_heat_flux": 0.0,
     "latent_heat_flux": 0.0,
@@ -50,11 +42,16 @@ def _bulk_flux_step(
     temperature_2m: object,
     sea_surface_temperature: object,
 ) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """Return downward-positive sensible/latent heat fluxes and relaxed air.
+
+    Grid-shaped temperatures are in K and fluxes in W/m2. The latent flux
+    is a toy half-sensible closure, not a humidity-based water budget.
+    """
     temperature_2m_array = as_jax_real_array(temperature_2m)
     sea_surface_temperature_array = as_jax_real_array(sea_surface_temperature)
     delta_temperature = temperature_2m_array - sea_surface_temperature_array
-    sensible_heat_flux = -10.0 * delta_temperature
-    latent_heat_flux = -0.5 * sensible_heat_flux
+    sensible_heat_flux = 10.0 * delta_temperature
+    latent_heat_flux = 0.5 * sensible_heat_flux
     updated_temperature_2m = temperature_2m_array - 0.01 * delta_temperature
     return sensible_heat_flux, latent_heat_flux, updated_temperature_2m
 

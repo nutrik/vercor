@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import pytest
 
 from vercor.calendar import DateTime360, DateTime365
+from vercor.components import ComponentSpec
 from vercor.setups._time_helpers import (
     align_model_timestep,
     assign_model_timestep_alignment,
@@ -23,7 +24,7 @@ from vercor.setups._external.camulator_forcing import (
 )
 from tests._coverage_support import make_test_grid
 from vercor.output import OutputSpec, PeriodOutput
-from vercor.setups import JAXGCMConfig, JCMLandAtmosphereConfig, Spinup
+from vercor.setups import JCMAtmosphereConfig, JCMLandAtmosphereConfig, Spinup
 
 
 class _RecordingLogger:
@@ -130,11 +131,11 @@ def test_run_logged_spinup_logs_each_step_and_returns_callback_result() -> None:
 
 def test_grid_field_defaults_returns_defaults_with_overrides() -> None:
     fields = grid_field_defaults(
-        ("temperature", "humidity"),
-        overrides={"temperature": 280.0},
+        ("air_temperature", "humidity"),
+        overrides={"air_temperature": 280.0},
     )
 
-    assert fields == {"temperature": 280.0, "humidity": 0.0}
+    assert fields == {"air_temperature": 280.0, "humidity": 0.0}
 
 
 def test_load_jcm_inputs_facade_returns_named_payload(
@@ -184,11 +185,16 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
 
     coords = object()
     forcing = object()
-    terrain = SimpleNamespace(fmask="original-mask")
+    terrain = SimpleNamespace(
+        fmask=jnp.full((2, 2), 0.25), copy=lambda **updates: SimpleNamespace(**updates)
+    )
     inputs = setups.JCMInputs(coords=coords, terrain=terrain, forcing=forcing)
     ocean_grid = make_test_grid(name="ocn-grid")
     land_mask = jnp.asarray([[1.0, 0.0], [0.0, 1.0]])
-    land: Any = SimpleNamespace(grid=SimpleNamespace(binary_mask=land_mask))
+    land: Any = SimpleNamespace(
+        grid=SimpleNamespace(binary_mask=land_mask),
+        spec=SimpleNamespace(initial_fields={"land_fraction": land_mask}),
+    )
     atmosphere: Any = object()
     calls: dict[str, Any] = {}
 
@@ -202,6 +208,7 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
         *,
         name: str = "LND",
         output: OutputSpec | None = None,
+        native_land_fraction: object = None,
     ) -> Any:
         calls["land_args"] = (
             received_coords,
@@ -210,6 +217,7 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
             name,
             output,
         )
+        calls["native_land_fraction"] = native_land_fraction
         return land
 
     def fake_transposed_host_array(mask: object) -> str:
@@ -234,21 +242,29 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
     )
     monkeypatch.setattr(helper, "_load_jcm_factories", fake_load_jcm_factories)
     monkeypatch.setattr(helper, "transposed_host_array", fake_transposed_host_array)
+    prescribed = jnp.zeros((2, 2))
+    monkeypatch.setattr(
+        helper,
+        "_surface_fractions_from_ocean",
+        lambda *args: (prescribed, prescribed, land_mask),
+    )
 
     result = helper.make_jcm_land_atmosphere(
         ocean_grid,
         inputs=inputs,
         config=JCMLandAtmosphereConfig(
-            atmosphere=JAXGCMConfig(spinup=Spinup(enabled=False)),
+            atmosphere=JCMAtmosphereConfig(spinup=Spinup(enabled=False)),
         ),
     )
 
     assert result.land is land
     assert result.atmosphere is atmosphere
     assert result.coords is coords
-    assert result.terrain is terrain
+    assert result.terrain is not terrain
+    assert result.terrain.fmask == "patched-mask"
     assert result.forcing is forcing
-    assert terrain.fmask == "patched-mask"
+    assert bool(jnp.all(terrain.fmask == 0.25))
+    assert bool(jnp.all(calls["native_land_fraction"] == 0.25))
     assert calls["mask"] is land_mask
     assert calls["land_args"] == (
         coords,
@@ -259,9 +275,10 @@ def test_make_jcm_land_atmosphere_accepts_preloaded_inputs(
     )
     assert calls["atmosphere_args"] == (
         coords,
-        terrain,
+        result.terrain,
         {
-            "config": JAXGCMConfig(
+            "prescribed_marine_fraction": prescribed,
+            "config": JCMAtmosphereConfig(
                 forcing_data=forcing,
                 spinup=Spinup(enabled=False),
                 jitted=True,
@@ -279,7 +296,7 @@ def test_make_jcm_land_atmosphere_replaces_only_missing_forcing(
     caller_forcing = object()
 
     @dataclass(frozen=True)
-    class ExtendedJAXGCMConfig(JAXGCMConfig):
+    class ExtendedJAXGCMConfig(JCMAtmosphereConfig):
         extension: object = extension_token
 
     atmosphere_config = ExtendedJAXGCMConfig(
@@ -288,14 +305,20 @@ def test_make_jcm_land_atmosphere_replaces_only_missing_forcing(
     )
     inputs = helper.JCMInputs(
         coords=object(),
-        terrain=SimpleNamespace(fmask=None),
+        terrain=SimpleNamespace(
+            fmask=jnp.zeros((2, 2)), copy=lambda **kwargs: SimpleNamespace(**kwargs)
+        ),
         forcing=object(),
     )
     ocean_grid = make_test_grid(name="jcm-replace-ocean")
     land = SimpleNamespace(
         grid=SimpleNamespace(binary_mask=jnp.ones(ocean_grid.shape)),
+        spec=ComponentSpec(
+            initial_fields={"land_fraction": jnp.ones(ocean_grid.shape)},
+            outputs=("land_fraction",),
+        ),
     )
-    captured: dict[str, JAXGCMConfig] = {}
+    captured: dict[str, JCMAtmosphereConfig] = {}
 
     def fake_make_jcm_land(*args: object, **kwargs: object) -> object:
         _ = args, kwargs
@@ -305,9 +328,10 @@ def test_make_jcm_land_atmosphere_replaces_only_missing_forcing(
         coords: object,
         terrain: object,
         *,
-        config: JAXGCMConfig,
+        config: JCMAtmosphereConfig,
+        prescribed_marine_fraction: object = None,
     ) -> object:
-        _ = coords, terrain
+        _ = coords, terrain, prescribed_marine_fraction
         captured["config"] = config
         return object()
 
@@ -315,6 +339,9 @@ def test_make_jcm_land_atmosphere_replaces_only_missing_forcing(
         helper,
         "_load_jcm_factories",
         lambda: (fake_make_jcm_land, fake_make_jax_gcm),
+    )
+    monkeypatch.setattr(
+        helper, "_surface_fractions_from_ocean", lambda *args: (jnp.zeros((2, 2)),) * 3
     )
 
     helper.make_jcm_land_atmosphere(
@@ -441,10 +468,15 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
 
     coords = object()
     forcing = object()
-    terrain = SimpleNamespace(fmask="original-mask")
+    terrain = SimpleNamespace(
+        fmask=jnp.full((2, 2), 0.25), copy=lambda **updates: SimpleNamespace(**updates)
+    )
     ocean_grid = make_test_grid(name="ocn-grid")
     land_mask = jnp.asarray([[1.0, 0.0], [0.0, 1.0]])
-    land: Any = SimpleNamespace(grid=SimpleNamespace(binary_mask=land_mask))
+    land: Any = SimpleNamespace(
+        grid=SimpleNamespace(binary_mask=land_mask),
+        spec=SimpleNamespace(initial_fields={"land_fraction": land_mask}),
+    )
     atmosphere: Any = object()
     calls: dict[str, Any] = {}
 
@@ -459,6 +491,7 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
         *,
         name: str = "LND",
         output: OutputSpec | None = None,
+        native_land_fraction: object = None,
     ) -> Any:
         calls["land_args"] = (
             received_coords,
@@ -467,6 +500,7 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
             name,
             output,
         )
+        calls["native_land_fraction"] = native_land_fraction
         return land
 
     def fake_transposed_host_array(mask: object) -> str:
@@ -487,11 +521,17 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
     monkeypatch.setattr(helper, "load_jcm_inputs", fake_load_jcm_inputs)
     monkeypatch.setattr(helper, "_load_jcm_factories", fake_load_jcm_factories)
     monkeypatch.setattr(helper, "transposed_host_array", fake_transposed_host_array)
+    prescribed = jnp.zeros((2, 2))
+    monkeypatch.setattr(
+        helper,
+        "_surface_fractions_from_ocean",
+        lambda *args: (prescribed, prescribed, land_mask),
+    )
 
     result = helper.make_jcm_land_atmosphere(
         ocean_grid,
         config=JCMLandAtmosphereConfig(
-            atmosphere=JAXGCMConfig(
+            atmosphere=JCMAtmosphereConfig(
                 custom_parameters={"surface_flux.vgust": 5.01},
                 spinup=Spinup(enabled=False),
                 output=OutputSpec(period=PeriodOutput(frequency="year")),
@@ -504,9 +544,11 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
     assert result.land is land
     assert result.atmosphere is atmosphere
     assert result.coords is coords
-    assert result.terrain is terrain
+    assert result.terrain is not terrain
+    assert result.terrain.fmask == "patched-mask"
     assert result.forcing is forcing
-    assert terrain.fmask == "patched-mask"
+    assert bool(jnp.all(terrain.fmask == 0.25))
+    assert bool(jnp.all(calls["native_land_fraction"] == 0.25))
     assert calls["load_inputs"] is True
     assert calls["mask"] is land_mask
     assert calls["land_args"] == (
@@ -518,9 +560,10 @@ def test_make_jcm_land_atmosphere_patches_mask_and_options(
     )
     assert calls["atmosphere_args"] == (
         coords,
-        terrain,
+        result.terrain,
         {
-            "config": JAXGCMConfig(
+            "prescribed_marine_fraction": prescribed,
+            "config": JCMAtmosphereConfig(
                 custom_parameters={"surface_flux.vgust": 5.01},
                 forcing_data=forcing,
                 spinup=Spinup(enabled=False),

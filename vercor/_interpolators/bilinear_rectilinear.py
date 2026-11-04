@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
@@ -122,7 +122,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
 
         self.lon_src_deg = lon_src_deg
         self.lat_src_deg = lat_src_deg
-        self.lon_src_rad = jnp.deg2rad(lon_src_deg)
+        self.lon_src_rad = _geometry.longitude_radians(lon_src_deg)
         self.lat_src_rad = jnp.deg2rad(lat_src_deg)
         self.nlon = int(lon_src_deg.size)
         self.nlat = int(lat_src_deg.size)
@@ -133,7 +133,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         self.tshape = tuple(int(size) for size in lon_tgt_deg.shape)
         self.lon_tgt_deg = lon_tgt_deg
         self.lat_tgt_deg = lat_tgt_deg
-        self.lon_tgt_rad = jnp.deg2rad(lon_tgt_deg)
+        self.lon_tgt_rad = _geometry.longitude_radians(lon_tgt_deg)
         self.lat_tgt_rad = jnp.deg2rad(lat_tgt_deg)
         self._lon_tgt_flat = self.lon_tgt_rad.reshape(-1)
         self._lat_tgt_flat = self.lat_tgt_rad.reshape(-1)
@@ -201,7 +201,11 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             raise ValueError(
                 f"src field must have shape (nlat,nlon)=({self.nlat},{self.nlon})"
             )
-        valid = _extrapolation.valid_scalar_source_mask(src_array, self.src_mask)
+        # Keep the entry guard outside compiled control flow so eager checkify
+        # retains its direct CouplerError; finishing kernels remain compiled.
+        valid = _extrapolation.valid_scalar_source_mask(
+            src_array, self.src_mask, conditional_callback=False
+        )
 
         v00 = src_array[self.j0, self.i0]
         v10 = src_array[self.j0, self.i1]
@@ -245,13 +249,13 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         return out, wsum
 
     def _extrapolate_scalar(self, src: Array, src_mask: Array | None) -> Array:
+        """Extrapolate source values already aligned with the internal mask."""
         if self.extrapolation_mode is None:
             return jax_full(self.tshape, self.fill_value)
 
-        src_array = self._prepare_source_field(src)
-        valid = _extrapolation.valid_scalar_source_mask(src_array, src_mask)
+        valid = _extrapolation.valid_scalar_source_mask(src, src_mask)
         return _extrapolation.extrapolate_scalar_field(
-            source_values=src_array,
+            source_values=src,
             valid_source_mask=valid,
             target_shape=self.tshape,
             target_lon_flat=self._lon_tgt_flat,
@@ -266,10 +270,17 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
 
     def apply_scalar(self, src: Any) -> Any:
         out, _ = self._apply_bilinear_scalar(src)
+        return self._finish_scalar(src, out)
+
+    @jax.jit
+    def _finish_scalar(self, src: Any, out: Array) -> Any:
+        """Reuse extrapolation control flow while source checks stay eager."""
         need = ~jnp.isfinite(out)
         ext = lax.cond(
             jnp.any(need),
-            lambda _: self._extrapolate_scalar(src, self.src_mask),
+            lambda _: self._extrapolate_scalar(
+                self._prepare_source_field(src), self.src_mask
+            ),
             lambda _: jax_full(self.tshape, self.fill_value),
             operand=None,
         )
@@ -343,6 +354,22 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         vt3_for_projection = jnp.where(need[..., None], 0.0, vt3)
         u_t = jnp.sum(vt3_for_projection * self._e_east_t, axis=-1)
         v_t = jnp.sum(vt3_for_projection * self._e_north_t, axis=-1)
+        return cast(
+            tuple[Any, Any],
+            self._finish_vector(u_src_array, v_src_array, valid, need, u_t, v_t),
+        )
+
+    @jax.jit
+    def _finish_vector(
+        self,
+        u_src_array: Array,
+        v_src_array: Array,
+        valid: Array,
+        need: Array,
+        u_t: Array,
+        v_t: Array,
+    ) -> tuple[Any, Any]:
+        """Reuse vector extrapolation without changing source error boundaries."""
 
         def apply_vector_extrapolation(_: None) -> tuple[Array, Array]:
             u_fill = self._extrapolate_scalar(u_src_array, valid)

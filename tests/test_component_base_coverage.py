@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 import jax.numpy as jnp
+import jax
 import numpy as np
 import pytest
 
@@ -13,18 +14,23 @@ from tests._coverage_support import make_test_grid
 from vercor.clock import Clock
 from vercor.components import (
     CallableComponent,
+    ComponentMaskSpec,
     ComponentSpec,
+    DataComponent,
     LifecycleHooks,
     PrefillResult,
     SetupResult,
     StepContext,
     StepResult,
+    TransferPolicy,
 )
 from vercor.coupler import Coupler
 from vercor.dtypes import DTypePolicy
 from vercor.exceptions import ComponentError
 from vercor.runtime import RuntimeOptions
 from vercor._runtime.contracts import ExchangeContract
+from vercor._runtime.field_transfer import select_runtime_field
+from vercor._runtime.time import initial_runtime_step_info
 
 
 def _coupler(component: Any, *, steps: int = 1) -> Coupler:
@@ -279,3 +285,149 @@ def test_prefill_rejects_nonnumeric_store_values_with_component_error() -> None:
             {},
             ExchangeContract(receives=("incoming",), sends=("outgoing",)),
         )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    ("mode", "shape"),
+    [
+        ("linear", (2, 2)),
+        ("linear", (1, 2, 2)),
+        ("linear", (13, 2, 2)),
+        ("linear", (11, 3, 2, 2)),
+        ("daily", (2, 2)),
+        ("daily", (1, 2, 2)),
+        ("daily", (366, 2, 2)),
+        ("daily", (364, 3, 2, 2)),
+    ],
+)
+def test_time_selected_outputs_reject_invalid_record_layouts_before_run(
+    mode: str, shape: tuple[int, ...]
+) -> None:
+    """Output-only data must fail before bad takes become missing samples."""
+    component = DataComponent(
+        "FORCING",
+        make_test_grid(),
+        {"temperature": np.ones(shape)},
+        spec=ComponentSpec(transfer=TransferPolicy(mode)),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(
+        ComponentError,
+        match=rf"FORCING.*temperature.*{mode}.*(12|365).*time-first",
+    ):
+        _coupler(component).initial_state()
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(("mode", "records"), [("linear", 12), ("daily", 365)])
+@pytest.mark.parametrize("levels", [False, True])
+def test_setup_can_seed_time_selected_outputs_with_static_declared_masks(
+    mode: str, records: int, levels: bool
+) -> None:
+    shape = (records, 3, 2, 2) if levels else (records, 2, 2)
+    component = CallableComponent(
+        "FORCING",
+        make_test_grid(),
+        lambda fields: {},
+        spec=ComponentSpec(
+            outputs=("temperature", "wet", "fraction"),
+            lifecycle=LifecycleHooks(
+                setup=lambda component, context: SetupResult(
+                    fields={
+                        "temperature": np.full(shape, 280.0),
+                        "wet": 1.0,
+                        "fraction": 0.5,
+                    }
+                )
+            ),
+            transfer=TransferPolicy(mode),  # type: ignore[arg-type]
+            masks=ComponentMaskSpec(binary_field="wet", fractional_field="fraction"),
+        ),
+    )
+
+    state = _coupler(component).run()
+
+    assert state.component("FORCING").field("temperature").shape == shape
+    np.testing.assert_array_equal(state.component("FORCING").field("fraction"), 0.5)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("mode", ["linear", "daily"])
+@pytest.mark.parametrize("phase", ["setup", "prefill"])
+def test_lifecycle_cannot_install_invalid_time_selected_output(
+    mode: str, phase: str
+) -> None:
+    fields = {"temperature": np.ones((1, 2, 2))}
+    hooks = (
+        LifecycleHooks(setup=lambda component, context: SetupResult(fields=fields))
+        if phase == "setup"
+        else LifecycleHooks(
+            prefill=lambda component, context: PrefillResult(fields=fields)
+        )
+    )
+    records = 12 if mode == "linear" else 365
+    component = DataComponent(
+        "FORCING",
+        make_test_grid(),
+        {"temperature": np.ones((records, 2, 2))},
+        spec=ComponentSpec(
+            lifecycle=hooks,
+            transfer=TransferPolicy(mode),  # type: ignore[arg-type]
+        ),
+    )
+
+    with pytest.raises(ComponentError, match=rf"FORCING.*temperature.*{mode}"):
+        _coupler(component).initial_state()
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("mode", ["linear", "daily"])
+def test_time_selector_rejects_incomplete_climatology(mode: str) -> None:
+    clock = Clock(datetime(2001, 2, 1), 86400.0, 1)
+
+    with pytest.raises(ComponentError, match=rf"temperature.*{mode}.*time-first"):
+        select_runtime_field(
+            np.ones((1, 2, 2)),
+            TransferPolicy(mode),  # type: ignore[arg-type]
+            initial_runtime_step_info(clock),
+            field_name="temperature",
+        )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("field_dtype", [jnp.float32, jnp.float64])
+def test_linear_time_selector_preserves_field_precision_and_derivatives(
+    field_dtype: Any,
+) -> None:
+    assert jax.config.read("jax_enable_x64")
+    forcing = jnp.ones((12, 2, 2), dtype=field_dtype)
+    step_info = initial_runtime_step_info(Clock(datetime(2001, 2, 1), 86400.0, 1))
+
+    def select(values: Any) -> Any:
+        return select_runtime_field(values, TransferPolicy("linear"), step_info)
+
+    selected, tangent = jax.jvp(jax.jit(select), (forcing,), (jnp.ones_like(forcing),))
+    _, pullback = jax.vjp(select, forcing)
+
+    assert selected.dtype == field_dtype
+    assert tangent.dtype == field_dtype
+    np.testing.assert_allclose(selected, 1.0)
+    np.testing.assert_allclose(tangent, 1.0)
+    np.testing.assert_allclose(
+        jnp.sum(pullback(jnp.ones_like(selected))[0], axis=0), 1.0
+    )
+
+
+@pytest.mark.parametrize("shape", [(2, 2), (3, 2, 2), (4, 3, 2, 2)])
+def test_current_outputs_preserve_static_and_level_layouts(
+    shape: tuple[int, ...],
+) -> None:
+    component = DataComponent(
+        "FORCING", make_test_grid(), {"temperature": np.full(shape, 280.0)}
+    )
+
+    assert (
+        _coupler(component).run().component("FORCING").field("temperature").shape
+        == shape
+    )

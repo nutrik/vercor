@@ -1,0 +1,175 @@
+from datetime import datetime
+from typing import Any, cast
+
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+
+from vercor import (
+    Clock,
+    Coupler,
+    Exchange,
+    RuntimeOptions,
+)
+from vercor.dtypes import DTypePolicy, jax_ones
+from vercor import RectilinearGrid
+from vercor.output import OutputTarget
+from vercor.regridding import bilinear, conservative
+from vercor.setups import (
+    make_slab_atmosphere,
+    make_slab_land,
+    make_slab_ocean,
+    make_slab_seaice,
+)
+from vercor.recipes import (
+    OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+    OCEAN_TO_SEAICE_SURFACE_FIELDS,
+    ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
+    ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
+)
+from vercor.diagnostics import (
+    plot_component_scalar_vector_comparison,
+    print_component_field_means_table,
+)
+from vercor.topology import SurfaceMaskPolicy
+
+
+def run_setup(*, loglevel: str, float_type: str) -> None:
+    """Run this setup through the shared VerCOR CLI contract."""
+
+    dtype = DTypePolicy(enable_x64=float_type == "float64")
+    # Build grids
+    atm_grid = RectilinearGrid.uniform(
+        "atm-grid",
+        nlon=128,
+        nlat=64,
+        longitude=(0.0, 360.0),
+        latitude=(-90.0, 90.0),
+    )
+
+    ocn_grid_shape = (64, 32)
+    binary_mask = jax_ones(ocn_grid_shape).T.at[:2, :].set(0.0)  # land points
+    ocn_grid = RectilinearGrid.uniform(
+        "ocn-grid",
+        nlon=ocn_grid_shape[0],
+        nlat=ocn_grid_shape[1],
+        longitude=(0.0, 360.0),
+        latitude=(-90.0, 90.0),
+        binary_mask=binary_mask,
+    )
+
+    ice_grid = RectilinearGrid.uniform(
+        "ice-grid",
+        nlon=ocn_grid_shape[0],
+        nlat=ocn_grid_shape[1],
+        longitude=(0.0, 360.0),
+        latitude=(-90.0, 90.0),
+    )
+    lnd_grid = RectilinearGrid.uniform(
+        "lnd-grid",
+        nlon=128,
+        nlat=64,
+        longitude=(0.0, 360.0),
+        latitude=(-90.0, 90.0),
+    )
+
+    # Build components
+    atm = make_slab_atmosphere(atm_grid)
+    ocn = make_slab_ocean(ocn_grid)
+    ice = make_slab_seaice(ice_grid)
+    lnd = make_slab_land(lnd_grid)
+
+    # Clock and sequence
+    clock = Clock(start=datetime(2000, 1, 1, 0, 0, 0), dt_seconds=3600, steps=24)
+    run_order = [ocn.name, atm.name, ice.name, lnd.name]
+
+    # Exchanges
+    # scalar fields (vector field))
+    # ["SHF", "LHF", ("u10m", "v10m")]
+    exchanges = (
+        Exchange(
+            quantity="intensive",
+            source=atm.name,
+            target=ocn.name,
+            fields=ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
+            regridder_factory=bilinear,
+        ),
+        Exchange(
+            quantity="intensive",
+            source=ocn.name,
+            target=atm.name,
+            fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
+            regridder_factory=bilinear,
+        ),
+        Exchange(
+            quantity="intensive",
+            source=ocn.name,
+            target=ice.name,
+            fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
+            regridder_factory=bilinear,
+        ),
+        Exchange(
+            quantity="intensive",
+            source=atm.name,
+            target=lnd.name,
+            fields=ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
+            regridder_factory=conservative,
+        ),
+    )
+    components: list[Any] = [atm, ocn, ice, lnd]
+    cpl = Coupler(
+        clock=clock,
+        components=components,
+        exchanges=exchanges,
+        run_order=run_order,
+        runtime=RuntimeOptions(
+            dtype=dtype,
+            topology=SurfaceMaskPolicy(
+                atmosphere=atm.name, ocean=ocn.name, land=lnd.name
+            ),
+        ),
+        log_level=loglevel,
+    )
+
+    final_state = cpl.run(output=OutputTarget("."))
+    views = final_state.components((atm.name, ocn.name, lnd.name, ice.name))
+
+    # Inspect a few fields in a component-wise table.
+    print_component_field_means_table(
+        components=views,
+        fields=[
+            ("sea_surface_temperature", "sst"),
+            ("temperature_2m", "temperature_2m"),
+            ("u_velocity_10m", "u_velocity_10m"),
+            ("v_velocity_10m", "v_velocity_10m"),
+            ("soil_moisture", "soil_moisture"),
+            ("sensible_heat_flux", "sensible_heat_flux"),
+        ],
+        component_order=[atm.name, ocn.name, lnd.name],
+    )
+    print(
+        "ICE ice_fraction mean:",
+        float(jnp.nanmean(jnp.asarray(views[ice.name].field("ice_fraction")))),
+    )
+
+    fig, axs, scalar_mappable = plot_component_scalar_vector_comparison(
+        rows=[
+            (
+                atm.name,
+                views[atm.name],
+                "sea_surface_temperature",
+                "u_velocity_10m",
+                "v_velocity_10m",
+            ),
+        ],
+        figsize=(15, 10),
+        quiver_scale=100,
+        cmap="coolwarm",
+    )
+
+    fig.colorbar(cast(Any, scalar_mappable), ax=axs, shrink=0.6)
+
+    plt.show()
+
+
+if __name__ == "__main__":
+    run_setup(loglevel="info", float_type="float64")

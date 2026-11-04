@@ -48,6 +48,8 @@ def make_camulator_gcm(
         device=config.device,
         time_alignment=config.time_alignment,
         logger=config.logger,
+        initial_diagnostics=config.initial_diagnostics,
+        water_vapor_variable=config.water_vapor_variable,
     )
     output_provider = (
         _camulator_output.camulator_output_provider(resources)
@@ -68,7 +70,11 @@ def make_camulator_gcm(
     component = CallableComponent(
         config.name,
         resources.grid,
-        partial(_camulator_runtime.step_camulator_runtime, resources),
+        partial(
+            _camulator_runtime.step_camulator_runtime,
+            resources,
+            sample_native_output=config.output.provider is None,
+        ),
         spec=ComponentSpec(
             inputs=("sea_surface_temperature", "land_surface_temperature"),
             outputs=_camulator_contracts.CAMULATOR_RUNTIME_FIELD_NAMES,

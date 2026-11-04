@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 from numpy.typing import NDArray
 import pytest
@@ -22,21 +24,16 @@ from vercor.components._adapter import normalize_component, prepare_component
 from vercor.components.contexts import StepContext
 from vercor.components.runtime_execution import step_component_runtime_state
 from vercor.recipes import (
-    ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
-    ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
-    ATMOSPHERE_TO_LAND_BASIC_FIELDS,
     ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
     ATMOSPHERE_TO_LAND_STATE_FIELDS,
     ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
     ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
-    JCM_LAND_TO_ATMOSPHERE_FIELDS,
-    LAND_TO_ATMOSPHERE_SOIL_FIELDS,
+    LAND_TO_ATMOSPHERE_STATE_FIELDS,
     LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
     OCEAN_TO_SEAICE_SURFACE_FIELDS,
-    SEAICE_TO_OCEAN_FIELDS,
-    SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-    SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+    ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
+    ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
 )
 from vercor.setups._data.era5_atmosphere import make_era5_atmosphere
 from vercor.setups._data.era5_land import make_era5_land
@@ -68,22 +65,16 @@ _DATA_DRIVER_LAND_INPUTS = tuple(
         (*ATMOSPHERE_TO_LAND_STATE_FIELDS, *ATMOSPHERE_TO_LAND_RADIATION_FIELDS)
     )
 )
-_DATA_LAND_INPUTS = tuple(
-    dict.fromkeys(
-        _flatten_field_items(
-            (*_DATA_DRIVER_LAND_INPUTS, *ATMOSPHERE_TO_LAND_BASIC_FIELDS)
-        )
-    )
-)
 _DATA_OCEAN_INPUTS = tuple(
     _flatten_field_items(
         (*ATMOSPHERE_TO_OCEAN_STATE_FIELDS, *ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS)
     )
 )
 _DATA_OCEAN_PUBLIC_RECIPE_INPUTS = tuple(
-    _flatten_field_items(ATMOSPHERE_TO_DATA_OCEAN_FIELDS)
+    _flatten_field_items(
+        (*ATMOSPHERE_TO_OCEAN_STATE_FIELDS, *ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS)
+    )
 )
-_JCM_LAND_INPUTS = tuple(_flatten_field_items(ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS))
 
 
 def _install_data_driver_factory_fakes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -105,6 +96,9 @@ def _install_data_driver_factory_fakes(monkeypatch: pytest.MonkeyPatch) -> None:
         "u": np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "v": -np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "msnswrf": np.full((2, 3, 12), 150.0, dtype=float),
+        "msdwswrf": np.full((2, 3, 12), 180.0),
+        "u10": np.full((2, 3, 12), 4.0),
+        "v10": np.full((2, 3, 12), -3.0),
         "msdwlwrf": np.full((2, 3, 12), 75.0, dtype=float),
         "crr": np.full((2, 3, 12), 1e-5),
         "lsrr": np.broadcast_to(np.arange(12) * 1e-6, (2, 3, 12)),
@@ -290,16 +284,11 @@ def test_jcm_land_exchange_recipe_fields_are_declared() -> None:
     atmosphere = DataComponent(
         name="ATM",
         grid=atmosphere_grid,
-        fields={
-            field_name: np.zeros(atmosphere_grid.shape, dtype=float)
-            for field_name in _JCM_LAND_INPUTS
-        },
         spec=ComponentSpec(
-            inputs=tuple(_flatten_field_items(JCM_LAND_TO_ATMOSPHERE_FIELDS)),
-            outputs=_JCM_LAND_INPUTS,
+            inputs=tuple(_flatten_field_items(LAND_TO_ATMOSPHERE_STATE_FIELDS)),
             initial_fields={
                 field_name: 0.0
-                for field_name in _flatten_field_items(JCM_LAND_TO_ATMOSPHERE_FIELDS)
+                for field_name in _flatten_field_items(LAND_TO_ATMOSPHERE_STATE_FIELDS)
             },
         ),
     )
@@ -308,44 +297,46 @@ def test_jcm_land_exchange_recipe_fields_are_declared() -> None:
         tuple(components),
         (
             Exchange(
-                source="ATM",
-                target="LND",
-                fields=ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS,
-                regridder_factory=bilinear,
-            ),
-            Exchange(
+                quantity="intensive",
                 source="LND",
                 target="ATM",
-                fields=JCM_LAND_TO_ATMOSPHERE_FIELDS,
+                fields=LAND_TO_ATMOSPHERE_STATE_FIELDS,
                 regridder_factory=bilinear,
             ),
         ),
-        validate_endpoints=True,
     )
 
-    assert contracts["LND"].receives == _JCM_LAND_INPUTS
+    assert contracts["LND"].receives == ()
     assert contracts["LND"].sends == tuple(
-        _flatten_field_items(JCM_LAND_TO_ATMOSPHERE_FIELDS)
+        _flatten_field_items(LAND_TO_ATMOSPHERE_STATE_FIELDS)
     )
     for name, component in components.items():
         validate_exchange_fields_declared(component, contracts[name])
 
 
 @pytest.mark.fast_always
-def test_data_driver_exchange_recipes_are_declared_by_data_factories(
+def test_data_driver_declares_diagnostic_imports_explicitly(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _install_data_driver_factory_fakes(monkeypatch)
     atmosphere = make_era5_atmosphere()
     ocean = make_erainterim_ocean()
     land = make_era5_land()
-    components = {
-        "ATM": atmosphere,
-        "OCN": ocean,
-        "LND": land,
-    }
+    atmosphere = DataComponent(
+        atmosphere.name,
+        atmosphere.grid,
+        spec=replace(atmosphere.spec, inputs=_DATA_ATMOSPHERE_INPUTS),
+    )
+    ocean = DataComponent(
+        ocean.name, ocean.grid, spec=replace(ocean.spec, inputs=_DATA_OCEAN_INPUTS)
+    )
+    land = DataComponent(
+        land.name, land.grid, spec=replace(land.spec, inputs=_DATA_DRIVER_LAND_INPUTS)
+    )
+    components = {"ATM": atmosphere, "OCN": ocean, "LND": land}
     exchanges = (
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
@@ -353,6 +344,7 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="OCN",
             fields=ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
@@ -360,6 +352,7 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
             regridder_factory=conservative,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="LND",
             fields=ATMOSPHERE_TO_LAND_STATE_FIELDS,
@@ -367,6 +360,7 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="ATM",
             target="LND",
             fields=ATMOSPHERE_TO_LAND_RADIATION_FIELDS,
@@ -374,12 +368,14 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
             regridder_factory=conservative,
         ),
         Exchange(
+            quantity="intensive",
             source="OCN",
             target="ATM",
             fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
             regridder_factory=bilinear,
         ),
         Exchange(
+            quantity="intensive",
             source="LND",
             target="ATM",
             fields=LAND_TO_ATMOSPHERE_SURFACE_FIELDS,
@@ -389,7 +385,6 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
     contracts = build_exchange_contracts(
         tuple(components),
         exchanges,
-        validate_endpoints=True,
     )
 
     assert contracts["ATM"].receives == _DATA_ATMOSPHERE_INPUTS
@@ -401,7 +396,7 @@ def test_data_driver_exchange_recipes_are_declared_by_data_factories(
 
 @pytest.mark.fast_always
 @pytest.mark.parametrize("make_ocean", (make_era5_ocean, make_erainterim_ocean))
-def test_public_data_ocean_recipe_fields_are_declared_by_data_factories(
+def test_data_ocean_diagnostic_recipe_requires_explicit_declaration(
     monkeypatch: pytest.MonkeyPatch,
     make_ocean: Any,
 ) -> None:
@@ -416,19 +411,28 @@ def test_public_data_ocean_recipe_fields_are_declared_by_data_factories(
         },
         spec=ComponentSpec(outputs=_DATA_OCEAN_PUBLIC_RECIPE_INPUTS),
     )
-    ocean = make_ocean()
+    prescribed = make_ocean()
+    assert prescribed.spec.inputs == ()
+    ocean = DataComponent(
+        prescribed.name,
+        prescribed.grid,
+        spec=replace(prescribed.spec, inputs=_DATA_OCEAN_PUBLIC_RECIPE_INPUTS),
+    )
     components = {"ATM": atmosphere, "OCN": ocean}
     contracts = build_exchange_contracts(
         tuple(components),
         (
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
-                fields=ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
+                fields=(
+                    *ATMOSPHERE_TO_OCEAN_STATE_FIELDS,
+                    *ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS,
+                ),
                 regridder_factory=bilinear,
             ),
         ),
-        validate_endpoints=True,
     )
 
     assert contracts["OCN"].receives == _DATA_OCEAN_PUBLIC_RECIPE_INPUTS
@@ -449,55 +453,44 @@ def test_slab_driver_exchange_recipes_are_declared_by_slab_factories() -> None:
         tuple(components),
         (
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
-                fields=SLAB_ATMOSPHERE_TO_OCEAN_FIELDS,
+                fields=ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
+                quantity="intensive",
                 source="OCN",
                 target="ATM",
                 fields=OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
+                quantity="intensive",
                 source="OCN",
                 target="ICE",
                 fields=OCEAN_TO_SEAICE_SURFACE_FIELDS,
                 regridder_factory=bilinear,
             ),
             Exchange(
-                source="LND",
-                target="ATM",
-                fields=LAND_TO_ATMOSPHERE_SOIL_FIELDS,
-                regridder_factory=bilinear,
-            ),
-            Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="LND",
-                fields=SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS,
-                regridder_factory=conservative,
-            ),
-            Exchange(
-                source="ICE",
-                target="OCN",
-                fields=SEAICE_TO_OCEAN_FIELDS,
+                fields=ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS,
                 regridder_factory=conservative,
             ),
         ),
-        validate_endpoints=True,
     )
 
     assert contracts["ATM"].receives == (
         *_flatten_field_items(OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS),
-        *_flatten_field_items(LAND_TO_ATMOSPHERE_SOIL_FIELDS),
     )
     assert contracts["OCN"].receives == (
-        *_flatten_field_items(SLAB_ATMOSPHERE_TO_OCEAN_FIELDS),
-        *_flatten_field_items(SEAICE_TO_OCEAN_FIELDS),
+        *_flatten_field_items(ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS),
     )
     assert contracts["LND"].receives == tuple(
-        _flatten_field_items(SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS)
+        _flatten_field_items(ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS)
     )
     assert contracts["ICE"].receives == tuple(
         _flatten_field_items(OCEAN_TO_SEAICE_SURFACE_FIELDS)
@@ -518,12 +511,7 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     )
 
     atmosphere = cast(Any, make_slab_atmosphere(grid=grid))
-    assert atmosphere.spec.inputs == (
-        "sea_surface_temperature",
-        "land_surface_temperature",
-        "soil_moisture",
-        "ice_fraction",
-    )
+    assert atmosphere.spec.inputs == ("sea_surface_temperature",)
     assert atmosphere.spec.outputs == (
         "temperature_2m",
         "sensible_heat_flux",
@@ -533,9 +521,6 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     )
     assert set(atmosphere.spec.initial_fields) == {
         "sea_surface_temperature",
-        "land_surface_temperature",
-        "soil_moisture",
-        "ice_fraction",
         *atmosphere.spec.outputs,
     }
     atmosphere_state = _step_component(atmosphere, dt, timestamp, coupler)
@@ -558,7 +543,7 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     assert atmosphere_data.get("latent_heat_flux").shape == grid.shape
     assert atmosphere_data.get("u_velocity_10m").shape == grid.shape
     assert atmosphere_data.get("v_velocity_10m").shape == grid.shape
-    assert np.all(np.asarray(atmosphere_data.get("sensible_heat_flux")) < 0.0)
+    assert np.all(np.asarray(atmosphere_data.get("sensible_heat_flux")) > 0.0)
     assert np.all(np.asarray(atmosphere_data.get("latent_heat_flux")) > 0.0)
     assert np.any(np.asarray(atmosphere_data.get("u_velocity_10m")) != 0.0)
     assert np.any(np.asarray(atmosphere_data.get("v_velocity_10m")) != 0.0)
@@ -567,35 +552,12 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     )
 
     ocean = cast(Any, make_slab_ocean(grid=grid))
-    assert ocean.spec.inputs == (
-        "sensible_heat_flux",
-        "latent_heat_flux",
-        "u_velocity_10m",
-        "v_velocity_10m",
-        "u_velocity",
-        "v_velocity",
-        "specific_humidity",
-        "temperature",
-        "model_level_height",
-        "net_shortwave_radiation_flux",
-        "downward_longwave_radiation_flux",
-        "ice_fraction",
-    )
+    assert ocean.spec.inputs == ("sensible_heat_flux", "latent_heat_flux")
     assert ocean.spec.outputs == ("sea_surface_temperature",)
     assert set(ocean.spec.initial_fields) == {
         "sea_surface_temperature",
         "sensible_heat_flux",
         "latent_heat_flux",
-        "u_velocity_10m",
-        "v_velocity_10m",
-        "u_velocity",
-        "v_velocity",
-        "specific_humidity",
-        "temperature",
-        "model_level_height",
-        "net_shortwave_radiation_flux",
-        "downward_longwave_radiation_flux",
-        "ice_fraction",
     }
     ocean_state = _step_component(ocean, dt, timestamp, coupler)
     assert "sea_surface_temperature" in ocean_state.fields.field_names
@@ -613,20 +575,19 @@ def test_slab_component_initialize_and_step_behaviors() -> None:
     assert np.all(np.asarray(ocean_sst) > starting_sst)
 
     land = cast(Any, make_slab_land(grid=grid))
-    assert land.spec.inputs == ("latent_heat_flux", "sensible_heat_flux")
+    assert land.spec.inputs == ("latent_heat_flux",)
     assert land.spec.outputs == ("soil_moisture", "land_surface_temperature")
     assert set(land.spec.initial_fields) == {
         "soil_moisture",
         "land_surface_temperature",
         "latent_heat_flux",
-        "sensible_heat_flux",
     }
     _prepare_component_for_test(land, coupler)
     land._data["latent_heat_flux"] = np.full(grid.shape, 100.0)
     land_state = _step_component(land, timedelta(seconds=10.0), timestamp, coupler)
     soil_moisture = land_state.fields.get("soil_moisture")
     assert soil_moisture.shape == grid.shape
-    assert np.all(np.asarray(soil_moisture) < 0.3)
+    assert np.all(np.asarray(soil_moisture) > 0.3)
 
     seaice = cast(Any, make_slab_seaice(grid=grid))
     assert seaice.spec.inputs == ("sea_surface_temperature",)
@@ -666,6 +627,7 @@ def test_era5_land_constructor_uses_masked_grid_and_enables_interpolation(
             ]
         ),
     }
+    forcing["skt"] = np.repeat(forcing["skt"], 12, axis=2)
 
     def fake_get_forcing_data(file_type: str) -> Path:
         assert file_type == "era5_land_masked"
@@ -690,7 +652,7 @@ def test_era5_land_constructor_uses_masked_grid_and_enables_interpolation(
 
     assert not hasattr(component, "_data_files")
     assert component.spec.transfer.time_selection == "linear"
-    assert component.spec.inputs == _DATA_LAND_INPUTS
+    assert component.spec.inputs == ()
     assert component.spec.outputs == ("land_surface_temperature",)
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component.grid.latitude, jax.Array)
@@ -725,6 +687,7 @@ def test_era5_ocean_constructor_applies_land_mask_and_reverses_latitude(
             ]
         ),
     }
+    forcing["sst"] = np.tile(forcing["sst"], (1, 1, 6))
 
     def fake_get_forcing_data(file_type: str) -> Path:
         assert file_type == "era5_surface"
@@ -748,7 +711,7 @@ def test_era5_ocean_constructor_applies_land_mask_and_reverses_latitude(
 
     assert not hasattr(component, "_data_files")
     assert component.spec.transfer.time_selection == "linear"
-    assert component.spec.inputs == _DATA_OCEAN_INPUTS
+    assert component.spec.inputs == ()
     assert component.spec.outputs == ("sea_surface_temperature",)
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component._data["sea_surface_temperature"], jax.Array)
@@ -757,7 +720,7 @@ def test_era5_ocean_constructor_applies_land_mask_and_reverses_latitude(
     binary_mask = component.grid.binary_mask
     assert binary_mask is not None
     assert_allclose_compact(binary_mask, expected_mask)
-    assert component._data["sea_surface_temperature"].shape == (2, 2, 2)
+    assert component._data["sea_surface_temperature"].shape == (12, 2, 2)
     assert np.isnan(component._data["sea_surface_temperature"][0, 0, 0])
     assert np.isclose(component._data["sea_surface_temperature"][0, 0, 1], 284.0)
 
@@ -803,7 +766,7 @@ def test_erainterim_ocean_constructor_builds_global_masked_grid(
 
     assert not hasattr(component, "_data_files")
     assert component.spec.transfer.time_selection == "linear"
-    assert component.spec.inputs == _DATA_OCEAN_INPUTS
+    assert component.spec.inputs == ()
     assert component.spec.outputs == ("sea_surface_temperature",)
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component._data["sea_surface_temperature"], jax.Array)
@@ -839,6 +802,9 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         "u": np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "v": -np.arange(1, 1 + (2 * 3 * 2 * 12), dtype=float).reshape(2, 3, 2, 12),
         "msnswrf": np.full((2, 3, 12), 150.0, dtype=float),
+        "msdwswrf": np.full((2, 3, 12), 180.0),
+        "u10": np.full((2, 3, 12), 4.0),
+        "v10": np.full((2, 3, 12), -3.0),
         "msdwlwrf": np.full((2, 3, 12), 75.0, dtype=float),
         "crr": np.full((2, 3, 12), 1e-5),
         "lsrr": np.broadcast_to(np.arange(12) * 1e-6, (2, 3, 12)),
@@ -849,7 +815,7 @@ def test_era5_atmosphere_constructor_initialize_and_step(
     physics_calls: dict[str, list[Any]] = {
         "pressure": [],
         "height": [],
-        "density": [],
+        "air_density": [],
         "theta": [],
     }
 
@@ -882,7 +848,17 @@ def test_era5_atmosphere_constructor_initialize_and_step(
             }
         else:
             assert where == "surface"
-            assert variable in {"msnswrf", "msdwlwrf", "crr", "lsrr", "csfr", "lssfr"}
+            assert variable in {
+                "msnswrf",
+                "msdwswrf",
+                "msdwlwrf",
+                "u10",
+                "v10",
+                "crr",
+                "lsrr",
+                "csfr",
+                "lssfr",
+            }
         _ = flip_y
         return forcing[variable]
 
@@ -927,7 +903,7 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         pressure_level: NDArray,
         temperature: NDArray,
     ) -> NDArray:
-        physics_calls["density"].append(
+        physics_calls["air_density"].append(
             (settings, pressure_level.copy(), temperature.copy())
         )
         return np.asarray(pressure_level + temperature, dtype=float)
@@ -976,33 +952,36 @@ def test_era5_atmosphere_constructor_initialize_and_step(
     assert not hasattr(component, "_data_files")
     assert not hasattr(component, "_hybrid_coefficients")
     assert component.spec.transfer.time_selection == "linear"
-    assert component.spec.inputs == _DATA_ATMOSPHERE_INPUTS
-    assert set(_DATA_ATMOSPHERE_INPUTS).issubset(component.spec.initial_fields)
+    assert component.spec.inputs == ()
+    assert set(_DATA_ATMOSPHERE_INPUTS).isdisjoint(component.spec.initial_fields)
     assert {
         "surface_pressure",
         "specific_humidity_3d",
         "temperature_3d",
-        "u_velocity",
-        "v_velocity",
+        "air_u_velocity",
+        "air_v_velocity",
     }.issubset(component.spec.initial_fields)
     assert {
         "model_level_height",
-        "density",
-        "potential_temperature",
+        "air_density",
+        "air_potential_temperature",
     }.isdisjoint(component.spec.initial_fields)
     assert component.spec.outputs == (
         "surface_pressure",
         "specific_humidity_3d",
         "temperature_3d",
-        "u_velocity",
-        "v_velocity",
+        "air_u_velocity",
+        "air_v_velocity",
+        "u_velocity_10m",
+        "v_velocity_10m",
+        "downward_shortwave_radiation_flux",
         "net_shortwave_radiation_flux",
         "downward_longwave_radiation_flux",
-        "specific_humidity",
-        "temperature",
+        "air_specific_humidity",
+        "air_temperature",
         "model_level_height",
-        "density",
-        "potential_temperature",
+        "air_density",
+        "air_potential_temperature",
         "rain_rate",
         "snow_rate",
     )
@@ -1013,30 +992,36 @@ def test_era5_atmosphere_constructor_initialize_and_step(
     for coefficient_name in ("hyai", "hybi", "hyam", "hybm"):
         assert coefficient_name not in component._data
     assert component._data["surface_pressure"].shape == (12, 3, 2)
+    assert_allclose_compact(component._data["downward_shortwave_radiation_flux"], 180.0)
+    assert_allclose_compact(component._data["u_velocity_10m"], 4.0)
+    assert_allclose_compact(component._data["v_velocity_10m"], -3.0)
     assert component._data["specific_humidity_3d"].shape == (12, 2, 3, 2)
     assert component._data["temperature_3d"].shape == (12, 2, 3, 2)
-    assert component._data["u_velocity"].shape == (12, 3, 2)
-    assert component._data["v_velocity"].shape == (12, 3, 2)
+    assert component._data["air_u_velocity"].shape == (12, 3, 2)
+    assert component._data["air_v_velocity"].shape == (12, 3, 2)
 
     assert component.spec.outputs == (
         "surface_pressure",
         "specific_humidity_3d",
         "temperature_3d",
-        "u_velocity",
-        "v_velocity",
+        "air_u_velocity",
+        "air_v_velocity",
+        "u_velocity_10m",
+        "v_velocity_10m",
+        "downward_shortwave_radiation_flux",
         "net_shortwave_radiation_flux",
         "downward_longwave_radiation_flux",
-        "specific_humidity",
-        "temperature",
+        "air_specific_humidity",
+        "air_temperature",
         "model_level_height",
-        "density",
-        "potential_temperature",
+        "air_density",
+        "air_potential_temperature",
         "rain_rate",
         "snow_rate",
     )
     assert len(physics_calls["pressure"]) == 24
     assert len(physics_calls["height"]) == 12
-    assert len(physics_calls["density"]) == 12
+    assert len(physics_calls["air_density"]) == 12
     assert len(physics_calls["theta"]) == 12
     assert_allclose_compact(
         physics_calls["pressure"][0][1], np.asarray([2.0, 3.0, 4.0])
@@ -1045,8 +1030,8 @@ def test_era5_atmosphere_constructor_initialize_and_step(
         physics_calls["pressure"][0][2], np.asarray([12.0, 13.0, 14.0])
     )
     assert component._data["model_level_height"].shape == (12, 3, 2)
-    assert component._data["density"].shape == (12, 3, 2)
-    assert component._data["potential_temperature"].shape == (12, 3, 2)
+    assert component._data["air_density"].shape == (12, 3, 2)
+    assert component._data["air_potential_temperature"].shape == (12, 3, 2)
     assert np.all(component._data["model_level_height"] > 0.0)
     assert "total_surface_temperature" not in component._data
 
@@ -1079,7 +1064,11 @@ def test_era5_precipitation_is_zero_seeded_and_summed_before_monthly_exchange(
             calendar="noleap",
         ),
         components=(atmosphere, ocean),
-        exchanges=(Exchange("ATM", "OCN", fields=("rain_rate", "snow_rate")),),
+        exchanges=(
+            Exchange(
+                "ATM", "OCN", quantity="intensive", fields=("rain_rate", "snow_rate")
+            ),
+        ),
         run_order=("ATM", "OCN"),
     )
     initial = coupler.initial_state()
@@ -1107,20 +1096,20 @@ def test_jcm_land_constructor_converts_coords_and_preserves_data(
     expected_mask = np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=float)
     recorded_inputs: dict[str, NDArray] = {}
 
-    def fake_create_lnd_mask_from_ocn(
-        atm_lat: NDArray,
-        atm_lon: NDArray,
-        ocn_grid: Any,
+    def fake_create_land_mask_from_ocean(
+        atmosphere_latitude: NDArray,
+        atmosphere_longitude: NDArray,
+        ocean_grid: Any,
     ) -> tuple[NDArray, NDArray]:
-        recorded_inputs["atm_lat"] = np.asarray(atm_lat)
-        recorded_inputs["atm_lon"] = np.asarray(atm_lon)
-        recorded_inputs["ocn_lon"] = np.asarray(ocn_grid.longitude)
-        return expected_mask, np.zeros_like(expected_mask)
+        recorded_inputs["atm_lat"] = np.asarray(atmosphere_latitude)
+        recorded_inputs["atm_lon"] = np.asarray(atmosphere_longitude)
+        recorded_inputs["ocn_lon"] = np.asarray(ocean_grid.longitude)
+        return expected_mask, 0.4 * expected_mask
 
     monkeypatch.setattr(
         jcm_land_module,
-        "create_lnd_mask_from_ocn",
-        fake_create_lnd_mask_from_ocn,
+        "create_land_mask_from_ocean",
+        fake_create_land_mask_from_ocean,
     )
 
     coords = SimpleNamespace(
@@ -1146,10 +1135,11 @@ def test_jcm_land_constructor_converts_coords_and_preserves_data(
     coupler = cast(Any, CoverageCouplerStub())
     _step_component(component, timedelta(hours=1), datetime(2000, 1, 1), coupler)
 
-    assert component.spec.transfer.time_selection == "daily"
+    assert component.spec.transfer.time_selection == "current"
     assert component.spec.outputs == (
         "land_surface_temperature",
         "soil_moisture",
+        "land_fraction",
     )
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component._data["land_surface_temperature"], jax.Array)
@@ -1165,13 +1155,16 @@ def test_jcm_land_constructor_converts_coords_and_preserves_data(
     )
     assert_allclose_compact(component._data["soil_moisture"], forcing.soilw_am.T)
 
+    assert component.spec.masks.fractional_field == "land_fraction"
+    assert_allclose_compact(component._data["land_fraction"], 0.4 * expected_mask)
+
 
 def test_jcm_land_canonicalizes_jcm_2_time_series_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         jcm_land_module,
-        "create_lnd_mask_from_ocn",
+        "create_land_mask_from_ocean",
         lambda **kwargs: (np.ones((2, 2)), np.zeros((2, 2))),
     )
     coords = SimpleNamespace(
@@ -1180,7 +1173,7 @@ def test_jcm_land_canonicalizes_jcm_2_time_series_values(
             latitudes=np.deg2rad(np.asarray([-45.0, 45.0])),
         )
     )
-    values = np.arange(12.0).reshape(3, 2, 2)
+    values = np.arange(365.0 * 2 * 2).reshape(365, 2, 2)
     forcing = SimpleNamespace(
         stl_am=SimpleNamespace(values=values),
         soilw_am=SimpleNamespace(values=values + 20.0),
@@ -1227,7 +1220,7 @@ def test_jcm_land_rejects_wrong_spatial_extents(
 ) -> None:
     monkeypatch.setattr(
         jcm_land_module,
-        "create_lnd_mask_from_ocn",
+        "create_land_mask_from_ocean",
         lambda **kwargs: (np.ones((2, 2)), np.zeros((2, 2))),
     )
     coords = SimpleNamespace(
@@ -1250,3 +1243,56 @@ def test_jcm_land_rejects_wrong_spatial_extents(
             cast(Any, forcing),
             make_test_grid(name="ocn"),
         )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize(
+    "factory,field_name,value",
+    [
+        (make_slab_land, "land_surface_temperature", 288.15),
+        (make_slab_ocean, "sea_surface_temperature", 288.15),
+    ],
+)
+def test_slab_fractional_coasts_keep_local_temperature(
+    factory: Any,
+    field_name: str,
+    value: float,
+) -> None:
+    from vercor import Clock, Coupler, Exchange, RuntimeOptions
+    from vercor.components import ComponentSpec, DataComponent
+    from vercor.regridding import conservative
+    from datetime import datetime
+
+    fraction = jnp.asarray([[0.0, 0.25], [0.75, 1.0]])
+    grid = make_test_grid(name="surface", binary_mask=np.asarray(fraction > 0))
+    component = factory(grid, fractional_coverage=fraction)
+    target = DataComponent(
+        "DST",
+        make_test_grid(name="target"),
+        {field_name: 0.0},
+        spec=ComponentSpec(inputs=(field_name,)),
+    )
+    coupler = Coupler(
+        Clock(datetime(2000, 1, 1), dt_seconds=60, steps=1),
+        components=(component, target),
+        run_order=(component.name, "DST"),
+        exchanges=(
+            Exchange(
+                component.name,
+                "DST",
+                (field_name,),
+                quantity="intensive",
+                regridder_factory=conservative,
+            ),
+        ),
+        runtime=RuntimeOptions(topology=None),
+    )
+    state = coupler.run()
+    np.testing.assert_allclose(
+        state.component("DST").field(field_name, scope="received"),
+        np.where(fraction > 0, value, 0.0),
+    )
+    np.testing.assert_array_equal(
+        state.component(component.name).field("surface_fraction"),
+        fraction,
+    )

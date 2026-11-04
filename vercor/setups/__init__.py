@@ -6,10 +6,11 @@ from typing import Any
 
 from vercor.setups.config import (
     CAMulatorConfig,
-    JAXGCMConfig,
+    JCMAtmosphereConfig,
     JCMLandAtmosphereConfig,
     Spinup,
     VerosConfig,
+    VerisConfig,
 )
 from vercor.setups._lazy_imports import (
     LazyExport as _LazyExport,
@@ -44,19 +45,28 @@ _LAZY_EXPORTS = {
         "_data.erainterim_ocean",
         "make_erainterim_ocean",
     ),
-    "make_jax_gcm": _LazyExport("_external.jax_gcm", "make_jax_gcm"),
+    "make_jcm_atmosphere": _LazyExport("_external.jax_gcm", "make_jcm_atmosphere"),
     "make_jcm_land": _LazyExport("_data.jcm_land", "make_jcm_land"),
     "make_veros_gcm": _LazyExport("_external.veros_gcm", "make_veros_gcm"),
+    "make_veris": _LazyExport("_external.veris", "make_veris"),
+    "replace_veris_parameters": _LazyExport(
+        "_external.veris_parameters", "replace_veris_parameters"
+    ),
+    "make_veris_veros": _LazyExport("_veris", "make_veris_veros"),
+    "VerisVerosSetup": _LazyExport("_veris", "VerisVerosSetup"),
+    "make_veris_verosdata": _LazyExport("_veris", "make_veris_verosdata"),
+    "VerisVerosDataSetup": _LazyExport("_veris", "VerisVerosDataSetup"),
 }
 
 __all__ = [
     "CAMulatorConfig",
-    "JAXGCMConfig",
+    "JCMAtmosphereConfig",
     "JCMLandAtmosphereConfig",
     "JCMLandAtmosphereSetup",
     "JCMInputs",
     "Spinup",
     "VerosConfig",
+    "VerisConfig",
     "load_jcm_inputs",
     "make_slab_atmosphere",
     "make_slab_land",

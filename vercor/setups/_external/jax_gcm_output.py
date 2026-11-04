@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import datetime
 from importlib import resources
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, Protocol, cast
 
 import jax
@@ -15,12 +15,13 @@ import jax.numpy as jnp
 
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_index_array, as_jax_real_array, jax_index_dtype
-from vercor.output import OutputContext, OutputFrame, SnapshotContext
+from vercor.output import JaxOutputContext, OutputContext, OutputFrame, SnapshotContext
 from vercor.output._dataset import time_coordinate_variable
+from vercor.output._selection import component_output_names, with_runtime_fields
 from vercor.output._netcdf import write_netcdf_dataset
 from vercor.output._period import TIME_NAME
 from vercor.output import OutputVariable
-from vercor.types import RuntimeArray
+from vercor.exceptions import ComponentError
 
 JAX_GCM_TIME_DIM = TIME_NAME
 _LEVEL_NAME = "level"
@@ -44,14 +45,6 @@ JAX_GCM_OUTPUT_DIMENSION_ORDER = (
 )
 
 
-class _PredictionLike(Protocol):
-    """JCM prediction fields consumed by the direct NetCDF writer."""
-
-    dynamics: Any
-    physics: Any
-    times: RuntimeArray
-
-
 class _PhysicsModuleLike(Protocol):
     """Subset of the JCM physics module output API used by this writer."""
 
@@ -62,7 +55,7 @@ class _PhysicsModuleLike(Protocol):
     def data_struct_to_dict(
         self,
         struct: Any,
-        nodal_shape: tuple[int, ...],
+        nodal_shape: tuple[int, ...] | None,
     ) -> dict[str, Any]: ...
 
 
@@ -80,10 +73,6 @@ def _float0_leaf_to_nan(value: Any) -> Any:
     return value
 
 
-def _float0s_to_nans(pytree: Any) -> Any:
-    return jax.tree_util.tree_map(_float0_leaf_to_nan, pytree)
-
-
 def jax_gcm_coordinate_variables(
     *,
     coords: Any,
@@ -91,16 +80,24 @@ def jax_gcm_coordinate_variables(
 ) -> dict[str, OutputVariable]:
     """Return NetCDF coordinate variables for JAXGCM period output."""
 
+    return {
+        JAX_GCM_TIME_DIM: time_coordinate_variable(
+            output_time,
+            time_dim=JAX_GCM_TIME_DIM,
+        ),
+        **_jax_gcm_numeric_coordinates(coords),
+    }
+
+
+def _jax_gcm_numeric_coordinates(coords: Any) -> dict[str, OutputVariable]:
+    """Extract native coordinate arrays without host calendar conversion."""
+
     lon, sin_lat = coords.horizontal.nodal_axes
     lon_k, lat_k = coords.horizontal.modal_axes
     level = as_jax_real_array(coords.vertical.centers)
     layers = _vertical_layers(coords)
 
     coordinate_variables = {
-        JAX_GCM_TIME_DIM: time_coordinate_variable(
-            output_time,
-            time_dim=JAX_GCM_TIME_DIM,
-        ),
         _LON_NAME: OutputVariable(
             (_LON_NAME,),
             as_jax_real_array(lon) * 180.0 / jnp.pi,
@@ -243,65 +240,6 @@ def _default_physics_module() -> _PhysicsModuleLike:
     return cast(_PhysicsModuleLike, speedy_physics())
 
 
-def jax_gcm_prediction_output_variables(
-    prediction: Any,
-    *,
-    coords: Any,
-    physics_module: _PhysicsModuleLike | None = None,
-) -> dict[str, OutputVariable]:
-    """Return JAXGCM prediction variables ready for period accumulation."""
-
-    selected_physics_module = physics_module or _default_physics_module()
-    selected_physics_module.cache_coords(coords)
-    return _jax_gcm_prediction_output_variables(
-        prediction,
-        coords=coords,
-        physics_module=selected_physics_module,
-    )
-
-
-def _jax_gcm_prediction_output_variables(
-    prediction: Any,
-    *,
-    coords: Any,
-    physics_module: _PhysicsModuleLike,
-) -> dict[str, OutputVariable]:
-    """Purely extract prediction variables after coordinate caching."""
-
-    prediction_values = cast(_PredictionLike, prediction)
-    dynamics_predictions = _float0s_to_nans(prediction_values.dynamics)
-    physics_predictions = _float0s_to_nans(prediction_values.physics)
-    time_values = as_jax_real_array(prediction_values.times)
-    time_shape = tuple(time_values.shape)
-    shape_to_dims = _infer_shape_to_dims(coords=coords, time_shape=time_shape)
-
-    nodal_shape = (
-        _vertical_layers(coords),
-        *tuple(coords.horizontal.nodal_shape),
-    )
-    data = _mapping_from_struct(dynamics_predictions)
-    data.update(
-        physics_module.data_struct_to_dict(
-            physics_predictions,
-            nodal_shape=nodal_shape,
-        )
-    )
-
-    variables: dict[str, OutputVariable] = {}
-    for name, value in _iter_data_items(data):
-        values = as_jax_real_array(value)
-        dims = shape_to_dims.get(tuple(values.shape))
-        if dims is None:
-            raise ValueError(
-                f"Value of shape {values.shape} for variable {name!r} "
-                "is not recognized."
-            )
-        if JAX_GCM_TIME_DIM not in dims:
-            raise ValueError(f"Variable {name!r} does not include a time dimension.")
-        variables[name] = OutputVariable(dims=dims, values=values)
-    return variables
-
-
 def jax_gcm_state_snapshot_output_variables(
     jcm_state: Any,
     *,
@@ -327,26 +265,85 @@ def _jax_gcm_state_output_variables(
 ) -> dict[str, OutputVariable]:
     """Purely extract one state sample after coordinate caching."""
 
-    prediction = SimpleNamespace(
-        dynamics=jax.tree_util.tree_map(
-            _with_leading_time_dim,
-            jcm_state.dynamics,
-        ),
-        physics=jax.tree_util.tree_map(
-            _with_leading_time_dim,
-            jcm_state.physics,
-        ),
-        times=as_jax_real_array([0.0]),
-    )
-    return _jax_gcm_prediction_output_variables(
-        prediction,
-        coords=coords,
-        physics_module=physics_module,
-    )
+    data = _jax_gcm_state_data(jcm_state, coords=coords, physics_module=physics_module)
+    return _jax_gcm_selected_state_variables(data, tuple(data), coords=coords)
 
 
-def _with_leading_time_dim(value: Any) -> Any:
-    return jnp.asarray(value)[jnp.newaxis, ...]
+@dataclass(frozen=True)
+class _OutputLeaf:
+    """A native array plus deferred reshape/channel selection metadata."""
+
+    values: Any
+    shape: tuple[int, ...]
+    channel: int | None = None
+
+
+def _jax_gcm_state_data(
+    jcm_state: Any,
+    *,
+    coords: Any,
+    physics_module: _PhysicsModuleLike,
+) -> dict[str, _OutputLeaf]:
+    """Flatten native references without reshaping or expanding unselected arrays."""
+    nodal_shape = (_vertical_layers(coords), *tuple(coords.horizontal.nodal_shape))
+    spatial_shape = tuple(coords.horizontal.nodal_shape)
+    ncols = spatial_shape[0] * spatial_shape[1]
+    data = _mapping_from_struct(jcm_state.dynamics)
+    # Native nodal formatting would reshape/slice every field. Defer those array
+    # operations until selection; an empty shape suppresses native array layout
+    # work, including older typed-struct formatters that index nodal_shape.
+    # The native routine still owns flattening and output names.
+    physics = physics_module.data_struct_to_dict(jcm_state.physics, nodal_shape=())
+    data.update(physics)
+    physics_names = {name for name, _ in _iter_data_items(physics)}
+    shapes = _infer_shape_to_dims(coords=coords, time_shape=())
+    expanded: dict[str, _OutputLeaf] = {}
+    for name, value in _iter_data_items(data):
+        shape = tuple(getattr(value, "shape", ()))
+        axes = tuple(axis for axis, size in enumerate(shape) if size == ncols)
+        if name in physics_names and len(axes) == 1:
+            axis = axes[0]
+            if spatial_shape not in (
+                shape[max(axis - 1, 0) : axis + 1],  # noqa: E203
+                shape[axis : axis + 2],  # noqa: E203
+            ):
+                shape = shape[:axis] + spatial_shape + shape[axis + 1 :]  # noqa: E203
+        if shape not in shapes and shape and shape[:-1] in (nodal_shape, spatial_shape):
+            expanded.update(
+                {
+                    f"{name}.{index}": _OutputLeaf(value, shape, index)
+                    for index in range(shape[-1])
+                }
+            )
+        else:
+            expanded[name] = _OutputLeaf(value, shape)
+    return expanded
+
+
+def _jax_gcm_selected_state_variables(
+    data: Mapping[str, _OutputLeaf],
+    names: Sequence[str],
+    *,
+    coords: Any,
+) -> dict[str, OutputVariable]:
+    """Convert only selected leaves, then apply their deferred native layout."""
+    shapes = _infer_shape_to_dims(coords=coords, time_shape=(1,))
+    variables = {}
+    for name in names:
+        reference = data[name]
+        values = jnp.asarray(_float0_leaf_to_nan(reference.values)).reshape(
+            reference.shape
+        )
+        if reference.channel is not None:
+            values = values[..., reference.channel]
+        values = values[jnp.newaxis, ...]
+        dims = shapes.get(tuple(values.shape))
+        if dims is None:
+            raise ValueError(
+                f"Value of shape {values.shape} for variable {name!r} is not recognized."
+            )
+        variables[name] = OutputVariable(dims, values)
+    return variables
 
 
 def _read_units_table(path: Path) -> dict[str, dict[str, str]]:
@@ -412,37 +409,61 @@ class _JAXGCMOutputProvider:
     """Ordinary provider adapting the runtime JCM payload into a native frame."""
 
     def __init__(self, state: Any) -> None:
+        self._coupled = state.seaice_coupling
         self._coords = state.model.coords
-        self._physics = (
-            getattr(state.model, "physics", None) or _default_physics_module()
-        )
-        if hasattr(self._coords, "nodal_shape"):
-            self._physics.cache_coords(self._coords)
+        self._physics = state.model.physics
+        self._physics.cache_coords(self._coords)
         self._unit_metadata = jax_gcm_unit_metadata(self._physics)
 
     def sample(self, context: OutputContext) -> OutputFrame:
         """Extract one post-step JCM state using native dimensions and metadata."""
 
+        frame = self._sample_frame(context)
+        return replace(
+            frame,
+            coordinates={
+                JAX_GCM_TIME_DIM: time_coordinate_variable(
+                    context.time,
+                    time_dim=JAX_GCM_TIME_DIM,
+                ),
+                **frame.coordinates,
+            },
+        )
+
+    def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
+        """Purely extract current native arrays for compiled period means."""
+
+        return self._sample_frame(context)
+
+    def _sample_frame(self, context: OutputContext | JaxOutputContext) -> OutputFrame:
+        """Share native state extraction independently of host timestamps."""
+
         jcm_state = getattr(context.payload, "jcm_state", None)
         if jcm_state is None:
             raise ValueError("JAXGCM output requires a post-step JCM state.")
-        variables = _jax_gcm_state_output_variables(
-            jcm_state,
-            coords=self._coords,
-            physics_module=self._physics,
+        data = _jax_gcm_state_data(
+            jcm_state, coords=self._coords, physics_module=self._physics
         )
-        return OutputFrame(
-            jax_gcm_data_variables_with_unit_metadata(
-                variables,
-                self._unit_metadata,
-            ),
-            coordinates=jax_gcm_coordinate_variables(
-                coords=self._coords,
-                output_time=context.time,
-            ),
+        native, canonical = component_output_names(context, data)
+        variables = _jax_gcm_selected_state_variables(data, native, coords=self._coords)
+        variables = jax_gcm_data_variables_with_unit_metadata(
+            variables, self._unit_metadata
+        )
+        if self._coupled:
+            # Preserve established marine metadata while respecting selection.
+            for name, variable in _coupled_surface_output_variables(context).items():
+                if not context.variables or name in context.variables:
+                    variables[name] = variable
+                    canonical = tuple(key for key in canonical if key != name)
+        frame = OutputFrame(
+            variables,
+            coordinates=_jax_gcm_numeric_coordinates(self._coords),
             sample_dimension=JAX_GCM_TIME_DIM,
             time_dimension=JAX_GCM_TIME_DIM,
             dimension_order=JAX_GCM_OUTPUT_DIMENSION_ORDER,
+        )
+        return with_runtime_fields(
+            frame, context, canonical, horizontal_dims=(_LAT_NAME, _LON_NAME)
         )
 
 
@@ -450,6 +471,27 @@ def jax_gcm_output_provider(state: Any) -> _JAXGCMOutputProvider:
     """Return the native JAXGCM provider installed by the setup factory."""
 
     return _JAXGCMOutputProvider(state)
+
+
+def _coupled_surface_output_variables(
+    context: OutputContext | JaxOutputContext | SnapshotContext,
+) -> dict[str, OutputVariable]:
+    """Share the actually applied marine boundary fields across output forms."""
+    return {
+        name: OutputVariable(
+            (JAX_GCM_TIME_DIM, _LAT_NAME, _LON_NAME),
+            as_jax_real_array(context.state.field(name))[jnp.newaxis, ...],
+            {"units": units},
+        )
+        for name, units in (
+            ("sea_surface_temperature", "K"),
+            ("marine_surface_albedo", "1"),
+            ("marine_ice_fraction", "1"),
+        )
+        if not isinstance(context, (OutputContext, JaxOutputContext))
+        or not context.variables
+        or name in context.variables
+    }
 
 
 def write_jax_gcm_snapshot_output(
@@ -461,11 +503,12 @@ def write_jax_gcm_snapshot_output(
     payload = context.payload
     jcm_state = getattr(payload, "jcm_state", None)
     if jcm_state is None:
-        jcm_state = getattr(state, "_state", None)
-    if jcm_state is None:
-        raise ValueError("JAXGCM snapshot output requires a final JCM state.")
+        raise ComponentError(
+            f"JAXGCM component '{context.state.name}' snapshot output requires "
+            "a final native runtime payload."
+        )
 
-    physics_module = getattr(state.model, "physics", None)
+    physics_module = state.model.physics
     variables = jax_gcm_state_snapshot_output_variables(
         jcm_state,
         coords=state.model.coords,
@@ -476,6 +519,8 @@ def write_jax_gcm_snapshot_output(
         variables,
         unit_metadata,
     )
+    if state.seaice_coupling:
+        data_variables.update(_coupled_surface_output_variables(context))
     write_netcdf_dataset(
         output=str(context.output_path),
         coordinate_variables=jax_gcm_coordinate_variables(
@@ -510,7 +555,6 @@ __all__ = [
     "JAX_GCM_TIME_DIM",
     "jax_gcm_coordinate_variables",
     "jax_gcm_data_variables_with_unit_metadata",
-    "jax_gcm_prediction_output_variables",
     "jax_gcm_output_provider",
     "jax_gcm_state_snapshot_output_variables",
     "jax_gcm_unit_metadata",

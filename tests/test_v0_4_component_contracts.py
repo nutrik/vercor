@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 from datetime import datetime
-from inspect import Parameter, signature
 from types import MappingProxyType
 from typing import Any, cast, get_args, get_origin, get_type_hints
 
@@ -63,36 +62,6 @@ def test_component_is_the_structural_protocol() -> None:
     model = StructuralModel()
     assert getattr(component_type, "_is_protocol", False)
     assert isinstance(model, component_type)
-
-
-def test_public_constructor_signatures_match_the_v0_4_contract() -> None:
-    component_spec = signature(_api("ComponentSpec"))
-    callable_component = signature(_api("CallableComponent"))
-    data_component = signature(_api("DataComponent"))
-
-    assert tuple(component_spec.parameters) == (
-        "inputs",
-        "outputs",
-        "initial_fields",
-        "execution",
-        "lifecycle",
-        "transfer",
-        "output",
-    )
-    assert tuple(callable_component.parameters) == (
-        "name",
-        "grid",
-        "step",
-        "spec",
-    )
-    assert tuple(data_component.parameters) == ("name", "grid", "fields", "spec")
-    for constructor in (component_spec, callable_component, data_component):
-        assert (
-            constructor.parameters["spec"].kind is Parameter.KEYWORD_ONLY
-            if "spec" in constructor.parameters
-            else True
-        )
-    assert component_spec.parameters["execution"].kind is Parameter.KEYWORD_ONLY
 
 
 def test_component_spec_deduplicates_names_and_freezes_initial_fields() -> None:

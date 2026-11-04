@@ -5,16 +5,17 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
+from inspect import signature
 from types import MappingProxyType
 from typing import Any
 
 import jax
 import jax.numpy as jnp
 
-from vercor.components._callable_wrappers import normalize_component_step_callable
 from vercor.components._contracts import (
     normalize_field_values,
     validate_declared_updates,
+    validate_selectable_output_fields,
 )
 from vercor.components.contracts import (
     Component,
@@ -81,7 +82,7 @@ class _ComponentBinding:
         context: StepContext,
         payload: Any | None = None,
     ) -> _ComponentStepReturn:
-        """Delegate one step through the normalized public callback."""
+        """Delegate one step directly through the public protocol method."""
 
         return self._step(fields, context, payload)
 
@@ -135,6 +136,11 @@ class _ComponentBinding:
             grid=self.grid,
             fields=result.fields,
             policy=self._dtype_policy,
+        )
+        validate_selectable_output_fields(
+            component_name=self.name,
+            spec=self.spec,
+            fields=normalized_fields,
         )
         normalized_received = _normalize_prefill_contract_store(
             component=self,
@@ -206,17 +212,12 @@ def normalize_component(component: Component) -> _ComponentDeclaration:
     """Validate a public component once without running lifecycle setup."""
 
     validate_component_contract(component)
-    normalized_step = getattr(component, "_normalized_step", None)
     return _ComponentDeclaration(
         component=component,
         name=component.name,
         grid=component.grid,
         spec=component.spec,
-        step=(
-            normalize_component_step_callable(component.step)
-            if normalized_step is None
-            else normalized_step
-        ),
+        step=component.step,
     )
 
 
@@ -251,6 +252,14 @@ def prepare_component(
     dtype: DTypePolicy,
 ) -> _ComponentBinding:
     """Run setup once and freeze normalized fields/payload in a runtime binding."""
+
+    try:
+        signature(declaration.step).bind({}, None, None)
+    except (TypeError, ValueError) as exc:
+        raise ComponentError(
+            f"Component '{declaration.name}' step must accept three "
+            "positional arguments: fields, context, payload."
+        ) from exc
 
     identity = _ComponentIdentity(
         name=declaration.name,
@@ -295,6 +304,11 @@ def prepare_component(
                 policy=dtype,
             )
         )
+    validate_selectable_output_fields(
+        component_name=declaration.name,
+        spec=declaration.spec,
+        fields=data,
+    )
     payload = None if result is None else _copy_owned_pytree(result.payload)
     return _ComponentBinding(
         _component=declaration.component,

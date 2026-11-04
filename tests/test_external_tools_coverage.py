@@ -14,6 +14,7 @@ import xarray as xr
 import vercor.setups._external._jax_gcm_pytree as jax_gcm_pytree_module
 import vercor.setups._external.jax_gcm_tools as jax_gcm_tools_module
 import vercor.setups._external.veros_fluxes as veros_fluxes_module
+import vercor.setups._surface_fluxes as surface_fluxes_module
 import vercor.setups._external.veros_state as veros_state_module
 from tests.assertions import assert_allclose_compact
 from vercor.dtypes import DTypePolicy
@@ -37,27 +38,18 @@ class _FakeVerosState:
         self.settings = SimpleNamespace(__fields__=())
 
 
-def test_change_and_get_default_jcm_parameter_values() -> None:
+def test_change_jcm_parameter_values() -> None:
     parameters = jax_gcm_tools_module.Parameters.default()
 
-    original = jax_gcm_tools_module.get_default_parameter_values(
-        ["condensation.trlsc"],
-        parameters,
-    )
-    assert np.isclose(
-        float(original["condensation.trlsc"]), float(parameters.condensation.trlsc)
-    )
+    original = float(parameters.condensation.trlsc)
+    assert np.isfinite(original)
 
     jax_gcm_tools_module.change_jcm_parameter_values(
         {"condensation.trlsc": 0.123},
         parameters,
     )
 
-    updated = jax_gcm_tools_module.get_default_parameter_values(
-        ["condensation.trlsc"],
-        parameters,
-    )
-    assert np.isclose(float(updated["condensation.trlsc"]), 0.123)
+    assert np.isclose(float(parameters.condensation.trlsc), 0.123)
 
 
 def test_compute_sigma_pressure_levels_handles_valid_and_invalid_inputs() -> None:
@@ -299,29 +291,29 @@ def test_jax_gcm_tree_helpers_transform_pytrees() -> None:
     assert_allclose_compact(mean_tree["a"], np.asarray([3.0, 5.0]))
     assert_allclose_compact(mean_tree["b"], np.asarray([4.0, 6.0]))
 
-    unwrapped = jax_gcm_pytree_module.tree_unwrap_leading_dims(
-        {
-            "a": jnp.arange(24.0).reshape(2, 3, 4),
-            "b": jnp.arange(24.0, 48.0).reshape(2, 3, 4),
-        },
-        first_n_dim=2,
+    categories = jnp.asarray([[1, 2], [3, 4]], dtype=jnp.int32)
+    flags = jnp.asarray([[False, True], [True, False]])
+    complex_values = tree["a"].astype(jnp.complex64) * (1 + 2j)
+    reduced = jax_gcm_pytree_module.tree_mean(
+        {"category": categories, "flag": flags, "complex": complex_values}, axis=0
     )
-    assert unwrapped["a"].shape == (6, 4)
-    assert unwrapped["b"].shape == (6, 4)
-
-    stacked = jax_gcm_pytree_module.tree_stack(
-        [
-            {"a": jnp.asarray([1.0, 2.0]), "b": jnp.asarray([3.0, 4.0])},
-            {"a": jnp.asarray([5.0, 6.0]), "b": jnp.asarray([7.0, 8.0])},
-        ]
+    assert reduced["category"].dtype == categories.dtype
+    assert reduced["flag"].dtype == flags.dtype
+    np.testing.assert_array_equal(reduced["category"], categories[-1])
+    np.testing.assert_array_equal(reduced["flag"], flags[-1])
+    assert_allclose_compact(reduced["complex"], np.asarray([3 + 6j, 5 + 10j]))
+    multi_axis = jax_gcm_pytree_module.tree_mean(
+        {"category": categories, "complex": complex_values}, axis=[0, -1]
     )
-    assert_allclose_compact(stacked["a"], np.asarray([[1.0, 2.0], [5.0, 6.0]]))
-    assert_allclose_compact(stacked["b"], np.asarray([[3.0, 4.0], [7.0, 8.0]]))
+    assert int(multi_axis["category"]) == 4
+    assert_allclose_compact(multi_axis["complex"], 4 + 8j)
 
 
 def test_veros_compute_fluxes_preserves_sign_conventions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from vercor.fluxes.bulk_formula_cesm import _OceanBulkResult
+
     shape = (8, 8, 1, 1)
     variables = SimpleNamespace(
         u=np.arange(np.prod(shape), dtype=float).reshape(shape),
@@ -333,21 +325,21 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
     veros_state = SimpleNamespace(variables=variables)
     runtime_fields = {
         "model_level_height": np.full((4, 4), 10.0),
-        "u_velocity": np.full((4, 4), 11.0),
-        "v_velocity": np.full((4, 4), 12.0),
-        "potential_temperature": np.full((4, 4), 13.0),
-        "specific_humidity": np.full((4, 4), 14.0),
-        "density": np.full((4, 4), 15.0),
-        "temperature": np.full((4, 4), 16.0),
+        "air_u_velocity": np.full((4, 4), 11.0),
+        "air_v_velocity": np.full((4, 4), 12.0),
+        "air_potential_temperature": np.full((4, 4), 13.0),
+        "air_specific_humidity": np.full((4, 4), 14.0),
+        "air_density": np.full((4, 4), 15.0),
+        "air_temperature": np.full((4, 4), 16.0),
         "net_shortwave_radiation_flux": np.full((4, 4), 20.0),
         "downward_longwave_radiation_flux": np.full((4, 4), 30.0),
         "rain_rate": np.full((4, 4), 1e-4),
         "snow_rate": np.full((4, 4), 2e-5),
     }
 
-    def fake_compute_ocean_surface_fluxes(*args: Any) -> tuple[Any, ...]:
+    def fake_compute_ocean_surface_fluxes(*args: Any) -> _OceanBulkResult:
         _ = args
-        return (
+        fluxes = (
             np.full((4, 4), 1.0),
             np.full((4, 4), 2.0),
             np.full((4, 4), 3.0),
@@ -370,18 +362,25 @@ def test_veros_compute_fluxes_preserves_sign_conventions(
             ),
         )
 
+        return _OceanBulkResult(
+            tuple(jnp.asarray(value) for value in fluxes),
+            jnp.zeros_like(fluxes[0]),
+            jnp.zeros_like(fluxes[0]),
+        )
+
     monkeypatch.setattr(
-        veros_fluxes_module,
-        "compute_ocean_surface_fluxes",
+        surface_fluxes_module,
+        "_compute_ocean_surface_fluxes_with_winds",
         fake_compute_ocean_surface_fluxes,
     )
 
-    taux, tauy, qnet, qnec, salt_flux = veros_fluxes_module.compute_fluxes(
-        veros_state=veros_state,  # type: ignore[arg-type]
-        runtime_fields=runtime_fields,
-        constants=PhysicalConstants(),
-        dtype=DTypePolicy(),
-    )
+    with jax.disable_jit():
+        taux, tauy, qnet, qnec, salt_flux = veros_fluxes_module.compute_fluxes(
+            veros_state=veros_state,  # type: ignore[arg-type]
+            runtime_fields=runtime_fields,
+            constants=PhysicalConstants(),
+            dtype=DTypePolicy(),
+        )
 
     assert_allclose_compact(taux, np.full((4, 4), 5.0))
     assert_allclose_compact(tauy, np.full((4, 4), 6.0))

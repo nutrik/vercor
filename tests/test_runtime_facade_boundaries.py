@@ -778,7 +778,6 @@ def test_runtime_topology_maps_are_frozen_read_only_views() -> None:
     maps = RuntimeTopologyMaps(
         regridders={key: object()},
         binary_masks={key: jnp.ones((2, 2))},
-        fractional_masks={key: jnp.ones((2, 2))},
     )
 
     assert getattr(RuntimeTopologyMaps, "__dataclass_params__").frozen is True
@@ -786,8 +785,6 @@ def test_runtime_topology_maps_are_frozen_read_only_views() -> None:
         maps.regridders[key] = object()  # type: ignore[index]
     with pytest.raises(TypeError):
         maps.binary_masks[key] = jnp.zeros((2, 2))  # type: ignore[index]
-    with pytest.raises(TypeError):
-        maps.fractional_masks[key] = jnp.zeros((2, 2))  # type: ignore[index]
     with pytest.raises(FrozenInstanceError):
         maps.regridders = {}  # type: ignore[misc]
 
@@ -900,7 +897,6 @@ def test_runtime_topology_state_groups_read_only_maps() -> None:
     assert [field.name for field in fields(RuntimeTopologyMaps)] == [
         "regridders",
         "binary_masks",
-        "fractional_masks",
     ]
     assert "class RuntimeTopologyMaps" in topology_state_source
     assert "class ExchangeTopologyState" not in topology_state_source
@@ -931,9 +927,9 @@ def test_runtime_topology_policy_boundaries_are_focused() -> None:
     assert "def build_topology_context(" in topology_policy_source
 
     for marker in (
-        "compute_ocn_lnd_masks_on_atm_grid",
+        "compute_ocean_land_masks_on_atmosphere_grid",
         "check_remap_conservation",
-        "check_total_lnd_ocn_mask_sum",
+        "check_land_ocean_fraction_sum",
         "ConservativeRectilinearRegridder",
         "jax_ones",
         "def create_exchange_masks(",
@@ -1026,7 +1022,6 @@ def test_runtime_facade_builds_and_executes_the_validated_plan_directly() -> Non
     assert "context.compiled_runtime_cache_key(" not in facade_source
     assert "get_or_compile(" not in facade_source
     assert facade_source.count("signal_scope(") == 1
-    assert "donate_state" not in facade_source
     assert "raise CouplerError(" not in run_body
 
 

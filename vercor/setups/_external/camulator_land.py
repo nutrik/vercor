@@ -7,6 +7,7 @@ from vercor.components import (
     CallableComponent,
     Component,
     ComponentSpec,
+    ComponentMaskSpec,
     SetupResult,
     SetupContext,
     StepResult,
@@ -14,7 +15,7 @@ from vercor.components import (
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grids import RectilinearGrid
-from vercor.grid_masks import create_lnd_mask_from_ocn
+from vercor.grid_masks import create_land_mask_from_ocean
 from vercor.exceptions import ComponentError
 from vercor.jax_logging import LoggerLike
 from vercor.setups._time_helpers import assign_model_timestep_alignment
@@ -23,14 +24,9 @@ from vercor.setups._external.camulator_forcing import (
     load_camulator_forcing_context,
 )
 
-_CAMULATOR_LAND_INPUTS = (
-    "net_shortwave_radiation_flux",
-    "downward_longwave_radiation_flux",
-)
-_CAMULATOR_LAND_OUTPUTS = ("land_surface_temperature",)
+_CAMULATOR_LAND_OUTPUTS = ("land_surface_temperature", "land_fraction")
 _CAMULATOR_LAND_DEFAULT_FIELDS = {
     "land_surface_temperature": 283.0,
-    **{field_name: 0.0 for field_name in _CAMULATOR_LAND_INPUTS},
 }
 
 
@@ -55,14 +51,14 @@ def make_camulator_land(
     *,
     time_alignment: Literal["strict", "forcing_start"] = "strict",
 ) -> Component:
-    """Return a host-backed CAMulator land forcing component."""
+    """Return a host-backed prescribed CAMulator land forcing component."""
 
     longitude = camulator_grid.longitude
     latitude = camulator_grid.latitude
-    lnd_bmask, _ = create_lnd_mask_from_ocn(
-        atm_lat=latitude,
-        atm_lon=longitude,
-        ocn_grid=ocn_grid,
+    land_binary_mask, land_fraction = create_land_mask_from_ocean(
+        atmosphere_latitude=latitude,
+        atmosphere_longitude=longitude,
+        ocean_grid=ocn_grid,
     )
 
     forcing_context = load_camulator_forcing_context(config_path=config_path)
@@ -77,13 +73,15 @@ def make_camulator_land(
         name=f"{name.lower()}-grid",
         longitude=longitude,
         latitude=latitude,
-        binary_mask=lnd_bmask,
+        binary_mask=land_binary_mask,
     )
 
     def setup(
         component: Component,
         context: SetupContext,
     ) -> SetupResult:
+        if context.calendar != "gregorian":
+            raise ValueError("CAMulator requires a Gregorian coupler calendar.")
         logger = context.logger
         state.coupler_start_datetime = context.start
         assign_model_timestep_alignment(
@@ -140,9 +138,12 @@ def make_camulator_land(
         grid,
         step,
         spec=ComponentSpec(
-            inputs=_CAMULATOR_LAND_INPUTS,
             outputs=_CAMULATOR_LAND_OUTPUTS,
-            initial_fields=_CAMULATOR_LAND_DEFAULT_FIELDS,
+            initial_fields={
+                **_CAMULATOR_LAND_DEFAULT_FIELDS,
+                "land_fraction": land_fraction,
+            },
+            masks=ComponentMaskSpec(fractional_field="land_fraction"),
             execution="host",
             lifecycle=LifecycleHooks(setup=setup),
         ),

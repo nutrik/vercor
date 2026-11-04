@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Sequence
 
 from vercor.exceptions import CouplerError
 from vercor.exchanges import Exchange
-from vercor.fields import ExchangeField, _flatten_field_items
+from vercor.fields import _flatten_field_items
 
 
 @dataclass(frozen=True)
@@ -14,18 +14,7 @@ class ExchangeContract:
 
     receives: tuple[str, ...] = ()
     sends: tuple[str, ...] = ()
-
-    @property
-    def all_fields(self) -> tuple[str, ...]:
-        """Return all import/export fields while preserving contract order."""
-
-        return (*self.receives, *self.sends)
-
-
-def flatten_exchange_fields(field_names: Sequence[ExchangeField]) -> list[str]:
-    """Return scalar field names from scalar and vector exchange declarations."""
-
-    return _flatten_field_items(field_names)
+    binary_sends: tuple[str, ...] = ()
 
 
 def append_unique_runtime_fields(target: list[str], exchange_items: list[str]) -> None:
@@ -50,7 +39,7 @@ def validate_exchange_fan_in(exchanges: Sequence[Exchange]) -> None:
 
     producers: dict[tuple[str, str], list[str]] = {}
     for exchange in exchanges:
-        flattened_fields = set(flatten_exchange_fields(exchange.fields))
+        flattened_fields = set(_flatten_field_items(exchange.fields))
         for field_name in flattened_fields:
             producers.setdefault((exchange.target, field_name), []).append(
                 exchange.route_id
@@ -76,46 +65,39 @@ def validate_exchange_fan_in(exchanges: Sequence[Exchange]) -> None:
 def build_exchange_contracts(
     component_names: Sequence[str],
     exchanges: Sequence[Exchange],
-    *,
-    validate_endpoints: bool,
 ) -> dict[str, ExchangeContract]:
     """Build coupler-owned import/export contracts from exchange declarations."""
 
     known_components = set(component_names)
     contracts = {name: ExchangeContract() for name in component_names}
-    if validate_endpoints:
-        for exchange in exchanges:
-            if exchange.source not in known_components:
-                raise CouplerError(
-                    f"Source component '{exchange.source}' not registered in coupler"
-                )
-            if exchange.target not in known_components:
-                raise CouplerError(
-                    f"Destination component '{exchange.target}' not registered in coupler"
-                )
+    for exchange in exchanges:
+        if exchange.source not in known_components:
+            raise CouplerError(
+                f"Source component '{exchange.source}' not registered in coupler"
+            )
+        if exchange.target not in known_components:
+            raise CouplerError(
+                f"Destination component '{exchange.target}' not registered in coupler"
+            )
     validate_exchange_fan_in(exchanges)
 
     for exchange in exchanges:
-        if exchange.source not in known_components:
-            continue
-        if exchange.target not in known_components:
-            continue
-
-        flattened_fields = flatten_exchange_fields(exchange.fields)
+        flattened_fields = _flatten_field_items(exchange.fields)
         source_contract = contracts[exchange.source]
-        destination_contract = contracts[exchange.target]
-        contracts[exchange.source] = ExchangeContract(
-            receives=source_contract.receives,
-            sends=_extend_contract_fields(
-                source_contract.sends,
-                flattened_fields,
+        contracts[exchange.source] = replace(
+            source_contract,
+            sends=_extend_contract_fields(source_contract.sends, flattened_fields),
+            binary_sends=(
+                _extend_contract_fields(source_contract.binary_sends, flattened_fields)
+                if exchange.source_coverage == "binary"
+                else source_contract.binary_sends
             ),
         )
-        contracts[exchange.target] = ExchangeContract(
+        destination_contract = contracts[exchange.target]
+        contracts[exchange.target] = replace(
+            destination_contract,
             receives=_extend_contract_fields(
-                destination_contract.receives,
-                flattened_fields,
+                destination_contract.receives, flattened_fields
             ),
-            sends=destination_contract.sends,
         )
     return contracts

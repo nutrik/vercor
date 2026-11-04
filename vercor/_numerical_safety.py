@@ -37,16 +37,27 @@ def _raise_for_invalid_count(count: Any, owner: str, requirement: str) -> None:
         )
 
 
-def _require_zero(count: jax.Array, owner: str, requirement: str) -> None:
+def _require_zero(
+    count: jax.Array,
+    owner: str,
+    requirement: str,
+    *,
+    conditional_callback: bool = True,
+) -> None:
     if isinstance(count, jax.core.Tracer):
-        jax.debug.callback(
-            lambda concrete: _raise_for_invalid_count(
-                concrete,
-                owner,
-                requirement,
-            ),
-            count,
-        )
+
+        def report() -> None:
+            jax.debug.callback(
+                lambda concrete: _raise_for_invalid_count(concrete, owner, requirement),
+                count,
+            )
+
+        # Eager transform boundaries can retain direct host exceptions. Most
+        # compiled checks need Python only on failure, avoiding scalar transfers.
+        if conditional_callback:
+            jax.lax.cond(count != 0, report, lambda: None)
+        else:
+            report()
         return
     _raise_for_invalid_count(count, owner, requirement)
 
@@ -56,15 +67,33 @@ def require_active_finite(
     *,
     active_mask: Any | None,
     owner: str,
+    conditional_callback: bool = True,
 ) -> None:
-    """Reject active NaN/inf and reject infinity outside the active domain."""
+    """Reject active NaN/inf and reject infinity outside the active domain.
+
+    A static false ``conditional_callback`` preserves direct host exceptions at
+    deliberately uncompiled boundaries, including eager ``checkify`` calls.
+    """
 
     array = jnp.asarray(values)
     active = _broadcast_active_mask(array, active_mask, owner)
     valid = jnp.isfinite(array) | (~active & jnp.isnan(array))
     invalid_count = jnp.count_nonzero(~valid)
     requirement = "finite values in the active domain and no infinity elsewhere"
-    _require_zero(invalid_count, owner, requirement)
+    _require_zero(
+        invalid_count, owner, requirement, conditional_callback=conditional_callback
+    )
+
+
+def require_mask_values(values: Any, *, owner: str, binary: bool) -> None:
+    """Validate finite binary or fractional mask values, including under JIT."""
+    array = jnp.asarray(values)
+    valid = ((array == 0) | (array == 1)) if binary else ((array >= 0) & (array <= 1))
+    _require_zero(
+        jnp.count_nonzero(~jnp.isfinite(array) | ~valid),
+        owner,
+        "finite binary {0, 1} values" if binary else "finite fractional [0, 1] values",
+    )
 
 
 def require_strictly_positive(values: Any, *, owner: str) -> None:

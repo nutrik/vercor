@@ -11,6 +11,7 @@ from vercor._interpolators.conservative_remap_rectilinear import (
     ConservativeRectilinearRemapper,
 )
 from vercor.types import RuntimeArray
+from vercor.exceptions import CouplerError
 
 
 def _make_remapper(
@@ -27,6 +28,65 @@ def _make_remapper(
         dst_lat_edges=dst_lat_edges,
         **kwargs,  # type: ignore
     )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("normalize", ["conservation", "fracarea"])
+def test_sparse_accumulation_reuses_executable_with_live_geometry_and_nan_support(
+    normalize: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Repeated values and equal-shaped geometry share one sparse kernel trace."""
+    jax.clear_caches()
+    original = ConservativeRectilinearRemapper._segment_sum
+    calls = 0
+
+    def counted(values: jax.Array, indices: jax.Array, size: int) -> jax.Array:
+        nonlocal calls
+        calls += 1
+        return original(values, indices, size)
+
+    monkeypatch.setattr(
+        ConservativeRectilinearRemapper, "_segment_sum", staticmethod(counted)
+    )
+    remappers = [
+        _make_remapper(
+            jnp.array([0.0, 1.0, 2.0]),
+            jnp.array([-1.0, 1.0]),
+            jnp.array([0.0, edge, 1.5]),
+            jnp.array([-1.0, 1.0]),
+            normalize=normalize,
+        )
+        for edge in (0.75, 0.5)
+    ]
+    first = remappers[0].apply_scalar(jnp.array([[2.0, 10.0]]))
+    assert_allclose_compact(first, [[2.0, 22.0 / 3.0]], rtol=1e-12, atol=1e-12)
+    first_calls = calls
+    assert first_calls > 0
+    for remapper, expected in zip(remappers, (22.0 / 3.0, 6.0)):
+        actual = remapper.apply_scalar(jnp.array([[2.0, 10.0]]))
+        assert_allclose_compact(actual, [[2.0, expected]], rtol=1e-12, atol=1e-12)
+    missing = remappers[1].apply_scalar(jnp.array([[jnp.nan, 10.0]]))
+    assert_allclose_compact(
+        missing,
+        [[jnp.nan, 10.0]] if normalize == "fracarea" else [[0.0, 5.0]],
+        rtol=1e-12,
+        atol=1e-12,
+    )
+    assert calls == first_calls, "ERROR sparse accumulation retraced unchanged shapes"
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("value", [jnp.inf, np.finfo(np.float64).max])
+def test_sparse_accumulation_preserves_direct_numerator_errors(value: float) -> None:
+    """Kernel fusion must retain eager validation of infinity and overflow."""
+    remapper = _make_remapper(
+        jnp.array([0.0, 180.0, 360.0]),
+        jnp.array([-90.0, 90.0]),
+        jnp.array([0.0, 360.0]),
+        jnp.array([-90.0, 90.0]),
+    )
+    with pytest.raises(CouplerError, match="safe numerator"):
+        remapper.apply_scalar(jnp.full((1, 2), value))
 
 
 def _cell_areas(
@@ -64,6 +124,27 @@ def test_remapper_does_not_expose_vector_api() -> None:
     assert not hasattr(remapper, "get_src_areas")
     assert not hasattr(remapper, "get_src_total_mass")
     assert not hasattr(remapper, "get_dst_total_mass")
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True])
+@pytest.mark.parametrize("longitude_origin", [0.0, 90.0])
+def test_global_full_coverage_stays_within_surface_roundoff(
+    enable_x64: bool, longitude_origin: float
+) -> None:
+    """Keep a constant field at unity across T31 longitudes, including the seam."""
+    with jax.enable_x64(enable_x64):
+        remapper = _make_remapper(
+            src_lon_edges=np.arange(91) * 4.0 + longitude_origin,
+            src_lat_edges=np.array([-80.0, 0.0, 80.0]),
+            dst_lon_edges=np.arange(97) * 3.75 - 1.875 + longitude_origin,
+            dst_lat_edges=np.array([-80.0, -40.0, 0.0, 40.0, 80.0]),
+        )
+        field = jnp.ones((2, 90))
+        result = jax.jit(remapper.apply_scalar)(field)
+        assert_allclose_compact(
+            result, np.ones((4, 96)), rtol=0, atol=2 * np.finfo(result.dtype).eps
+        )
 
 
 def test_constant_field_preserved_on_refinement_conservation_mode() -> None:

@@ -14,7 +14,8 @@ from vercor.components import (
     ComponentSpec,
 )
 from vercor.output import OutputSpec
-from vercor.setups.config import JAXGCMConfig
+from vercor.setups.config import JCMAtmosphereConfig
+from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from dinosaur.coordinate_systems import CoordinateSystem as _CoordinateSystem
@@ -24,13 +25,19 @@ else:
     _TerrainData = Any
 
 
-def make_jax_gcm(
+def make_jcm_atmosphere(
     coords: _CoordinateSystem,
     terrain: _TerrainData,
     *,
-    config: JAXGCMConfig | None = None,
+    config: JCMAtmosphereConfig | None = None,
+    prescribed_marine_fraction: RuntimeArray | None = None,
 ) -> Component:
-    """Return a differentiable JAXGCM/JCM atmosphere component."""
+    """Return a differentiable JCM component with optional prescribed ocean area.
+
+    ``prescribed_marine_fraction`` is whole-cell area in canonical (latitude,
+    longitude) layout outside the coupled ocean's domain. Native SST, ice and
+    albedo retain their time selection there. Omission means full coupling.
+    """
 
     try:
         import jcm  # noqa: F401
@@ -43,10 +50,10 @@ def make_jax_gcm(
     import vercor.setups._external.jax_gcm_fields as _jax_gcm_fields
     import vercor.setups._external.jax_gcm_output as _jax_gcm_output
     import vercor.setups._external.jax_gcm_runtime as _jax_gcm_runtime
-    from vercor.setups._external.jax_gcm_state import JAXGCMSetupState
+    from vercor.setups._external.jax_gcm_state import JCMAtmosphereSetupState
 
-    config = JAXGCMConfig() if config is None else config
-    state = JAXGCMSetupState(
+    config = JCMAtmosphereConfig() if config is None else config
+    state = JCMAtmosphereSetupState(
         coords=coords,
         terrain=terrain,
         name=config.name,
@@ -57,23 +64,45 @@ def make_jax_gcm(
         forcing_data=config.forcing_data,
         do_spinup=config.spinup.enabled,
         jitted=config.jitted,
+        seaice_coupling=config.seaice_coupling,
+        prescribed_marine_fraction=prescribed_marine_fraction,
     )
     initial_fields: dict[str, object] = dict(_jax_gcm_runtime.jax_gcm_default_fields())
-    initial_fields["pressure"] = jnp.zeros(
+    initial_fields["air_pressure_3d"] = jnp.zeros(
         (state.sigma_levels.shape[0], *state.grid.shape)
     )
+    if config.seaice_coupling:
+        initial_fields.update(
+            {
+                name: 0.0
+                for name in (
+                    *_jax_gcm_fields.JAXGCM_COUPLED_INPUT_GRID_FIELD_NAMES,
+                    *_jax_gcm_fields.JAXGCM_COUPLED_OUTPUT_GRID_FIELD_NAMES,
+                )
+            }
+        )
     component = CallableComponent(
         config.name,
         state.grid,
         partial(_jax_gcm_runtime.step_jax_gcm_component, state),
         spec=ComponentSpec(
-            inputs=_jax_gcm_fields.JAXGCM_INPUT_GRID_FIELD_NAMES,
+            inputs=(
+                _jax_gcm_fields.JAXGCM_COUPLED_INPUT_GRID_FIELD_NAMES
+                if config.seaice_coupling
+                else _jax_gcm_fields.JAXGCM_INPUT_GRID_FIELD_NAMES
+            ),
             outputs=(
                 "land_surface_temperature",
                 "sea_surface_temperature",
                 "total_surface_temperature",
                 *_jax_gcm_fields.JAXGCM_OUTPUT_GRID_FIELD_NAMES,
-                "pressure",
+                "air_pressure_3d",
+                *(("soil_moisture",) if config.seaice_coupling else ()),
+                *(
+                    _jax_gcm_fields.JAXGCM_COUPLED_OUTPUT_GRID_FIELD_NAMES
+                    if config.seaice_coupling
+                    else ()
+                ),
             ),
             initial_fields=initial_fields,
             lifecycle=LifecycleHooks(
@@ -103,5 +132,5 @@ def make_jax_gcm(
 
 
 __all__ = [
-    "make_jax_gcm",
+    "make_jcm_atmosphere",
 ]

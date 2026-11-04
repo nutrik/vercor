@@ -107,12 +107,12 @@ that local copy:
 
 ```console
 vercor show-setups
-vercor copy-setup run_jcm_with_veros \
-  --to ~/vercor-setups/run_jcm_with_veros
+vercor copy-setup jcm_with_veros \
+  --to ~/vercor-setups/jcm_with_veros
 vercor run \
   --loglevel info \
   --float-type float64 \
-  ~/vercor-setups/run_jcm_with_veros/run_jcm_with_veros.py
+  ~/vercor-setups/jcm_with_veros/jcm_with_veros.py
 ```
 
 `vercor --version` reports the installed distribution version. `VERCOR_SETUP_DIR`
@@ -136,6 +136,7 @@ Read the canonical documentation at
 - [Researcher guide](https://vercor.readthedocs.io/en/latest/researchers/)
 - [Developer guide](https://vercor.readthedocs.io/en/latest/developers/)
 - [Python API](https://vercor.readthedocs.io/en/latest/api/)
+- [Coupling fields and naming migration](docs/coupling-fields.rst)
 - [Plugin authoring](https://vercor.readthedocs.io/en/latest/plugin-authoring.html)
 
 Repository resources:

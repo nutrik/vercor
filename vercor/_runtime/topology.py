@@ -21,7 +21,6 @@ def build_exchange_topology(
     exchanges: Sequence[Exchange],
     dtype: DTypePolicy,
     logger: LoggerLike,
-    topology_maps: RuntimeTopologyMaps | None = None,
     topology_policy: TopologyPolicy | None = None,
 ) -> RuntimeTopologyMaps:
     """Build exchange regridders, masks, and surface topology maps."""
@@ -29,7 +28,6 @@ def build_exchange_topology(
     initialized_maps = _exchange_topology.build_exchange_topology_maps(
         components=components,
         exchanges=exchanges,
-        topology_maps=topology_maps,
         dtype=dtype,
         logger=logger,
     )

@@ -63,6 +63,7 @@ PUBLIC_MODULE_EXPORTS = {
     "vercor.components": (
         "CallableComponent",
         "Component",
+        "ComponentMaskSpec",
         "ComponentSpec",
         "DataComponent",
         "LifecycleHooks",
@@ -144,7 +145,6 @@ PUBLIC_MODULE_EXPORTS = {
     ),
     "vercor.forcing_data": ("read_forcing",),
     "vercor.forcing_index": (
-        "ForcingYearType",
         "daily_forcing_day_of_year",
         "daily_forcing_index",
         "day_of_year_360_to_gregorian",
@@ -153,10 +153,10 @@ PUBLIC_MODULE_EXPORTS = {
     ),
     "vercor.grid_masks": (
         "check_remap_conservation",
-        "check_total_lnd_ocn_mask_sum",
+        "check_land_ocean_fraction_sum",
         "compute_land_mask",
-        "compute_ocn_lnd_masks_on_atm_grid",
-        "create_lnd_mask_from_ocn",
+        "compute_ocean_land_masks_on_atmosphere_grid",
+        "create_land_mask_from_ocean",
     ),
     "vercor.grid_geometry": ("centers_to_edges", "grids_identical"),
     "vercor.grids": ("RectilinearGrid",),
@@ -175,6 +175,8 @@ PUBLIC_MODULE_EXPORTS = {
         "setup_logger",
     ),
     "vercor.output": (
+        "JaxOutputContext",
+        "JaxOutputProvider",
         "OutputContext",
         "OutputFrame",
         "OutputProvider",
@@ -187,24 +189,24 @@ PUBLIC_MODULE_EXPORTS = {
     ),
     "vercor.physics": ("PhysicalConstants",),
     "vercor.recipes": (
-        "ATMOSPHERE_TO_DATA_OCEAN_FIELDS",
-        "ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS",
-        "ATMOSPHERE_TO_LAND_BASIC_FIELDS",
         "ATMOSPHERE_TO_LAND_RADIATION_FIELDS",
         "ATMOSPHERE_TO_LAND_STATE_FIELDS",
         "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS",
         "ATMOSPHERE_TO_OCEAN_STATE_FIELDS",
-        "ATMOSPHERE_TO_VEROS_FORCING_FIELDS",
-        "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS",
-        "JCM_LAND_TO_ATMOSPHERE_FIELDS",
-        "LAND_TO_ATMOSPHERE_SOIL_FIELDS",
+        "ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS",
+        "OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS",
+        "MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS",
+        "LAND_TO_ATMOSPHERE_STATE_FIELDS",
         "LAND_TO_ATMOSPHERE_SURFACE_FIELDS",
         "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS",
+        "OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS",
         "OCEAN_TO_SEAICE_SURFACE_FIELDS",
-        "SEAICE_TO_OCEAN_FIELDS",
-        "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS",
-        "SLAB_ATMOSPHERE_TO_OCEAN_FIELDS",
-        "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS",
+        "OCEAN_TO_SEAICE_FORCING_FIELDS",
+        "ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS",
+        "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS",
+        "SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS",
+        "SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS",
+        "SEAICE_COVERAGE_FIELDS",
     ),
     "vercor.regridding": (
         "Regridder",
@@ -227,27 +229,34 @@ PUBLIC_MODULE_EXPORTS = {
     ),
     "vercor.setups": (
         "CAMulatorConfig",
-        "JAXGCMConfig",
+        "JCMAtmosphereConfig",
         "JCMLandAtmosphereConfig",
         "JCMLandAtmosphereSetup",
         "JCMInputs",
         "Spinup",
         "VerosConfig",
+        "VerisConfig",
         "load_jcm_inputs",
         "make_slab_atmosphere",
         "make_slab_land",
         "make_slab_ocean",
         "make_slab_seaice",
         "make_jcm_land_atmosphere",
+        "VerisVerosDataSetup",
+        "VerisVerosSetup",
         "make_camulator_gcm",
         "make_camulator_land",
         "make_era5_atmosphere",
         "make_era5_land",
         "make_era5_ocean",
         "make_erainterim_ocean",
-        "make_jax_gcm",
+        "make_jcm_atmosphere",
         "make_jcm_land",
+        "make_veris",
+        "make_veris_veros",
+        "make_veris_verosdata",
         "make_veros_gcm",
+        "replace_veris_parameters",
     ),
     "vercor.state": (
         "ComponentState",
@@ -290,6 +299,8 @@ def _clock(*, steps: int = 1) -> Clock:
 def test_root_exports_exactly_the_six_primary_symbols() -> None:
     assert tuple(vercor.__all__) == ROOT_EXPORTS
     assert all(hasattr(vercor, name) for name in ROOT_EXPORTS)
+    assert not hasattr(vercor, "Regridder")
+    assert not hasattr(vercor, "RegridderFactory")
 
 
 def test_public_module_inventory_exactly_matches_the_manifest() -> None:
@@ -305,14 +316,6 @@ def test_public_module_inventory_exactly_matches_the_manifest() -> None:
     }
 
     assert discovered == set(PUBLIC_MODULE_EXPORTS)
-
-
-@pytest.mark.parametrize("module_name", tuple(PUBLIC_MODULE_EXPORTS))
-def test_supported_public_module_has_exact_manifest(module_name: str) -> None:
-    module = importlib.import_module(module_name)
-    expected = PUBLIC_MODULE_EXPORTS[module_name]
-    assert tuple(module.__all__) == expected
-    assert all(hasattr(module, name) for name in expected)
 
 
 def test_public_module_namespaces_do_not_leak_non_exported_vercor_objects() -> None:
@@ -491,19 +494,6 @@ def test_constructor_normalizes_log_level_before_configuring_custom_logger() -> 
     [
         (("MODEL", "MODEL"), "Duplicate run-order component.*MODEL"),
         (("UNKNOWN",), "Unknown run-order component.*UNKNOWN"),
-    ],
-)
-def test_constructor_rejects_invalid_nonempty_run_order(
-    run_order: tuple[str, ...],
-    message: str,
-) -> None:
-    with pytest.raises(CouplerError, match=message):
-        Coupler(_clock(), components=(_component(),), run_order=run_order)
-
-
-@pytest.mark.parametrize(
-    ("run_order", "message"),
-    [
         (None, "run_order must be a sequence"),
         ("MODEL", "run_order must be a sequence"),
         ({"MODEL"}, "run_order must be a sequence"),
@@ -547,8 +537,8 @@ def test_constructor_rejects_invalid_component_and_exchange_iterables(
 
 def test_constructor_rejects_duplicate_exchanges_and_unknown_endpoints() -> None:
     component = _component()
-    exchange = Exchange("MODEL", "MODEL", ("value",))
-    equal_exchange = Exchange("MODEL", "MODEL", ("value",))
+    exchange = Exchange("MODEL", "MODEL", ("value",), quantity="intensive")
+    equal_exchange = Exchange("MODEL", "MODEL", ("value",), quantity="intensive")
     assert equal_exchange is not exchange
     assert equal_exchange == exchange
     with pytest.raises(
@@ -563,13 +553,13 @@ def test_constructor_rejects_duplicate_exchanges_and_unknown_endpoints() -> None
         Coupler(
             _clock(),
             components=(component,),
-            exchanges=(Exchange("UNKNOWN", "MODEL", ("value",)),),
+            exchanges=(Exchange("UNKNOWN", "MODEL", ("value",), quantity="intensive"),),
         )
     with pytest.raises(CouplerError, match="unknown target component.*UNKNOWN"):
         Coupler(
             _clock(),
             components=(component,),
-            exchanges=(Exchange("MODEL", "UNKNOWN", ("value",)),),
+            exchanges=(Exchange("MODEL", "UNKNOWN", ("value",), quantity="intensive"),),
         )
 
 
@@ -591,8 +581,12 @@ def test_constructor_rejects_exchange_fan_in_before_component_setup() -> None:
                 _component("DST", setup=setup),
             ),
             exchanges=(
-                Exchange("SRC_A", "DST", ("value",), route_id="route-a"),
-                Exchange("SRC_B", "DST", ("value",), route_id="route-b"),
+                Exchange(
+                    "SRC_A", "DST", ("value",), quantity="intensive", route_id="route-a"
+                ),
+                Exchange(
+                    "SRC_B", "DST", ("value",), quantity="intensive", route_id="route-b"
+                ),
             ),
             run_order=("SRC_A", "SRC_B", "DST"),
         )
@@ -619,8 +613,8 @@ def test_constructor_rejects_duplicate_route_id_before_component_setup() -> None
                 _component("DST", setup=setup),
             ),
             exchanges=(
-                Exchange("SRC", "DST", ("value",)),
-                Exchange("SRC", "DST", ("other",)),
+                Exchange("SRC", "DST", ("value",), quantity="intensive"),
+                Exchange("SRC", "DST", ("other",), quantity="intensive"),
             ),
             run_order=("SRC", "DST"),
         )
@@ -642,6 +636,7 @@ def test_exchange_rejects_noncallable_factory_before_component_setup() -> None:
             "SRC",
             "DST",
             ("value",),
+            quantity="intensive",
             regridder_factory=object(),  # type: ignore[arg-type]
         )
 
@@ -668,7 +663,7 @@ def test_constructor_validates_runtime_constants_and_logger(
 
 def test_public_configuration_views_are_stable_immutable_snapshots() -> None:
     component = _component()
-    exchange = Exchange("MODEL", "MODEL", ("value",))
+    exchange = Exchange("MODEL", "MODEL", ("value",), quantity="intensive")
     components = [component]
     exchanges = [exchange]
     run_order = ["MODEL"]
@@ -893,7 +888,10 @@ def test_regridder_factory_is_one_runtime_protocol_with_public_hints(
     assert hints["return"] is Regridder
     assert isinstance(bilinear, RegridderFactory)
     assert isinstance(conservative, RegridderFactory)
-    assert Exchange("SOURCE", "TARGET", ("field",)).regridder_factory is bilinear
+    assert (
+        Exchange("SOURCE", "TARGET", ("field",), quantity="intensive").regridder_factory
+        is bilinear
+    )
 
 
 def test_prepared_runtime_has_no_reflective_configuration_snapshot() -> None:

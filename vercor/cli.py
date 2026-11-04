@@ -155,8 +155,8 @@ class _CopySetupCommand(click.Command):
         formatter.write_paragraph()
         formatter.write_text(
             "Example:\n"
-            "    $ vercor copy-setup run_jcm_with_veros --to "
-            "~/vercor-setups/run_jcm_with_veros\n\n"
+            "    $ vercor copy-setup jcm_with_veros --to "
+            "~/vercor-setups/jcm_with_veros\n\n"
             "Further directories containing setup templates can be added "
             "via the VERCOR_SETUP_DIR environment variable."
         )

@@ -1,15 +1,16 @@
 import importlib
-from pathlib import Path
 from typing import Any
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from tests.assertions import assert_array_equal_compact
+from tests.assertions import assert_allclose_compact, assert_array_equal_compact
 from vercor.grids import RectilinearGrid
 from vercor._regridders.base import _BaseRegridder
-from vercor._regridders.bilinear import BilinearRectilinearRegridder, bilinear
+from vercor._regridders.bilinear import BilinearRectilinearRegridder
+from vercor.regridding import bilinear
 from vercor._interpolators.bilinear_rectilinear import BilinearRectilinearInterpolator
 
 
@@ -36,41 +37,6 @@ def test_regridder_constructor_sets_interpolator_and_grids() -> None:
     assert regridder.source_grid is src_grid
     assert regridder.target_grid is dst_grid
     assert regridder.interpolator is not None
-
-
-def test_regridder_constructor_propagates_interpolator_options() -> None:
-    src_mask = np.array([[True, False, True], [True, True, False]])
-    dst_mask = np.array([[True, False], [False, True], [True, True]])
-
-    src_grid = _make_grid(
-        "src", np.array([0.0, 1.0, 2.0]), np.array([0.0, 1.0]), mask=src_mask
-    )
-    dst_grid = _make_grid(
-        "dst", np.array([0.0, 2.0]), np.array([0.0, 1.0, 2.0]), mask=dst_mask
-    )
-
-    regridder = BilinearRectilinearRegridder(
-        src_grid,
-        dst_grid,
-        periodic_longitude=False,
-        nan_renorm=False,
-        extrapolation_mode="nearest",
-        idw_k=3,
-        idw_eps=1e-6,
-        fill_value=-99.0,
-    )
-
-    interp = regridder.interpolator
-    if isinstance(interp, BilinearRectilinearInterpolator):
-        assert interp is not None
-        assert interp.periodic is False
-        assert interp.nan_renorm is False
-        assert interp.extrapolation_mode == "nearest"
-        assert interp.idw_k == 3
-        assert np.isclose(interp.idw_eps, 1e-6)
-        assert np.isclose(interp.fill_value, -99.0)
-        assert_array_equal_compact(interp.src_mask, src_mask)
-        assert_array_equal_compact(interp.tgt_mask, dst_mask)
 
 
 def test_regridder_scalar_call_dispatches_and_returns_destination_shape() -> None:
@@ -120,16 +86,6 @@ def test_regridder_vector_call_dispatches_and_returns_two_destination_arrays() -
     assert out[1].shape == dst_grid.shape
 
 
-def test_regridder_has_identical_grids_true_for_equal_coords() -> None:
-    lon = np.array([0.0, 1.0, 2.0])
-    lat = np.array([0.0, 1.0])
-    src_grid = _make_grid("src", lon.copy(), lat.copy())
-    dst_grid = _make_grid("dst", lon.copy(), lat.copy())
-
-    regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
-    assert regridder.has_identical_grids is True
-
-
 def test_regridder_identical_grid_skips_interpolator_construction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -148,17 +104,11 @@ def test_regridder_identical_grid_skips_interpolator_construction(
     src_grid = _make_grid("src", lon.copy(), lat.copy())
     dst_grid = _make_grid("dst", lon.copy(), lat.copy())
 
-    regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
+    regridder = bilinear(src_grid, dst_grid)
 
     assert regridder.has_identical_grids is True
+    assert isinstance(regridder, BilinearRectilinearRegridder)
     assert regridder.interpolator is None
-
-
-def test_regridder_identical_grid_passthrough_does_not_use_identity_helper() -> None:
-    base_source = Path("vercor/_regridders/base.py").read_text(encoding="utf-8")
-    bilinear_source = Path("vercor/_regridders/bilinear.py").read_text(encoding="utf-8")
-    assert "_IdentityInterpolator" not in base_source
-    assert "_IdentityInterpolator" not in bilinear_source
 
 
 def test_regridder_non_identical_grid_constructs_interpolator(
@@ -190,14 +140,6 @@ def test_regridder_identical_grid_uses_shared_coordinate_tolerance() -> None:
 
     regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
     assert regridder.has_identical_grids is True
-
-
-def test_regridder_has_identical_grids_false_for_different_coords() -> None:
-    src_grid = _make_grid("src", np.array([0.0, 1.0, 2.0]), np.array([0.0, 1.0]))
-    dst_grid = _make_grid("dst", np.array([0.0, 2.0, 4.0]), np.array([0.0, 1.0]))
-
-    regridder = BilinearRectilinearRegridder(src_grid, dst_grid)
-    assert regridder.has_identical_grids is False
 
 
 def test_regridder_identical_grid_scalar_short_circuit_returns_input_object() -> None:
@@ -285,6 +227,7 @@ def test_bilinear_factory_forwards_interpolator_options() -> None:
         fill_value=-99.0,
     )
 
+    assert isinstance(regridder, BilinearRectilinearRegridder)
     interp = regridder.interpolator
     assert isinstance(interp, BilinearRectilinearInterpolator)
     assert interp.periodic is False
@@ -295,3 +238,67 @@ def test_bilinear_factory_forwards_interpolator_options() -> None:
     assert np.isclose(interp.fill_value, -99.0)
     assert_array_equal_compact(interp.src_mask, src_mask)
     assert_array_equal_compact(interp.tgt_mask, dst_mask)
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+def test_bilinear_periodic_longitude_turns_preserve_scalar_vector_and_source_ad(
+    enable_x64: bool,
+) -> None:
+    """Whole longitude turns must leave interpolation and source weights unchanged."""
+    with jax.enable_x64(enable_x64):
+        source = _make_grid("source", [0.0, 90.0, 180.0, 270.0], [-1.0, 1.0])
+        target = _make_grid("target", [-675.0, -315.0, 45.0, 405.0, 765.0], [0.0])
+        regridder = BilinearRectilinearRegridder(source, target)
+        values = jnp.asarray([[0.0, 1.0, 2.0, 3.0], [0.0, 1.0, 2.0, 3.0]])
+        compiled = jax.jit(regridder.regrid)
+        assert_allclose_compact(compiled(values), 0.5, rtol=2e-6, atol=1e-7)
+
+        # Five identical midpoint samples each use four source corners with
+        # weight 1/4, so the VJP of their sum is exactly 5/4 on those corners.
+        def objective(field: jax.Array) -> jax.Array:
+            return jnp.sum(compiled(field))
+
+        direction = jnp.arange(1.0, 9.0).reshape(2, 4)
+        _, forward = jax.jvp(objective, (values,), (direction,))
+        reverse = jax.grad(objective)(values)
+        expected_gradient = np.array([[1.25, 1.25, 0.0, 0.0]] * 2)
+        assert_allclose_compact(reverse, expected_gradient, rtol=2e-6, atol=1e-7)
+        assert_allclose_compact(forward, 17.5, rtol=2e-6, atol=1e-7)
+
+        vector_u, vector_v = regridder.regrid_vector(values, -2 * values)
+        # Tangent-vector interpolation first averages Cartesian components.
+        assert_allclose_compact(vector_u, np.sqrt(2.0) / 4.0, rtol=2e-6, atol=1e-6)
+        assert_allclose_compact(
+            vector_v, -np.cos(np.deg2rad(1.0)), rtol=2e-6, atol=1e-6
+        )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True], ids=["float32", "float64"])
+def test_bilinear_nonperiodic_longitude_clamps_both_endpoints(
+    enable_x64: bool,
+) -> None:
+    """A target west of the source domain must use its western boundary."""
+    with jax.enable_x64(enable_x64):
+        source = _make_grid("source", [0.0, 10.0], [-1.0, 1.0])
+        target = _make_grid("target", [-5.0, 0.0, 5.0, 10.0, 15.0], [0.0])
+        regridder = BilinearRectilinearRegridder(
+            source, target, periodic_longitude=False
+        )
+        assert_allclose_compact(
+            jax.jit(regridder.regrid)(jnp.asarray([[0.0, 10.0], [0.0, 10.0]])),
+            np.array([[0.0, 0.0, 5.0, 10.0, 10.0]]),
+            rtol=2e-6,
+            atol=1e-7,
+        )
+        # With a uniform zonal source vector, projection to the target tangent
+        # yields cos(5 degrees) outside either boundary and at the midpoint.
+        vector_u, vector_v = regridder.regrid_vector(
+            jnp.ones((2, 2)), jnp.zeros((2, 2))
+        )
+        cosine = np.cos(np.deg2rad(5.0))
+        assert_allclose_compact(
+            vector_u, np.array([[cosine, 1.0, cosine, 1.0, cosine]]), rtol=2e-6
+        )
+        assert_allclose_compact(vector_v, 0.0, atol=1e-7)

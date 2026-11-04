@@ -4,15 +4,17 @@ import jax
 import jax.numpy as jnp
 
 from vercor.components import (
+    ComponentMaskSpec,
     ComponentSpec,
     DataComponent,
     TransferPolicy,
 )
 from vercor.dtypes import as_jax_real_array
 from vercor.grids import RectilinearGrid
-from vercor.grid_masks import create_lnd_mask_from_ocn
+from vercor.grid_masks import create_land_mask_from_ocean
 from vercor.output import OutputSpec
 from vercor.setups._output import resolve_output
+from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from dinosaur.coordinate_systems import CoordinateSystem as _CoordinateSystem
@@ -21,8 +23,8 @@ else:
     _CoordinateSystem = Any
     _ForcingData = Any
 
-_JCM_LAND_INPUT_NAMES = ("latent_heat_flux", "sensible_heat_flux")
-_JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture")
+_JCM_LAND_INPUT_NAMES: tuple[str, ...] = ()
+_JCM_LAND_FIELD_NAMES = ("land_surface_temperature", "soil_moisture", "land_fraction")
 
 
 def _canonicalize_jcm_forcing_field(
@@ -56,8 +58,14 @@ def make_jcm_land(
     name: str = "LND",
     *,
     output: OutputSpec | None = None,
+    native_land_fraction: RuntimeArray | None = None,
 ) -> DataComponent:
-    """Return a JCM land forcing component."""
+    """Return JCM land forcing, optionally retaining native terrain outside ocean.
+
+    ``native_land_fraction`` uses the canonical atmosphere (latitude, longitude)
+    layout. Forcing records and their independent time-selection policy remain
+    unchanged; geometry alone selects which land tiles participate in exchange.
+    """
 
     longitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.longitudes))
     latitude = jnp.rad2deg(as_jax_real_array(jcm_coords.horizontal.latitudes))
@@ -72,17 +80,38 @@ def make_jcm_land(
         field_name="soilw_am",
         expected_spatial_shape=forcing_spatial_shape,
     )
-    lnd_bmask, _ = create_lnd_mask_from_ocn(
-        atm_lat=latitude,
-        atm_lon=longitude,
-        ocn_grid=ocn_grid,
-    )
+    daily = land_surface_temperature.ndim == 3 or soil_moisture.ndim == 3
+    if daily:
+        records = max(
+            (
+                land_surface_temperature.shape[0]
+                if land_surface_temperature.ndim == 3
+                else 1
+            ),
+            soil_moisture.shape[0] if soil_moisture.ndim == 3 else 1,
+        )
+        shape = (records, *land_surface_temperature.shape[-2:])
+        land_surface_temperature = jnp.broadcast_to(land_surface_temperature, shape)
+        soil_moisture = jnp.broadcast_to(soil_moisture, shape)
+    if native_land_fraction is None:
+        land_binary_mask, land_fraction = create_land_mask_from_ocean(
+            atmosphere_latitude=latitude,
+            atmosphere_longitude=longitude,
+            ocean_grid=ocn_grid,
+        )
+    else:
+        land_binary_mask, land_fraction = create_land_mask_from_ocean(
+            atmosphere_latitude=latitude,
+            atmosphere_longitude=longitude,
+            ocean_grid=ocn_grid,
+            native_land_fraction=native_land_fraction,
+        )
 
     grid = RectilinearGrid(
         name=f"{name.lower()}-grid",
         longitude=longitude,
         latitude=latitude,
-        binary_mask=lnd_bmask,
+        binary_mask=land_binary_mask,
     )
 
     component = DataComponent(
@@ -91,12 +120,14 @@ def make_jcm_land(
         {
             "land_surface_temperature": land_surface_temperature,
             "soil_moisture": soil_moisture,
+            "land_fraction": land_fraction,
         },
         spec=ComponentSpec(
             inputs=_JCM_LAND_INPUT_NAMES,
             outputs=_JCM_LAND_FIELD_NAMES,
             initial_fields={field_name: 0.0 for field_name in _JCM_LAND_INPUT_NAMES},
-            transfer=TransferPolicy(time_selection="daily"),
+            transfer=TransferPolicy(time_selection="daily" if daily else "current"),
+            masks=ComponentMaskSpec(fractional_field="land_fraction"),
             output=resolve_output(output),
         ),
     )

@@ -172,7 +172,11 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
     runtime_dependencies = tuple(project["dependencies"])
     extras = project["optional-dependencies"]
 
-    assert extras["jcm"] == ["dinosaur>=1.3.6", "jcm==2.0.1"]
+    assert extras["veros"] == ["veros>=1.7.0"]
+    assert extras["jcm"] == ["dinosaur>=1.5.0", "jcm==3.0.0"]
+    assert extras["veris"] == [
+        "veris @ git+https://github.com/team-ocean/veris.git@v0.2.1"
+    ]
     assert extras["veros_ad"] == [
         f"veros @ git+{VEROS_AD_REPOSITORY}@{VEROS_AD_COMMIT}"
     ]
@@ -318,7 +322,7 @@ def test_current_external_extension_fixture_uses_canonical_owners_and_v0_4_workf
         "SetupResult(",
         "Exchange(",
         "ExchangeTopologyPatch(",
-        "fractional_masks=",
+        "binary_masks=",
         "PeriodOutput(",
         "StepResult(",
         ".replace_fields(",
@@ -1180,9 +1184,12 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
     )
 
     assert autodiff["runs-on"] == "ubuntu-latest"
-    assert autodiff["env"] == {"VEROS_AD_COMMIT": VEROS_AD_COMMIT}
+    assert autodiff["env"] == {
+        "VEROS_AD_COMMIT": VEROS_AD_COMMIT,
+        "VERIS_COMMIT": jobs["quality"]["env"]["VERIS_COMMIT"],
+    }
     assert install_index < verify_index < rollout_index
-    assert 'python -m pip install ".[dev,jcm,veros]"' in install["run"]
+    assert "python tools/install_coupled_models.py" in install["run"]
     assert "ipdb==0.13.13" in install["run"]
     assert f'"git+{VEROS_AD_REPOSITORY}@${{VEROS_AD_COMMIT}}"' in install["run"]
     assert "--no-deps" in install["run"]
@@ -1193,11 +1200,12 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
     for capability in ("VerosState.copy", "safe_sqrt", "c_k", "c_eps"):
         assert capability in verify["run"]
     assert rollout["run"] == (
-        "python -m pytest tests/test_veros_autodiff_rollouts.py "
+        "python -m pytest tests/test_veros_autodiff_rollouts.py tests/test_veris_prognostic_autodiff.py "
+        "tests/test_veris_veros_jcm_autodiff.py tests/test_veros_float32.py "
         "-q -n0 -m veros_autodiff --tb=short "
         "--cov=vercor --cov-branch --cov-report= --cov-fail-under=0"
     )
-    assert 'python -m pip install ".[dev,jcm,veros]"' in quality_commands
+    assert "python tools/install_coupled_models.py" in quality_commands
     for stock_step in (stock_full, stock_coverage):
         assert '-m "not veros_autodiff"' in stock_step["run"]
     assert "combined-coverage" in jobs["publish-release"]["needs"]
@@ -1355,7 +1363,7 @@ def test_ci_quality_job_enforces_static_gates_and_collects_stock_coverage() -> N
 
     assert checkout.get("with", {}).get("fetch-depth") == 0
     assert setup["with"]["python-version"] == "3.12"
-    assert 'pip install ".[dev,jcm,veros]"' in commands
+    assert "python tools/install_coupled_models.py" in commands
     assert "black --check vercor tests" in commands
     assert "flake8 ." in commands
     assert "--exit-zero" not in commands
@@ -1467,14 +1475,18 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     gallery_names = {
         "vercor/setups/gallery/custom_component_wrapping.py",
         "vercor/setups/gallery/profile_runtime.py",
-        "vercor/setups/gallery/run_camulator_with_veros.py",
-        "vercor/setups/gallery/run_data_driver.py",
-        "vercor/setups/gallery/run_jcm_with_era5data.py",
-        "vercor/setups/gallery/run_jcm_with_slab.py",
-        "vercor/setups/gallery/run_jcm_with_veros.py",
-        "vercor/setups/gallery/run_jcm_with_verosdata.py",
-        "vercor/setups/gallery/run_slab_driver.py",
-        "vercor/setups/gallery/run_veros_with_era5data.py",
+        "vercor/setups/gallery/camulator_with_veros.py",
+        "vercor/setups/gallery/data_driver.py",
+        "vercor/setups/gallery/jcm_with_era5data.py",
+        "vercor/setups/gallery/jcm_with_slab.py",
+        "vercor/setups/gallery/jcm_with_veros.py",
+        "vercor/setups/gallery/jcm_with_verosdata.py",
+        "vercor/setups/gallery/slab_driver.py",
+        "vercor/setups/gallery/veros_with_era5data.py",
+        "vercor/setups/gallery/veris_dataveros_era5.py",
+        "vercor/setups/gallery/veris_calibration.py",
+        "vercor/setups/gallery/veris_veros_era5.py",
+        "vercor/setups/gallery/veris_veros_jcm.py",
     }
     runner_name = "vercor/_setup_runner.py"
 
@@ -1790,6 +1802,7 @@ def normalized_signature(value):
         .replace("vercor.components.data.", "vercor.components.")
         .replace("vercor.setups.config.", "vercor.setups.")
         .replace("vercor.setups._jcm.", "vercor.setups.")
+        .replace("vercor.setups._veris.", "vercor.setups.")
         .replace("pathlib._local.Path", "pathlib.Path")
         .replace(" -> NoneType", " -> None")
     )
@@ -1897,6 +1910,7 @@ print(json.dumps({{
     )
     evidence = json.loads(smoke.stdout.splitlines()[-1])
     assert evidence["temperature"] == 12.0
+    assert evidence["coverage"] == 0.625
     assert evidence["host_value"] == 17.0
     assert evidence["exchange_forcing"] == 2.0
     assert evidence["state_replacement"] is True

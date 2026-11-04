@@ -14,8 +14,8 @@ ComponentMetric = str | Callable[[ComponentState], RuntimeArray | float]
 
 def component_vector_speed(
     component_state: ComponentState,
-    u_field: str = "u_velocity",
-    v_field: str = "v_velocity",
+    u_field: str = "air_u_velocity",
+    v_field: str = "air_v_velocity",
 ) -> RuntimeArray:
     """Return vector speed from a runtime component state."""
 

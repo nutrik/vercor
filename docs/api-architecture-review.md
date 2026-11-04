@@ -49,11 +49,24 @@ each step, never retained as hidden adapter state.
 | Backend/native output sessions | `vercor.output._session` | One immutable accumulator and one run-level output lifecycle. |
 | Public and internal state mutation helpers | `RunState.replace_fields` | One immutable public replacement operation; alignment remains private. |
 | Setup import registries | `vercor.setups` | One lazy public facade; implementation imports occur at factory invocation. |
+| Regridder construction helpers | `vercor.regridding` | Public factories construct concrete private regridders directly; `radius_km` remains the public conservative radius argument. |
+| Forcing year metadata | `vercor.calendar.YearType` | Import the canonical enum from `vercor.calendar`; the duplicate `forcing_index.ForcingYearType` alias is removed. |
+| JCM final native output | `SnapshotContext.payload` | Providers and snapshots consume runtime state only; absent final payload raises a component-scoped error before writing output. |
 
 These consolidations are intentionally narrow. Scalar and vector regridding
 remain separate capabilities. Provider sampling and file writing remain
 separate boundaries. Physics values and static precision policy remain
 separate because JAX traces the former and uses the latter to control arrays.
+
+Migrate `from vercor.forcing_index import ForcingYearType` to
+`from vercor.calendar import YearType` and use `YearType` at call sites. Native
+Veris consumers use `prepare_veris_forcing_pack(...).native_forcing`; the pack
+also owns open-water face stresses from the same bulk calculation. JCM runtime
+normalization uses `tree_as_runtime_dtype`, retaining integer and categorical
+leaves and selecting complex precision consistently. Native layout preparation
+uses the explicit time-last surface/level functions, or transposes static
+longitude/latitude arrays at its owning setup. Removed test-only stack, unwrap,
+all-real dtype and prediction-output conveniences have no alternate runtime path.
 
 ## 3. Bad design decisions
 
@@ -96,7 +109,7 @@ signatures from installed artifacts.
   "vercor.calendar": ["CalendarDate", "DAYS_PER_MONTH_360", "DAYS_PER_MONTH_GREGORIAN_LEAP", "DAYS_PER_MONTH_GREGORIAN_NO_LEAP", "DateTime360", "DateTime365", "ModelDateTime", "YearType", "day_of_year_from_month_day", "is_leap_year", "model_year_seconds", "month_day_from_day_of_year", "year_type_for_calendar"],
   "vercor.cli": ["cli"],
   "vercor.clock": ["Clock"],
-  "vercor.components": ["CallableComponent", "Component", "ComponentSpec", "DataComponent", "LifecycleHooks", "PrefillContext", "PrefillResult", "SetupContext", "SetupResult", "StepContext", "StepResult", "TransferPolicy", "ValidationContext"],
+  "vercor.components": ["CallableComponent", "Component", "ComponentMaskSpec", "ComponentSpec", "DataComponent", "LifecycleHooks", "PrefillContext", "PrefillResult", "SetupContext", "SetupResult", "StepContext", "StepResult", "TransferPolicy", "ValidationContext"],
   "vercor.coupler": ["Coupler"],
   "vercor.diagnostics": ["ComponentMetric", "combine_surface_temperatures", "component_vector_speed", "plot_component_scalar_vector_comparison", "print_component_field_means_table", "safe_component_nanmean", "total_surface_temperature"],
   "vercor.dtypes": ["DTypePolicy", "PrecisionPolicy", "ShapeLike", "as_jax_index_array", "as_jax_real_array", "dtype_policy", "jax_arange", "jax_full", "jax_index_dtype", "jax_linspace", "jax_ones", "jax_real_dtype", "jax_zeros"],
@@ -106,17 +119,17 @@ signatures from installed artifacts.
   "vercor.fields": ["COMMON_FIELD_NAMES", "ExchangeField", "VectorField", "vector"],
   "vercor.fluxes": ["cdn", "compute_air_density", "compute_hybrid_pressure_levels", "compute_hybrid_sigma_full_level_altitudes", "compute_ocean_surface_fluxes", "compute_potential_temperature", "compute_sigma_pressure_levels", "get_altitudes_hybrid_sigma_levels", "get_altitudes_sigma_levels", "psimhu", "psixhu", "qsat", "qsat_august_eqn", "shr_flux_atmIce"],
   "vercor.forcing_data": ["read_forcing"],
-  "vercor.forcing_index": ["ForcingYearType", "daily_forcing_day_of_year", "daily_forcing_index", "day_of_year_360_to_gregorian", "gregorian_month_lengths", "noleap_day_of_year"],
+  "vercor.forcing_index": ["daily_forcing_day_of_year", "daily_forcing_index", "day_of_year_360_to_gregorian", "gregorian_month_lengths", "noleap_day_of_year"],
   "vercor.grid_geometry": ["centers_to_edges", "grids_identical"],
-  "vercor.grid_masks": ["check_remap_conservation", "check_total_lnd_ocn_mask_sum", "compute_land_mask", "compute_ocn_lnd_masks_on_atm_grid", "create_lnd_mask_from_ocn"],
+  "vercor.grid_masks": ["check_remap_conservation", "check_land_ocean_fraction_sum", "compute_land_mask", "compute_ocean_land_masks_on_atmosphere_grid", "create_land_mask_from_ocean"],
   "vercor.grids": ["RectilinearGrid"],
   "vercor.jax_logging": ["CANONICAL_LOG_DATE_FORMAT", "CANONICAL_LOG_FORMAT", "DEFAULT_LOGGER_NAME", "JaxCallbackLogger", "LoggerLike", "configure_python_logger", "effective_log_level", "emit_host_log", "get_default_logger", "logger_enabled_for", "normalize_log_level", "setup_logger"],
-  "vercor.output": ["OutputContext", "OutputFrame", "OutputProvider", "OutputSpec", "OutputTarget", "OutputVariable", "PeriodOutput", "SnapshotContext", "SnapshotWriter"],
+  "vercor.output": ["JaxOutputContext", "JaxOutputProvider", "OutputContext", "OutputFrame", "OutputProvider", "OutputSpec", "OutputTarget", "OutputVariable", "PeriodOutput", "SnapshotContext", "SnapshotWriter"],
   "vercor.physics": ["PhysicalConstants"],
-  "vercor.recipes": ["ATMOSPHERE_TO_DATA_OCEAN_FIELDS", "ATMOSPHERE_TO_JCM_LAND_FLUX_FIELDS", "ATMOSPHERE_TO_LAND_BASIC_FIELDS", "ATMOSPHERE_TO_LAND_RADIATION_FIELDS", "ATMOSPHERE_TO_LAND_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS", "ATMOSPHERE_TO_OCEAN_STATE_FIELDS", "ATMOSPHERE_TO_VEROS_FORCING_FIELDS", "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS", "JCM_LAND_TO_ATMOSPHERE_FIELDS", "LAND_TO_ATMOSPHERE_SOIL_FIELDS", "LAND_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_SEAICE_SURFACE_FIELDS", "SEAICE_TO_OCEAN_FIELDS", "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS", "SLAB_ATMOSPHERE_TO_OCEAN_FIELDS", "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS"],
+  "vercor.recipes": ["ATMOSPHERE_TO_LAND_RADIATION_FIELDS", "ATMOSPHERE_TO_LAND_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS", "ATMOSPHERE_TO_OCEAN_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS", "OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS", "MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS", "LAND_TO_ATMOSPHERE_STATE_FIELDS", "LAND_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS", "OCEAN_TO_SEAICE_SURFACE_FIELDS", "OCEAN_TO_SEAICE_FORCING_FIELDS", "ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS", "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS", "SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS", "SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS", "SEAICE_COVERAGE_FIELDS"],
   "vercor.regridding": ["Regridder", "RegridderFactory", "VectorRegridder", "bilinear", "conservative"],
   "vercor.runtime": ["ExecutionBackend", "ExecutionChunk", "ExecutionContext", "ExecutionPlan", "RuntimeDriver", "RuntimeOptions", "SequentialWorkflow", "StepPlan", "Workflow", "WorkflowContext"],
-  "vercor.setups": ["CAMulatorConfig", "JAXGCMConfig", "JCMLandAtmosphereConfig", "JCMLandAtmosphereSetup", "JCMInputs", "Spinup", "VerosConfig", "load_jcm_inputs", "make_slab_atmosphere", "make_slab_land", "make_slab_ocean", "make_slab_seaice", "make_jcm_land_atmosphere", "make_camulator_gcm", "make_camulator_land", "make_era5_atmosphere", "make_era5_land", "make_era5_ocean", "make_erainterim_ocean", "make_jax_gcm", "make_jcm_land", "make_veros_gcm"],
+  "vercor.setups": ["CAMulatorConfig", "JCMAtmosphereConfig", "JCMLandAtmosphereConfig", "JCMLandAtmosphereSetup", "JCMInputs", "Spinup", "VerosConfig", "VerisConfig", "load_jcm_inputs", "make_slab_atmosphere", "make_slab_land", "make_slab_ocean", "make_slab_seaice", "make_jcm_land_atmosphere", "VerisVerosDataSetup", "VerisVerosSetup", "make_camulator_gcm", "make_camulator_land", "make_era5_atmosphere", "make_era5_land", "make_era5_ocean", "make_erainterim_ocean", "make_jcm_atmosphere", "make_jcm_land", "make_veris", "make_veris_veros", "make_veris_verosdata", "make_veros_gcm", "replace_veris_parameters"],
   "vercor.state": ["ComponentState", "FieldLookupScope", "FieldScope", "RunState"],
   "vercor.time_selection": ["datetime_to_seconds_in_year", "get_periodic_interval"],
   "vercor.topology": ["ExchangeTopologyPatch", "SurfaceMaskPolicy", "TopologyContext", "TopologyPolicy"],
@@ -131,7 +144,7 @@ could otherwise be confused with data:
 ```text
 Coupler(clock, *, components=(), exchanges=(), run_order=(), runtime=None,
         constants=None, logger=None, log_level="INFO")
-Exchange(source, target, fields, *, route_id=None, regridder_factory=bilinear)
+Exchange(source, target, fields, *, route_id=None, regridder_factory=bilinear, quantity, source_coverage="component")
 ComponentSpec(inputs=(), outputs=(), initial_fields=None, *, execution="jax",
               lifecycle=None, transfer=None, output=None)
 RuntimeOptions(dtype=DTypePolicy(), backend="auto", workflow=SequentialWorkflow(),
@@ -143,7 +156,7 @@ OutputTarget(directory, *, write_period=True, write_final_fields=True,
 The five signatures above are a readable representative sample. The complete,
 static executable inventory is
 [`tests/contracts/vercor-0.4.0-public-signatures.json`](../tests/contracts/vercor-0.4.0-public-signatures.json):
-it covers all 150 concrete callable exports in canonical non-root owner
+it covers all 158 concrete callable exports in canonical non-root owner
 manifests and 55 public class/protocol-call methods. Every
 normalized value includes parameter order and kind, defaults, resolved public
 annotations, and the return annotation. Source and isolated installed-artifact
@@ -164,6 +177,7 @@ following inventory is complete for `0.4.0` and documents responsibility,
 not import permission.
 
 ```text
+vercor._averaging
 vercor._field_names
 vercor._host_arrays
 vercor._interpolators
@@ -186,12 +200,14 @@ vercor._run_order
 vercor._numerical_safety
 vercor._runtime
 vercor._runtime.backends
+vercor._runtime.component_masks
 vercor._runtime.component_state
 vercor._runtime.contracts
 vercor._runtime.coupler_state
 vercor._runtime.dispatch_context
 vercor._runtime.driver
 vercor._runtime.exchange_dispatch
+vercor._runtime.exchange_masks
 vercor._runtime.exchange_topology
 vercor._runtime.execution
 vercor._runtime.facade
@@ -233,6 +249,8 @@ vercor.output._dataset
 vercor.output._netcdf
 vercor.output._period
 vercor.output._runtime
+vercor.output._scan
+vercor.output._selection
 vercor.output._session
 vercor.setups._data
 vercor.setups._data._component_helpers
@@ -243,6 +261,7 @@ vercor.setups._data.era5_land
 vercor.setups._data.era5_ocean
 vercor.setups._data.erainterim_ocean
 vercor.setups._data.jcm_land
+vercor.setups._data.veros_ocean
 vercor.setups._external
 vercor.setups._external._camulator_wind_filtering
 vercor.setups._external._jax_gcm_pytree
@@ -265,27 +284,42 @@ vercor.setups._external.jax_gcm_fields
 vercor.setups._external.jax_gcm_output
 vercor.setups._external.jax_gcm_runtime
 vercor.setups._external.jax_gcm_state
+vercor.setups._external.jax_gcm_surface
 vercor.setups._external.jax_gcm_tools
+vercor.setups._external.veris
+vercor.setups._external.veris_fluxes
+vercor.setups._external.veris_forcing
+vercor.setups._external.veris_output
+vercor.setups._external.veris_parameters
+vercor.setups._external.veris_runtime
+vercor.setups._external.veros_data
 vercor.setups._external.veros_fluxes
 vercor.setups._external.veros_gcm
 vercor.setups._external.veros_gcm_state
+vercor.setups._external.veros_host_state
 vercor.setups._external.veros_output
 vercor.setups._external.veros_runtime
 vercor.setups._external.veros_runtime_settings
 vercor.setups._external.veros_setup
 vercor.setups._external.veros_setup_jax
 vercor.setups._external.veros_state
+vercor.setups._surface_fluxes
+vercor.setups._veris
 vercor.setups.gallery
 vercor.setups.gallery.custom_component_wrapping
 vercor.setups.gallery.profile_runtime
-vercor.setups.gallery.run_camulator_with_veros
-vercor.setups.gallery.run_data_driver
-vercor.setups.gallery.run_jcm_with_era5data
-vercor.setups.gallery.run_jcm_with_slab
-vercor.setups.gallery.run_jcm_with_veros
-vercor.setups.gallery.run_jcm_with_verosdata
-vercor.setups.gallery.run_slab_driver
-vercor.setups.gallery.run_veros_with_era5data
+vercor.setups.gallery.camulator_with_veros
+vercor.setups.gallery.data_driver
+vercor.setups.gallery.jcm_with_era5data
+vercor.setups.gallery.jcm_with_slab
+vercor.setups.gallery.jcm_with_veros
+vercor.setups.gallery.jcm_with_verosdata
+vercor.setups.gallery.slab_driver
+vercor.setups.gallery.veris_calibration
+vercor.setups.gallery.veris_dataveros_era5
+vercor.setups.gallery.veris_veros_era5
+vercor.setups.gallery.veris_veros_jcm
+vercor.setups.gallery.veros_with_era5data
 vercor.setups._jcm
 vercor.setups._lazy_imports
 vercor.setups._output
@@ -300,6 +334,9 @@ vercor.setups.config
 
 ### Foundations and numerical implementations
 
+- Shared averaging: `vercor._averaging` owns finite sums/counts, safe mean
+  division and the scalar-count native accumulator; sampling and selection stay
+  with the existing output and adapter owners.
 - Field/runtime helpers: `vercor._field_names`, `vercor._host_arrays`,
   `vercor._pytree`, and `vercor._run_order`.
 - Numerical safety: `vercor._numerical_safety` owns transform-safe finite,
@@ -345,11 +382,16 @@ calls.
 - Diagnostics: `vercor.diagnostics.fields`, `plotting`, and `tables`.
 - Fluxes: `vercor.fluxes.bulk_formula_cesm`, `utilities`, and
   `vertical_coordinates`.
-- Output: `vercor.output._dataset`, `_netcdf`, `_period`, `_runtime`, and
+- Output: `vercor.output._dataset`, `_netcdf`, `_period`, `_runtime`, `_selection`, and
   `_session`.
 
-The component adapter is the only declaration-to-runtime normalization
-boundary. The output session is the only cadence and mean-accumulation owner;
+The component adapter is the only declaration-to-runtime preparation
+boundary. It checks structural step signatures and binds their public method
+directly; callable arity normalization belongs only to CallableComponent.
+Contracts are prepared once with validated endpoints, topology is constructed
+from declared factories and policy, and supplied RunState values always pass
+the prepared schema validation. The output session is the only cadence and
+mean-accumulation owner;
 `_netcdf` is the only file-writing primitive. There is no hidden output marker,
 second component adapter, duplicate accumulator, or native period-file path.
 
@@ -364,14 +406,14 @@ second component adapter, duplicate accumulator, or native period-file path.
   `camulator_init`, `camulator_land`, `camulator_output`, `camulator_runtime`,
   `camulator_runtime_settings`, `camulator_stepper`, `camulator_tensors`,
   `camulator_wind_filter`, `jax_gcm`, `jax_gcm_fields`, `jax_gcm_output`,
-  `jax_gcm_runtime`, `jax_gcm_state`, `jax_gcm_tools`, `veros_fluxes`,
+  `jax_gcm_runtime`, `jax_gcm_state`, `jax_gcm_surface`, `jax_gcm_tools`, `veros_fluxes`,
   `veros_gcm`, `veros_gcm_state`, `veros_output`, `veros_runtime`,
   `veros_runtime_settings`, `veros_setup`, and `veros_state`.
 - Runnable gallery: `vercor.setups.gallery`, `custom_component_wrapping`,
-  `profile_runtime`, `run_camulator_with_veros`, `run_data_driver`,
-  `run_jcm_with_era5data`, `run_jcm_with_slab`, `run_jcm_with_veros`,
-  `run_jcm_with_verosdata`, `run_slab_driver`, and
-  `run_veros_with_era5data`.
+  `profile_runtime`, `camulator_with_veros`, `data_driver`,
+  `jcm_with_era5data`, `jcm_with_slab`, `jcm_with_veros`,
+  `jcm_with_verosdata`, `slab_driver`, and
+  `veros_with_era5data`.
 - Remaining setup owners: `vercor.setups._jcm`, `vercor.setups._lazy_imports`,
   `vercor.setups._slab`, `vercor.setups._slab.atmosphere`,
   `vercor.setups._slab.land`, `vercor.setups._slab.ocean`,
@@ -380,7 +422,7 @@ second component adapter, duplicate accumulator, or native period-file path.
 
 Public setup access is always through `vercor.setups`. Private factories defer
 JCM/Dinosaur, Veros, CREDIT, Torch, and TensorFlow imports until invocation.
-JAXGCM, Veros, and CAMulator expose ordinary output providers and snapshot
+JCM, Veros, and CAMulator expose ordinary output providers and snapshot
 writers; they do not own cadence, paths, period accumulation, or writes.
 
 ## 6. Setup-agnostic plugin architecture
@@ -416,6 +458,11 @@ Paired JCM configuration owns land and atmosphere output independently. CI has
 installed base, JCM, and Veros lanes. CAMulator remains lazy and source-tested
 because a compatible external release is not yet pinned.
 
+The [source and coupling audit](source-coupling-audit.md) records the complete
+current source inventory, removed private alternatives, necessary adapters and
+exact surviving test assertions after the 2026-10-19 cleanup. Private naming
+checks are subordinate to these behavior and owner contracts.
+
 ## 7. Compatibility plan
 
 The 0.4 API does not include legacy compatibility adapters. Task 9 was
@@ -423,7 +470,11 @@ explicitly skipped. Applications use the current researcher and developer
 guides for imports and construction; primary 0.4 modules remain alias-free.
 
 No legacy compatibility adapter namespace or executable pre-redesign evidence
-ships. No earlier API is restored.
+ships. No earlier API is restored. Current gallery compositions omit feedback
+routes into prescribed producers and imports unused by slab kernels. Explicit
+DataComponent diagnostics remain supported; CAMulator applications must provide
+a real vapor-channel declaration and timestamped native initial diagnostics.
+See the [migration and evidence record](source-coupling-audit.md).
 
 Compatibility within the 0.4.x line is defined by canonical public owner
 manifests, signatures, public-only plugin behavior, output-free gradients, and

@@ -14,6 +14,7 @@ from vercor.components._protocol import Component as _Component
 from vercor.jax_logging import LoggerLike as _LoggerLike
 from vercor._field_names import freeze_name_sequence as _freeze_name_sequence
 from vercor.state import ComponentState as _ComponentState
+from vercor.types import RuntimeArray as _RuntimeArray
 
 _OutputFrequency: TypeAlias = Literal["step", "day", "month", "year"]
 
@@ -128,10 +129,15 @@ class OutputFrame:
     axis reduced into the period mean. ``time_dimension`` names the leading
     coordinate added to a written mean. ``dimension_order`` optionally gives
     the preferred NetCDF order; dimensions absent from it retain their sampled
-    order.
+    order. ``reduction_counts`` optionally supplies finite native-sample counts
+    for already reduced variables. For those entries, variable values are sums
+    with the same shape as their nonnegative integer counts; their dimensions
+    exclude ``sample_dimension``. The coordinator merges sums/counts and computes
+    means only at write boundaries. Other variables remain ordinary samples.
     """
 
     variables: Mapping[str, OutputVariable]
+    reduction_counts: Mapping[str, Any]
     coordinates: Mapping[str, OutputVariable]
     metadata: Mapping[str, Any]
     sample_dimension: str | None
@@ -143,6 +149,7 @@ class OutputFrame:
         variables: Mapping[str, OutputVariable],
         *,
         coordinates: Mapping[str, OutputVariable] | None = None,
+        reduction_counts: Mapping[str, Any] | None = None,
         metadata: Mapping[str, Any] | None = None,
         sample_dimension: str | None = None,
         time_dimension: str = "time",
@@ -170,7 +177,14 @@ class OutputFrame:
             raise ValueError(
                 f"OutputFrame name {sorted(overlap)[0]!r} is both a variable and coordinate"
             )
+        frozen_counts = _frozen_mapping(reduction_counts, label="reduction_counts")
+        unknown = next(
+            (name for name in frozen_counts if name not in frozen_variables), None
+        )
+        if unknown is not None:
+            raise ValueError(f"reduction_counts contains unknown variable {unknown!r}")
         object.__setattr__(self, "variables", frozen_variables)
+        object.__setattr__(self, "reduction_counts", frozen_counts)
         object.__setattr__(self, "coordinates", frozen_coordinates)
         object.__setattr__(
             self,
@@ -218,6 +232,7 @@ class OutputContext:
     step: int
     time: datetime | _ModelDateTime
     dt: timedelta
+    variables: tuple[str, ...] = ()
 
 
 @runtime_checkable
@@ -229,12 +244,48 @@ class OutputProvider(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class JaxOutputContext:
+    """Numeric post-step view for pure, fixed-schema output sampling.
+
+    ``step`` is an absolute zero-based int32 clock index, traced inside JAX
+    scans and concrete on host runs. ``dt_seconds`` is the static coupling
+    interval in seconds. Calendar formatting belongs to host output; numeric
+    sampling must not perform I/O or mutate native state.
+    """
+
+    component: _Component
+    state: _ComponentState
+    payload: Any | None
+    step: int | _RuntimeArray
+    dt_seconds: float
+    variables: tuple[str, ...] = ()
+
+
+@runtime_checkable
+class JaxOutputProvider(OutputProvider, Protocol):
+    """Optional numeric sampling capability used independently of the backend.
+
+    Numeric frames have a fixed schema, metadata, shapes and dtypes across the
+    run. Numeric values and coordinates may evolve; Python time coordinates
+    are omitted. Ordinary providers need only implement :class:`OutputProvider`.
+    Period output prefers ``sample_jax`` wherever this capability is present;
+    all-numeric JAX runs additionally accumulate samples inside scans.
+    """
+
+    def sample_jax(self, context: JaxOutputContext) -> OutputFrame:
+        """Return a pure numeric frame from the supplied post-step state."""
+        ...
+
+
 @dataclass(frozen=True, init=False)
 class PeriodOutput:
     """Mean-output cadence and uniform provider-variable selection policy.
 
     An empty ``variables`` tuple selects every variable returned by the
-    provider. A non-empty tuple selects that ordered subset, duplicate names
+    component, including native and canonical fields for bundled providers.
+    Providers receive this selection before sampling. A non-empty tuple selects
+    that ordered subset, duplicate names
     are removed, and unknown names fail with a component-scoped error.
     """
 
@@ -370,6 +421,8 @@ SnapshotContext.__init__.__annotations__.update(
 
 
 __all__ = [
+    "JaxOutputContext",
+    "JaxOutputProvider",
     "OutputContext",
     "OutputFrame",
     "OutputProvider",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import jax
@@ -14,12 +14,13 @@ import tree_math
 from dinosaur.coordinate_systems import CoordinateSystem
 
 from jcm.forcing import ForcingData, default_forcing
-from jcm.model import Model, ModelPredictions
+from jcm.model import Model
 from jcm.physics.speedy.params import Parameters
 from jcm.physics.speedy.speedy_terms import speedy_physics
 from jcm.physics_interface import PhysicsState
 from jcm.terrain import TerrainData
 
+from vercor.calendar import ModelDateTime
 from vercor.components import (
     Component,
     SetupContext,
@@ -33,7 +34,6 @@ from vercor.setups._time_helpers import (
 )
 from vercor.setups._external._jax_gcm_pytree import (
     tree_as_runtime_dtype,
-    tree_mean,
 )
 import vercor.setups._external.jax_gcm_runtime as _jax_gcm_runtime
 from vercor.setups._external.jax_gcm_tools import change_jcm_parameter_values
@@ -43,34 +43,50 @@ from vercor.types import RuntimeArray
 @tree_math.struct
 @dataclass
 class JCMState:
-    """JCM gridpoint output, native dycore state, and physics carry."""
+    """Endpoint JCM output, resumable native state, and its exact clock."""
 
     dynamics: PhysicsState
     physics: Any
     dycore_state: Any
     physics_carry: Any
+    time: Any
+    step: Any
 
 
 def _bootstrap_jcm_state(model: Model) -> JCMState:
-    """Return the initialized JCM 2 dycore and physics state bundle."""
+    """Return initialized native dynamics, physics carry, and clock."""
 
     model.bootstrap_state()
-    dycore_state = model._final_dycore_state
-    physics_carry = model._final_physics_state
-    if dycore_state is None or physics_carry is None:
+    native = model.run_state
+    if native is None or native.dynamics is None or native.physics is None:
         raise RuntimeError("JCM bootstrap did not initialize dycore and physics state")
     return JCMState(
-        dynamics=model.dycore.to_physics_state(dycore_state),
-        physics=physics_carry,
-        dycore_state=dycore_state,
-        physics_carry=physics_carry,
+        dynamics=model.dycore.to_physics_state(native.dynamics),
+        physics=native.physics,
+        dycore_state=native.dynamics,
+        physics_carry=native.physics,
+        time=native.time,
+        step=native.step,
     )
 
 
-class JAXGCMSetupState:
+def jax_gcm_epoch(start: datetime | ModelDateTime, effective_spinup: timedelta) -> Any:
+    """Bind the native Gregorian clock before any enabled spinup interval."""
+    from jcm.date import to_datetime
+
+    if not isinstance(start, datetime):
+        raise ValueError("JCM requires a Gregorian datetime start")
+    with jax.ensure_compile_time_eval():
+        return to_datetime(start - effective_spinup, name="JCM epoch")
+
+
+class JCMAtmosphereSetupState:
     """Mutable setup-time owner for a JAXGCM/JCM atmosphere adapter."""
 
-    _step_function: Callable[[JCMState, ForcingData], tuple[JCMState, ModelPredictions]]
+    _step_function: Callable[
+        [JCMState, ForcingData], tuple[JCMState, dict[str, jax.Array]]
+    ]
+    _epoch_key: tuple[datetime | ModelDateTime, timedelta, timedelta]
     _state: JCMState
     forcing: ForcingData
     data: dict[str, RuntimeArray]
@@ -89,9 +105,13 @@ class JAXGCMSetupState:
         forcing_data: ForcingData | None = None,
         do_spinup: bool = False,
         jitted: bool = True,
+        seaice_coupling: bool = False,
+        prescribed_marine_fraction: RuntimeArray | None = None,
     ) -> None:
         """Build JAXGCM model resources and the VerCOR grid."""
 
+        self.seaice_coupling = seaice_coupling
+        self.prescribed_marine_fraction = prescribed_marine_fraction
         self.forcing_data = forcing_data
         self.model_timestep = model_timestep
         self.save_interval = save_interval
@@ -107,7 +127,15 @@ class JAXGCMSetupState:
                 default_parameters=jcm_parameters,
             )
 
+        self.open_water_albedo = jcm_parameters.mod_radcon.albsea
         physics = speedy_physics(parameters=jcm_parameters)
+        if seaice_coupling:
+            from vercor.setups._external.jax_gcm_surface import CoupledSpeedyForcing
+
+            physics = physics.replace(
+                "forcing",
+                CoupledSpeedyForcing(mod_radcon_params=jcm_parameters.mod_radcon),
+            )
 
         self.model = Model(
             coords=coords,
@@ -134,39 +162,44 @@ class JAXGCMSetupState:
 
     def _generate_step_function(
         self, jitted: bool = True
-    ) -> Callable[[JCMState, ForcingData], tuple[JCMState, ModelPredictions]]:
+    ) -> Callable[[JCMState, ForcingData], tuple[JCMState, dict[str, jax.Array]]]:
         """Return the model step function, optionally JIT compiled."""
 
         def step_function(
             state: JCMState, forcing: ForcingData
-        ) -> tuple[JCMState, ModelPredictions]:
+        ) -> tuple[JCMState, dict[str, jax.Array]]:
             precision_policy = self._dtype_policy
-            final_dycore_state, final_physics_carry, predictions = (
-                self.model.run_from_state_with_carry(
-                    initial_state=state.dycore_state,
-                    initial_physics_state=state.physics_carry,
-                    save_interval=self.save_interval / timedelta(days=1),
-                    total_time=self.coupling_timestep / timedelta(days=1),
-                    output_averages=False,
-                    forcing=forcing,
-                )
+            native, predictions = self.model.run_from_state_with_carry(
+                initial_state=state.dycore_state,
+                initial_physics_state=state.physics_carry,
+                save_interval=self.model_timestep / timedelta(days=1),
+                total_time=self.coupling_timestep / timedelta(days=1),
+                output_averages=False,
+                forcing=forcing,
+                initial_time=state.time,
+                initial_step=state.step,
             )
 
-            # JCM currently returns a stacked object; reduce to one runtime state.
+            # Every native sample is needed for interval integration; endpoint
+            # state and exact continuation carry retain their own ownership.
             return (
                 JCMState(
                     dynamics=tree_as_runtime_dtype(
-                        tree_mean(predictions.dynamics, axis=0),
+                        jax.tree.map(lambda value: value[-1], predictions.dynamics),
                         precision_policy,
                     ),
                     physics=tree_as_runtime_dtype(
-                        tree_mean(predictions.physics, axis=0),
+                        jax.tree.map(lambda value: value[-1], predictions.physics),
                         precision_policy,
                     ),
-                    dycore_state=final_dycore_state,
-                    physics_carry=final_physics_carry,
+                    dycore_state=native.dynamics,
+                    physics_carry=native.physics,
+                    time=native.time,
+                    step=native.step,
                 ),
-                predictions,
+                _jax_gcm_runtime._jcm_exchange_samples(
+                    predictions.dynamics, predictions.physics, component_name=self.name
+                ),
             )
 
         return jax.jit(step_function) if jitted else step_function
@@ -184,9 +217,28 @@ class JAXGCMSetupState:
             context.dt_seconds,
             self.model_timestep,
         )
+        if self.save_interval <= timedelta(0):
+            raise ValueError("JCM save_interval must be positive")
+        if self.save_interval % self.model_timestep:
+            raise ValueError("JCM save_interval must be divisible by model_timestep")
+        if self.coupling_timestep % self.save_interval:
+            raise ValueError("JCM save_interval must evenly divide coupling_timestep")
         self.spinup_steps = int(
             self.spinup_time.total_seconds() // self.coupling_timestep.total_seconds()
         )
+
+        if context.calendar != "gregorian":
+            raise ValueError("JCM 3 requires a Gregorian coupler calendar")
+        effective_spinup = self.spinup_time if self.do_spinup else timedelta(0)
+        if effective_spinup < timedelta(0) or effective_spinup % self.coupling_timestep:
+            raise ValueError("Enabled JCM spinup must align to coupling intervals")
+        epoch_key = (context.start, effective_spinup, self.coupling_timestep)
+        if hasattr(self, "_epoch_key") and self._epoch_key != epoch_key:
+            raise ValueError(
+                "JCM epoch already bound; construct a new component for another start"
+            )
+        self._epoch_key = epoch_key
+        self.model.start_time = jax_gcm_epoch(context.start, effective_spinup)
 
         self._state = _bootstrap_jcm_state(self.model)
 
@@ -222,13 +274,16 @@ class JAXGCMSetupState:
                 step=spinup_step,
             )
 
-        return SetupResult(
-            fields=initial_fields,
-            payload=_jax_gcm_runtime.create_jax_gcm_runtime_payload(self, component),
-        )
+        payload = _jax_gcm_runtime.create_jax_gcm_runtime_payload(self, component)
+        if self.seaice_coupling:
+            diagnosed, payload = _jax_gcm_runtime.diagnose_jax_gcm_initial_fields(
+                self, payload, context.constants, context.dtype
+            )
+            initial_fields.update(diagnosed)
+        return SetupResult(fields=initial_fields, payload=payload)
 
 
 __all__ = [
-    "JAXGCMSetupState",
+    "JCMAtmosphereSetupState",
     "JCMState",
 ]

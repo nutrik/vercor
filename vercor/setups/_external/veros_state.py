@@ -9,6 +9,7 @@ from typing import Any, Callable, Literal, NamedTuple, cast
 import jax
 import jax.numpy as jnp
 
+from vercor._averaging import SampleMean
 from vercor._numerical_safety import replace_missing_nan
 from vercor.dtypes import as_jax_index_array, as_jax_real_array
 from vercor._host_arrays import runtime_array_to_host
@@ -22,7 +23,7 @@ class VerosForcingFields(NamedTuple):
     taux: jax.Array
     tauy: jax.Array
     qnet: jax.Array
-    qnec: jax.Array
+    qnec: jax.Array | None
     coupled_salt_flux: jax.Array
 
 
@@ -47,7 +48,8 @@ def prepare_surface_forcing_fields(
     """Clean and transpose surface arrays into native Veros forcing layouts.
 
     Stress and heat have a singleton month axis for broadcast into the native
-    climatology arrays. The already-converted salt flux remains a 2D T-grid
+    climatology arrays. qnec=None preserves the native climatological restoring
+    coefficient. The already-converted salt flux remains a 2D T-grid
     array in m (g/kg)/s; the native tracer owns timestep/depth integration.
     Restoring weights are applied by the native callback, including spinup;
     this layout boundary preserves the raw heat-correction coefficient.
@@ -60,7 +62,9 @@ def prepare_surface_forcing_fields(
     taux_prepared = _prepare(taux, "Veros taux surface forcing")
     tauy_prepared = _prepare(tauy, "Veros tauy surface forcing")
     qnet_prepared = _prepare(qnet, "Veros qnet surface forcing")
-    qnec_prepared = _prepare(qnec, "Veros qnec surface forcing")
+    qnec_prepared = (
+        None if qnec is None else _prepare(qnec, "Veros qnec surface forcing")
+    )
 
     return VerosForcingFields(
         taux=taux_prepared,
@@ -101,6 +105,10 @@ def copy_state(
     if execution != "host":
         raise ValueError("execution must be 'host' or 'jax'")
 
+    if isinstance(getattr(tree.variables, "temp", None), jax.Array):
+        from vercor.setups._external.veros_host_state import copy_host_jax_state
+
+        return cast(VerosState, copy_host_jax_state(tree))
     setting_fields = tree.settings.__fields__
     return cast(
         VerosState,
@@ -123,9 +131,8 @@ def _get_veros_linear_solver_interface() -> (
         or solver_cache is not wrapped_cache
     ):
         raise RuntimeError(
-            "component-scoped Veros solver caching requires Veros >=1.6.2,<1.7 "
-            "with get_linear_solver.cache and its wrapped accessor exposing "
-            "the same mutable mapping"
+            "component-scoped Veros solver caching requires a mutable cache mapping "
+            "shared by get_linear_solver.cache and its wrapped accessor"
         )
     return cast(Callable[[VerosState], Any], get_linear_solver), cast(
         MutableMapping[tuple[VerosState], Any], solver_cache
@@ -147,8 +154,17 @@ def pure(
     linear_solver: Any,
     *,
     execution: Literal["host", "jax"],
+    synchronize_surface_height: bool = False,
 ) -> VerosState:
-    """Run one native step with the component-owned solver."""
+    """Run one native step with the component-owned solver.
+
+    Coupled pressure execution refreshes the diagnostic SSH after the native
+    driver rotates time slots. Native pressure kernels diagnose SSH from the
+    old tau while updating velocity from taup1. In pressure mode psi is surface
+    geopotential (m²/s²), so psi at the rotated tau divided by gravity is the
+    current height in metres. Streamfunction psi (m³/s) is never converted.
+    Native prognostic slots and the native integrator remain untouched.
+    """
 
     next_state = (
         state if execution == "host" else copy_state(state, execution=execution)
@@ -160,6 +176,12 @@ def pure(
     solver_cache[cache_key] = linear_solver
     try:
         step(next_state)
+        if synchronize_surface_height and not next_state.settings.enable_streamfunction:
+            variables = next_state.variables
+            with variables.unlock():
+                variables.ssh = (
+                    variables.psi[..., variables.tau] / next_state.settings.grav
+                )
     finally:
         if previous_solver is missing:
             solver_cache.pop(cache_key, None)
@@ -180,30 +202,80 @@ def extract_veros_runtime_sst(state: VerosState) -> jax.Array:
     )
 
 
+def extract_veros_runtime_surface_fields(
+    state: VerosState,
+    *,
+    coupled: bool,
+) -> dict[str, jax.Array]:
+    """Extract native SST K and, for coupled mode, actual prognostic surfaces.
+
+    SSS retains native g/kg, east/north face velocities are m/s, and active
+    native SSH is metres. Extraction reads the SSH diagnostic synchronized by
+    coupled pressure stepping, rather than interpreting the formulation-dependent
+    psi here. Dry/coastal operands use their actual native wet masks.
+    """
+    vs = state.variables
+    result = {"sea_surface_temperature": extract_veros_runtime_sst(state)}
+    if not coupled:
+        return result
+    tau = as_jax_index_array(vs.tau)
+
+    def surface(array: object, mask: object) -> jax.Array:
+        return (
+            as_jax_real_array(array)[2:-2, 2:-2, -1, tau]
+            * as_jax_real_array(mask)[2:-2, 2:-2, -1]
+        ).T
+
+    result.update(
+        sea_surface_salinity=surface(vs.salt, vs.maskT),
+        ocean_u_velocity=surface(vs.u, vs.maskU),
+        ocean_v_velocity=surface(vs.v, vs.maskV),
+        sea_surface_height=(
+            as_jax_real_array(vs.ssh)[2:-2, 2:-2]
+            * as_jax_real_array(vs.maskT)[2:-2, 2:-2, -1]
+        ).T,
+    )
+    return result
+
+
 def apply_veros_forcing_fields(
     state: VerosState,
     forcing_fields: VerosForcingFields,
     *,
     execution: Literal["host", "jax"],
+    activate_coupled_feedback: bool = False,
 ) -> VerosState:
-    """Write prepared VerCOR forcing fields into Veros state variables."""
+    """Write forcing once, preserving omitted qnec and optionally activating totals.
+
+    Host callers already own a copied payload; JAX callers retain functional
+    copying. Activation is explicit even for zero flux and persists through
+    later native substeps, while climatological spinup starts inactive.
+    """
 
     updated_state = (
         state if execution == "host" else copy_state(state, execution=execution)
     )
     variables = updated_state.variables
+    native_jax = execution == "jax" or isinstance(variables.qnet, jax.Array)
     with variables.unlock():
         for variable_name, variable_value in zip(
             VerosForcingFields._fields,
             forcing_fields,
             strict=True,
         ):
+            if variable_value is None:
+                continue
             current = getattr(variables, variable_name)
             updated = update_veros_interior(current, variable_value)
             setattr(
                 variables,
                 variable_name,
-                updated if execution == "jax" else runtime_array_to_host(updated),
+                updated if native_jax else runtime_array_to_host(updated),
+            )
+        if activate_coupled_feedback:
+            active = jnp.ones_like(variables.coupled_feedback_active)
+            variables.coupled_feedback_active = (
+                active if native_jax else runtime_array_to_host(active)
             )
     return updated_state
 
@@ -213,16 +285,30 @@ def advance_veros_substeps(
     *,
     step_function: Callable[[VerosState], VerosState],
     model_substeps: int,
-    logger: Any | None,
-) -> VerosState:
-    """Advance Veros through the configured number of native substeps."""
+    sample_fields: Callable[[VerosState], dict[str, jax.Array]],
+) -> tuple[VerosState, dict[str, jax.Array]]:
+    """Advance native state and average mapped post-step surfaces without history.
+
+    Every aligned native step has equal duration. The final native state stays
+    separate from the small canonical field sums used by the coupling exchange.
+    This helper emits no sub-step progress logs.
+    """
 
     updated_state = state
-    for i in range(model_substeps):
-        if logger is not None:
-            logger.info(f"Veros sub-step {i+1} / {model_substeps}")
+    accumulator: SampleMean | None = None
+    for _ in range(model_substeps):
         updated_state = step_function(updated_state)
-    return updated_state
+        sample = sample_fields(updated_state)
+        accumulator = (
+            SampleMean.from_sample(sample)
+            if accumulator is None
+            else accumulator.add(sample)
+        )
+    if accumulator is None:
+        raise ValueError(
+            "Veros requires at least one native step per coupling interval"
+        )
+    return updated_state, cast(dict[str, jax.Array], accumulator.mean())
 
 
 __all__ = [

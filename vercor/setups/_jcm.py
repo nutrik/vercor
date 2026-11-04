@@ -8,6 +8,8 @@ from typing import Any
 from vercor._host_arrays import transposed_host_array
 from vercor.components import Component, DataComponent
 from vercor.grids import RectilinearGrid
+from vercor.dtypes import as_jax_real_array
+from vercor.grid_masks import _surface_fractions_from_ocean
 from vercor.setups.config import JCMLandAtmosphereConfig
 
 
@@ -54,9 +56,9 @@ def _load_jcm_factories() -> tuple[
     """Return optional JCM setup factories from their owning modules."""
 
     from vercor.setups._data.jcm_land import make_jcm_land
-    from vercor.setups._external.jax_gcm import make_jax_gcm
+    from vercor.setups._external.jax_gcm import make_jcm_atmosphere
 
-    return make_jcm_land, make_jax_gcm
+    return make_jcm_land, make_jcm_atmosphere
 
 
 def make_jcm_land_atmosphere(
@@ -67,7 +69,7 @@ def make_jcm_land_atmosphere(
 ) -> JCMLandAtmosphereSetup:
     """Create paired JCM land and atmosphere setup components for an ocean grid."""
 
-    make_jcm_land, make_jax_gcm = _load_jcm_factories()
+    make_jcm_land, make_jcm_atmosphere = _load_jcm_factories()
     if config is None:
         config = JCMLandAtmosphereConfig()
     atmosphere_config = config.atmosphere
@@ -81,14 +83,22 @@ def make_jcm_land_atmosphere(
         ocn_grid,
         name=config.land_name,
         output=config.land_output,
+        native_land_fraction=as_jax_real_array(terrain.fmask).T,
     )
 
     # JAXGCM expects the terrain mask in host/transposed JCM layout.
     if land.grid.binary_mask is None:
         raise ValueError("JCM land grid requires a binary mask for terrain patching")
-    terrain.fmask = transposed_host_array(land.grid.binary_mask)
+    terrain = terrain.copy(
+        fmask=transposed_host_array(
+            as_jax_real_array(land.spec.initial_fields["land_fraction"])
+        )
+    )
+    _, prescribed_marine_fraction, _ = _surface_fractions_from_ocean(
+        land.grid, ocn_grid, as_jax_real_array(jcm_inputs.terrain.fmask).T
+    )
 
-    atmosphere = make_jax_gcm(
+    atmosphere = make_jcm_atmosphere(
         coords,
         terrain,
         config=replace(
@@ -99,6 +109,7 @@ def make_jcm_land_atmosphere(
                 else atmosphere_config.forcing_data
             ),
         ),
+        prescribed_marine_fraction=prescribed_marine_fraction,
     )
     return JCMLandAtmosphereSetup(
         land=land,

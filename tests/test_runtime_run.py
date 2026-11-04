@@ -15,9 +15,6 @@ import pytest
 
 from tests.assertions import assert_allclose_compact
 from tests._coverage_support import make_test_grid
-from tests._runtime_helpers import (
-    replace_runtime_topology_maps,
-)
 from vercor.clock import Clock
 from vercor.components import CallableComponent, Component, ComponentSpec
 from vercor.exceptions import ComponentError, CouplerError
@@ -93,24 +90,28 @@ def _make_coupler(steps: int) -> Coupler:
         ),
         exchanges=(
             Exchange(
+                quantity="intensive",
                 source="OCN",
                 target="ATM",
                 fields=["sea_surface_temperature"],
                 regridder_factory=cast(Any, _identity_factory),
             ),
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
                 fields=["sensible_heat_flux", "latent_heat_flux"],
                 regridder_factory=cast(Any, _identity_factory),
             ),
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="LND",
                 fields=["latent_heat_flux"],
                 regridder_factory=cast(Any, _identity_factory),
             ),
             Exchange(
+                quantity="intensive",
                 source="OCN",
                 target="ICE",
                 fields=["sea_surface_temperature"],
@@ -123,22 +124,6 @@ def _make_coupler(steps: int) -> Coupler:
             "LND",
             "ICE",
         ),
-    )
-    regridders = cast(
-        Any,
-        {
-            "OCN->ATM": _IdentityRegridder(),
-            "ATM->OCN": _IdentityRegridder(),
-            "ATM->LND": _IdentityRegridder(),
-            "OCN->ICE": _IdentityRegridder(),
-        },
-    )
-    replace_runtime_topology_maps(
-        coupler,
-        regridders=regridders,
-        fractional_masks={
-            key: jnp.ones((2, 2), dtype=jnp.float64) for key in regridders
-        },
     )
     return coupler
 
@@ -814,12 +799,6 @@ def test_run_executes_pure_scanned_runtime_for_same_shapes_and_metadata() -> Non
     )
 
 
-def test_run_api_does_not_expose_state_donation() -> None:
-    signature = inspect.signature(Coupler.run)
-
-    assert "donate_state" not in signature.parameters
-
-
 def test_run_preserves_runtime_treedef() -> None:
     coupler = _make_coupler(steps=1)
 
@@ -846,9 +825,27 @@ def test_runtime_profile_harness_exposes_cli_entrypoint() -> None:
     assert callable(profile_runtime.main)
     assert callable(profile_runtime.run_setup)
     parser = profile_runtime.build_parser()
-    args = parser.parse_args(["--steps", "3", "--log-level", "WARNING"])
+    args = parser.parse_args(
+        [
+            "--steps",
+            "3",
+            "--log-level",
+            "WARNING",
+            "--repeats",
+            "2",
+            "--float-type",
+            "float32",
+            "--trace-dir",
+            "/tmp/profile",
+            "--json",
+        ]
+    )
     assert args.steps == 3
     assert args.log_level == "WARNING"
+    assert args.repeats == 2
+    assert args.float_type == "float32"
+    assert args.trace_dir == Path("/tmp/profile")
+    assert args.json
     assert not hasattr(args, "donate_state")
 
 
@@ -893,7 +890,7 @@ def test_runtime_profile_run_setup_maps_cli_options_and_returns_zero(
     }
 
 
-def test_runtime_profile_harness_runs_small_slab_profile() -> None:
+def test_runtime_profile_harness_runs_small_slab_profile(tmp_path: Path) -> None:
     profile_runtime = importlib.import_module("vercor.setups.gallery.profile_runtime")
 
     result = profile_runtime.profile_runtime(
@@ -901,8 +898,20 @@ def test_runtime_profile_harness_runs_small_slab_profile() -> None:
         grid_nx=2,
         grid_ny=2,
         log_level="WARNING",
+        repeats=2,
+        trace_dir=tmp_path,
     )
 
     assert result.run_seconds >= 0.0
+    assert result.setup_seconds >= 0.0
+    assert len(result.warm_run_seconds) == 2
+    assert all(value >= 0.0 for value in result.warm_run_seconds)
+    traces = tuple(tmp_path.glob("plugins/profile/*/perfetto_trace.json.gz"))
+    assert len(traces) == 1
+    import gzip
+    import json
+
+    events = json.loads(gzip.decompress(traces[0].read_bytes()))["traceEvents"]
+    assert any(event.get("name") == "vercor_warm_run" for event in events)
     assert not hasattr(result, "compiled_cache_entries")
     assert result.final_state_leaves > 0

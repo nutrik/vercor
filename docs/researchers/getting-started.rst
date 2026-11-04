@@ -35,6 +35,19 @@ to install VerCOR with the optional
 `JCM <https://jax-gcm.readthedocs.io/en/latest/>`_ and
 `Veros <https://veros.readthedocs.io/en/latest/>`_ components.
 
+For standalone Veris with prescribed Veros ocean data, install a source checkout
+containing the integration with ``python -m pip install ".[veris,veros]"``.
+The ``veris`` extra pins the maintained standalone native model; ``veros``
+provides the setup-only global ocean geometry and climatology. The gallery
+``veris_dataveros_era5`` supplies ERA5 forcing and uses the standard
+``vercor copy-setup`` and ``vercor run`` commands (see :doc:`../setup-gallery`).
+
+The combined JCM/Veris lane uses released JCM 3.0.0 and Veris v0.2.1.
+Their upstream JAX requirements conflict. From this checkout, use
+``python tools/install_coupled_models.py`` for the reviewed JAX 0.11.2 override;
+normal installation of the combined extras cannot resolve. See
+:doc:`../exchange-coverage` for the exact exception and validation scope.
+
 If you want to install a specific release version execute:
 
 .. code-block:: console
@@ -89,8 +102,8 @@ In order to perform your first coupled run, you can copy a pre-configured setup 
 
 .. code-block:: console
 
-   vercor copy-setup run_veros_with_era5data \
-     --to ~/vercor-setups/run_veros_with_era5data
+   vercor copy-setup veros_with_era5data \
+     --to ~/vercor-setups/veros_with_era5data
 
 Alternatively, you can create your own setup script from scratch. In this case, you need to define the longitude-latitude locations of a component's fields
 with :class:`~vercor.grids.RectilinearGrid`; the shared start time, coupler time step, and number of steps with
@@ -113,7 +126,7 @@ If you choose to run the copied above pre-configured setup, execute:
    vercor run \
      --loglevel info \
      --float-type float64 \
-     ~/vercor-setups/run_veros_with_era5data/run_veros_with_era5data.py
+     ~/vercor-setups/veros_with_era5data/veros_with_era5data.py
 
 For the alternative setup (given above) execute:
 

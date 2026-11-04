@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import jax
+import jax_datetime as jdt
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -22,7 +23,7 @@ from vercor.dtypes import DTypePolicy
 from vercor.exchanges import Exchange
 from vercor.exceptions import CouplerError
 from vercor.runtime import RuntimeOptions
-from vercor.setups._external.jax_gcm_runtime import JAXGCMRuntimePayload
+from vercor.setups._external.jax_gcm_runtime import JCMAtmosphereRuntimePayload
 from vercor.setups._external.jax_gcm_state import JCMState
 from vercor._runtime.contracts import ExchangeContract
 from vercor._runtime.component_state import create_runtime_component_state
@@ -76,7 +77,7 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     from vercor.fluxes.bulk_formula_cesm import compute_ocean_surface_fluxes
     from vercor.setups._external.camulator import make_camulator_gcm
     from vercor.setups._external.camulator_land import make_camulator_land
-    from vercor.setups._external.jax_gcm import make_jax_gcm
+    from vercor.setups._external.jax_gcm import make_jcm_atmosphere
     from vercor.setups._external.veros_gcm import make_veros_gcm
     from vercor.setups._jcm import make_jcm_land_atmosphere
 
@@ -88,7 +89,7 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     )
     assert make_camulator_gcm.__module__ == "vercor.setups._external.camulator"
     assert make_camulator_land.__module__ == ("vercor.setups._external.camulator_land")
-    assert make_jax_gcm.__module__ == "vercor.setups._external.jax_gcm"
+    assert make_jcm_atmosphere.__module__ == "vercor.setups._external.jax_gcm"
     assert make_jcm_land_atmosphere.__module__ == "vercor.setups._jcm"
     assert make_veros_gcm.__module__ == "vercor.setups._external.veros_gcm"
     assert compute_ocean_surface_fluxes.__module__ == (
@@ -233,7 +234,6 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "def _runtime_daily_index" not in coupler_source
     assert "def _build_exchange_contracts" not in coupler_source
     assert "class ExchangeContract" in runtime_contracts_source
-    assert "def flatten_exchange_fields" in runtime_contracts_source
     assert "def append_unique_runtime_fields" in runtime_contracts_source
     assert "def build_exchange_contracts" in runtime_contracts_source
     assert "def exchange_key" not in runtime_contracts_source
@@ -307,8 +307,6 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "from vercor._runtime.prepared import PreparedCoupling" in coupler_source
     assert "def _ensure_prepared(" in coupler_source
     assert "RuntimeInputs" not in runtime_facade_source
-    assert "donate_state" not in coupler_source
-    assert "donate_state" not in runtime_facade_source
     assert "def _run_host_runtime" not in coupler_source
     run_body = coupler_source.split("def run", 1)[1]
     assert "host_component_names(self._components)" not in run_body
@@ -359,12 +357,11 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "def receive_runtime_fields" in runtime_field_transfer_source
     assert "def send_runtime_fields" in runtime_field_transfer_source
     assert "def validate_component_runtime_contract_fields" in runtime_validation_source
-    assert "def check_not_empty_import_export_lists" in runtime_validation_source
     assert "def validate_exchange_fields_declared" in runtime_validation_source
-    assert "prepare_component," in runtime_initialization_source
+    assert "import prepare_component" in runtime_initialization_source
     assert "name: prepare_component(" in runtime_initialization_source
     assert "def initialize_coupler_runtime(" in runtime_initialization_source
-    assert "from vercor.components._adapter import (" in runtime_initialization_source
+    assert "from vercor.components._adapter import" in runtime_initialization_source
     assert "validate_component_contract" not in runtime_initialization_source
     assert "from vercor.components.setup_validation import" not in (
         runtime_initialization_source
@@ -448,8 +445,8 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "def _create_exchange_masks(" not in coupler_source
     assert "def _validate_land_mask_consistency(" not in coupler_source
     assert "def _patch_exchange_masks(" not in coupler_source
-    assert "compute_ocn_lnd_masks_on_atm_grid" not in coupler_source
-    assert "check_total_lnd_ocn_mask_sum" not in coupler_source
+    assert "compute_ocean_land_masks_on_atmosphere_grid" not in coupler_source
+    assert "check_land_ocean_fraction_sum" not in coupler_source
     assert "jax_ones(" not in coupler_source
     assert "class SetupContext" not in base_source
     assert "class StepContext" not in base_source
@@ -476,7 +473,7 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "elif field_name in store" not in diagnostics_source
     assert ".fields.get(" not in diagnostics_source
     assert "getattr(" not in diagnostics_source
-    assert "def make_jax_gcm" in jax_gcm_source
+    assert "def make_jcm_atmosphere" in jax_gcm_source
     assert "def make_veros_gcm" in veros_source
     assert "def make_camulator_gcm" in camulator_source
     assert "def make_camulator_land" in camulator_land_source
@@ -492,9 +489,9 @@ def test_runtime_modules_use_current_domain_owners() -> None:
         "def make_veros_gcm(", 1
     )
     assert "import vercor.setups._external.veros_gcm_state" in veros_loader_source
-    assert "configure_veros_runtime(config.execution)" in veros_factory_source
+    assert "configure_veros_runtime(" in veros_factory_source
     assert veros_factory_source.index(
-        "configure_veros_runtime(config.execution)"
+        "configure_veros_runtime("
     ) < veros_factory_source.index("_load_veros_implementation()")
     assert "def configure_veros_runtime" in veros_runtime_settings_source
     signature = camulator_land_source.split("def step(", 1)[1].split(") ->", 1)[0]
@@ -525,12 +522,14 @@ def test_runtime_contracts_include_all_constructor_exchanges() -> None:
         components=(atmosphere, ocean),
         exchanges=(
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
                 fields=("temperature",),
                 route_id="atmosphere-temperature",
             ),
             Exchange(
+                quantity="intensive",
                 source="ATM",
                 target="OCN",
                 fields=("humidity",),
@@ -602,39 +601,23 @@ def test_prepared_runtime_fields_are_frozen_and_read_only() -> None:
 
 
 @pytest.mark.fast_always
-def test_runtime_topology_maps_copying_stays_at_exchange_topology_boundary() -> None:
-    topology_state_source = Path("vercor/_runtime/topology_state.py").read_text(
-        encoding="utf-8"
-    )
-    exchange_topology_source = Path("vercor/_runtime/exchange_topology.py").read_text(
-        encoding="utf-8"
-    )
-
-    assert "def from_mappings(" not in topology_state_source
-    assert "RuntimeTopologyMaps.from_mappings" not in exchange_topology_source
-    assert "regridders = {}" in exchange_topology_source
-
-    regridders = cast(Any, {"ATM->OCN": object()})
-    binary_masks: dict[str, RuntimeArray] = {"ATM->OCN": jnp.ones((2, 2))}
-    fractional_masks: dict[str, RuntimeArray] = {"ATM->OCN": jnp.full((2, 2), 0.5)}
+def test_runtime_topology_maps_copy_and_freeze_input_mappings() -> None:
+    regridder = object()
+    regridders = cast(Any, {"ATM->OCN": regridder})
+    mask = jnp.ones((2, 2))
+    binary_masks: dict[str, RuntimeArray] = {"ATM->OCN": mask}
     topology_maps = RuntimeTopologyMaps(
         regridders=regridders,
         binary_masks=binary_masks,
-        fractional_masks=fractional_masks,
     )
-
-    copied = RuntimeTopologyMaps(
-        regridders=dict(topology_maps.regridders),
-        binary_masks=dict(topology_maps.binary_masks),
-        fractional_masks=dict(topology_maps.fractional_masks),
-    )
-
-    assert copied.regridders == topology_maps.regridders
-    assert copied.binary_masks == topology_maps.binary_masks
-    assert copied.fractional_masks == topology_maps.fractional_masks
-    assert copied.regridders is not topology_maps.regridders
-    assert copied.binary_masks is not topology_maps.binary_masks
-    assert copied.fractional_masks is not topology_maps.fractional_masks
+    regridders.clear()
+    binary_masks.clear()
+    assert topology_maps.regridders["ATM->OCN"] is regridder
+    assert topology_maps.binary_masks["ATM->OCN"] is mask
+    with pytest.raises(TypeError):
+        topology_maps.regridders["extra"] = object()  # type: ignore[index]
+    with pytest.raises(TypeError):
+        topology_maps.binary_masks["extra"] = mask  # type: ignore[index]
 
 
 def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:
@@ -651,13 +634,13 @@ def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:
 
 
 def test_examples_use_coupler_runtime_component_view_factory() -> None:
-    slab_driver_source = Path("vercor/setups/gallery/run_slab_driver.py").read_text(
+    slab_driver_source = Path("vercor/setups/gallery/slab_driver.py").read_text(
         encoding="utf-8"
     )
-    data_driver_source = Path("vercor/setups/gallery/run_data_driver.py").read_text(
+    data_driver_source = Path("vercor/setups/gallery/data_driver.py").read_text(
         encoding="utf-8"
     )
-    jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
+    jcm_slab_source = Path("vercor/setups/gallery/jcm_with_slab.py").read_text(
         encoding="utf-8"
     )
 
@@ -667,7 +650,13 @@ def test_examples_use_coupler_runtime_component_view_factory() -> None:
 
 
 def test_examples_import_component_contracts_from_canonical_owner() -> None:
-    for path in Path("vercor/setups/gallery").glob("run_*.py"):
+    paths = tuple(
+        path
+        for path in Path("vercor/setups/gallery").glob("*.py")
+        if not path.name.startswith("_")
+    )
+    assert paths, "No public gallery examples were checked"
+    for path in paths:
         source = path.read_text(encoding="utf-8")
         assert "from vercor import Component" not in source
         assert "from vercor import DataComponent" not in source
@@ -888,8 +877,10 @@ def test_runtime_coupler_state_restores_component_index_cache_after_pytree_round
 
 
 def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
-    payload = JAXGCMRuntimePayload(
+    payload = JCMAtmosphereRuntimePayload(
         jcm_state=JCMState(
+            time=jdt.to_datetime("2000-01-01"),
+            step=jnp.int32(0),
             dynamics={},
             physics={},
             dycore_state={"marker": jnp.asarray(1.0)},
@@ -906,10 +897,12 @@ def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
 
     def update(value: ComponentRuntimeState) -> ComponentRuntimeState:
         runtime_payload = value.payload
-        assert isinstance(runtime_payload, JAXGCMRuntimePayload)
+        assert isinstance(runtime_payload, JCMAtmosphereRuntimePayload)
         return value.with_payload(
-            JAXGCMRuntimePayload(
+            JCMAtmosphereRuntimePayload(
                 jcm_state=JCMState(
+                    time=jdt.to_datetime("2000-01-01"),
+                    step=jnp.int32(0),
                     dynamics=runtime_payload.jcm_state.dynamics,
                     physics=runtime_payload.jcm_state.physics,
                     dycore_state={
@@ -926,7 +919,7 @@ def test_runtime_component_state_preserves_optional_payload_under_jit() -> None:
 
     updated = jax.jit(update)(component)
 
-    assert isinstance(updated.payload, JAXGCMRuntimePayload)
+    assert isinstance(updated.payload, JCMAtmosphereRuntimePayload)
     assert_allclose_compact(
         updated.payload.jcm_state.dycore_state["marker"],
         np.asarray(2.0),
@@ -942,7 +935,8 @@ def test_shared_runtime_field_selector_applies_every_transfer_policy() -> None:
         lambda value: value[0],
         RuntimeStepInfo.from_sequences([0], [1], [0.75], [0.25], [2]),
     )
-    forcing = jnp.arange(4 * 2 * 2, dtype=jnp.float64).reshape((4, 2, 2))
+    forcing = jnp.arange(12 * 2 * 2, dtype=jnp.float64).reshape((12, 2, 2))
+    daily_forcing = jnp.arange(365 * 2 * 2, dtype=jnp.float64).reshape((365, 2, 2))
 
     current = field_transfer_module.select_runtime_field(
         forcing,
@@ -955,7 +949,7 @@ def test_shared_runtime_field_selector_applies_every_transfer_policy() -> None:
         step_info,
     )
     daily = field_transfer_module.select_runtime_field(
-        forcing,
+        daily_forcing,
         TransferPolicy("daily"),
         step_info,
     )
@@ -971,7 +965,7 @@ def test_shared_runtime_field_selector_applies_every_transfer_policy() -> None:
         linear,
         0.75 * np.asarray(forcing[0]) + 0.25 * np.asarray(forcing[1]),
     )
-    assert_allclose_compact(daily, np.asarray(forcing[2]))
+    assert_allclose_compact(daily, np.asarray(daily_forcing[2]))
 
 
 def test_runtime_send_applies_monthly_interpolation_under_jit_and_grad() -> None:
@@ -1023,7 +1017,7 @@ def test_runtime_send_applies_daily_time_slice_under_jit_and_grad() -> None:
         lambda value: value[0],
         RuntimeStepInfo.from_sequences([0], [1], [1.0], [0.0], [2]),
     )
-    forcing = jnp.arange(5 * 2 * 2, dtype=jnp.float64).reshape((5, 2, 2))
+    forcing = jnp.arange(365 * 2 * 2, dtype=jnp.float64).reshape((365, 2, 2))
 
     def send_loss(field: jax.Array) -> jax.Array:
         state = ComponentRuntimeState(
@@ -1052,7 +1046,7 @@ def test_runtime_send_applies_daily_time_slice_under_jit_and_grad() -> None:
     assert_allclose_compact(sent_state.sent.get("temperature"), np.asarray(forcing[2]))
     assert_allclose_compact(gradient[2], np.ones((2, 2)))
     assert_allclose_compact(gradient[:2], np.zeros((2, 2, 2)))
-    assert_allclose_compact(gradient[3:], np.zeros((2, 2, 2)))
+    assert_allclose_compact(gradient[3:], np.zeros((362, 2, 2)))
 
 
 def _runtime_send_state(forcing: jax.Array) -> ComponentRuntimeState:
@@ -1091,6 +1085,7 @@ def test_runtime_send_rejects_nonfinite_selected_active_field() -> None:
             [[jnp.nan, jnp.nan], [3.0, jnp.nan]],
         ]
     )
+    forcing = jnp.broadcast_to(forcing[0], (365, 2, 2)).at[1].set(forcing[1])
     state = _runtime_send_state(forcing)
     with pytest.raises(CouplerError, match="sent field 'temperature'.*active domain"):
         send_runtime_fields(

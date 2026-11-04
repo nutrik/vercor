@@ -7,6 +7,13 @@ versioning; pre-releases may still refine new contracts.
 
 ### Added
 
+- Add keyword-only `VerosConfig.salinity_restoring_timescale` in seconds,
+  defaulting to four 365-day model years (126,144,000 s). Pass it into native
+  state for differentiable surface salinity restoring. Salinity restoring
+  now defaults on and temperature restoring stays off, including galleries;
+  set the time scale to `30 * 86400.0` to retain the previous strength.
+- Audit component interfaces, wrappers, physical recipe compatibility, lifecycle,
+  and output/restart boundaries in `docs/interface-wrapper-audit.md`.
 - Transfer ERA5 rain and water-equivalent snow and JCM total precipitation to
   Veros through zero-seeded `rain_rate` and `snow_rate` exchange fields.
 - Compute virtual salt flux in VerCOR from precipitation minus bulk evaporation,
@@ -15,18 +22,59 @@ versioning; pre-releases may still refine new contracts.
   before remapping, using a sigmoid matched to the calibrated LT midpoint and
   slope, with traced phase-temperature thresholds.
 
+### Changed
+
+- Standardize the Veros adapter on `global_4deg` and remove ACC support,
+  `VerosConfig.setup`, the ACC JAX adapter, and the internal-forcing bypass.
+  Remove `setup=` from configuration calls; remaining positional arguments
+  follow `name, execution, custom_parameters, ...`. Migrate native backend,
+  multi-day gradient and quiet-step checks to the global ocean. Benchmarks now
+  select `--case ocean` or `--case coupled`, record `setup=global_4deg` and
+  reject comparisons between different cases. Historical ACC timing data
+  retains its original labels.
+
+- Remove the per-native-step `Veros sub-step` progress messages from the Veros
+  adapter. Coupler step and component progress reporting remains available.
+- Remove the `run_` prefix from bundled setup gallery filenames and case names.
+  Use, for example, `vercor copy-setup jcm_with_veros` and import
+  `vercor.setups.gallery.jcm_with_veros`.
+- Name bundled lowest-model-level meteorology with six explicit `air_*` keys.
+  Distinguish JCM's `air_pressure_3d` from CAMulator's
+  `model_level_air_pressure`, and name JCM's phase-only `t0` input
+  `near_surface_air_temperature` without asserting a 2 m height.
+- Rename shared recipes by physical contract, the JCM-backed factory/config to
+  `make_jcm_atmosphere` / `JCMAtmosphereConfig`, and Veros surface-forcing modes
+  to `bulk_meteorology` / `surface_fluxes`. Spell out public mask helpers and
+  identify CAMulator's combined surface-temperature packer. Former names have
+  no compatibility aliases; units, signs, staggering and coverage are retained.
+- Derive gallery routes, execution order and topology roles from component
+  names. Document the migration and physical contracts in
+  `docs/coupling-fields.rst`.
+
 ### Fixed
 
+- Preserve independently supplied conservative cell bounds and explicit source
+  exclusion masks, including grids with identical centers. Compute bilinear
+  weights from the same wrapped/clipped longitude used for source-cell lookup.
+- Validate monthly/daily forcing record layouts before selection, and preserve
+  field precision in monthly interpolation and period output.
+- Write accepted list, tuple, and scalar provider coordinates through the shared
+  host-array boundary before defining NetCDF dimensions.
+- Accept nanosecond CAMulator forcing times and reject missing records,
+  inconsistent native cadence, and unsupported calendars before native stepping.
+- Keep JCM evolving state exclusively in payloads and validate native save
+  intervals before bootstrap or spinup.
 - Distinguish JCM bottom-level air variables from near-surface temperature and
   surface radiation in local adapter names, preserving bulk-flux field meanings.
 - Apply the VerCOR global forcing callback in both Veros execution lanes,
   preserve cyclic salt-flux halos, and report unambiguous salinity-flux units.
 - Make global salinity restoring an optional additive term controlled by
-  `VerosConfig.restore_to_climatology_salt`, disabled by default in the gallery.
+  `VerosConfig.restore_to_climatology_salt`, enabled by default in the gallery.
 - Replace the shared Veros restoring argument with independent
-  `restore_to_climatology_temp` and `restore_to_climatology_salt` flags, both
-  disabled by default. Apply the switches in the native global callback so
-  they also control restoring during spinup; preserve raw `qnec` diagnostics.
+  `restore_to_climatology_temp` and `restore_to_climatology_salt` flags,
+  respectively disabled and enabled by default. Apply the switches in the
+  native global callback so they also control restoring during spinup;
+  preserve raw `qnec` diagnostics.
 
 ## [0.4.6] - 2026-08-27
 

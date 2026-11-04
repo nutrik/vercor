@@ -5,8 +5,12 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from vercor.grids import RectilinearGrid as _RectilinearGrid
-from vercor._regridders.bilinear import bilinear as _bilinear
-from vercor._regridders.conservative import conservative as _conservative
+from vercor._regridders.bilinear import (
+    BilinearRectilinearRegridder as _BilinearRectilinearRegridder,
+)
+from vercor._regridders.conservative import (
+    ConservativeRectilinearRegridder as _ConservativeRectilinearRegridder,
+)
 from vercor.types import RuntimeArray as _RuntimeArray
 
 
@@ -65,7 +69,7 @@ def bilinear(
 ) -> Regridder:
     """Build a public bilinear regridder for one source/target grid pair."""
 
-    return _bilinear(
+    return _BilinearRectilinearRegridder(
         source_grid,
         target_grid,
         periodic_longitude=periodic_longitude,
@@ -87,7 +91,7 @@ def conservative(
 ) -> Regridder:
     """Build a public conservative scalar regridder for one grid pair."""
 
-    return _conservative(
+    return _ConservativeRectilinearRegridder(
         source_grid,
         target_grid,
         source_mask=source_mask,

@@ -6,7 +6,6 @@ from inspect import signature
 from pathlib import Path
 from typing import Any, cast, get_type_hints
 
-import jax
 import jax.numpy as jnp
 import pytest
 
@@ -164,6 +163,8 @@ def test_output_public_api_is_spec_not_mutable_adapter() -> None:
     assert vercor.output.OutputSpec.__module__ == "vercor.output"
     assert vercor.output.PeriodOutput.__module__ == "vercor.output"
     assert vercor.output.__all__ == [
+        "JaxOutputContext",
+        "JaxOutputProvider",
         "OutputContext",
         "OutputFrame",
         "OutputProvider",
@@ -249,30 +250,8 @@ def test_public_component_contracts_use_public_state_and_output_types() -> None:
         signature(contracts_module.ValidationContext).parameters["state"].annotation
         == "ComponentState"
     )
+    assert get_type_hints(contracts_module.ValidationContext)["state"] is ComponentState
     assert get_type_hints(components_module.ComponentSpec)["output"] is OutputSpec
-
-
-@pytest.mark.fast_always
-def test_validation_context_runtime_type_hints_resolve_public_state() -> None:
-    contracts_module = importlib.import_module("vercor.components.contracts")
-
-    type_hints = get_type_hints(contracts_module.ValidationContext)
-
-    assert type_hints["state"] is ComponentState
-
-
-@pytest.mark.fast_always
-def test_public_component_step_type_hints_resolve_at_runtime() -> None:
-    components_module = importlib.import_module("vercor.components")
-
-    for component_type in (
-        components_module.Component,
-        components_module.CallableComponent,
-        components_module.DataComponent,
-    ):
-        type_hints = get_type_hints(component_type.step)
-        assert type_hints["context"] is components_module.StepContext
-        assert "StepResult" in str(type_hints["return"])
 
 
 @pytest.mark.fast_always
@@ -375,7 +354,7 @@ def test_output_and_setup_configs_use_final_names() -> None:
     output = OutputSpec(period=period)
     spinup = vercor.setups.Spinup(enabled=True)
     veros = vercor.setups.VerosConfig(spinup=spinup, output=output)
-    jax_gcm = vercor.setups.JAXGCMConfig(spinup=spinup, output=output)
+    jax_gcm = vercor.setups.JCMAtmosphereConfig(spinup=spinup, output=output)
     camulator = vercor.setups.CAMulatorConfig(
         config_path="config.yml", spinup=spinup, output=output
     )
@@ -399,7 +378,12 @@ def test_output_and_setup_configs_use_final_names() -> None:
             config_path="config.yml",
             time_alignment=cast(Any, "invalid"),
         )
-    for setup_name in ("Spinup", "VerosConfig", "JAXGCMConfig", "CAMulatorConfig"):
+    for setup_name in (
+        "Spinup",
+        "VerosConfig",
+        "JCMAtmosphereConfig",
+        "CAMulatorConfig",
+    ):
         assert setup_name in vercor.setups.__all__
         assert hasattr(vercor.setups, setup_name)
 
@@ -501,23 +485,3 @@ def test_setup_and_dtype_config_objects_are_public() -> None:
     assert PeriodOutput is vercor.output.PeriodOutput
     assert "Spinup" in vercor.setups.__all__
     assert "RuntimeOptions" in vercor.__all__
-
-
-@pytest.mark.fast_always
-def test_run_state_remains_a_jax_pytree() -> None:
-    component = DataComponent(
-        "ATM",
-        make_test_grid(name="public-api-pytree"),
-        fields={"temperature": 280.0},
-    )
-    coupler = Coupler(
-        clock=Clock(start=datetime(2000, 1, 1), dt_seconds=60.0, steps=1),
-        components=(component,),
-        run_order=("ATM",),
-    )
-    state = coupler.initial_state()
-
-    leaves = jax.tree_util.tree_leaves(state)
-
-    assert leaves
-    assert state.component("ATM").field("temperature").shape == component.grid.shape

@@ -15,7 +15,7 @@ from vercor._runtime.state import ComponentRuntimeState
 from vercor.state import RunState
 from vercor._runtime.stores import FieldStore
 from vercor._runtime.time import RuntimeStepInfo
-from vercor.setups._external.jax_gcm_runtime import JAXGCMRuntimePayload
+from vercor.setups._external.jax_gcm_runtime import JCMAtmosphereRuntimePayload
 
 
 def test_registered_pytree_classes_inherit_shared_flatten_methods() -> None:
@@ -26,7 +26,7 @@ def test_registered_pytree_classes_inherit_shared_flatten_methods() -> None:
         RectilinearGrid,
         BilinearRectilinearInterpolator,
         ConservativeRectilinearRemapper,
-        JAXGCMRuntimePayload,
+        JCMAtmosphereRuntimePayload,
     )
 
     for registered_class in registered_classes:

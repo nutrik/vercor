@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from vercor._numerical_safety import require_active_finite
+from vercor._runtime.component_masks import field_active_mask, resolve_component_masks
 from vercor.exceptions import CouplerError
 from vercor.exchanges import Exchange
 from vercor._runtime.contracts import ExchangeContract
@@ -27,6 +28,7 @@ def validate_runtime_state(
     regridders: Mapping[str, Any],
     contracts: Mapping[str, ExchangeContract],
     run_order: Sequence[str] | None,
+    validate_lifecycle: bool = True,
 ) -> None:
     """Validate that runtime state matches the configured coupler topology."""
 
@@ -105,6 +107,12 @@ def validate_runtime_state(
         owner="Runtime fractional masks",
     )
 
+    _validate_exact_names(
+        runtime_state._received_fractional_masks.field_names,
+        expected_mask_names,
+        owner="Runtime received masks",
+    )
+
     for exchange in exchanges:
         route_id = exchange.route_id
         if exchange.source not in runtime_component_names:
@@ -121,36 +129,21 @@ def validate_runtime_state(
                 f"{exchange.route_id}"
             )
 
-        mask_name = route_id
-        if mask_name not in runtime_state._fractional_masks.field_names:
-            raise CouplerError(
-                "Runtime requires an initialized fractional mask for exchange "
-                f"{exchange.route_id}"
+        for masks, owner in (
+            (runtime_state._fractional_masks, "Runtime fractional mask"),
+            (runtime_state._received_fractional_masks, "Runtime received mask"),
+        ):
+            _validate_route_mask(
+                masks.get(route_id),
+                shape=components[exchange.target].grid.shape,
+                dtype=components[exchange.target]._dtype_policy.jax_real,
+                owner=f"{owner} for exchange {route_id}",
             )
-        destination_shape = components[exchange.target].grid.shape
-        mask = runtime_state._fractional_masks.get(mask_name)
-        mask_array = jnp.asarray(mask)
-        mask_shape = mask_array.shape
-        if mask_shape != destination_shape:
-            raise CouplerError(
-                "Runtime fractional mask for exchange "
-                f"{exchange.route_id} has shape {mask_shape}, expected {destination_shape}"
-            )
-        expected_dtype = components[exchange.target]._dtype_policy.jax_real
-        if mask_array.dtype != expected_dtype:
-            raise CouplerError(
-                "Runtime fractional mask for exchange "
-                f"{exchange.route_id} has dtype {mask_array.dtype}, expected "
-                f"{expected_dtype}."
-            )
-        _validate_concrete_mask_values(
-            mask_array,
-            owner=f"Runtime fractional mask for exchange {exchange.route_id}",
-            binary=False,
-        )
 
     received_masks = {
-        (exchange.target, field_name): runtime_state._fractional_mask(exchange.route_id)
+        (exchange.target, field_name): runtime_state._received_fractional_masks.get(
+            exchange.route_id
+        )
         for exchange in exchanges
         for field_name in _flatten_field_items(exchange.fields)
     }
@@ -160,12 +153,26 @@ def validate_runtime_state(
             component_state,
             component=component,
             received_masks=received_masks,
+            contract=contracts[component.name],
         )
-    for component in components.values():
-        component._validate_runtime_state(
-            runtime_state._component_state(component.name),
-            contracts[component.name],
-        )
+    if validate_lifecycle:
+        for component in components.values():
+            component._validate_runtime_state(
+                runtime_state._component_state(component.name),
+                contracts[component.name],
+            )
+
+
+def _validate_route_mask(
+    mask: Any, *, shape: tuple[int, ...], dtype: Any, owner: str
+) -> None:
+    """Validate coverage metadata for current routes and stored imports."""
+    value = jnp.asarray(mask)
+    if value.shape != shape:
+        raise CouplerError(f"{owner} has shape {value.shape}, expected {shape}")
+    if value.dtype != dtype:
+        raise CouplerError(f"{owner} has dtype {value.dtype}, expected {dtype}.")
+    _validate_concrete_mask_values(value, owner=owner, binary=False)
 
 
 def _validate_component_store_schemas(
@@ -217,9 +224,13 @@ def _validate_component_store_finiteness(
     *,
     component: Any,
     received_masks: Mapping[tuple[str, str], Any],
+    contract: ExchangeContract,
 ) -> None:
     """Reject non-finite values before a runtime store crosses its next owner."""
 
+    binary, fraction = resolve_component_masks(
+        component, component_state.fields.to_mapping(), component._dtype_policy
+    )
     for store_name in ("fields", "received", "sent"):
         store = getattr(component_state, store_name)
         for field_name in store.field_names:
@@ -227,7 +238,25 @@ def _validate_component_store_finiteness(
             active_mask = (
                 inbound_mask
                 if store_name in {"fields", "received"} and inbound_mask is not None
-                else component.grid.binary_mask
+                else (
+                    component.grid.binary_mask
+                    if component.spec.masks is None
+                    else binary
+                )
+            )
+            active_mask = field_active_mask(
+                component,
+                field_name,
+                default_mask=active_mask,
+                fractional_mask=fraction,
+                binary_mask=binary,
+                binary_output_fields=(
+                    contract.binary_sends if store_name != "received" else ()
+                ),
+                produced=(
+                    store_name == "sent"
+                    or (store_name == "fields" and field_name in component.spec.outputs)
+                ),
             )
             require_active_finite(
                 store.get(field_name),
@@ -411,9 +440,13 @@ def _require_true(predicate: Any, message: str) -> None:
     """Raise for a false scalar predicate, including inside JAX transforms."""
 
     if _array_is_traced(predicate):
-        jax.debug.callback(
-            lambda concrete: _raise_if_false(concrete, message),
+        # Keep valid predicates on device, preserving the same host error path.
+        jax.lax.cond(
             predicate,
+            lambda: None,
+            lambda: jax.debug.callback(
+                lambda concrete: _raise_if_false(concrete, message), predicate
+            ),
         )
         return
     _raise_if_false(predicate, message)

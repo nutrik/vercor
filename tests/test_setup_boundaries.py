@@ -125,9 +125,9 @@ else:
         "import vercor; import vercor.setups",
         "import vercor.setups as setups; dir(setups)",
         (
-            "from vercor.setups import (CAMulatorConfig, JAXGCMConfig, "
+            "from vercor.setups import (CAMulatorConfig, JCMAtmosphereConfig, "
             "JCMLandAtmosphereConfig, Spinup, VerosConfig); "
-            "Spinup(); JAXGCMConfig(); VerosConfig(); "
+            "Spinup(); JCMAtmosphereConfig(); VerosConfig(); "
             "CAMulatorConfig(config_path='config.yml'); JCMLandAtmosphereConfig()"
         ),
     ),
@@ -147,7 +147,7 @@ def test_public_import_and_config_access_are_optional_dependency_free(
 @pytest.mark.parametrize(
     ("factory_name", "factory_module"),
     (
-        ("make_jax_gcm", "vercor.setups._external.jax_gcm"),
+        ("make_jcm_atmosphere", "vercor.setups._external.jax_gcm"),
         ("make_veros_gcm", "vercor.setups._external.veros_gcm"),
         ("make_camulator_gcm", "vercor.setups._external.camulator"),
     ),
@@ -188,7 +188,7 @@ def test_vercor_setups_is_the_only_setup_lazy_export_registry() -> None:
     ("factory_name", "dependency_roots", "invocation", "message"),
     (
         (
-            "make_jax_gcm",
+            "make_jcm_atmosphere",
             ("jcm",),
             "factory(None, None)",
             "requires the jcm package.*pip install jcm",
@@ -309,7 +309,7 @@ def test_veros_factory_configures_once_before_implementation_import(
     class ImplementationReached(RuntimeError):
         pass
 
-    def configure(execution: str) -> None:
+    def configure(execution: str, *, backend: str | None = None) -> None:
         events.append(f"configure:{execution}")
 
     def load_implementation() -> object:
@@ -345,7 +345,7 @@ def test_veros_jax_factory_checks_capabilities_before_implementation_import(
     monkeypatch.setattr(
         runtime_settings,
         "configure_veros_runtime",
-        lambda execution: events.append(f"configure:{execution}"),
+        lambda execution, **kwargs: events.append(f"configure:{execution}"),
     )
     monkeypatch.setattr(
         runtime_settings,

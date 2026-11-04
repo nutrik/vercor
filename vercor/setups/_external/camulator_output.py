@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 from importlib import resources
 from os.path import expandvars
@@ -18,6 +18,11 @@ from vercor.output import OutputContext, OutputFrame, SnapshotContext
 from vercor.output._dataset import time_coordinate_variable, used_dimension_names
 from vercor.output._netcdf import write_netcdf_dataset
 from vercor.output import OutputVariable
+from vercor.output._selection import (
+    component_output_names,
+    selected_output_names,
+    with_runtime_fields,
+)
 
 if TYPE_CHECKING:
     from vercor.setups._external.camulator_gcm_state import CAMulatorRuntimePayload
@@ -62,22 +67,75 @@ def camulator_period_output_variables(
     metadata: Mapping[str, Any],
     conf: Mapping[str, Any],
     state_transformer: Any | None,
+    variables: Sequence[str] = (),
+    decoded_prediction: torch.Tensor | None = None,
 ) -> dict[str, OutputVariable]:
     """Return CAMulator prediction variables ready for period accumulation."""
 
     _validate_supported_output_options(conf)
+    channels = _prediction_channels(conf)
+    names = selected_output_names(channels, variables)
     output_prediction = _prediction_for_output(
         prediction,
         conf=conf,
         state_transformer=state_transformer,
+        decoded_prediction=decoded_prediction,
     )
-    _, _, _, data_variables = _data_variables_from_prediction(
-        output_prediction,
-        metadata=metadata,
-        conf=conf,
-        require_single_time=False,
-    )
+    expected_channels = sum(stop - start for start, stop, _ in channels.values())
+    if output_prediction.shape[1] != expected_channels:
+        raise ValueError(
+            "CAMulator prediction channel count does not match the config: "
+            f"expected {expected_channels}, got {output_prediction.shape[1]}."
+        )
+    data_variables = {}
+    for name in names:
+        start, stop, dims = channels[name]
+        values = _prediction_values(
+            output_prediction[:, start:stop], require_single_time=False
+        )
+        data_variables[name] = _with_metadata(
+            OutputVariable(dims, values if _LEVEL_NAME in dims else values[:, 0]),
+            name,
+            metadata,
+        )
     return data_variables
+
+
+def _prediction_channels(
+    conf: Mapping[str, Any],
+) -> dict[str, tuple[int, int, tuple[str, ...]]]:
+    """Map configured output names to tensor slices without touching values."""
+    data_conf = _mapping(conf.get("data", {}), name="data")
+    levels = _configured_levels(
+        data_conf, _mapping(conf.get("model", {}), name="model")
+    )
+    upper = _string_sequence(data_conf.get("variables", ()), "data.variables")
+    surface = _string_sequence(
+        data_conf.get("surface_variables", ()), "data.surface_variables"
+    )
+    diagnostic = _string_sequence(
+        data_conf.get("diagnostic_variables", ()), "data.diagnostic_variables"
+    )
+    channels: dict[str, tuple[int, int, tuple[str, ...]]] = {
+        name: (
+            index * levels,
+            (index + 1) * levels,
+            (CAMULATOR_TIME_DIM, _LEVEL_NAME, _LATITUDE_NAME, _LONGITUDE_NAME),
+        )
+        for index, name in enumerate(upper)
+    }
+    first_surface = len(upper) * levels
+    channels.update(
+        {
+            name: (
+                first_surface + index,
+                first_surface + index + 1,
+                (CAMULATOR_TIME_DIM, _LATITUDE_NAME, _LONGITUDE_NAME),
+            )
+            for index, name in enumerate((*surface, *diagnostic))
+        }
+    )
+    return channels
 
 
 def camulator_average_coordinate_variables(
@@ -137,26 +195,54 @@ class _CAMulatorOutputProvider:
 
         payload = context.payload
         payload = _require_camulator_runtime_payload(payload)
-        prediction = (
-            payload.output_prediction
-            if self._latest_only
-            else payload.output_prediction_samples
+        native, canonical = component_output_names(
+            context, _prediction_channels(self._resources.conf)
         )
-        if prediction is None:
+        if payload.output_prediction is None:
             raise ValueError("CAMulator output requires a completed prediction.")
         if not isinstance(context.time, datetime):
             raise TypeError("CAMulator output requires a datetime timestamp.")
-        variables = camulator_period_output_variables(
-            prediction,
-            metadata=self._resources.metadata,
-            conf=self._resources.conf,
-            state_transformer=self._resources.state_transformer,
-        )
-        return OutputFrame(
-            camulator_average_data_variables(
-                variables,
+        accumulator = None if self._latest_only else payload.output_accumulator
+        counts = {}
+        if not native:
+            variables = {}
+        elif accumulator is not None:
+            variables = {
+                name: OutputVariable(dims, values, dict(attrs))
+                for name, dims, values, attrs in zip(
+                    accumulator.names,
+                    accumulator.dims,
+                    accumulator.sum_values,
+                    accumulator.attrs,
+                    strict=True,
+                )
+                if name in native
+            }
+            counts = {
+                name: value
+                for name, value in zip(
+                    accumulator.names, accumulator.counts, strict=True
+                )
+                if name in native
+            }
+            missing = next((name for name in native if name not in variables), None)
+            if missing is not None:
+                raise ValueError(
+                    f"CAMulator native reduction is missing requested variable {missing!r}"
+                )
+        else:
+            variables = camulator_period_output_variables(
+                payload.output_prediction,
                 metadata=self._resources.metadata,
+                conf=self._resources.conf,
+                state_transformer=self._resources.state_transformer,
+                variables=native,
+            )
+        frame = OutputFrame(
+            camulator_average_data_variables(
+                variables, metadata=self._resources.metadata
             ),
+            reduction_counts=counts,
             coordinates=camulator_average_coordinate_variables(
                 variables,
                 output_time=context.time,
@@ -165,8 +251,11 @@ class _CAMulatorOutputProvider:
                 metadata=self._resources.metadata,
                 conf=self._resources.conf,
             ),
-            sample_dimension=CAMULATOR_TIME_DIM,
+            sample_dimension=None if accumulator is not None else CAMULATOR_TIME_DIM,
             time_dimension=CAMULATOR_TIME_DIM,
+        )
+        return with_runtime_fields(
+            frame, context, canonical, horizontal_dims=(_LATITUDE_NAME, _LONGITUDE_NAME)
         )
 
 
@@ -241,10 +330,13 @@ def _prediction_for_output(
     *,
     conf: Mapping[str, Any],
     state_transformer: Any | None,
+    decoded_prediction: torch.Tensor | None = None,
 ) -> torch.Tensor:
     predict_conf = _mapping(conf.get("predict", {}), name="predict")
     if not bool(predict_conf.get("climate_rescale_output", False)):
-        return prediction.detach().cpu()
+        return prediction.detach()
+    if decoded_prediction is not None:
+        return decoded_prediction.detach()
     if state_transformer is None:
         raise ValueError(
             "CAMulator output requires state_transformer when "
@@ -282,92 +374,6 @@ def _prediction_values(
             f"got {values.shape[0]} times."
         )
     return values
-
-
-def _data_variables_from_prediction(
-    prediction: torch.Tensor,
-    *,
-    metadata: Mapping[str, Any],
-    conf: Mapping[str, Any],
-    require_single_time: bool,
-) -> tuple[np.ndarray, int, Mapping[str, Any], dict[str, OutputVariable]]:
-    data_conf = _mapping(conf.get("data", {}), name="data")
-    model_conf = _mapping(conf.get("model", {}), name="model")
-    levels = _configured_levels(data_conf, model_conf)
-    upper_names = _string_sequence(data_conf.get("variables", ()), "data.variables")
-    surface_names = _string_sequence(
-        data_conf.get("surface_variables", ()),
-        "data.surface_variables",
-    )
-    diagnostic_names = _string_sequence(
-        data_conf.get("diagnostic_variables", ()),
-        "data.diagnostic_variables",
-    )
-
-    values = _prediction_values(prediction, require_single_time=require_single_time)
-    _validate_prediction_shape(
-        values,
-        levels=levels,
-        n_upper_variables=len(upper_names),
-        n_single_level_variables=len(surface_names) + len(diagnostic_names),
-    )
-    data_variables = _prediction_data_variables(
-        values,
-        upper_names=upper_names,
-        single_level_names=surface_names + diagnostic_names,
-        levels=levels,
-        metadata=metadata,
-    )
-    return values, levels, data_conf, data_variables
-
-
-def _validate_prediction_shape(
-    values: np.ndarray,
-    *,
-    levels: int,
-    n_upper_variables: int,
-    n_single_level_variables: int,
-) -> None:
-    expected_channels = levels * n_upper_variables + n_single_level_variables
-    if values.shape[1] != expected_channels:
-        raise ValueError(
-            "CAMulator prediction channel count does not match the config: "
-            f"expected {expected_channels}, got {values.shape[1]}."
-        )
-
-
-def _prediction_data_variables(
-    values: np.ndarray,
-    *,
-    upper_names: tuple[str, ...],
-    single_level_names: tuple[str, ...],
-    levels: int,
-    metadata: Mapping[str, Any],
-) -> dict[str, OutputVariable]:
-    variables: dict[str, OutputVariable] = {}
-    for index, name in enumerate(upper_names):
-        start = index * levels
-        stop = start + levels
-        variables[name] = _with_metadata(
-            OutputVariable(
-                (CAMULATOR_TIME_DIM, _LEVEL_NAME, _LATITUDE_NAME, _LONGITUDE_NAME),
-                values[:, start:stop, :, :],
-            ),
-            name,
-            metadata,
-        )
-
-    single_level_start = len(upper_names) * levels
-    for index, name in enumerate(single_level_names):
-        variables[name] = _with_metadata(
-            OutputVariable(
-                (CAMULATOR_TIME_DIM, _LATITUDE_NAME, _LONGITUDE_NAME),
-                values[:, single_level_start + index, :, :],
-            ),
-            name,
-            metadata,
-        )
-    return variables
 
 
 def _with_metadata(

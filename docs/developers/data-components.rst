@@ -12,13 +12,19 @@ while a leading record axis is preserved.  The executable example defines both
 forms.
 
 :class:`~vercor.components.TransferPolicy` ``("current")`` exports the stored
-field as-is.  ``linear`` selects adjacent monthly records and interpolates 
+field as-is.  ``linear`` requires twelve monthly records and interpolates
 during exchange.  ``daily`` selects from one no-leap climatology with 365
 records for every supported calendar. 
 In a Gregorian leap year, February 29 uses the same record as
 February 28.  For a 360-day clock, VerCOR maps the relative position of each
 day in a 360-day month onto the corresponding no-leap month; it does not
 expect a separate 360-record dataset.
+
+Non-current selectable outputs must have time-first surface or level layouts:
+``(nTime, nLat, nLon)`` or ``(nTime, nLev, nLat, nLon)``. Preparation rejects
+missing or extra records and static outputs under these policies. Declared
+grid-shaped mask fields remain current. Monthly interpolation preserves the
+field dtype in both exchanges and period output.
 
 .. literalinclude:: ../_examples/data_component.py
    :language: python

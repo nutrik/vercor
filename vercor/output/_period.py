@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Any, Literal, cast
 
 import jax
@@ -12,6 +13,8 @@ import jax.numpy as jnp
 from vercor.calendar import ModelDateTime
 from vercor.dtypes import as_jax_real_array, jax_index_dtype
 from vercor._host_arrays import host_int64_array
+from vercor._numerical_safety import _require_zero
+from vercor._averaging import finite_sum_and_count
 from vercor.output import OutputVariable, PeriodOutput
 
 TIME_NAME = "time"
@@ -151,7 +154,24 @@ def _sample_sum_and_counts(
     sample: OutputVariable,
     *,
     summation_dim: str | None,
+    reduction_counts: Any | None = None,
 ) -> tuple[tuple[str, ...], jax.Array, jax.Array]:
+    dims, values, counts, axis = _prepare_output_sample(
+        name, sample, summation_dim=summation_dim, reduction_counts=reduction_counts
+    )
+    total, count = _output_sum_and_counts(values, counts, axis)
+    return dims, total, count
+
+
+def _prepare_output_sample(
+    name: str,
+    sample: OutputVariable,
+    *,
+    summation_dim: str | None,
+    reduction_counts: Any | None = None,
+) -> tuple[tuple[str, ...], jax.Array, jax.Array | None, int | None]:
+    """Validate one field's schema and counts before batched numeric execution."""
+
     dims = sample.dims
     if not isinstance(dims, tuple) or not all(isinstance(dim, str) for dim in dims):
         raise ValueError(f"Period average variable {name!r} has invalid dimensions.")
@@ -169,18 +189,28 @@ def _sample_sum_and_counts(
             f"but dimensions {dims}."
         )
 
-    try:
-        finite = jnp.isfinite(values)
-    except TypeError as exc:
-        raise ValueError(
-            f"Period average variable {name!r} must contain numeric values."
-        ) from exc
-
-    sum_values = jnp.where(finite, values, 0.0)
-    counts = finite.astype(jax_index_dtype())
+    if reduction_counts is not None:
+        counts = jnp.asarray(reduction_counts)
+        if counts.shape != values.shape:
+            raise ValueError(
+                f"Reduction counts for {name!r} must have the same shape as sums."
+            )
+        if not jnp.issubdtype(counts.dtype, jnp.integer):
+            raise TypeError(f"Reduction counts for {name!r} must be integer arrays.")
+        _require_zero(
+            jnp.count_nonzero(counts < 0),
+            f"Output variable {name!r}",
+            "nonnegative reduction counts",
+        )
+        _require_zero(
+            jnp.count_nonzero((counts > 0) & ~jnp.isfinite(values)),
+            f"Output variable {name!r}",
+            "finite reduced sums",
+        )
+        return dims, values, counts, None
 
     if summation_dim is None:
-        return dims, sum_values, counts
+        return dims, values, None, None
 
     if dims.count(summation_dim) != 1:
         raise ValueError(
@@ -189,11 +219,46 @@ def _sample_sum_and_counts(
         )
     axis = dims.index(summation_dim)
     reduced_dims = dims[:axis] + dims[axis + 1 :]  # noqa: E203
-    return (
-        reduced_dims,
-        jnp.sum(sum_values, axis=axis),
-        jnp.sum(counts, axis=axis),
-    )
+    return reduced_dims, values, None, axis
+
+
+def _output_sum_and_counts(
+    values: jax.Array, counts: jax.Array | None, axis: int | None
+) -> tuple[jax.Array, jax.Array]:
+    """Normalize an ordinary or already-reduced sample using its validated axis."""
+
+    if counts is None:
+        total, count = finite_sum_and_count(values, axis=axis)
+        return total, count
+    return jnp.where(counts > 0, values, 0.0), counts.astype(jax_index_dtype())
+
+
+@partial(jax.jit, static_argnames=("axes",))
+def _accumulate_output_samples(
+    totals: tuple[jax.Array, ...],
+    counts: tuple[jax.Array, ...],
+    samples: tuple[jax.Array, ...],
+    reduction_counts: tuple[jax.Array | None, ...],
+    *,
+    axes: tuple[int | None, ...],
+) -> tuple[tuple[jax.Array, ...], tuple[jax.Array, ...]]:
+    """Fuse one frame's finite reductions and sum/count updates in one dispatch.
+
+    Tuple leaves retain each field's shape, dtype and reduction order without
+    stacking heterogeneous fields. Only axes are static: host schema validation
+    stays outside the kernel, and scanned output uses the same pure arithmetic.
+    Storage remains bounded by the selected fields, independent of sample count.
+    """
+
+    next_totals = []
+    next_counts = []
+    for total, count, sample, reduced_count, axis in zip(
+        totals, counts, samples, reduction_counts, axes, strict=True
+    ):
+        sample_sum, sample_count = _output_sum_and_counts(sample, reduced_count, axis)
+        next_totals.append(total + sample_sum)
+        next_counts.append(count + sample_count)
+    return tuple(next_totals), tuple(next_counts)
 
 
 __all__ = [

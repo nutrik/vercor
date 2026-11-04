@@ -56,6 +56,7 @@ class DataComponent:
             lifecycle=declaration.lifecycle,
             transfer=declaration.transfer,
             output=declaration.output,
+            masks=declaration.masks,
         )
 
     def step(

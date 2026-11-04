@@ -1,0 +1,108 @@
+from datetime import datetime
+
+from vercor import (
+    Clock,
+    Coupler,
+    Exchange,
+    RuntimeOptions,
+)
+from vercor.dtypes import DTypePolicy
+from vercor.output import OutputSpec, OutputTarget, PeriodOutput
+from vercor.setups import make_era5_atmosphere
+from vercor.setups import make_era5_land
+from vercor.setups import VerosConfig, make_veros_gcm
+from vercor.recipes import (
+    ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
+)
+from vercor.regridding import bilinear
+from vercor.topology import SurfaceMaskPolicy
+
+
+def run_setup(*, loglevel: str, float_type: str) -> None:
+    """Run this setup through the shared VerCOR CLI contract."""
+
+    dtype = DTypePolicy(enable_x64=float_type == "float64")
+    atm = make_era5_atmosphere(
+        output=OutputSpec(
+            period=PeriodOutput(
+                frequency="month",
+                variables=(
+                    "surface_pressure",
+                    "air_temperature",
+                    "net_shortwave_radiation_flux",
+                    "downward_longwave_radiation_flux",
+                    "rain_rate",
+                    "snow_rate",
+                ),
+            ),
+        )
+    )
+    ocn = make_veros_gcm(
+        config=VerosConfig(
+            # Use default four-year SSS restoring; SST correction stays disabled.
+            output=OutputSpec(
+                period=PeriodOutput(
+                    frequency="month",
+                    variables=(
+                        "temp",
+                        "salt",
+                        "u",
+                        "v",
+                        "w",
+                        "surface_taux",
+                        "surface_tauy",
+                        "forc_salt_surface",
+                        "psi",
+                    ),
+                ),
+            ),
+        ),
+    )
+    lnd = make_era5_land(
+        output=OutputSpec(
+            period=PeriodOutput(
+                frequency="month",
+                variables=("land_surface_temperature",),
+            ),
+        )
+    )
+
+    # Clock and sequence
+    clock = Clock(
+        start=datetime(2000, 1, 1, 0, 0, 0),
+        dt_seconds=86400.0,
+        steps=365,
+        calendar="noleap",
+    )
+    run_order = [ocn.name, lnd.name, atm.name]
+
+    # Exchanges
+    exchanges = (
+        Exchange(
+            quantity="intensive",
+            source=atm.name,
+            target=ocn.name,
+            fields=ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
+            regridder_factory=bilinear,
+        ),
+    )
+    components = [ocn, lnd, atm]
+    cpl = Coupler(
+        clock=clock,
+        components=components,
+        exchanges=exchanges,
+        run_order=run_order,
+        runtime=RuntimeOptions(
+            dtype=dtype,
+            topology=SurfaceMaskPolicy(
+                atmosphere=atm.name, ocean=ocn.name, land=lnd.name
+            ),
+        ),
+        log_level=loglevel,
+    )
+
+    cpl.run(output=OutputTarget("."))
+
+
+if __name__ == "__main__":
+    run_setup(loglevel="info", float_type="float64")

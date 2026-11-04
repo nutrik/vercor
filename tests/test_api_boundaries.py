@@ -84,43 +84,12 @@ def test_public_api_exports_state_view_fields_and_regridders() -> None:
 
 
 @pytest.mark.fast_always
-def test_root_api_is_core_only_after_boundary_redesign() -> None:
-    allowed_root_exports = {
-        "Clock",
-        "Coupler",
-        "Exchange",
-        "RectilinearGrid",
-        "RuntimeOptions",
-        "RunState",
-    }
-
-    assert set(vercor.__all__) == allowed_root_exports
-    for name in (
-        "bilinear",
-        "conservative",
-        "Regridder",
-        "RegridderFactory",
-        "CAMulatorConfig",
-        "fluxes",
-        "JAXGCMConfig",
-        "recipes",
-        "setups",
-        "Spinup",
-        "SurfaceMaskPolicy",
-        "VerosConfig",
-    ):
-        assert name not in vercor.__all__
-    for name in ("bilinear", "conservative", "Regridder", "RegridderFactory"):
-        assert not hasattr(vercor, name)
-
-
-@pytest.mark.fast_always
 def test_setup_implementation_modules_are_private_after_boundary_redesign() -> None:
     import vercor.setups as setup_facade
 
     public_factory_names = {
         "CAMulatorConfig",
-        "JAXGCMConfig",
+        "JCMAtmosphereConfig",
         "JCMLandAtmosphereConfig",
         "JCMLandAtmosphereSetup",
         "load_jcm_inputs",
@@ -130,7 +99,7 @@ def test_setup_implementation_modules_are_private_after_boundary_redesign() -> N
         "make_era5_land",
         "make_era5_ocean",
         "make_erainterim_ocean",
-        "make_jax_gcm",
+        "make_jcm_atmosphere",
         "make_jcm_land",
         "make_jcm_land_atmosphere",
         "make_slab_atmosphere",
@@ -263,6 +232,8 @@ def test_public_facades_hide_private_implementation_modules() -> None:
         "RunState",
     ]
     assert output_module.__all__ == [
+        "JaxOutputContext",
+        "JaxOutputProvider",
         "OutputContext",
         "OutputFrame",
         "OutputProvider",
@@ -294,7 +265,7 @@ def test_fields_facade_owns_vector_field_contract() -> None:
     with pytest.raises(
         TypeError, match="Tuple vector field declarations are unsupported"
     ):
-        Exchange("ATM", "OCN", (("u_velocity", "v_velocity"),))  # type: ignore[arg-type]
+        Exchange("ATM", "OCN", (("u_velocity", "v_velocity"),), quantity="intensive")  # type: ignore[arg-type]
 
 
 @pytest.mark.fast_always
@@ -354,7 +325,7 @@ def test_runtime_private_state_uses_public_domain_vocabulary() -> None:
     component_state_parameters = signature(ComponentState).parameters
 
     assert tuple(state_parameters) == ("fields", "received", "sent", "payload")
-    assert tuple(contract_parameters) == ("receives", "sends")
+    assert tuple(contract_parameters) == ("receives", "sends", "binary_sends")
     assert "received" in component_state_parameters
     assert "sent" in component_state_parameters
     assert "incoming" not in component_state_parameters
@@ -570,7 +541,8 @@ def test_public_api_uses_canonical_breaking_names(
     with pytest.raises(TypeError):
         coupler.components["NEW"] = component  # type: ignore[index]
     with pytest.raises(AttributeError):
-        coupler.exchanges.append(Exchange("ATM", "ATM", ("temperature",)))  # type: ignore[attr-defined]
+        route = Exchange("ATM", "ATM", ("temperature",), quantity="intensive")
+        coupler.exchanges.append(route)  # type: ignore[attr-defined]
 
     state = coupler.initial_state()
     output_state = coupler.run(
@@ -648,6 +620,7 @@ def test_exchange_accepts_supported_names_only() -> None:
         "ATM",
         "OCN",
         ("temperature", vector("u_velocity", "v_velocity")),
+        quantity="intensive",
         regridder_factory=bilinear,
     )
 
@@ -734,59 +707,18 @@ def test_shallow_setup_regridding_grid_and_exchange_imports() -> None:
 
 
 @pytest.mark.fast_always
-def test_top_level_exports_public_orchestration_and_component_author_api() -> None:
-    expected_component_exports = (
-        "CallableComponent",
-        "Component",
-        "ComponentSpec",
-        "DataComponent",
-        "LifecycleHooks",
-        "PrefillContext",
-        "PrefillResult",
-        "SetupContext",
-        "SetupResult",
-        "StepContext",
-        "StepResult",
-        "TransferPolicy",
-        "ValidationContext",
-    )
-
-    assert tuple(components_module.__all__) == expected_component_exports
-    assert tuple(vercor.__all__) == (
-        "Clock",
-        "Coupler",
-        "Exchange",
-        "RectilinearGrid",
-        "RunState",
-        "RuntimeOptions",
-    )
-
-    assert components_module.Component is Component
-    assert components_module.ComponentSpec is component_contracts_module.ComponentSpec
-    assert components_module.SetupContext is component_contexts_module.SetupContext
-    assert components_module.StepContext is component_contexts_module.StepContext
-    assert components_module.StepResult is component_contracts_module.StepResult
-    assert components_module.SetupResult is component_contracts_module.SetupResult
-    assert components_module.TransferPolicy is component_contracts_module.TransferPolicy
-    data_component_type = getattr(components_module, "DataComponent", None)
-    assert data_component_type is not None
-    assert components_module.DataComponent is data_component_type
-    assert components_module.CallableComponent is base_module.CallableComponent
-
-
-@pytest.mark.fast_always
 def test_model_setup_factories_use_the_public_setup_owner() -> None:
     from vercor.setups._data.jcm_land import make_jcm_land
     from vercor.setups._external.camulator import make_camulator_gcm
     from vercor.setups._external.camulator_land import make_camulator_land
-    from vercor.setups._external.jax_gcm import make_jax_gcm
+    from vercor.setups._external.jax_gcm import make_jcm_atmosphere
     from vercor.setups._external.veros_gcm import make_veros_gcm
     from vercor.setups._jcm import make_jcm_land_atmosphere
 
     expected_factories = {
         "make_camulator_gcm": make_camulator_gcm,
         "make_camulator_land": make_camulator_land,
-        "make_jax_gcm": make_jax_gcm,
+        "make_jcm_atmosphere": make_jcm_atmosphere,
         "make_jcm_land": make_jcm_land,
         "make_jcm_land_atmosphere": make_jcm_land_atmosphere,
         "make_veros_gcm": make_veros_gcm,
@@ -807,6 +739,7 @@ def test_components_package_exports_only_component_author_contracts() -> None:
     assert components_module.__all__ == [
         "CallableComponent",
         "Component",
+        "ComponentMaskSpec",
         "ComponentSpec",
         "DataComponent",
         "LifecycleHooks",
@@ -1011,11 +944,11 @@ def test_setup_state_reads_run_order_as_plain_sequence() -> None:
 @pytest.mark.fast_always
 def test_multi_exchange_setup_scripts_use_constructor_assembly() -> None:
     multi_exchange_scripts = (
-        Path("vercor/setups/gallery/run_data_driver.py"),
-        Path("vercor/setups/gallery/run_jcm_with_verosdata.py"),
-        Path("vercor/setups/gallery/run_jcm_with_veros.py"),
-        Path("vercor/setups/gallery/run_jcm_with_slab.py"),
-        Path("vercor/setups/gallery/run_slab_driver.py"),
+        Path("vercor/setups/gallery/data_driver.py"),
+        Path("vercor/setups/gallery/jcm_with_verosdata.py"),
+        Path("vercor/setups/gallery/jcm_with_veros.py"),
+        Path("vercor/setups/gallery/jcm_with_slab.py"),
+        Path("vercor/setups/gallery/slab_driver.py"),
     )
 
     for path in multi_exchange_scripts:
@@ -1027,12 +960,15 @@ def test_multi_exchange_setup_scripts_use_constructor_assembly() -> None:
 
 @pytest.mark.fast_always
 def test_slab_driver_uses_runtime_views_for_ice_diagnostics() -> None:
-    slab_source = Path("vercor/setups/gallery/run_slab_driver.py").read_text(
+    slab_source = Path("vercor/setups/gallery/slab_driver.py").read_text(
         encoding="utf-8"
     )
 
-    assert 'final_state.components(("ATM", "OCN", "LND", "ICE"))' in slab_source
-    assert 'views["ICE"].field("ice_fraction")' in slab_source
+    assert (
+        "final_state.components((atm.name, ocn.name, lnd.name, ice.name))"
+        in slab_source
+    )
+    assert 'views[ice.name].field("ice_fraction")' in slab_source
     assert 'get_component_state("ICE").fields.get("ice_fraction")' not in slab_source
 
 
@@ -1156,10 +1092,8 @@ def test_shared_helpers_have_core_owners_not_setup_or_regridder_owners() -> None
     assert callable(vertical_module.compute_hybrid_pressure_levels)
     assert callable(vertical_module.compute_hybrid_sigma_full_level_altitudes)
     assert callable(vertical_module.get_altitudes_sigma_levels)
-    assert callable(jax_gcm_pytree_module.tree_as_real_dtype)
+    assert callable(jax_gcm_pytree_module.tree_as_runtime_dtype)
     assert callable(jax_gcm_pytree_module.tree_mean)
-    assert callable(jax_gcm_pytree_module.tree_stack)
-    assert callable(jax_gcm_pytree_module.tree_unwrap_leading_dims)
     assert callable(time_selection_module.datetime_to_seconds_in_year)
     assert callable(time_selection_module.get_periodic_interval)
     assert "gravity" in physics_module.PhysicalConstants.__dataclass_fields__
@@ -1301,7 +1235,7 @@ def test_external_adapter_all_exports_are_public() -> None:
 def test_external_runtime_helpers_use_concrete_setup_state_annotations() -> None:
     runtime_sources = {
         "vercor/setups/_external/jax_gcm_runtime.py": (
-            "JAXGCMSetupState",
+            "JCMAtmosphereSetupState",
             "vercor.setups._external.jax_gcm_state",
             "state",
         ),
@@ -1333,7 +1267,7 @@ def test_external_runtime_helpers_use_concrete_setup_state_annotations() -> None
 @pytest.mark.fast_always
 def test_jax_gcm_factory_binds_runtime_hooks_directly() -> None:
     source = Path("vercor/setups/_external/jax_gcm.py").read_text(encoding="utf-8")
-    factory_source = source.split("def make_jax_gcm(", 1)[1]
+    factory_source = source.split("def make_jcm_atmosphere(", 1)[1]
 
     assert "from functools import partial" in source
     assert "partial(_jax_gcm_runtime.step_jax_gcm_component, state)" in factory_source
@@ -1401,20 +1335,16 @@ def test_veros_runtime_settings_imports_runtime_settings_lazily() -> None:
 def test_common_exchange_recipes_are_centralized_for_examples() -> None:
     import vercor.recipes as recipes_module
     from vercor.recipes import (
-        ATMOSPHERE_TO_DATA_OCEAN_FIELDS,
-        JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS,
-        SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS,
+        ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS,
     )
 
     required_recipes = (
-        "ATMOSPHERE_TO_DATA_OCEAN_FIELDS",
         "ATMOSPHERE_TO_LAND_RADIATION_FIELDS",
         "ATMOSPHERE_TO_LAND_STATE_FIELDS",
-        "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS",
         "LAND_TO_ATMOSPHERE_SURFACE_FIELDS",
         "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS",
-        "SLAB_ATMOSPHERE_TO_LAND_FLUX_FIELDS",
-        "SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS",
+        "ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS",
+        "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS",
     )
     recipes_source = Path("vercor/recipes.py").read_text(encoding="utf-8")
     for recipe_name in required_recipes:
@@ -1423,29 +1353,28 @@ def test_common_exchange_recipes_are_centralized_for_examples() -> None:
         assert f"{recipe_name}: tuple[_ExchangeField, ...]" in recipes_source
 
     recipe_users = (
-        Path("vercor/setups/gallery/run_jcm_with_verosdata.py"),
-        Path("vercor/setups/gallery/run_jcm_with_era5data.py"),
-        Path("vercor/setups/gallery/run_jcm_with_slab.py"),
-        Path("vercor/setups/gallery/run_camulator_with_veros.py"),
-        Path("vercor/setups/gallery/run_data_driver.py"),
-        Path("vercor/setups/gallery/run_veros_with_era5data.py"),
+        Path("vercor/setups/gallery/jcm_with_verosdata.py"),
+        Path("vercor/setups/gallery/jcm_with_era5data.py"),
+        Path("vercor/setups/gallery/jcm_with_slab.py"),
+        Path("vercor/setups/gallery/camulator_with_veros.py"),
+        Path("vercor/setups/gallery/data_driver.py"),
+        Path("vercor/setups/gallery/veros_with_era5data.py"),
         Path("vercor/setups/gallery/profile_runtime.py"),
     )
     for path in recipe_users:
         source = path.read_text(encoding="utf-8")
         assert "from vercor.recipes import" in source, path
-        if path.name.startswith("run_"):
+        if path.name != "profile_runtime.py":
             assert "Exchange(" in source, path
 
-    assert _flatten_field_items(
-        JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS
-    ) == _flatten_field_items(
-        (*ATMOSPHERE_TO_DATA_OCEAN_FIELDS, *SLAB_ATMOSPHERE_TO_OCEAN_FLUX_FIELDS)
-    )
-    jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
+    jcm_slab_source = Path("vercor/setups/gallery/jcm_with_slab.py").read_text(
         encoding="utf-8"
     )
-    assert "JCM_ATMOSPHERE_TO_SLAB_OCEAN_FIELDS" in jcm_slab_source
+    assert "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS" in jcm_slab_source
+    assert _flatten_field_items(ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS) == [
+        "latent_heat_flux",
+        "sensible_heat_flux",
+    ]
 
 
 @pytest.mark.fast_always
@@ -1477,11 +1406,11 @@ def test_veros_factory_binds_current_runtime_step_and_setup() -> None:
     assert (
         "import vercor.setups._external.veros_runtime as veros_runtime" in loader_source
     )
-    assert "configure_veros_runtime(config.execution)" in factory_source
+    assert "configure_veros_runtime(" in factory_source
     assert "_load_veros_implementation()" in factory_source
-    assert factory_source.index(
-        "configure_veros_runtime(config.execution)"
-    ) < factory_source.index("_load_veros_implementation()")
+    assert factory_source.index("configure_veros_runtime(") < factory_source.index(
+        "_load_veros_implementation()"
+    )
     assert "partial(_veros_runtime.step_veros_runtime, state)" in factory_source
     assert "LifecycleHooks(setup=state.setup)" in factory_source
     assert "_veros_output.veros_output_provider()" in factory_source
@@ -1536,7 +1465,22 @@ def test_camulator_gcm_factory_passes_runtime_step_directly() -> None:
         "import vercor.setups._external.camulator_runtime as _camulator_runtime"
         in gcm_source
     )
-    assert "partial(_camulator_runtime.step_camulator_runtime, resources)" in gcm_source
+    step_bindings = [
+        node
+        for node in ast.walk(ast.parse(gcm_source))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "partial"
+        and node.args
+        and isinstance(node.args[0], ast.Attribute)
+        and node.args[0].attr == "step_camulator_runtime"
+    ]
+    assert len(step_bindings) == 1
+    assert isinstance(step_bindings[0].args[1], ast.Name)
+    assert step_bindings[0].args[1].id == "resources"
+    assert {keyword.arg for keyword in step_bindings[0].keywords} == {
+        "sample_native_output"
+    }
     assert "LifecycleHooks(setup=resources.setup)" in gcm_source
     setup_attributes = {
         target.attr
@@ -1599,7 +1543,7 @@ def test_jax_gcm_factory_does_not_attach_test_only_setup_state() -> None:
 
     assert "_setup_state" not in runtime_test_source
 
-    jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
+    jcm_slab_source = Path("vercor/setups/gallery/jcm_with_slab.py").read_text(
         encoding="utf-8"
     )
     assert 'getattr(atm, "model")' not in jcm_slab_source
@@ -1607,13 +1551,13 @@ def test_jax_gcm_factory_does_not_attach_test_only_setup_state() -> None:
 
 @pytest.mark.fast_always
 def test_jcm_examples_use_public_input_loader_facade() -> None:
-    jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
+    jcm_slab_source = Path("vercor/setups/gallery/jcm_with_slab.py").read_text(
         encoding="utf-8"
     )
     assert "vercor.setups._external.jax_gcm_tools" not in jcm_slab_source
     assert "load_jcm_inputs" in jcm_slab_source
 
-    jcm_veros_source = Path("vercor/setups/gallery/run_jcm_with_veros.py").read_text(
+    jcm_veros_source = Path("vercor/setups/gallery/jcm_with_veros.py").read_text(
         encoding="utf-8"
     )
     assert "generate_jcm_coords_forcing_topography_files" not in jcm_veros_source
@@ -1623,9 +1567,9 @@ def test_jcm_examples_use_public_input_loader_facade() -> None:
 @pytest.mark.parametrize(
     ("module_name", "first_factory_name"),
     (
-        ("vercor.setups.gallery.run_jcm_with_slab", "load_jcm_inputs"),
-        ("vercor.setups.gallery.run_jcm_with_veros", "make_veros_gcm"),
-        ("vercor.setups.gallery.run_jcm_with_verosdata", "make_erainterim_ocean"),
+        ("vercor.setups.gallery.jcm_with_slab", "load_jcm_inputs"),
+        ("vercor.setups.gallery.jcm_with_veros", "make_veros_gcm"),
+        ("vercor.setups.gallery.jcm_with_verosdata", "make_erainterim_ocean"),
     ),
 )
 def test_jcm_galleries_enable_dtype_before_native_model_construction(

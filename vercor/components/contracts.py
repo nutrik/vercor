@@ -216,8 +216,10 @@ class TransferPolicy:
 
     ``current`` sends the stored field directly, ``linear`` interpolates the
     adjacent monthly samples using runtime weights, and ``daily`` selects the
-    active daily sample. The mode is static component policy, not traced
-    physics.
+    active daily sample. Non-current selectable outputs require time-first
+    surface or level arrays with twelve monthly or 365 no-leap daily records;
+    declared grid-shaped mask fields remain current. The mode is static
+    component policy, not traced physics.
     """
 
     time_selection: Literal["current", "linear", "daily"] = "current"
@@ -227,6 +229,29 @@ class TransferPolicy:
 
         if self.time_selection not in ("current", "linear", "daily"):
             raise ValueError("time_selection must be 'current', 'linear', or 'daily'")
+
+
+@dataclass(frozen=True)
+class ComponentMaskSpec:
+    """Reference evolving binary/fractional fields on a component's static grid.
+
+    Both fields use the current grid-shaped runtime layout. Omitted binary
+    support defaults to the grid wet mask; omitted fractional coverage is one
+    on the binary support. Fractional fields remain differentiable inputs.
+    """
+
+    binary_field: str | None = None
+    fractional_field: str | None = None
+
+    def __post_init__(self) -> None:
+        """Reject malformed field references before component preparation."""
+        for label in ("binary_field", "fractional_field"):
+            value = getattr(self, label)
+            if value is not None:
+                if not isinstance(value, str):
+                    raise TypeError(f"{label} must be a field name or None")
+                if not value.strip():
+                    raise ValueError(f"{label} must be a non-empty field name")
 
 
 @dataclass(frozen=True, init=False)
@@ -240,6 +265,8 @@ class ComponentSpec:
     preparation. ``execution`` selects differentiable JAX capability or the
     Python host path. ``lifecycle``, ``transfer``, and ``output`` own the sole
     setup/runtime-hook, time-selection, and output policies respectively.
+    ``masks`` optionally references current binary/fractional runtime fields;
+    computational grid support stays immutable.
     """
 
     inputs: tuple[str, ...]
@@ -249,6 +276,7 @@ class ComponentSpec:
     lifecycle: LifecycleHooks
     transfer: TransferPolicy
     output: "OutputSpec"
+    masks: ComponentMaskSpec | None
 
     def __init__(
         self,
@@ -260,6 +288,7 @@ class ComponentSpec:
         lifecycle: LifecycleHooks | None = None,
         transfer: TransferPolicy | None = None,
         output: "OutputSpec | None" = None,
+        masks: ComponentMaskSpec | None = None,
     ) -> None:
         """Create and eagerly validate a component declaration."""
 
@@ -286,6 +315,14 @@ class ComponentSpec:
             raise TypeError("transfer must be TransferPolicy or None")
         if output is not None and not isinstance(output, OutputSpec):
             raise TypeError("output must be OutputSpec or None")
+        if masks is not None:
+            if not isinstance(masks, ComponentMaskSpec):
+                raise TypeError("masks must be ComponentMaskSpec or None")
+            for name in (masks.binary_field, masks.fractional_field):
+                if name is not None and name not in declared:
+                    raise ComponentError(
+                        f"Component mask field '{name}' must be declared."
+                    )
         object.__setattr__(self, "inputs", normalized_inputs)
         object.__setattr__(self, "outputs", normalized_outputs)
         object.__setattr__(self, "initial_fields", frozen_initial_fields)
@@ -297,6 +334,7 @@ class ComponentSpec:
             self, "transfer", TransferPolicy() if transfer is None else transfer
         )
         object.__setattr__(self, "output", OutputSpec() if output is None else output)
+        object.__setattr__(self, "masks", masks)
 
 
 # This late public-owner import keeps component and output declarations acyclic
@@ -310,6 +348,7 @@ _KEEP_PAYLOAD = _component_protocol._KEEP_PAYLOAD
 
 __all__ = [
     "Component",
+    "ComponentMaskSpec",
     "ComponentSpec",
     "LifecycleHooks",
     "PrefillContext",

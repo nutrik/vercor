@@ -11,17 +11,20 @@ from veros.tools import get_periodic_interval
 from veros.variables import Variable
 from veros.core.utilities import enforce_boundaries
 
+from vercor.setups.config import VerosConfig
+
 
 def _surface_tke_forcing(stress_x, stress_y, density):  # type: ignore[no-untyped-def]
-    """Return wind-work TKE forcing with a finite calm-stress JAX derivative."""
+    """Return native wind work, preserving the fork's finite calm derivative."""
 
     stress_squared = (stress_x / density) ** 2 + (stress_y / density) ** 2
     from veros import runtime_settings
 
     if runtime_settings.backend == "jax":
-        from veros.core.operators import safe_sqrt
+        from veros.core import operators
 
-        stress_norm = safe_sqrt(stress_squared)
+        # Only the differentiable fork provides a finite calm-stress derivative.
+        stress_norm = getattr(operators, "safe_sqrt", npx.sqrt)(stress_squared)
     else:
         stress_norm = npx.sqrt(stress_squared)
     return stress_norm**1.5
@@ -34,13 +37,15 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
         self,
         override: dict[str, Any] | None = None,
         *,
-        restore_to_climatology_temp: bool = False,
-        restore_to_climatology_salt: bool = False,
+        restore_to_climatology_temp: bool = VerosConfig.restore_to_climatology_temp,
+        restore_to_climatology_salt: bool = VerosConfig.restore_to_climatology_salt,
+        salinity_restoring_timescale: float = VerosConfig.salinity_restoring_timescale,
     ) -> None:
-        """Keep independent restoring choices as setup configuration."""
+        """Keep restoring choices and the salinity time scale in seconds."""
 
         self.restore_to_climatology_temp = restore_to_climatology_temp
         self.restore_to_climatology_salt = restore_to_climatology_salt
+        self.salinity_restoring_timescale = salinity_restoring_timescale
         super().__init__(override=override)
 
     @veros_routine
@@ -49,11 +54,19 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
 
         super().set_parameter(state)
         state.var_meta.update(
+            coupled_feedback_active=Variable(
+                "Total feedback activation",
+                (),
+                "1",
+                "One after total sea-ice feedback is installed; zero during climatological spinup",
+                initial=0.0,
+                time_dependent=False,
+            ),
             coupled_salt_flux=Variable(
                 "Coupled virtual salt flux",
                 ("xt", "yt"),
                 "m g kg-1 s-1",
-                "VerCOR-computed freshwater contribution to surface salinity flux",
+                "VerCOR-computed total virtual salt contribution from bulk mass and actual salt",
                 initial=0.0,
             ),
             temp_restoring=Variable(
@@ -68,8 +81,16 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
                 "Salinity restoring weight",
                 (),
                 "1",
-                "Enable the existing 30-day surface salinity restoring term",
+                "Enable the surface salinity restoring term",
                 initial=float(self.restore_to_climatology_salt),
+                time_dependent=False,
+            ),
+            salinity_restoring_timescale=Variable(
+                "Salinity restoring time scale",
+                (),
+                "s",
+                "Positive surface salinity relaxation duration in seconds",
+                initial=self.salinity_restoring_timescale,
                 time_dependent=False,
             ),
         )
@@ -118,11 +139,10 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
             / settings.rho_0
         )
 
-        t_rest = 30 * 86400.0
         sss = f1 * vs.sss_clim[:, :, n1] + f2 * vs.sss_clim[:, :, n2]
         vs.forc_salt_surface = (
             vs.salt_restoring
-            / t_rest
+            / vs.salinity_restoring_timescale
             * (sss - vs.salt[:, :, -1, vs.tau])
             * vs.maskT[:, :, -1]
             * vs.dzt[-1]
@@ -135,19 +155,22 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
             vs.temp[:, :, -1, vs.tau] * vs.maskT[:, :, -1] < -1.8,
             vs.forc_temp_surface < 0.0,
         )
+        mask = npx.logical_and(mask, vs.coupled_feedback_active == 0)
         vs.forc_temp_surface = npx.where(mask, 0.0, vs.forc_temp_surface)
         vs.forc_salt_surface = npx.where(mask, 0.0, vs.forc_salt_surface)
         vs.forc_salt_surface = enforce_boundaries(
             vs.forc_salt_surface, settings.enable_cyclic_x
         )
 
-        return KernelOutput(
+        output = dict(
             surface_taux=vs.surface_taux,
             surface_tauy=vs.surface_tauy,
-            forc_tke_surface=vs.forc_tke_surface,
             forc_temp_surface=vs.forc_temp_surface,
             forc_salt_surface=vs.forc_salt_surface,
         )
+        if settings.enable_tke:
+            output["forc_tke_surface"] = vs.forc_tke_surface
+        return KernelOutput(**output)
 
     @veros_routine
     def set_diagnostics(self, state):  # type: ignore

@@ -3,7 +3,9 @@
 VerCOR is a JAX-first, fully differentiable coupler for composing Earth-system
 components. This document describes the implemented stable `0.4.0` architecture.
 The exact API inventory and compatibility decisions are in
-`docs/api-architecture-review.md`.
+`docs/api-architecture-review.md`. The completed source/test removal decisions,
+retained native adapters and assertion migrations are recorded in
+`docs/source-coupling-audit.md`.
 
 ## 1. Goals and constraints
 
@@ -22,6 +24,19 @@ The exact API inventory and compatibility decisions are in
   applicable component or route mask; infinity is always invalid.
 - Masked numerical kernels neutralize inactive operands before nonlinear
   arithmetic so output-free JVP and VJP cannot inherit inactive-branch NaNs.
+- ComponentMaskSpec may reference current binary and fractional runtime fields
+  inside immutable grid support. Explicit exchange quantities weight source
+  fields before remapping; intensive values normalize covered overlap and
+  remain available on wet cells with zero target coverage. Route diagnostics
+  refresh at initialization, supplied-state preparation, and every component
+  step, and final output records current coverage. Mask fields remain finite
+  everywhere; inactive exports may contain NaN until their support reactivates.
+  Stored imports retain the coverage of their last dispatch, separately from
+  current route diagnostics, so a source can reactivate before its recipient
+  runs. Imported mask fields are validated before author physics executes.
+  Explicit routes can select `source_coverage="binary"` for total-area fluxes;
+  their exported fields require finite binary support in sends and supplied
+  states, including wet cells with zero fractional coverage.
 
 The stable release does not provide registries, entry-point discovery, Pydantic
 models, fan-in reducers, a public prepared graph, fractional subcycling,
@@ -53,6 +68,59 @@ The public state surface is intentionally opaque. `RunState.component(...)`,
 `RunState.components(...)`, and `RunState.replace_fields(...)` provide reads and
 immutable replacement. Runtime stores, topology maps, alignment metadata, and
 prepared bindings remain private.
+Replacing a current exported field also replaces its matching outgoing copy,
+so a supplied state is coherent before any recipient runs. Record arrays refresh
+their selected export at each recipient's clock time as well as at source send.
+Selection does not advance source physics and works for omitted or later sources;
+current evolving exports retain explicit sequential feedback ordering. Received
+values and their last-dispatch support retain independent ownership.
+
+Non-current transfer policies require time-first selectable outputs with twelve
+monthly records or 365 no-leap daily records. Declared grid-shaped mask fields
+remain current. Setup, prefill, and the shared selector enforce this layout;
+monthly interpolation preserves the runtime field dtype in sends and output.
+
+Bundled evolving adapters exchange means of canonical state samples after every
+native step in the coupling interval. One native step yields its endpoint;
+initialization retains instantaneous initial diagnostics. Nonlinear derived
+state fields are diagnosed before reduction. Native continuation payloads,
+clocks, categorical fields and native diagnostic snapshots retain endpoints.
+JCM surface fluxes and Veris ocean feedback integrate every native interval.
+JCM diagnoses rain/snow before reduction, independently of diagnostic save
+cadence. Its native step returns endpoint state, eight horizontal flux histories,
+normalized surface pressure and four bottom-level dynamics histories. With the
+default wrapper JIT enabled, host/mixed paths avoid materializing unused full
+diagnostic histories; disabling wrapper JIT can retain those native temporaries.
+CAMulator averages every native prediction's mapped meteorology and decoded
+radiation rates. Veros accumulates canonical native surfaces; Veris accumulates
+ice fraction, temperature and diagnosed albedo alongside its mean fluxes.
+Prescribed records retain their existing time selection, and slab components
+use one coupling-sized step. Plugin authors own internal native sampling.
+Native output samples and exchanged state/rate means have distinct meanings
+and are documented separately.
+
+Exchange and output reduction share `vercor/_averaging.py` numerical kernels.
+Sampling clocks and field selections stay independent: component contracts and
+native mappers own exchanges; `OutputSpec`/`PeriodOutput` own optional output.
+Required native samples use strict sums and a scalar equal-step count, preserving
+invalid-physics propagation with no field-sized count arrays. Output excludes
+missing diagnostic samples using per-cell int32 finite counts. Both divide only
+at their interval boundary; Veris retains its native duration-weighted integrals.
+JCM folds compact native samples into mapped totals in a cached numeric scan,
+without allocating a second mapped trajectory. Its native model still returns
+the compact raw history. Endpoint payloads and nonlinear diagnosis order remain
+owned by the adapters.
+
+Host output validates each selected field's schema and reduced counts before
+batching one frame's numeric reductions and accumulator updates in a pure JIT
+kernel. Tuple leaves preserve heterogeneous shapes and dtypes without stacking.
+Scanned output uses the same arithmetic inside its existing compiled executor.
+
+Coupled pressure-mode Veros stepping synchronizes SSH to the rotated current
+pressure solution without changing prognostic state. Surface-flux setups use
+matching 1800-second momentum/tracer steps by default; custom momentum duration
+sets implicit tracer duration, and explicit tracer overrides retain deliberate
+native acceleration. Bulk meteorology retains its native timestep policy.
 
 ## 3. Configuration ownership
 
@@ -69,8 +137,10 @@ year types and durations, and runtime time metadata derives the applicable
 duration independently from every timestamp's calendar and year.
 
 `RuntimeOptions.dtype` is the sole precision owner. Preparation normalizes
-VerCOR-owned fields, grids, constants, and numeric payload leaves to that
-policy. Integer/index arrays stay 32-bit. Physics code never branches in Python
+VerCOR-owned fields, grids, and constants to that policy. Native adapters own
+payload precision conversion; the generic binding copies arbitrary payload
+leaves without casting opaque native state or categorical values. VerCOR
+integer/index arrays stay 32-bit. Physics code never branches in Python
 on traced constants.
 
 ## 4. Component authoring
@@ -149,9 +219,12 @@ numerical kernels neutralize inactive operands before nonlinear arithmetic so
 output-free JVP and VJP cannot inherit inactive-branch NaNs.
 State validation completes schema, topology, and central route/component field
 finiteness checks before invoking component-author lifecycle validation.
-Bundled adapters validate owned numeric payload/native leaves immediately
-before reuse and after production while preserving each adapter's established
-JAX-transform or host-only differentiation boundary.
+JCM, Veris, and CAMulator validate their owned numeric payload/native leaves
+at native transition boundaries while preserving each adapter's established
+JAX-transform or host-only differentiation boundary. Veros currently relies on
+central exported-field validation; hidden deep native-state validation needs
+an explicit active-mask policy. The current interface and wrapper audit is
+recorded in `docs/interface-wrapper-audit.md`.
 
 ## 7. Workflow and execution
 
@@ -161,13 +234,25 @@ registered components but may not reference unknown names or repeat one. The
 default `SequentialWorkflow` repeats the constructor run order.
 
 The private coordinator validates the plan, groups compatible consecutive
-schedules, and splits at output boundaries. Each `ExecutionChunk` retains
+schedules, and splits at the union of enabled output cadence boundaries when
+every provider supports numeric JAX sampling. Each `ExecutionChunk` retains
 absolute clock indices. Output-free uniform workflows preserve one JIT-wrapped
 `jax.lax.scan`; a run-local executor is reused for repeated schedules. The
 fixed-shape scan step is wrapped in `jax.checkpoint`, so reverse-mode rollouts
 rematerialize per-step intermediates instead of retaining the complete
-trajectory. Scan length, callback order, progress reporting, interrupt checks,
-and carry structure are unchanged.
+trajectory. Each schedule uses a fixed scan width equal to the greatest common
+divisor of its chunk lengths. Larger chunks use multiple internal blocks with
+dynamic absolute indices while retaining their original validation and output
+boundaries. Every scan slot is an actual step; no padding or conditional wraps
+the runtime state. Uniform workflows still use one complete scan. Coprime
+calendar or schedule windows use smaller blocks to preserve one compiled shape.
+
+Numeric output uses the same private runtime-step builder, composing each
+post-step sample with immutable sum/count accumulation inside a checkpointed
+scan. Output-free and output-carry executors retain separate run-local caches
+by component schedule. Ordinary providers and host/custom backends preserve
+single-step sampling through the same output session. A schedule change also
+splits a scanned output window while retaining every provider's partial accumulator.
 
 An `ExecutionBackend.execute(...)` receives state, public context, a core-owned
 chunk, and `RuntimeDriver`. It must consume every plan exactly once and in order
@@ -178,6 +263,14 @@ reordered, skipped, or out-of-chunk plans before dispatch.
 execution. Forced JAX rejects host components; forced host runs all scheduled
 components in Python. Host, compiled, and custom execution share receive,
 step, send, cancellation, state validation, and output boundaries.
+
+For fixed array schemas, VerCOR-owned JAX work retains its compiled functions
+throughout a run. Bilinear extrapolation kernels and the native Veris transition
+retain stable JIT boundaries on host, mixed and custom-driver execution too.
+Initial compilation per schedule/kernel is expected. Separate runs create
+run-local executors; new shapes, dtypes, static configuration or user-created
+JIT functions can require new compilation. Host component and custom-backend
+Python semantics remain unchanged; plugin authors own their internal JIT caches.
 
 Graceful interruption is scoped around each run. Host paths check at step and
 component boundaries. Compiled paths use ordered callbacks and a nonblocking
@@ -192,18 +285,68 @@ Differentiated and outer-jitted callers use this path.
 
 An `OutputProvider.sample(OutputContext)` returns an immutable `OutputFrame` of
 named `OutputVariable` values, coordinates, dimensions, attributes, and
-metadata. `PeriodOutput.variables` uses identical empty/subset/unknown behavior
-for runtime, JAXGCM, Veros, CAMulator, and third-party providers.
+metadata. Ordinary and numeric contexts carry `variables` before extraction.
+The default runtime provider samples all declared state (inputs and outputs),
+applying export transfer selection only to outputs. Bundled native providers
+combine all available native state/flux/diagnostic registry fields with canonical
+runtime fields; native names retain their meaning on collisions. Veros diagnostic
+arrays are namespaced by owner and are sampled only if initialized. Output does
+not schedule native diagnostic routines. Repeated native dimensions are uniquely
+named and implicit axes receive index coordinates.
+
+`OutputFrame.reduction_counts` permits already reduced native sums with matching
+nonnegative integer counts. The session merges these directly with ordinary
+samples and computes means only at completed write boundaries. The run-specific
+static `StepContext.output_variables` request is None when period output is off
+and an empty tuple when all variables are requested. CAMulator uses it to reduce
+selected native prediction output immediately while mandatory exchange mapping
+still diagnoses every native endpoint before averaging. The payload retains an
+endpoint prediction and fixed-size sums/counts, with no prediction history. `PeriodOutput.variables` uses identical empty/subset/unknown behavior
+for runtime, JCM, Veros, CAMulator, and third-party providers.
 Bundled slab and data factories default to `OutputSpec()` with no period
 policy, matching bundled external configuration defaults. They accept a
 complete keyword-only `OutputSpec`, allowing cadence, variable selection,
 providers, and snapshots to be configured independently per component.
+
+`JaxOutputProvider` is an optional structural capability in addition to ordinary
+`OutputProvider.sample`. Period sampling prefers this capability independently
+for each provider on every backend, including mixed-component and custom runs.
+Its pure `sample_jax(JaxOutputContext)` receives state, payload, absolute int32
+step and coupling interval in seconds, with no Python datetime. The step is
+traced inside a scan and concrete on the host. Numeric values and coordinates
+may change, but names, dimensions, metadata, shapes and dtypes remain fixed.
+The default field provider and bundled
+JCM, Veris and Veros providers implement it. Their host methods add calendar
+timestamps to the same numeric extraction; snapshots retain ordinary host I/O.
+
+Before the first output scan, abstract tracing of the first runtime step and
+numeric sample establishes a zero accumulator template. It executes no actual
+model step and accumulates no initial-state sample. The first actual post-step
+sample remains inside the first scan. The carry stores only current state,
+sums, finite counts and latest coordinates, without a trajectory. Completed
+periods reset only their due accumulators; incomplete periods are not flushed.
+Zero-step runs do not trace or sample providers. An ordinary provider among the
+enabled providers retains per-step execution without speculative tracing of its
+sampling method; numeric neighbors still use `sample_jax`. Ordinary providers
+receive the concrete Python step, exact end-of-step calendar time and interval.
+Host and custom backends sample concrete post-step state without abstractly
+tracing native payloads. All sampling paths share provider selection, frame
+validation, variable selection, finite sum/count accumulation and period resets.
+Only scanned carry normalizes coordinate leaves to JAX arrays; host sampling
+preserves native coordinate precision.
 
 The default runtime-field provider applies the component's `TransferPolicy`
 with the exact precomputed metadata for `OutputContext.step`. Period output
 therefore samples the same `current`, linearly interpolated monthly, or indexed
 daily field exported during that coupling step; internal forcing-record axes
 are never emitted as physical output dimensions.
+
+Paired JCM surface output retains prescribed marine forcing beyond a coupled
+ocean's rectangular footprint. Coupled source-weighted products and prescribed
+native contributions are merged by fractional area before output. SST and ice
+sample the same native physics dates as saved model snapshots; albedo comes
+from the retained native radiation diagnostic. Period output and final native
+snapshots share these applied marine boundary fields.
 
 One private session owns:
 
@@ -222,7 +365,7 @@ absolute-step, and schema discriminators where needed.
 
 Enabled output rejects traced runtime leaves before provider or writer calls.
 Execution backends and model steps never receive an output session and never
-choose cadence or paths. JAXGCM, Veros, and CAMulator retain only native state
+choose cadence or paths. JCM, Veros, and CAMulator retain only native state
 needed for sampling and final snapshots.
 
 ## 9. Bundled setups and plugins
@@ -260,18 +403,35 @@ and an integer is the process status. CLI choices are lowercase ``trace``,
 those choices to the Coupler log level and ``DTypePolicy``/``RuntimeOptions``
 dtype policy.
 
-Bundled slab, data, JCM, Veros, and CAMulator factories return the same
-structural components used by external plugins. JAXGCM/Veros spinup is
+Bundled slab, data, JCM, Veros, Veris, and CAMulator factories return the same
+structural components used by external plugins. JCM/Veros spinup is
 controlled only by `Spinup.enabled`. CAMulator enabled spinup is rejected
 because it is not implemented. CAMulator forcing alignment is explicitly
 `strict` or `forcing_start`; both policies require a standard-library
 `datetime` clock because no-leap and 360-day CAMulator conversion is not
 implemented.
 
-`VerosConfig` selects `setup="global_4deg"` or `setup="acc"` and an
-`execution="host"` or `execution="jax"` lane. Host is the compatibility
-default and configures stock Veros with the NumPy backend and its best
-available solver. Adapter construction deep-copies the complete native state,
+Standalone Veris uses native `initialize_experiment` and pure `advance` with
+immutable state/diagnostics and traced physical constants in the component
+payload. Frozen setup resources retain numerical configuration, precision and
+substep alignment. The lazy `replace_veris_parameters` helper replaces only
+independent scalar physical leaves, using native validation/dependent laws,
+while preserving fields and native state. VerCOR owns native rhoFresh through
+its traced freshwater_density at setup and every transition. Native ocean
+initial fields do not depend on rhoFresh, so that owner is applied after host
+initialization to preserve outer-JIT setup. Each substep receives fresh forcing. `make_veris_verosdata` snapshots one setup-only Veros global4deg ocean,
+sharing its exact tracer grid/wet domain with the data ocean. The snapshot
+converts Veros east/north face geometry to native west/south indices and retains
+authoritative latitude/edge coordinates and native radius for spherical metrics;
+supplied native areas retain their quadrature without rescaling. CESM bulk
+`tref/qref` supply ice air temperature/humidity; native `Area` supplies evolving
+fractional coverage while ice-free wet cells retain forcing. Output reuses
+the shared coordinator; the gallery sends no feedback to prescribed data.
+
+`VerosConfig` configures the sole `global_4deg` ocean with an
+`execution="host"` or `execution="jax"` lane; there is no setup selector.
+Host is the compatibility default and uses native JAX kernels by default,
+with explicit `backend="numpy"` available and the best available solver. Adapter construction deep-copies the complete native state,
 substituting an immutable tuple for Veros' non-copyable settings `dict_keys`
 view without modifying the source. On every host step, the generic component
 runtime ownership boundary copies that normalized payload exactly once before
@@ -283,14 +443,18 @@ copying, differentiable operators, and traced `c_k`/`c_eps` variables.
 `execution` is the sole Veros copy and compilation policy; there is no separate
 `jitted` option. Runtime settings lock on first Veros use, so conflicting
 host/JAX components must run in separate Python processes. The packaged
-optional requirement remains `veros>=1.6.2,<1.7`; fork selection is
+optional requirement remains `veros>=1.7.0`; fork selection is
 capability-gated rather than globally pinned.
+
+Veros native substeps advance and accumulate exchange samples without adapter
+progress logging in either execution lane. Progress is reported at the coupler's
+step and component boundaries.
 
 Both global Veros execution lanes receive zero-seeded `rain_rate` and
 `snow_rate` in kg/m²/s. ERA5 aggregates `crr + lsrr` and `csfr + lssfr` before
 monthly interpolation; JCM aggregates `precls + precnv` before remapping and
 converts g/m²/s to kg/m²/s. JCM diagnoses phases on its native grid using
-SPEEDY `surface_flux.t0`, locally named `temperature_2m`. This near-surface
+SPEEDY `surface_flux.t0`, passed as `near_surface_air_temperature`. This near-surface
 diagnostic has no specified 2 m height; it is distinct from bottom-level air.
 The snow fraction is `sigmoid(4 * (T_mid - t0) / (T_rain - T_snow))`, with
 `T_mid = (T_snow + T_rain) / 2`. The traced `PhysicalConstants` thresholds
@@ -304,8 +468,11 @@ eastern Canadian land stations, not global ocean or SPEEDY validation.
 Native snow is total precipitation times its fraction; native rain is the
 remainder. Both rates are transposed and then independently interpolated.
 Bottom sigma-center temperature, humidity, winds, density, and potential
-temperature keep their canonical exchange keys and their common
-`model_level_height`; only the phase diagnosis uses t0.
+temperature use `air_temperature`, `air_specific_humidity`, `air_u_velocity`,
+`air_v_velocity`, `air_density` and `air_potential_temperature`, with their common
+`model_level_height`; only the phase diagnosis uses t0. JCM's `air_pressure_3d`
+retains `(sigma_level, latitude, longitude)` pressure in Pa; CAMulator's
+`model_level_air_pressure` is the horizontal lowest-level pressure in Pa.
 VerCOR computes the rigid-lid virtual salt flux on the ocean grid as
 `-S_ref * (rain + snow - E) / rho_fw`, with upward-positive evaporation `E`
 from the existing bulk calculation. `PhysicalConstants` owns traced
@@ -313,27 +480,44 @@ from the existing bulk calculation. `PhysicalConstants` owns traced
 The native adapter retains the coupled contribution separately so its forcing
 callback can assign `forc_salt_surface` without accumulating restoring across
 substeps. `restore_to_climatology_temp` independently enables the SST
-correction, while `restore_to_climatology_salt` adds 30-day SSS restoring.
-Both default to `False`. The common host/JAX native callback owns both
-scalar weights, so the controls also apply during spinup before any coupled
+correction (off by default), while `restore_to_climatology_salt` adds SSS
+restoring (on by default). The independent keyword-only
+`salinity_restoring_timescale` defaults to `4 * 365 * 86400.0` seconds
+(four 365-day model years). The public config validates a positive finite
+duration, passed through the factory/setup owner into a traced native scalar;
+the native flux is `salt_restoring * dzt[-1] * (SSS_clim - SSS) / timescale`.
+The common host/JAX native callback owns both scalar weights, so the controls
+also apply during spinup before any coupled
 forcing is prepared. Layout preparation preserves the raw `qnec` coefficient;
 the temperature weight gates only its contribution to heat forcing. Coupled
 heat and freshwater contributions remain active with either switch off.
-Ocean/ice masks
-and native cyclic halo exchange are applied to the final salt flux. Its
-metadata is `m g kg-1 s-1`; no timestep or top-cell-depth factor is applied
-before Veros's tracer integration.
+Ocean/ice masks and native cyclic halo exchange are applied to the final salt
+flux. Its metadata is `m g kg-1 s-1`; the coupled freshwater conversion applies
+no timestep or top-cell-depth factor before Veros's tracer integration.
+
+Paired JCM construction distinguishes geometric ocean footprint `G` from
+remapped wet coverage `C`. Native land fraction `N` supplies prescribed marine
+area `U=(1-G)*(1-N)` outside the footprint, and effective land is `L=1-C-U`.
+Inside the footprint, the coupled ocean still owns the coastline. Land and
+atmosphere share this effective terrain; surface topology preserves actual
+land support outside the ocean domain. Standalone mask construction retains
+its complement policy unless native land fractions are supplied explicitly.
+Native SST/ice time-series blending preserves labels, interpolation and solar
+selection; each coupling interval starts from the original immutable forcing.
+The existing native forcing hook diagnoses prescribed albedo and merges it
+with coupled albedo without duplicating SPEEDY's albedo law. A two-machine-
+epsilon full-prescribed reconciliation handles precision conversion before
+support decisions, with the same identity-tangent policy as full ice.
 
 The JAX global adapter consumes external atmospheric forcing, disables
 streamfunction and diagnostics that would change the payload PyTree, and uses
-the fork's finite-derivative calm-stress norm. The JAX ACC adapter retains its
-native internal forcing and topology while leaving variable-owned turbulence
-parameters at their fork defaults. JAXGCM uses one physical default mapping
+the fork's finite-derivative calm-stress norm. Both execution lanes use
+the same global forcing definition and native turbulence defaults. JCM uses one physical default mapping
 everywhere fields are declared, initialized, or prefilled: temperature and
 potential temperature are 288.15 K, density is 1.2 kg/m³, and model-level
 height is 50 m. These defaults prevent a not-yet-stepped atmosphere from
 feeding valid-looking zero divisors and logarithm inputs into the ocean.
-After a JAXGCM step, model-level height is the surface-nearest sigma-center
+After a JCM step, model-level height is the surface-nearest sigma-center
 altitude above ground. The adapter anchors the pressure ratio at the surface
 and uses the lowest model-level virtual temperature for the unresolved
 surface-to-center layer.
@@ -372,6 +556,14 @@ output. It imports no private VerCOR module.
 The 0.4 API does not include legacy compatibility adapters or executable
 pre-redesign evidence. Applications use the current contracts directly.
 
+`calendar.YearType` is the sole forcing-year enum owner. Public regridding
+factories construct concrete private implementations directly while retaining
+their signatures, including `radius_km`. JCM output reads only runtime context
+payloads; a missing final snapshot payload raises a component-scoped error
+before output is created. Setup constructors own all native runtime policy
+attributes. Veris forcing consumers use the single production forcing pack,
+which contains native forcing and open-water face stresses.
+
 ## 10. Testing and release evidence
 
 Tests are layered across pure numerical kernels, component contracts, routes,
@@ -391,7 +583,7 @@ macOS smoke, and `git diff --check`.
 
 CI keeps stock-Veros compatibility separate from differentiable-fork
 acceptance. The ordinary quality job and installed-artifact Veros matrix lane
-resolve the packaged `veros>=1.6.2,<1.7` requirement. A dedicated serial job
+resolve the packaged `veros>=1.7.0` requirement. A dedicated serial job
 installs the public differentiable fork without dependencies at immutable commit
 `7a8c964cf00b5aa0713c995edd760643a431b3c9`, verifies its PEP 610 commit record
 and required runtime capabilities, and runs the multi-step rollout module.
@@ -408,3 +600,82 @@ constructor signatures, removed primary modules, the dependency-free slab, and
 the composed external extension. CI builds and uploads only the two VerCOR
 distributions once, shares that artifact bundle with all matrix cells, and
 builds the fixture separately for each external-extension contract job.
+
+The Veris runtime retains final native diagnostics and separately integrates
+complete ocean heat, actual mass/salt and face-stress products over native
+substeps. Canonical fields are total-area interval means; two external boundary
+means in the payload support independent column budgets. Native inputs/outputs
+are checked at every substep with a sticky validity carry and a single coupling
+boundary guard, including accumulation overflow. Stress combines retained
+momentum AreaW/AreaS with ice traction and complementary shared-bulk open-water
+traction before shifting west/south to east/north faces.
+
+Global Veros selects `surface_forcing="bulk_meteorology"` (default) or
+`surface_forcing="surface_fluxes"` explicitly. Surface-flux mode consumes the
+five canonical rates once, preserves independent native
+restoring, and activates a scalar native flag after climatological spinup. The
+cold-water proxy applies only while total feedback is inactive. Native pressure/
+free-surface execution provides actual SSH, with canonical native surface
+velocities and salinity alongside SST. Salt conversion uses fixed S_ref and
+actual M/J, separately from physical local-salinity inventory accounting.
+
+The prognostic Veris/Veros factory reuses the sole Veros setup owner and extracts
+geometry without copying prescribed climatology proxies. Both components share
+one exact grid. Scalar total fluxes use conservative routing; vector stresses
+use existing shared-grid identity routing, with binary coverage for both. The
+focused calibration gallery fits native h0 through public immutable state and
+fields using fixed wet weights, an identifiability guard and JAX value/gradient
+evaluation inside bounded SciPy minimization; it adds no generic optimizer API.
+
+Extended Veris validation reuses the prescribed gallery, Coupler.run, native
+stored areas and the shared output coordinator. A private index counter measures
+actual guarded native transitions; pure device reductions provide scalar budget
+rates. Host-only benchmark reporting and segmented comparisons introduce no
+alternative integrator or mutable model state. See docs/veris-validation.rst.
+
+
+## Coupled Veris–Veros–JCM surface assembly
+
+Reusable field recipes use physical atmosphere/ocean/sea-ice names. The concrete
+JCM entry points are `make_jcm_atmosphere` and `JCMAtmosphereConfig`; private
+`JCMAtmosphereSetupState` and `JCMAtmosphereRuntimePayload` retain their existing
+module paths and lifecycle. There are no former-name aliases. The field,
+recipe, mask-helper and forcing-mode migration is documented in
+`docs/coupling-fields.rst`.
+
+`veris_veros_jcm.py` reuses the paired native factories and the sequential
+LND → CICE → OCN → ATM workflow. Ice exports current per-ice temperature and
+native category/snow albedo, plus current concentration. Ocean exports current
+`(1-A)*SST` after its native advance; full SST/SSS/currents/SSH remain available
+under ice. Total ocean boundary rates pass through Veris once. Routes, run order,
+diagnostic state lookup and topology roles use actual component names, preserving
+configurable instance identities.
+
+Explicit routes form source products before conservative remapping:
+`R(W*A*Tice)`, `R(W*A*alpha_ice)`, `R(W*A)` and `R(W*(1-A)*SST)`.
+The JCM compositor normalizes by static ocean area only. Land temperature and
+moisture retain their independent native fields. A frozen forcing wrapper
+carries marine albedo through native time/solar selection; a narrow native
+SPEEDY forcing subclass replaces only marine and combined albedo diagnostics.
+Native concentration remains the real marine ice fraction. All evolving values
+are payload/field leaves, with no model or physics-term ice-state mutation.
+
+JCM 3 uses Gregorian native time/step leaves in its immutable payload. Initial
+physical diagnostics do not advance the native carry. Humidity is already kg/kg;
+evaporation and precipitation diagnostics retain native gram conversions.
+`SurfaceMaskPolicy` validates static geometry and restricts binary land support.
+Components own fractions; the runtime resolves current overlap and separately
+retains last-dispatch coverage for imports. Declared mask fields bypass record
+selection in static/daily/monthly data components.
+
+All exchanges require `intensive`, `source_flux`, or `target_flux`. One scalar/
+vector dispatcher forms covered source products before remapping. Intensive
+values divide by remapped source coverage; source fluxes retain that numerator;
+target fluxes multiply the normalized value by target coverage. Preweighted
+Veris rates and open-water products use binary source coverage to avoid a second
+area factor. See `docs/exchange-coverage.rst` for formulas and the field audit.
+
+JCM's single marine channel uses the area-composed effective temperature;
+separate ice/water turbulent channels and long-term climate validation remain
+outside this functional integration. Canonical marine output joins the native
+provider through the existing shared output coordinator.

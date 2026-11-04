@@ -41,20 +41,6 @@ def change_jcm_parameter_values(
         )
 
 
-def get_default_parameter_values(
-    parameters: list[str], default_parameters: Parameters
-) -> dict[str, float]:
-    output = {}
-
-    for parameter in parameters:
-        parameter_group_name, parameter_name = parameter.split(".")
-        output[parameter] = default_parameters.__getattribute__(
-            parameter_group_name
-        ).__getattribute__(parameter_name)
-
-    return output
-
-
 def load_jcm_coords_terrain_forcing(
     resolution: int = 31,
     input_data_directory: Optional[Path] = None,

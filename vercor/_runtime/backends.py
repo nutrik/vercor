@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Any, cast
 
 import jax
+import jax.numpy as jnp
 from jax.errors import JaxRuntimeError
 
 from vercor.calendar import ModelDateTime
@@ -74,6 +76,50 @@ def build_runtime_execution_data(
     )
 
 
+def build_jax_runtime_step(
+    components: tuple[str, ...],
+    *,
+    context: RuntimeRunContext,
+    execution_data: _RuntimeExecutionData,
+) -> Callable[[RunState, RuntimeArray, RuntimeStepInfo], RunState]:
+    """Build the shared component sequence for either scanned carry layout."""
+
+    def run_step(
+        carry: RunState, step_index: RuntimeArray, step_info: RuntimeStepInfo
+    ) -> RunState:
+        context.interrupts.scanned_checkpoint(
+            "scanned runtime step",
+            step_index,
+        )
+        log_scanned_step_progress(
+            context.logger,
+            step_index,
+            execution_data.progress_messages,
+        )
+        for component_name in components:
+            label = f"scanned runtime component {component_name}"
+            context.interrupts.scanned_checkpoint(label, step_index)
+            log_scanned_component_progress(context.logger, component_name)
+            carry = step_runtime_component(
+                carry,
+                component_name,
+                step_info,
+                dispatch_context=context.dispatch_context,
+                allow_host_runtime=False,
+                logger=context.logger,
+                step=step_index,
+                write_period=context.output is not None and context.output.write_period,
+            )
+            context.interrupts.scanned_checkpoint(label, step_index)
+        context.interrupts.scanned_checkpoint(
+            "scanned runtime step",
+            step_index,
+        )
+        return carry
+
+    return run_step
+
+
 def build_jax_chunk_executor(
     components: tuple[str, ...],
     *,
@@ -81,6 +127,9 @@ def build_jax_chunk_executor(
     execution_data: _RuntimeExecutionData,
 ) -> _JaxChunkExecutor:
     """Compile one reusable scanned executor for a component schedule."""
+    runtime_step = build_jax_runtime_step(
+        components, context=context, execution_data=execution_data
+    )
 
     def scanned_chunk(
         runtime_state: RunState,
@@ -88,38 +137,10 @@ def build_jax_chunk_executor(
         step_infos: RuntimeStepInfo,
     ) -> RunState:
         def run_step(
-            carry: RunState,
-            scan_input: tuple[RuntimeArray, Any],
+            carry: RunState, scan_input: tuple[RuntimeArray, Any]
         ) -> tuple[RunState, None]:
             step_index, step_info = scan_input
-            context.interrupts.scanned_checkpoint(
-                "scanned runtime step",
-                step_index,
-            )
-            log_scanned_step_progress(
-                context.logger,
-                step_index,
-                execution_data.progress_messages,
-            )
-            for component_name in components:
-                label = f"scanned runtime component {component_name}"
-                context.interrupts.scanned_checkpoint(label, step_index)
-                log_scanned_component_progress(context.logger, component_name)
-                carry = step_runtime_component(
-                    carry,
-                    component_name,
-                    step_info,
-                    dispatch_context=context.dispatch_context,
-                    allow_host_runtime=False,
-                    logger=context.logger,
-                    step=step_index,
-                )
-                context.interrupts.scanned_checkpoint(label, step_index)
-            context.interrupts.scanned_checkpoint(
-                "scanned runtime step",
-                step_index,
-            )
-            return carry, None
+            return runtime_step(carry, step_index, step_info), None
 
         final_state, _ = jax.lax.scan(
             jax.checkpoint(run_step),
@@ -132,6 +153,38 @@ def build_jax_chunk_executor(
     return cast(_JaxChunkExecutor, jax.jit(scanned_chunk))
 
 
+@partial(jax.jit, static_argnames=("size",))
+def jax_chunk_inputs(
+    step_infos: RuntimeStepInfo, start: RuntimeArray, *, size: int
+) -> tuple[RuntimeArray, RuntimeStepInfo]:
+    """Gather fixed-width metadata with dynamic absolute indices.
+
+    Each schedule uses the greatest common divisor of its chunk lengths, so
+    every block contains only actual steps. A fixed scan length retains
+    reverse-mode differentiation while changing month lengths, schedule windows
+    and final tails reuse the same executable without inactive branches.
+    """
+    indices = start + jnp.arange(size, dtype=start.dtype)
+    infos = jax.tree_util.tree_map(
+        lambda value: jnp.take(value, indices, axis=0, mode="clip"), step_infos
+    )
+    return indices, cast(RuntimeStepInfo, infos)
+
+
+def iter_jax_chunk_inputs(
+    chunk: ExecutionChunk, execution_data: _RuntimeExecutionData, *, max_steps: int
+) -> Iterator[tuple[RuntimeArray, RuntimeStepInfo]]:
+    """Split one core chunk into fixed-width calls without adding I/O boundaries."""
+    if not chunk.steps:
+        return
+    stop = chunk.steps[-1].step + 1
+    for start in range(chunk.steps[0].step, stop, max_steps):
+        indices, infos = jax_chunk_inputs(
+            execution_data.step_infos, as_jax_index_array(start), size=max_steps
+        )
+        yield indices, infos
+
+
 def execute_jax_chunk(
     state: RunState,
     *,
@@ -139,24 +192,16 @@ def execute_jax_chunk(
     context: RuntimeRunContext,
     execution_data: _RuntimeExecutionData,
     executor: _JaxChunkExecutor,
+    max_steps: int,
 ) -> RunState:
     """Execute one uniform chunk with its schedule's reusable JAX executor."""
 
-    if not chunk.steps:
-        return state
-    start = chunk.steps[0].step
-    stop = chunk.steps[-1].step + 1
-    step_infos = jax.tree_util.tree_map(
-        lambda value: value[start:stop],
-        execution_data.step_infos,
-    )
-
     try:
-        return executor(
-            state,
-            execution_data.step_indices[start:stop],
-            cast(RuntimeStepInfo, step_infos),
-        )
+        for indices, infos in iter_jax_chunk_inputs(
+            chunk, execution_data, max_steps=max_steps
+        ):
+            state = executor(state, indices, infos)
+        return state
     except JaxRuntimeError as error:
         context.interrupts.raise_if_jax_callback_interrupted(
             error,
@@ -260,6 +305,8 @@ class _RuntimeDriverAdapter:
                 time=time,
                 logger=self._context.logger,
                 step=step,
+                write_period=self._context.output is not None
+                and self._context.output.write_period,
             )
             _validate_state(
                 state,

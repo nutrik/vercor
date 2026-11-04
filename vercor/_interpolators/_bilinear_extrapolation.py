@@ -10,7 +10,12 @@ from vercor._numerical_safety import require_active_finite, safe_masked_divide
 import vercor._interpolators._bilinear_geometry as _geometry
 
 
-def valid_scalar_source_mask(source_values: Array, src_mask: Array | None) -> Array:
+def valid_scalar_source_mask(
+    source_values: Array,
+    src_mask: Array | None,
+    *,
+    conditional_callback: bool = True,
+) -> Array:
     """Return source points available for scalar interpolation or extrapolation."""
 
     missing_source = jnp.isnan(source_values)
@@ -18,6 +23,7 @@ def valid_scalar_source_mask(source_values: Array, src_mask: Array | None) -> Ar
         source_values,
         active_mask=~missing_source,
         owner="bilinear scalar source",
+        conditional_callback=conditional_callback,
     )
     available_source = ~missing_source
     if src_mask is None:
