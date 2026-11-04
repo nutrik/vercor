@@ -157,10 +157,28 @@ depth. This follows the freshwater term of the
 `rigid-lid conversion in Veros PR 81 <https://github.com/nutrik/veros/pull/81>`_,
 implemented entirely in the VerCOR adapter.
 
-The examples disable both climatological restoring terms by default.
 ``VerosConfig.restore_to_climatology_temp`` controls the SST correction,
 and ``VerosConfig.restore_to_climatology_salt`` independently controls
-30-day surface salinity restoring. Both default to ``False``.
+surface salinity restoring. Salinity restoring defaults to ``True`` and
+temperature restoring to ``False``, including in the gallery examples.
+``VerosConfig.salinity_restoring_timescale`` sets the salinity relaxation
+duration in seconds, independently of the enable flag. Its default is
+``4 * 365 * 86400.0`` = 126,144,000 seconds (four 365-day model years).
+It must be a positive, finite real number, even when restoring is disabled.
+
+The additive salinity restoring flux is
+
+.. math::
+
+   F_{S,\mathrm{restore}} = w_S\,h_{\mathrm{top}}
+       \frac{S_{\mathrm{clim}} - S_{\mathrm{surface}}}{\tau_S},
+
+where ``w_S`` is the salinity enable weight, ``h_top`` is the top-cell depth
+in metres, and ``tau_S`` is ``salinity_restoring_timescale`` in seconds.
+The result has units m (g/kg)/s and is added to the coupled virtual salt
+flux before native tracer advancement. To retain the previous 30-day strength,
+set ``VerosConfig(salinity_restoring_timescale=30 * 86400.0)``; to disable
+the term, set ``restore_to_climatology_salt=False``.
 
 .. list-table:: Independent global Veros restoring controls
    :header-rows: 1

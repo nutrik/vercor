@@ -290,6 +290,7 @@ def _prognostic_coupler(
 def test_actual_prognostic_pair_closes_native_heat_and_virtual_salt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Include default climatological salinity restoring in the native budget."""
     import jax
     from tests.test_veris_rollouts import native_payload
 
@@ -316,8 +317,14 @@ def test_actual_prognostic_pair_closes_native_heat_and_virtual_salt(
     mass = np.asarray(fields.field("sea_surface_mass_flux"))
     salt = np.asarray(fields.field("sea_surface_salt_mass_flux"))
     virtual = 600 * np.sum((-34.7 * mass + 1000 * salt) / 1000 * area)
+    # One 600 s native step; fixture SSS_clim - SSS = 1 g/kg and depth = 10 m.
+    wet = np.asarray(before.variables.maskT)[2:-2, 2:-2, -1].T
+    restoring = 600.0 * 10.0 / 126144000.0 * np.sum(area * wet)
     heat_change = changes["temp"] * after.settings.rho_0 * 3991.86795711963
-    for actual, expected in ((heat_change, heat), (changes["salt"], virtual)):
+    for actual, expected in (
+        (heat_change, heat),
+        (changes["salt"], virtual + restoring),
+    ):
         assert abs(actual - expected) / max(1.0, abs(expected)) < 1e-10
     p = ice_after.physical_constants
     solid_change = (

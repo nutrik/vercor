@@ -7,6 +7,11 @@ versioning; pre-releases may still refine new contracts.
 
 ### Added
 
+- Add keyword-only `VerosConfig.salinity_restoring_timescale` in seconds,
+  defaulting to four 365-day model years (126,144,000 s). Pass it into native
+  state for differentiable surface salinity restoring. Salinity restoring
+  now defaults on and temperature restoring stays off, including galleries;
+  set the time scale to `30 * 86400.0` to retain the previous strength.
 - Audit component interfaces, wrappers, physical recipe compatibility, lifecycle,
   and output/restart boundaries in `docs/interface-wrapper-audit.md`.
 - Transfer ERA5 rain and water-equivalent snow and JCM total precipitation to
@@ -55,11 +60,12 @@ versioning; pre-releases may still refine new contracts.
 - Apply the VerCOR global forcing callback in both Veros execution lanes,
   preserve cyclic salt-flux halos, and report unambiguous salinity-flux units.
 - Make global salinity restoring an optional additive term controlled by
-  `VerosConfig.restore_to_climatology_salt`, disabled by default in the gallery.
+  `VerosConfig.restore_to_climatology_salt`, enabled by default in the gallery.
 - Replace the shared Veros restoring argument with independent
-  `restore_to_climatology_temp` and `restore_to_climatology_salt` flags, both
-  disabled by default. Apply the switches in the native global callback so
-  they also control restoring during spinup; preserve raw `qnec` diagnostics.
+  `restore_to_climatology_temp` and `restore_to_climatology_salt` flags,
+  respectively disabled and enabled by default. Apply the switches in the
+  native global callback so they also control restoring during spinup;
+  preserve raw `qnec` diagnostics.
 
 ## [0.4.6] - 2026-08-27
 

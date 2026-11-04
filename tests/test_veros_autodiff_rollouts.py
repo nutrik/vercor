@@ -39,11 +39,13 @@ pytestmark = [pytest.mark.slow, pytest.mark.veros_autodiff]
 @pytest.mark.fast_always
 @pytest.mark.parametrize("restore_temp", [False, True])
 @pytest.mark.parametrize("restore_salt", [False, True])
+@pytest.mark.parametrize("timescale", [126144000.0, 2592000.0])
 def test_native_restoring_controls_have_independent_values_and_gradients(
     restore_temp: bool,
     restore_salt: bool,
+    timescale: float,
 ) -> None:
-    """Check both native switches before any coupled forcing is prepared."""
+    """Check switches and time-scale derivatives in the actual native kernel."""
 
     from vercor.setups._external.veros_runtime_settings import (
         configure_veros_runtime,
@@ -57,6 +59,7 @@ def test_native_restoring_controls_have_independent_values_and_gradients(
     model = DifferentiableGlobalFourDegree(
         restore_to_climatology_temp=restore_temp,
         restore_to_climatology_salt=restore_salt,
+        salinity_restoring_timescale=timescale,
     )
     state = model.state
     with state.settings.unlock():
@@ -78,6 +81,7 @@ def test_native_restoring_controls_have_independent_values_and_gradients(
         with current.variables.unlock():
             current.variables.temp = jnp.full_like(current.variables.temp, values[0])
             current.variables.salt = jnp.full_like(current.variables.salt, values[1])
+            current.variables.salinity_restoring_timescale = values[2]
         model.set_forcing(current)
         return jnp.stack(
             (
@@ -86,28 +90,31 @@ def test_native_restoring_controls_have_independent_values_and_gradients(
             )
         )
 
-    values = jnp.asarray([10.0, 35.0])
+    values = jnp.asarray([10.0, 35.0, timescale])
     heat_capacity = 3991.86795711963 * state.settings.rho_0
     expected = jnp.asarray(
         [
             (13.0 if restore_temp else 5.0) / heat_capacity,
-            -3.47e-6 + (50.0 / 2592000.0 if restore_salt else 0.0),
+            -3.47e-6 + (50.0 / timescale if restore_salt else 0.0),
         ]
     )
     expected_jacobian = jnp.asarray(
         [
-            [-4.0 / heat_capacity if restore_temp else 0.0, 0.0],
-            [0.0, -50.0 / 2592000.0 if restore_salt else 0.0],
+            [-4.0 / heat_capacity if restore_temp else 0.0, 0.0, 0.0],
+            [
+                0.0,
+                -50.0 / timescale if restore_salt else 0.0,
+                -50.0 / timescale**2 if restore_salt else 0.0,
+            ],
         ]
     )
     np.testing.assert_allclose(jax.jit(forcing)(values), expected, rtol=1e-12)
     forward = jax.jacfwd(forcing)(values)
     reverse = jax.jacrev(forcing)(values)
-    step = 1e-3
     finite_difference = jnp.stack(
         [
             (forcing(values + step * axis) - forcing(values - step * axis)) / (2 * step)
-            for axis in jnp.eye(2)
+            for axis, step in zip(jnp.eye(3), [1e-3, 1e-3, 100.0], strict=True)
         ],
         axis=1,
     )
@@ -268,15 +275,17 @@ def test_coupled_precipitation_reaches_native_salt_with_matching_jvp_vjp() -> No
         final, _ = jax.lax.scan(couple, state, xs=None, length=3)
         return cast(jax.Array, final.variables.salt[2, 2, -1, final.variables.tau])
 
-    # Six 20-second native steps in a 50 m top cell: dS/dR = -0.08328.
+    # Six 20 s Euler steps in a 50 m cell; default restoring attenuates each
+    # earlier rain increment by (1 - dt / timescale) per subsequent step.
+    expected_gradient = -0.01388 * np.sum((1.0 - 20.0 / 126144000.0) ** np.arange(6))
     rain = jnp.asarray(1e-4)
     value, tangent = jax.jvp(objective, (rain,), (jnp.asarray(1.0),))
     gradient = jax.grad(objective)(rain)
     dry = objective(jnp.asarray(0.0))
     finite_difference = (objective(rain + 1e-5) - objective(rain - 1e-5)) / 2e-5
-    np.testing.assert_allclose(value - dry, -8.328e-6, atol=1e-12)
-    np.testing.assert_allclose(tangent, -0.08328, rtol=1e-10)
-    np.testing.assert_allclose(gradient, -0.08328, rtol=1e-10)
+    np.testing.assert_allclose(value - dry, expected_gradient * rain, atol=1e-12)
+    np.testing.assert_allclose(tangent, expected_gradient, rtol=1e-10)
+    np.testing.assert_allclose(gradient, expected_gradient, rtol=1e-10)
     np.testing.assert_allclose(gradient, finite_difference, rtol=1e-7)
 
 

@@ -2977,10 +2977,12 @@ def test_veros_initialize_spinup_follows_enabled_only(
 @pytest.mark.fast_always
 @pytest.mark.parametrize("restore_temp", [False, True])
 @pytest.mark.parametrize("restore_salt", [False, True])
+@pytest.mark.parametrize("timescale", [126144000.0, 2592000.0])
 def test_veros_constructor_builds_jax_backed_grid(
     monkeypatch: pytest.MonkeyPatch,
     restore_temp: bool,
     restore_salt: bool,
+    timescale: float,
 ) -> None:
     mask = np.ones((8, 8, 1), dtype=float)
     mask[2, 3, 0] = 0.0
@@ -2989,7 +2991,7 @@ def test_veros_constructor_builds_jax_backed_grid(
         variables=SimpleNamespace(xt=np.arange(8.0), yt=np.arange(8.0), maskT=mask),
     )
 
-    restoring_options: list[tuple[bool, bool]] = []
+    restoring_options: list[tuple[bool, bool, float]] = []
 
     class _FakeGlobalFourDegree:
         def __init__(
@@ -2998,9 +3000,14 @@ def test_veros_constructor_builds_jax_backed_grid(
             *,
             restore_to_climatology_temp: bool,
             restore_to_climatology_salt: bool,
+            salinity_restoring_timescale: float,
         ) -> None:
             restoring_options.append(
-                (restore_to_climatology_temp, restore_to_climatology_salt)
+                (
+                    restore_to_climatology_temp,
+                    restore_to_climatology_salt,
+                    salinity_restoring_timescale,
+                )
             )
             self.override = override
             self.state = state
@@ -3041,6 +3048,7 @@ def test_veros_constructor_builds_jax_backed_grid(
             custom_parameters={"dt_tracer": 600.0},
             restore_to_climatology_temp=restore_temp,
             restore_to_climatology_salt=restore_salt,
+            salinity_restoring_timescale=timescale,
             output=OutputSpec(
                 period=PeriodOutput(
                     frequency="month",
@@ -3051,7 +3059,7 @@ def test_veros_constructor_builds_jax_backed_grid(
     )
 
     assert solver_states == [state]
-    assert restoring_options == [(restore_temp, restore_salt)]
+    assert restoring_options == [(restore_temp, restore_salt, timescale)]
     assert isinstance(component.grid.longitude, jax.Array)
     assert isinstance(component.grid.latitude, jax.Array)
     assert isinstance(component.grid.binary_mask, jax.Array)

@@ -38,6 +38,31 @@ def test_coupled_mode_is_explicit_and_preserves_legacy_positionals() -> None:
     )
 
 
+def test_restoring_defaults_enable_salinity_with_four_year_timescale() -> None:
+    """Catch changes in the default coupled-ocean restoring policy."""
+    config = VerosConfig()
+    assert config.restore_to_climatology_salt is True
+    assert config.restore_to_climatology_temp is False
+    assert config.salinity_restoring_timescale == 126144000.0
+
+
+@pytest.mark.parametrize("timescale", [0.0, -1.0, np.nan, np.inf, -np.inf])
+def test_invalid_salinity_restoring_timescale_is_rejected(timescale: float) -> None:
+    """Zero/nonfinite time scales must fail before native division."""
+    with pytest.raises(ValueError, match="salinity_restoring_timescale"):
+        VerosConfig(salinity_restoring_timescale=timescale)
+
+
+@pytest.mark.parametrize("timescale", [None, "4 years", True])
+def test_nonnumeric_salinity_restoring_timescale_is_rejected(timescale: Any) -> None:
+    """Seconds require a real numeric value, independent of the enable flag."""
+    with pytest.raises(TypeError, match="salinity_restoring_timescale"):
+        VerosConfig(
+            salinity_restoring_timescale=timescale,
+            restore_to_climatology_salt=False,
+        )
+
+
 @pytest.mark.parametrize(
     "mode,error", [("unknown", ValueError), (None, TypeError), (True, TypeError)]
 )
@@ -116,7 +141,7 @@ def test_total_feedback_enters_native_tracers_once(
     wet = np.asarray(vs.maskT[2:-2, 2:-2, -1]) > 0
     capacity = state.settings.rho_0 * 3991.86795711963
     expected_heat = -20.0 + (8.0 if restore_temp else 0.0)
-    expected_salt = -3.47e-6 + (depth / (30 * 86400.0) if restore_salt else 0.0)
+    expected_salt = -3.47e-6 + (depth / 126144000.0 if restore_salt else 0.0)
     np.testing.assert_allclose(
         vs.forc_temp_surface[2:-2, 2:-2], wet * expected_heat / capacity, rtol=1e-12
     )
@@ -274,9 +299,13 @@ def test_public_coupled_runtime_uses_only_total_fluxes(
     original_native = initial._component_state("OCN").payload
     assert native is not None and original_native is not None
     wet = np.asarray(ocean.grid.binary_mask) > 0
+    # Mean of two 600 s Euler endpoints, including default four-year restoring.
+    # dS/dt = coupled_flux / depth + (S_clim - S) / timescale.
+    initial_salt_rate = -3.47e-6 / 10.0 + 1.0 / 126144000.0
+    mean_salt = 35.0 + (900.0 - 180000.0 / 126144000.0) * initial_salt_rate
     np.testing.assert_allclose(
         np.asarray(final.component("OCN").field("sea_surface_salinity"))[wet],
-        35.0 - 900 * 3.47e-6 / 10,
+        mean_salt,
         rtol=1e-11,
     )
     np.testing.assert_allclose(

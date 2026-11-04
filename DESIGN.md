@@ -480,16 +480,20 @@ from the existing bulk calculation. `PhysicalConstants` owns traced
 The native adapter retains the coupled contribution separately so its forcing
 callback can assign `forc_salt_surface` without accumulating restoring across
 substeps. `restore_to_climatology_temp` independently enables the SST
-correction, while `restore_to_climatology_salt` adds 30-day SSS restoring.
-Both default to `False`. The common host/JAX native callback owns both
-scalar weights, so the controls also apply during spinup before any coupled
+correction (off by default), while `restore_to_climatology_salt` adds SSS
+restoring (on by default). The independent keyword-only
+`salinity_restoring_timescale` defaults to `4 * 365 * 86400.0` seconds
+(four 365-day model years). The public config validates a positive finite
+duration, passed through the factory/setup owner into a traced native scalar;
+the native flux is `salt_restoring * dzt[-1] * (SSS_clim - SSS) / timescale`.
+The common host/JAX native callback owns both scalar weights, so the controls
+also apply during spinup before any coupled
 forcing is prepared. Layout preparation preserves the raw `qnec` coefficient;
 the temperature weight gates only its contribution to heat forcing. Coupled
 heat and freshwater contributions remain active with either switch off.
-Ocean/ice masks
-and native cyclic halo exchange are applied to the final salt flux. Its
-metadata is `m g kg-1 s-1`; no timestep or top-cell-depth factor is applied
-before Veros's tracer integration.
+Ocean/ice masks and native cyclic halo exchange are applied to the final salt
+flux. Its metadata is `m g kg-1 s-1`; the coupled freshwater conversion applies
+no timestep or top-cell-depth factor before Veros's tracer integration.
 
 Paired JCM construction distinguishes geometric ocean footprint `G` from
 remapped wet coverage `C`. Native land fraction `N` supplies prescribed marine
