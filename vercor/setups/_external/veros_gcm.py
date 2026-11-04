@@ -68,7 +68,6 @@ def _initialize_veros_owner(config: VerosConfig) -> Any:
 
     return VerosGCMSetupState(
         name=config.name,
-        setup=config.setup,
         execution=config.execution,
         spinup_time=config.spinup.duration,
         custom_parameters=config.custom_parameters,
@@ -88,11 +87,7 @@ def _make_veros_component(state: Any, config: VerosConfig) -> Component:
         input_fields = tuple(_flatten_field_items(SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS))
         output_fields = tuple(_flatten_field_items(OCEAN_TO_SEAICE_FORCING_FIELDS))
     else:
-        input_fields = (
-            _veros_gcm_state.VEROS_INPUT_FIELD_NAMES
-            if state.uses_bulk_meteorology
-            else ()
-        )
+        input_fields = _veros_gcm_state.VEROS_INPUT_FIELD_NAMES
         output_fields = ("sea_surface_temperature",)
     if config.export_open_water_surface:
         input_fields += ("ice_fraction",)

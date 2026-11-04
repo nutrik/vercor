@@ -118,10 +118,10 @@ For ``VerosConfig.surface_forcing``, replace ``"atmosphere"`` with
 surface forcing from air, radiation and precipitation.
 ``"surface_fluxes"`` consumes complete sea-ice/open-water boundary rates once,
 requires the global setup and pressure/free-surface execution, and retains
-independent temperature/salinity restoring. ACC retains native internal forcing
-and rejects ``"surface_fluxes"``. ``export_open_water_surface=True`` requires
-``"surface_fluxes"``. The corresponding private predicate is
-``uses_bulk_meteorology``.
+independent temperature/salinity restoring. ``global_4deg`` is the sole
+supported ocean setup; remove the former ``VerosConfig.setup`` argument.
+``export_open_water_surface=True`` requires ``"surface_fluxes"``.
+``surface_forcing`` directly selects the forcing path in both execution lanes.
 
 The public grid-mask helpers migrate as follows:
 

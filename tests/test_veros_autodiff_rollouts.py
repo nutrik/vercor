@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from vercor import Clock, Coupler, Exchange, RuntimeOptions
-from vercor.components import Component
+from vercor.components import Component, DataComponent
 from vercor.dtypes import DTypePolicy
 from vercor.recipes import (
     ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
@@ -236,7 +236,6 @@ def test_coupled_precipitation_reaches_native_salt_with_matching_jvp_vjp() -> No
 
     resources = SimpleNamespace(
         execution="jax",
-        uses_bulk_meteorology=True,
         surface_forcing="bulk_meteorology",
         export_open_water_surface=False,
         model_substeps=2,
@@ -307,12 +306,12 @@ def _jax_runtime(*, with_topology: bool = False) -> RuntimeOptions:
 
 
 @lru_cache(maxsize=1)
-def _acc_component() -> Component:
+def _global_component() -> Component:
     try:
         return cast(
             Component,
             make_veros_gcm(
-                config=VerosConfig(setup="acc", execution="jax"),
+                config=VerosConfig(execution="jax"),
             ),
         )
     except RuntimeError as error:
@@ -322,10 +321,42 @@ def _acc_component() -> Component:
 
 
 def _ocean_coupler(component: Component, *, steps: int) -> Coupler:
+    """Force the full global ocean without changing its native daily policy."""
+
+    latitude = jnp.deg2rad(jnp.asarray(component.grid.latitude))[:, None]
+    temperature = jnp.broadcast_to(
+        298.0 - 30.0 * jnp.sin(latitude) ** 2,
+        component.grid.shape,
+    )
+    atmosphere = DataComponent(
+        "ATM",
+        component.grid,
+        {
+            "model_level_height": 10.0,
+            "air_u_velocity": 7.0,
+            "air_v_velocity": 1.0,
+            "air_potential_temperature": temperature,
+            "air_specific_humidity": 0.005,
+            "air_density": 1.2,
+            "air_temperature": temperature,
+            "net_shortwave_radiation_flux": 100.0,
+            "downward_longwave_radiation_flux": 300.0,
+            "rain_rate": 1e-5,
+            "snow_rate": 0.0,
+        },
+    )
     return Coupler(
         _clock(steps),
-        components=(component,),
-        run_order=("OCN",),
+        components=(atmosphere, component),
+        exchanges=(
+            Exchange(
+                source="ATM",
+                target="OCN",
+                fields=ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
+                quantity="intensive",
+            ),
+        ),
+        run_order=("ATM", "OCN"),
         runtime=_jax_runtime(),
         log_level="WARNING",
     )
@@ -355,17 +386,12 @@ def _replace_native_veros_variable(
 def _replace_ocean_surface_temperature(
     state: RunState,
     temperature: jax.Array,
+    cell: tuple[int, int],
 ) -> RunState:
     component_state = state._component_state("OCN")
     native_state = _ocean_payload(state)
     baseline = jnp.asarray(native_state.variables.temp)
-    surface_mask = jnp.asarray(native_state.variables.maskT[:, :, -1]) > 0.0
-    seeded_surface = jnp.where(
-        surface_mask[..., jnp.newaxis],
-        temperature,
-        baseline[:, :, -1, :],
-    )
-    seeded_temperature = baseline.at[:, :, -1, :].set(seeded_surface)
+    seeded_temperature = baseline.at[cell[0], cell[1], -1, :].set(temperature)
     seeded_payload = _replace_native_veros_variable(
         native_state,
         "temp",
@@ -401,6 +427,26 @@ def _assert_payload_structure_stable(initial: RunState, final: RunState) -> None
     )
 
 
+def _global_ocean_cell(
+    state: RunState, *, longitude: float, latitude: float
+) -> tuple[int, int]:
+    """Select a wet deep-ocean column from the complete native global geometry."""
+
+    variables = _ocean_payload(state).variables
+    wet = np.asarray(variables.maskT[2:-2, 2:-2, -1]) > 0.0
+    native_longitude = np.asarray(variables.xt[2:-2])[:, None]
+    native_latitude = np.asarray(variables.yt[2:-2])[None, :]
+    assert wet.shape == (90, 40)
+    assert variables.temp.shape[2] == 15
+    longitude_distance = (native_longitude - longitude + 180.0) % 360.0 - 180.0
+    distance = longitude_distance**2 + (native_latitude - latitude) ** 2
+    index = np.unravel_index(np.argmin(np.where(wet, distance, np.inf)), wet.shape)
+    cell = (int(index[0]) + 2, int(index[1]) + 2)
+    assert bool(np.asarray(variables.maskT)[cell[0], cell[1], -1] > 0.0)
+    assert float(variables.ht[cell[0], cell[1]]) > 1000.0
+    return cell
+
+
 def _assert_scalar_rollout_autodiff(
     objective: Callable[[jax.Array], jax.Array],
     parameter: float,
@@ -408,6 +454,7 @@ def _assert_scalar_rollout_autodiff(
     finite_difference_step: float | None,
     relative_tolerance: float,
     inner_product_tolerance: float = 1e-6,
+    minimum_gradient_magnitude: float = 0.0,
 ) -> None:
     """Validate scalar rollout AD, optionally including a centered difference."""
 
@@ -426,7 +473,7 @@ def _assert_scalar_rollout_autodiff(
         jax.device_get(jnp.stack((value, gradient, jvp_value, jvp_tangent)))
     )
     assert np.all(np.isfinite(values))
-    assert float(abs(gradient)) > 0.0
+    assert float(abs(gradient)) > minimum_gradient_magnitude
     np.testing.assert_allclose(
         jvp_tangent,
         tangent * gradient,
@@ -450,43 +497,55 @@ def _assert_scalar_rollout_autodiff(
     )
 
 
-def test_three_step_acc_gradient_with_respect_to_surface_temperature() -> None:
-    """ACC has finite agreeing derivatives through three scanned days."""
+def test_three_day_global_gradient_with_respect_to_surface_temperature() -> None:
+    """Global SST has finite agreeing derivatives through three scanned days."""
 
-    coupler = _ocean_coupler(_acc_component(), steps=3)
+    coupler = _ocean_coupler(_global_component(), steps=3)
     initial_state = coupler.initial_state()
     initial_variables = _ocean_payload(initial_state).variables
-    assert bool(jnp.asarray(initial_variables.maskT)[18, 11, -1] > 0.0)
+    cell = _global_ocean_cell(initial_state, longitude=180.0, latitude=-50.0)
+    temperature = float(
+        initial_variables.temp[cell[0], cell[1], -1, initial_variables.tau]
+    )
 
     def objective(temperature: jax.Array) -> jax.Array:
         final_state = coupler.run(
-            _replace_ocean_surface_temperature(initial_state, temperature),
+            _replace_ocean_surface_temperature(initial_state, temperature, cell),
             output=None,
         )
         final_variables = _ocean_payload(final_state).variables
         final_temperature = jnp.asarray(final_variables.temp)
-        return final_temperature[18, 11, -1, final_variables.tau]
+        return final_temperature[cell[0], cell[1], -1, final_variables.tau]
 
     seeded_state = _replace_ocean_surface_temperature(
         initial_state,
-        jnp.asarray(7.0, dtype=jnp.float64),
+        jnp.asarray(temperature, dtype=jnp.float64),
+        cell,
     )
-    _assert_payload_structure_stable(seeded_state, coupler.run(seeded_state))
+    final_state = coupler.run(seeded_state)
+    _assert_payload_structure_stable(seeded_state, final_state)
+    assert (
+        float(_ocean_payload(final_state).variables.time - initial_variables.time)
+        == 3 * 86400.0
+    )
     _assert_scalar_rollout_autodiff(
         objective,
-        7.0,
+        temperature,
         finite_difference_step=1e-2,
         relative_tolerance=1e-3,
+        minimum_gradient_magnitude=1e-4,
     )
 
 
-def test_twenty_step_acc_gradient_with_respect_to_native_c_k() -> None:
+def test_twenty_day_global_gradient_with_respect_to_native_c_k() -> None:
     """Fork-owned ``c_k`` remains differentiable through twenty scanned days."""
 
-    coupler = _ocean_coupler(_acc_component(), steps=20)
+    coupler = _ocean_coupler(_global_component(), steps=20)
     initial_state = coupler.initial_state()
     initial_variables = _ocean_payload(initial_state).variables
-    assert bool(jnp.asarray(initial_variables.maskT)[18, 2, -1] > 0.0)
+    # The stratified North Pacific column has a substantial TKE-mixing SST
+    # response, unlike nearly insensitive Southern Ocean surface columns.
+    cell = _global_ocean_cell(initial_state, longitude=180.0, latitude=30.0)
 
     def objective(c_k: jax.Array) -> jax.Array:
         final_state = coupler.run(
@@ -495,20 +554,26 @@ def test_twenty_step_acc_gradient_with_respect_to_native_c_k() -> None:
         )
         final_variables = _ocean_payload(final_state).variables
         final_temperature = jnp.asarray(final_variables.temp)
-        return final_temperature[18, 2, -1, final_variables.tau]
+        return final_temperature[cell[0], cell[1], -1, final_variables.tau]
 
     seeded_state = _replace_ocean_parameter(
         initial_state,
         "c_k",
         jnp.asarray(0.1, dtype=jnp.float64),
     )
-    _assert_payload_structure_stable(seeded_state, coupler.run(seeded_state))
+    final_state = coupler.run(seeded_state)
+    _assert_payload_structure_stable(seeded_state, final_state)
+    assert (
+        float(_ocean_payload(final_state).variables.time - initial_variables.time)
+        == 20 * 86400.0
+    )
     _assert_scalar_rollout_autodiff(
         objective,
         0.1,
         finite_difference_step=1e-3,
         relative_tolerance=1e-2,
         inner_product_tolerance=1e-2,
+        minimum_gradient_magnitude=1e-4,
     )
 
 
@@ -516,7 +581,7 @@ def test_twenty_step_acc_gradient_with_respect_to_native_c_k() -> None:
 def _fully_coupled_global_model() -> Coupler:
     try:
         ocean = make_veros_gcm(
-            config=VerosConfig(setup="global_4deg", execution="jax"),
+            config=VerosConfig(execution="jax"),
         )
     except RuntimeError as error:
         if "differentiable Veros fork" in str(error):

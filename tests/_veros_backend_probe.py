@@ -40,7 +40,6 @@ def main() -> None:
     temperature = np.asarray(initial.variables.temp).copy()
     resources: Any = SimpleNamespace(
         execution="host",
-        uses_bulk_meteorology=False,
         surface_forcing="surface_fluxes",
         export_open_water_surface=True,
         model_substeps=2,

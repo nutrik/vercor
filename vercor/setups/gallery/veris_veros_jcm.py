@@ -73,7 +73,6 @@ def build_coupler(
     if ocean_config is not None and (
         not ocean_config.export_open_water_surface
         or ocean_config.surface_forcing != "surface_fluxes"
-        or ocean_config.setup != "global_4deg"
     ):
         raise ValueError(
             "Veros requires global_4deg coupled forcing and export_open_water_surface"

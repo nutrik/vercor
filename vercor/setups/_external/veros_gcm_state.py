@@ -42,27 +42,17 @@ VEROS_FIELD_DEFAULTS = {"sea_surface_temperature": 283.15}
 
 
 def _select_veros_setup_class(
-    setup: Literal["global_4deg", "acc"],
     execution: Literal["host", "jax"],
 ) -> type[Any]:
-    """Return the native setup class for one execution lane."""
+    """Return the global four-degree setup class for one execution lane."""
 
     if execution == "jax":
         from vercor.setups._external.veros_setup_jax import (
-            DifferentiableACCSetup,
             DifferentiableGlobalFourDegree,
         )
 
-        return (
-            DifferentiableGlobalFourDegree
-            if setup == "global_4deg"
-            else DifferentiableACCSetup
-        )
-    if setup == "global_4deg":
-        return _veros_setup.CustomGlobalFourDegree
-    from veros.setups.acc import ACCSetup
-
-    return cast(type[Any], ACCSetup)
+        return DifferentiableGlobalFourDegree
+    return _veros_setup.CustomGlobalFourDegree
 
 
 class VerosGCMSetupState:
@@ -79,7 +69,6 @@ class VerosGCMSetupState:
     def __init__(
         self,
         name: str = "OCN",
-        setup: Literal["global_4deg", "acc"] = "global_4deg",
         execution: Literal["host", "jax"] = "host",
         spinup_time: timedelta = timedelta(days=2),
         custom_parameters: Mapping[str, Any] | None = None,
@@ -99,9 +88,6 @@ class VerosGCMSetupState:
         self.execution = execution
         self.surface_forcing = surface_forcing
         self.export_open_water_surface = export_open_water_surface
-        self.uses_bulk_meteorology = (
-            setup == "global_4deg" and surface_forcing == "bulk_meteorology"
-        )
         override = dict(custom_parameters or {})
         if execution == "jax" or surface_forcing == "surface_fluxes":
             override["enable_streamfunction"] = False
@@ -113,16 +99,12 @@ class VerosGCMSetupState:
             override.setdefault("dt_mom", 1800.0)
             override.setdefault("dt_tracer", override["dt_mom"])
 
-        setup_class = _select_veros_setup_class(setup, execution)
-        self.model = (
-            setup_class(
-                override=override,
-                restore_to_climatology_temp=restore_to_climatology_temp,
-                restore_to_climatology_salt=restore_to_climatology_salt,
-                salinity_restoring_timescale=salinity_restoring_timescale,
-            )
-            if setup == "global_4deg"
-            else setup_class(override=override)
+        setup_class = _select_veros_setup_class(execution)
+        self.model = setup_class(
+            override=override,
+            restore_to_climatology_temp=restore_to_climatology_temp,
+            restore_to_climatology_salt=restore_to_climatology_salt,
+            salinity_restoring_timescale=salinity_restoring_timescale,
         )
         self.model.setup()
         self._linear_solver = _veros_state.get_component_linear_solver(self.model.state)

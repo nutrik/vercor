@@ -58,7 +58,6 @@ def test_runtime_exports_mean_surfaces_and_retains_endpoint(
     advance = jax.jit(native_step) if execution == "jax" else native_step
     resources: Any = SimpleNamespace(
         execution=execution,
-        uses_bulk_meteorology=False,
         surface_forcing="surface_fluxes",
         model_substeps=substeps,
         export_open_water_surface=True,

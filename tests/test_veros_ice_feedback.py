@@ -26,8 +26,8 @@ def host_backend() -> None:
     configure_veros_runtime("host")
 
 
-def test_coupled_mode_is_explicit_and_preserves_legacy_positionals() -> None:
-    config = VerosConfig("SEA", "global_4deg", "host", None, True, False)
+def test_coupled_mode_is_explicit_and_preserves_remaining_positionals() -> None:
+    config = VerosConfig("SEA", "host", None, True, False)
     assert (
         config.restore_to_climatology_temp
         and config.surface_forcing == "bulk_meteorology"
@@ -73,15 +73,12 @@ def test_invalid_surface_forcing_mode_is_rejected(
         VerosConfig(surface_forcing=mode)
 
 
-@pytest.mark.parametrize(
-    "kwargs",
-    [dict(setup="acc"), dict(custom_parameters={"enable_streamfunction": True})],
-)
-def test_coupled_mode_rejects_incompatible_native_execution(
-    kwargs: dict[str, Any],
-) -> None:
+def test_coupled_mode_rejects_incompatible_native_execution() -> None:
     with pytest.raises(ValueError, match="surface_fluxes|streamfunction"):
-        VerosConfig(surface_forcing="surface_fluxes", **kwargs)
+        VerosConfig(
+            surface_forcing="surface_fluxes",
+            custom_parameters={"enable_streamfunction": True},
+        )
 
 
 @pytest.mark.parametrize("enable_x64", [False, True])

@@ -57,13 +57,13 @@ class JCMAtmosphereConfig:
 class VerosConfig:
     """Configuration for the bundled Veros ocean setup factory.
 
-    For ``global_4deg``, ``restore_to_climatology_temp`` enables the SST
+    The ``global_4deg`` ocean's ``restore_to_climatology_temp`` enables the SST
     correction (off by default) and ``restore_to_climatology_salt`` independently
     adds SSS restoring to the coupled virtual salt flux (on by default).
     ``salinity_restoring_timescale`` is a positive finite duration in seconds,
     defaulting to four 365-day model years (126144000 s). These controls apply
     during spinup and coupled stepping in either execution lane.
-    The ACC setup retains its native internal forcing. Explicit ``surface_forcing="surface_fluxes"``
+    Explicit ``surface_forcing="surface_fluxes"``
     accepts only total sea-ice ocean fluxes on the global grid, keeps independent
     restoring, and requires native pressure/free-surface execution for real SSH.
     Its default momentum and tracer timesteps are both 1800 seconds so physical
@@ -77,7 +77,6 @@ class VerosConfig:
     """
 
     name: str = "OCN"
-    setup: Literal["global_4deg", "acc"] = "global_4deg"
     execution: Literal["host", "jax"] = "host"
     custom_parameters: Mapping[str, Any] | None = None
     restore_to_climatology_temp: bool = False
@@ -112,8 +111,6 @@ class VerosConfig:
             raise ValueError(
                 "export_open_water_surface requires surface_fluxes surface_forcing"
             )
-        if self.setup not in ("global_4deg", "acc"):
-            raise ValueError("setup must be 'global_4deg' or 'acc'")
         if self.execution not in ("host", "jax"):
             raise ValueError("execution must be 'host' or 'jax'")
         if self.backend not in (None, "numpy", "jax"):
@@ -128,8 +125,6 @@ class VerosConfig:
                 "surface_forcing must be 'bulk_meteorology' or 'surface_fluxes'"
             )
         if self.surface_forcing == "surface_fluxes":
-            if self.setup != "global_4deg":
-                raise ValueError("surface_fluxes surface_forcing requires global_4deg")
             if (self.custom_parameters or {}).get("enable_streamfunction", False):
                 raise ValueError(
                     "surface_fluxes surface_forcing requires enable_streamfunction=False for native SSH"

@@ -34,13 +34,14 @@ def test_numerical_summary_rejects_changed_missing_support() -> None:
 def _lane(path: Path, samples: list[float], *, version: str = "1.7.0") -> None:
     path.mkdir()
     report = dict(
-        setup="acc",
+        setup="global_4deg",
+        case="ocean",
         steps=4,
         dtype="float64",
-        ocean_shape=[30, 42, 15],
-        dt_mom=4800.0,
-        dt_tracer=43200.0,
-        coupling_dt_seconds=43200.0,
+        ocean_shape=[90, 40, 15],
+        dt_mom=1800.0,
+        dt_tracer=1800.0,
+        coupling_dt_seconds=1800.0,
         native_steps=4,
         native_solver="SciPySolver",
         warm_seconds=samples,
@@ -75,3 +76,17 @@ def test_comparison_rejects_different_native_releases(tmp_path: Path) -> None:
     _lane(tmp_path / "fork", [1.0], version="0+fork")
     with pytest.raises(ValueError, match="distribution"):
         compare_lanes(tmp_path / "stock", tmp_path / "fork")
+
+
+def test_comparison_rejects_different_global_workloads(tmp_path: Path) -> None:
+    """Global ocean-only and coupled timings represent different amounts of work."""
+    from benchmarks.compare_veros import compare_lanes
+
+    _lane(tmp_path / "ocean", [2.0])
+    _lane(tmp_path / "coupled", [1.0])
+    report = tmp_path / "coupled" / "result.json"
+    metadata = json.loads(report.read_text())
+    metadata["case"] = "coupled"
+    report.write_text(json.dumps(metadata))
+    with pytest.raises(ValueError, match="case"):
+        compare_lanes(tmp_path / "ocean", tmp_path / "coupled")

@@ -47,14 +47,11 @@ def test_prognostic_pair_initializes_one_ocean_on_one_grid(
     np.testing.assert_array_equal(ice_owner.geometry.area_t, vs.area_t[2:-2, 2:-2])
 
 
-@pytest.mark.parametrize("config", [VerosConfig(), VerosConfig(setup="acc")])
-def test_pair_rejects_incompatible_ocean_before_initialization(
-    config: VerosConfig,
-) -> None:
+def test_pair_rejects_incompatible_ocean_before_initialization() -> None:
     from vercor.setups import make_veris_veros
 
     with pytest.raises(ValueError, match="surface_fluxes|global"):
-        make_veris_veros(ocean_config=config)
+        make_veris_veros(ocean_config=VerosConfig())
 
 
 def test_packaged_prognostic_example_exists_with_standard_contract() -> None:

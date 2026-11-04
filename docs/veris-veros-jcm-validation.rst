@@ -15,6 +15,16 @@ reused; no additional model or integration loop was introduced.
 Released Veros numerical backend (2026-11-03)
 ------------------------------------------------------------
 
+Historical benchmark record: ACC support was removed on 2026-11-04.
+The ACC measurements below retain their original provenance in the JSON
+record; they are not global-ocean measurements. Reproducing them requires
+the historical source revision recorded with those measurements. Current benchmarks
+select ``--case ocean`` or ``--case coupled``, both using ``global_4deg``.
+The ocean-only case supplies zero total surface fluxes with synchronous
+1800-second momentum, tracer and coupling timesteps; native salinity restoring
+retains its configured default. Results identify the case separately from
+the ocean setup, and comparisons require the same case.
+
 ``VerosConfig.backend`` selects native NumPy or JAX independently of
 ``execution``. Released Veros 1.7.0 runs JAX kernels with host orchestration;
 the existing pinned differentiable fork supplies the scanned execution path.
@@ -120,7 +130,7 @@ Reproduce a lane from a verified environment with:
 
 .. code-block:: bash
 
-   python -m benchmarks.benchmark_veros --setup coupled --backend jax \
+   python -m benchmarks.benchmark_veros --case coupled --backend jax \
        --execution host --steps 2 --repeats 5 --directory /tmp/veros-jax
 
 Run the NumPy lane in a separate interpreter, with a separate artifact directory.

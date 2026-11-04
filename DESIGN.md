@@ -120,7 +120,7 @@ Coupled pressure-mode Veros stepping synchronizes SSH to the rotated current
 pressure solution without changing prognostic state. Surface-flux setups use
 matching 1800-second momentum/tracer steps by default; custom momentum duration
 sets implicit tracer duration, and explicit tracer overrides retain deliberate
-native acceleration. Bulk-meteorology and ACC timestep policies are unchanged.
+native acceleration. Bulk meteorology retains its native timestep policy.
 
 ## 3. Configuration ownership
 
@@ -428,10 +428,10 @@ supplied native areas retain their quadrature without rescaling. CESM bulk
 fractional coverage while ice-free wet cells retain forcing. Output reuses
 the shared coordinator; the gallery sends no feedback to prescribed data.
 
-`VerosConfig` selects `setup="global_4deg"` or `setup="acc"` and an
-`execution="host"` or `execution="jax"` lane. Host is the compatibility
-default and configures stock Veros with the NumPy backend and its best
-available solver. Adapter construction deep-copies the complete native state,
+`VerosConfig` configures the sole `global_4deg` ocean with an
+`execution="host"` or `execution="jax"` lane; there is no setup selector.
+Host is the compatibility default and uses native JAX kernels by default,
+with explicit `backend="numpy"` available and the best available solver. Adapter construction deep-copies the complete native state,
 substituting an immutable tuple for Veros' non-copyable settings `dict_keys`
 view without modifying the source. On every host step, the generic component
 runtime ownership boundary copies that normalized payload exactly once before
@@ -511,9 +511,8 @@ support decisions, with the same identity-tangent policy as full ice.
 
 The JAX global adapter consumes external atmospheric forcing, disables
 streamfunction and diagnostics that would change the payload PyTree, and uses
-the fork's finite-derivative calm-stress norm. The JAX ACC adapter retains its
-native internal forcing and topology while leaving variable-owned turbulence
-parameters at their fork defaults. JCM uses one physical default mapping
+the fork's finite-derivative calm-stress norm. Both execution lanes use
+the same global forcing definition and native turbulence defaults. JCM uses one physical default mapping
 everywhere fields are declared, initialized, or prefilled: temperature and
 potential temperature are 288.15 K, density is 1.2 kg/m³, and model-level
 height is 50 m. These defaults prevent a not-yet-stepped atmosphere from

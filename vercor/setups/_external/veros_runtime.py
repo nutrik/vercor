@@ -58,7 +58,6 @@ def step_veros_runtime(
     if payload is None:
         raise ComponentError("Veros runtime requires a native runtime payload.")
     execution = resources.execution
-    uses_bulk_meteorology = resources.uses_bulk_meteorology
     native_state = payload
     time = context.time
     if execution == "host" and time is None:
@@ -83,7 +82,7 @@ def step_veros_runtime(
             execution=execution,
             activate_coupled_feedback=True,
         )
-    elif uses_bulk_meteorology:
+    else:
         taux, tauy, qnet, qnec, salt_flux = _veros_fluxes.compute_fluxes(
             native_state,
             fields,

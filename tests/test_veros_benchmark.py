@@ -9,6 +9,28 @@ import pytest
 pytestmark = pytest.mark.fast_always
 
 
+@pytest.mark.parametrize("case", ["ocean", "coupled"])
+def test_benchmark_selects_global_workloads(case: str) -> None:
+    """Both benchmark cases use the sole supported global ocean setup."""
+    from benchmarks.benchmark_veros import build_parser
+
+    args = build_parser().parse_args(
+        ["--case", case, "--directory", "/private/tmp/vercor-benchmark-test"]
+    )
+    assert args.case == case
+    assert not hasattr(args, "setup")
+
+
+def test_benchmark_defaults_to_global_ocean() -> None:
+    """The default isolates the global ocean from atmosphere and sea-ice work."""
+    from benchmarks.benchmark_veros import build_parser
+
+    args = build_parser().parse_args(
+        ["--directory", "/private/tmp/vercor-benchmark-test"]
+    )
+    assert args.case == "ocean"
+
+
 def test_measure_run_includes_device_wait_and_resets_input(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -1,9 +1,10 @@
 """Measure released Veros kernels and coupled execution in separate processes.
 
-Run each backend in a fresh interpreter. The ACC case uses its actual native
-grid and internal forcing; the coupled case uses the global four-degree
+Run each backend in a fresh interpreter. Both cases use the global four-degree
+ocean. The ocean-only case supplies zero total surface fluxes with synchronous
+1800-second native/coupling clocks; the coupled case uses the global
 Veris/Veros/JCM gallery with packaged JCM T31 inputs and no spinup. Native
-physics, solver tolerances and sea-ice numerics retain their setup defaults.
+physics, restoring, solver tolerances and sea-ice numerics retain their defaults.
 Only the pinned differentiable fork supports scanned or forced-host JAX
 components. Output-free compute timings exclude artifact writing.
 """
@@ -32,7 +33,7 @@ import numpy as np
 def build_parser() -> argparse.ArgumentParser:
     """Describe one native-backend/execution lane and its saved artifacts."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--setup", choices=("acc", "coupled"), default="acc")
+    parser.add_argument("--case", choices=("ocean", "coupled"), default="ocean")
     parser.add_argument("--backend", choices=("numpy", "jax"), default="numpy")
     parser.add_argument(
         "--execution", choices=("host", "jax", "forced-host"), default="host"
@@ -88,7 +89,7 @@ def measure_runs(
 
 
 def _build_coupler(args: argparse.Namespace) -> Any:
-    from vercor import Clock, Coupler, RuntimeOptions
+    from vercor import Clock, Coupler, Exchange, RuntimeOptions
     from vercor.dtypes import DTypePolicy
     from vercor.output import OutputSpec, PeriodOutput
     from vercor.setups import (
@@ -109,19 +110,36 @@ def _build_coupler(args: argparse.Namespace) -> Any:
         if args.output
         else OutputSpec()
     )
-    if args.setup == "acc":
+    if args.case == "ocean":
+        from vercor.components import DataComponent
+        from vercor.regridding import bilinear
+
         ocean = make_veros_gcm(
             config=VerosConfig(
-                setup="acc",
                 execution=native_execution,
                 backend=args.backend,
                 output=period,
+                surface_forcing="surface_fluxes",
             )
         )
+        forcing = DataComponent(
+            "FORCING",
+            ocean.grid,
+            fields={name: np.zeros(ocean.grid.shape) for name in ocean.spec.inputs},
+        )
         return Coupler(
-            Clock(datetime(2000, 1, 3), 43200.0, args.steps),
-            components=(ocean,),
-            run_order=(ocean.name,),
+            Clock(datetime(2000, 1, 3), 1800.0, args.steps),
+            components=(forcing, ocean),
+            exchanges=(
+                Exchange(
+                    quantity="intensive",
+                    source=forcing.name,
+                    target=ocean.name,
+                    fields=ocean.spec.inputs,
+                    regridder_factory=bilinear,
+                ),
+            ),
+            run_order=(forcing.name, ocean.name),
             log_level="ERROR",
             runtime=RuntimeOptions(
                 dtype=dtype, backend="jax" if args.execution == "jax" else "host"
@@ -279,7 +297,8 @@ def main() -> None:
 
     solver = get_component_linear_solver(native)
     report = {
-        "setup": args.setup,
+        "setup": "global_4deg",
+        "case": args.case,
         "backend": args.backend,
         "execution": args.execution,
         "steps": args.steps,
@@ -319,6 +338,7 @@ def main() -> None:
                 key: report[key]
                 for key in (
                     "setup",
+                    "case",
                     "backend",
                     "execution",
                     "native_steps",

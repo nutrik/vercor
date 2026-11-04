@@ -24,6 +24,15 @@ versioning; pre-releases may still refine new contracts.
 
 ### Changed
 
+- Standardize the Veros adapter on `global_4deg` and remove ACC support,
+  `VerosConfig.setup`, the ACC JAX adapter, and the internal-forcing bypass.
+  Remove `setup=` from configuration calls; remaining positional arguments
+  follow `name, execution, custom_parameters, ...`. Migrate native backend,
+  multi-day gradient and quiet-step checks to the global ocean. Benchmarks now
+  select `--case ocean` or `--case coupled`, record `setup=global_4deg` and
+  reject comparisons between different cases. Historical ACC timing data
+  retains its original labels.
+
 - Remove the per-native-step `Veros sub-step` progress messages from the Veros
   adapter. Coupler step and component progress reporting remains available.
 - Remove the `run_` prefix from bundled setup gallery filenames and case names.

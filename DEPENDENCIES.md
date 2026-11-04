@@ -77,7 +77,9 @@ consumed by `docs/releasing.md` and `tests/test_release_state_validator.py`.
 `vercor/time_selection.py` owns host-side interpolation of centered periodic
 records; runtime time metadata consumes it without changing the import layers.
 
-The Veros adapter has two capability-gated branches. Layer 1 owns lazy runtime
+The Veros adapter supports only the global four-degree ocean; `VerosConfig`
+has no setup selector. Its two capability-gated execution branches share
+the same global forcing definition. Layer 1 owns lazy runtime
 configuration plus the stock-compatible global forcing definition; layer 2's
 `veros_setup_jax.py` depends on that definition and contains only inherited JAX
 setup adaptations. Higher setup-state and factory layers select between them
