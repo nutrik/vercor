@@ -19,6 +19,8 @@ versioning; pre-releases may still refine new contracts.
 
 ### Changed
 
+- Remove the per-native-step `Veros sub-step` progress messages from the Veros
+  adapter. Coupler step and component progress reporting remains available.
 - Remove the `run_` prefix from bundled setup gallery filenames and case names.
   Use, for example, `vercor copy-setup jcm_with_veros` and import
   `vercor.setups.gallery.jcm_with_veros`.

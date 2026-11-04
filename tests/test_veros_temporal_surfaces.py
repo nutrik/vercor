@@ -8,6 +8,7 @@ for the exact differentiable fork without changing installed packages.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import logging
 import os
 from types import SimpleNamespace
 from typing import Any, Literal
@@ -25,7 +26,7 @@ pytestmark = pytest.mark.fast_always
 
 @pytest.mark.parametrize("substeps", [1, 2, 3])
 def test_runtime_exports_mean_surfaces_and_retains_endpoint(
-    execution: Any, substeps: int
+    execution: Any, substeps: int, caplog: pytest.LogCaptureFixture
 ) -> None:
     from veros.core.operators import numpy as npx
     from vercor.components import StepContext
@@ -65,7 +66,9 @@ def test_runtime_exports_mean_surfaces_and_retains_endpoint(
     )
     forcing = feedback_fields()
     forcing["ice_fraction"] = jnp.full(wet.shape, 0.25)
-    context = StepContext(substeps * 600, time=datetime(2000, 1, 1))
+    logger = logging.getLogger("VerCOR.test.veros-substeps")
+    caplog.set_level(logging.INFO, logger=logger.name)
+    context = StepContext(substeps * 600, time=datetime(2000, 1, 1), logger=logger)
 
     def run(scale: Any, payload: Any = original) -> Any:
         resources._step_function = lambda current: advance(current, scale)
@@ -110,6 +113,7 @@ def test_runtime_exports_mean_surfaces_and_retains_endpoint(
         reverse = jax.grad(objective)(point)
         assert_allclose_compact(tangent, 2 * first * np.sum(wet))
         assert_allclose_compact(reverse, tangent)
+    assert not [record for record in caplog.records if record.name == logger.name]
 
 
 @pytest.fixture(scope="module")

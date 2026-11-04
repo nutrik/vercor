@@ -118,7 +118,6 @@ def step_veros_runtime(
         native_state,
         step_function=resources._step_function,
         model_substeps=resources.model_substeps,
-        logger=context.logger if execution == "host" else None,
         sample_fields=sample_fields,
     )
     return StepResult(fields=surface_fields, payload=native_state)
