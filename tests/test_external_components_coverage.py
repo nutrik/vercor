@@ -3229,8 +3229,13 @@ def test_veros_step_requires_native_runtime_payload() -> None:
         veros_runtime_module.step_veros_runtime(resources, {}, context, None)
 
 
-def test_veros_acc_jax_step_uses_internal_forcing_without_host_logging(
+@pytest.mark.fast_always
+@pytest.mark.parametrize("execution", ["host", "jax"])
+@pytest.mark.parametrize("substeps", [1, 3])
+def test_veros_acc_step_uses_internal_forcing_without_substep_logging(
     monkeypatch: pytest.MonkeyPatch,
+    execution: Literal["host", "jax"],
+    substeps: int,
 ) -> None:
     resources = veros_gcm_state_module.VerosGCMSetupState.__new__(
         veros_gcm_state_module.VerosGCMSetupState
@@ -3238,9 +3243,9 @@ def test_veros_acc_jax_step_uses_internal_forcing_without_host_logging(
     resources.surface_forcing = "bulk_meteorology"
     resources.export_open_water_surface = False
     resources.name = "OCN"
-    resources.execution = "jax"
+    resources.execution = execution
     resources.uses_bulk_meteorology = False
-    resources.model_substeps = 1
+    resources.model_substeps = substeps
     stepped_states: list[Any] = []
 
     def step_function(state: Any) -> Any:
@@ -3252,7 +3257,7 @@ def test_veros_acc_jax_step_uses_internal_forcing_without_host_logging(
     logger = _RecordingLogger()
     context = StepContext(
         dt_seconds=20.0,
-        time=None,
+        time=datetime(2000, 1, 1),
         logger=cast(Any, logger),
     )
 
@@ -3270,7 +3275,7 @@ def test_veros_acc_jax_step_uses_internal_forcing_without_host_logging(
     )
 
     assert result.payload is native_state
-    assert stepped_states == [native_state]
+    assert stepped_states == [native_state] * substeps
     assert logger.messages == []
 
 

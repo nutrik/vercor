@@ -446,6 +446,10 @@ host/JAX components must run in separate Python processes. The packaged
 optional requirement remains `veros>=1.7.0`; fork selection is
 capability-gated rather than globally pinned.
 
+Veros native substeps advance and accumulate exchange samples without adapter
+progress logging in either execution lane. Progress is reported at the coupler's
+step and component boundaries.
+
 Both global Veros execution lanes receive zero-seeded `rain_rate` and
 `snow_rate` in kg/m²/s. ERA5 aggregates `crr + lsrr` and `csfr + lssfr` before
 monthly interpolation; JCM aggregates `precls + precnv` before remapping and

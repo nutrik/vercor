@@ -285,20 +285,18 @@ def advance_veros_substeps(
     *,
     step_function: Callable[[VerosState], VerosState],
     model_substeps: int,
-    logger: Any | None,
     sample_fields: Callable[[VerosState], dict[str, jax.Array]],
 ) -> tuple[VerosState, dict[str, jax.Array]]:
     """Advance native state and average mapped post-step surfaces without history.
 
     Every aligned native step has equal duration. The final native state stays
     separate from the small canonical field sums used by the coupling exchange.
+    This helper emits no sub-step progress logs.
     """
 
     updated_state = state
     accumulator: SampleMean | None = None
-    for i in range(model_substeps):
-        if logger is not None:
-            logger.info(f"Veros sub-step {i+1} / {model_substeps}")
+    for _ in range(model_substeps):
         updated_state = step_function(updated_state)
         sample = sample_fields(updated_state)
         accumulator = (
