@@ -74,6 +74,7 @@ def _initialize_veros_owner(config: VerosConfig) -> Any:
         custom_parameters=config.custom_parameters,
         restore_to_climatology_temp=config.restore_to_climatology_temp,
         restore_to_climatology_salt=config.restore_to_climatology_salt,
+        salinity_restoring_timescale=config.salinity_restoring_timescale,
         do_spinup=config.spinup.enabled,
         surface_forcing=config.surface_forcing,
         export_open_water_surface=config.export_open_water_surface,

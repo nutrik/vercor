@@ -16,6 +16,7 @@ from vercor.components import (
     SetupResult,
 )
 from vercor.grids import RectilinearGrid
+from vercor.setups.config import VerosConfig
 from vercor.setups._time_helpers import (
     assign_model_timestep_alignment,
     run_logged_spinup,
@@ -82,14 +83,15 @@ class VerosGCMSetupState:
         execution: Literal["host", "jax"] = "host",
         spinup_time: timedelta = timedelta(days=2),
         custom_parameters: Mapping[str, Any] | None = None,
-        restore_to_climatology_temp: bool = False,
-        restore_to_climatology_salt: bool = False,
+        restore_to_climatology_temp: bool = VerosConfig.restore_to_climatology_temp,
+        restore_to_climatology_salt: bool = VerosConfig.restore_to_climatology_salt,
         do_spinup: bool = False,
         surface_forcing: Literal[
             "bulk_meteorology", "surface_fluxes"
         ] = "bulk_meteorology",
         *,
         export_open_water_surface: bool = False,
+        salinity_restoring_timescale: float = VerosConfig.salinity_restoring_timescale,
     ) -> None:
         """Build Veros model resources and the VerCOR ocean grid."""
 
@@ -117,6 +119,7 @@ class VerosGCMSetupState:
                 override=override,
                 restore_to_climatology_temp=restore_to_climatology_temp,
                 restore_to_climatology_salt=restore_to_climatology_salt,
+                salinity_restoring_timescale=salinity_restoring_timescale,
             )
             if setup == "global_4deg"
             else setup_class(override=override)

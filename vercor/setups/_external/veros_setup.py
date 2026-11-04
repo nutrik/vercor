@@ -11,6 +11,8 @@ from veros.tools import get_periodic_interval
 from veros.variables import Variable
 from veros.core.utilities import enforce_boundaries
 
+from vercor.setups.config import VerosConfig
+
 
 def _surface_tke_forcing(stress_x, stress_y, density):  # type: ignore[no-untyped-def]
     """Return native wind work, preserving the fork's finite calm derivative."""
@@ -35,13 +37,15 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
         self,
         override: dict[str, Any] | None = None,
         *,
-        restore_to_climatology_temp: bool = False,
-        restore_to_climatology_salt: bool = False,
+        restore_to_climatology_temp: bool = VerosConfig.restore_to_climatology_temp,
+        restore_to_climatology_salt: bool = VerosConfig.restore_to_climatology_salt,
+        salinity_restoring_timescale: float = VerosConfig.salinity_restoring_timescale,
     ) -> None:
-        """Keep independent restoring choices as setup configuration."""
+        """Keep restoring choices and the salinity time scale in seconds."""
 
         self.restore_to_climatology_temp = restore_to_climatology_temp
         self.restore_to_climatology_salt = restore_to_climatology_salt
+        self.salinity_restoring_timescale = salinity_restoring_timescale
         super().__init__(override=override)
 
     @veros_routine
@@ -77,8 +81,16 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
                 "Salinity restoring weight",
                 (),
                 "1",
-                "Enable the existing 30-day surface salinity restoring term",
+                "Enable the surface salinity restoring term",
                 initial=float(self.restore_to_climatology_salt),
+                time_dependent=False,
+            ),
+            salinity_restoring_timescale=Variable(
+                "Salinity restoring time scale",
+                (),
+                "s",
+                "Positive surface salinity relaxation duration in seconds",
+                initial=self.salinity_restoring_timescale,
                 time_dependent=False,
             ),
         )
@@ -127,11 +139,10 @@ class CustomGlobalFourDegree(GlobalFourDegreeSetup):
             / settings.rho_0
         )
 
-        t_rest = 30 * 86400.0
         sss = f1 * vs.sss_clim[:, :, n1] + f2 * vs.sss_clim[:, :, n2]
         vs.forc_salt_surface = (
             vs.salt_restoring
-            / t_rest
+            / vs.salinity_restoring_timescale
             * (sss - vs.salt[:, :, -1, vs.tau])
             * vs.maskT[:, :, -1]
             * vs.dzt[-1]

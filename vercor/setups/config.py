@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import timedelta
+from math import isfinite
+from numbers import Real
 from types import MappingProxyType
 from typing import Any, Literal
 
@@ -56,9 +58,11 @@ class VerosConfig:
     """Configuration for the bundled Veros ocean setup factory.
 
     For ``global_4deg``, ``restore_to_climatology_temp`` enables the SST
-    correction and ``restore_to_climatology_salt`` independently adds 30-day
-    SSS restoring to the coupled virtual salt flux. Both default to False
-    and apply during spinup and coupled stepping in either execution lane.
+    correction (off by default) and ``restore_to_climatology_salt`` independently
+    adds SSS restoring to the coupled virtual salt flux (on by default).
+    ``salinity_restoring_timescale`` is a positive finite duration in seconds,
+    defaulting to four 365-day model years (126144000 s). These controls apply
+    during spinup and coupled stepping in either execution lane.
     The ACC setup retains its native internal forcing. Explicit ``surface_forcing="surface_fluxes"``
     accepts only total sea-ice ocean fluxes on the global grid, keeps independent
     restoring, and requires native pressure/free-surface execution for real SSH.
@@ -77,7 +81,7 @@ class VerosConfig:
     execution: Literal["host", "jax"] = "host"
     custom_parameters: Mapping[str, Any] | None = None
     restore_to_climatology_temp: bool = False
-    restore_to_climatology_salt: bool = False
+    restore_to_climatology_salt: bool = True
     spinup: Spinup = field(default_factory=Spinup)
     output: OutputSpec = field(default_factory=OutputSpec)
     surface_forcing: Literal["bulk_meteorology", "surface_fluxes"] = field(
@@ -86,10 +90,22 @@ class VerosConfig:
 
     export_open_water_surface: bool = field(default=False, kw_only=True)
     backend: Literal["numpy", "jax"] | None = field(default="jax", kw_only=True)
+    salinity_restoring_timescale: float = field(default=4 * 365 * 86400.0, kw_only=True)
 
     def __post_init__(self) -> None:
         """Validate execution policy and copy caller mappings into owned state."""
 
+        if isinstance(self.salinity_restoring_timescale, bool) or not isinstance(
+            self.salinity_restoring_timescale, Real
+        ):
+            raise TypeError(
+                "salinity_restoring_timescale must be a real number in seconds"
+            )
+        if (
+            not isfinite(self.salinity_restoring_timescale)
+            or self.salinity_restoring_timescale <= 0
+        ):
+            raise ValueError("salinity_restoring_timescale must be positive and finite")
         if not isinstance(self.export_open_water_surface, bool):
             raise TypeError("export_open_water_surface must be bool")
         if self.export_open_water_surface and self.surface_forcing != "surface_fluxes":

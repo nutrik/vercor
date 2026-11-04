@@ -121,6 +121,8 @@ ERA5 aggregation and lifecycle loading stay in its existing layer 15 owner.
 Independent global Veros restoring is configured in `vercor/setups/config.py`,
 passed through the factory and setup-state owners, and applied through
 native scalar temperature/salinity weights in `vercor/setups/_external/veros_setup.py`.
+The same path carries the independent salinity restoring time scale in seconds
+as a native scalar; the configuration owner supplies its four-year default.
 `veros_state.py` owns forcing layouts and cleanup, not restoring policy.
 The existing import layers are unchanged.
 

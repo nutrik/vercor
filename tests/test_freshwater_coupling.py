@@ -111,13 +111,22 @@ def test_virtual_salt_flux_obeys_runtime_precision(enable_x64: bool) -> None:
 
 
 def _global_forcing_model(
-    *, restore_temp: bool = False, restore_salt: bool = False
+    *,
+    restore_temp: bool = False,
+    restore_salt: bool = False,
+    salinity_restoring_timescale: float | None = None,
 ) -> Any:
     """Build a real small native state without downloading global input data."""
 
+    options: dict[str, Any] = (
+        {}
+        if salinity_restoring_timescale is None
+        else {"salinity_restoring_timescale": salinity_restoring_timescale}
+    )
     model = CustomGlobalFourDegree(
         restore_to_climatology_temp=restore_temp,
         restore_to_climatology_salt=restore_salt,
+        **options,
     )
     state = model.state
     with state.settings.unlock():
@@ -144,16 +153,23 @@ def _global_forcing_model(
 @pytest.mark.fast_always
 @pytest.mark.parametrize("restore_temp", [False, True])
 @pytest.mark.parametrize("restore_salt", [False, True])
+@pytest.mark.parametrize("timescale", [None, 2592000.0, 7776000.0])
 def test_native_callback_applies_coupled_flux_without_accumulating_restoring(
     restore_temp: bool,
     restore_salt: bool,
+    timescale: float | None,
 ) -> None:
     """The actual host callback must call VerCOR's kernel on every substep."""
 
-    model = _global_forcing_model(restore_temp=restore_temp, restore_salt=restore_salt)
+    model = _global_forcing_model(
+        restore_temp=restore_temp,
+        restore_salt=restore_salt,
+        salinity_restoring_timescale=timescale,
+    )
     for _ in range(2):
         model.set_forcing(model.state)
-        expected = -3.47e-6 + (50.0 / 2592000.0 if restore_salt else 0.0)
+        duration = 126144000.0 if timescale is None else timescale
+        expected = -3.47e-6 + (50.0 / duration if restore_salt else 0.0)
         assert_allclose_compact(
             model.state.variables.forc_salt_surface,
             np.full((7, 6), expected),
@@ -162,6 +178,21 @@ def test_native_callback_applies_coupled_flux_without_accumulating_restoring(
             3991.86795711963 * model.state.settings.rho_0
         )
         assert_allclose_compact(model.state.variables.forc_temp_surface, expected_heat)
+
+
+@pytest.mark.fast_always
+def test_native_restoring_defaults_use_four_years_with_only_salinity_enabled() -> None:
+    """Native setup defaults must agree with the public wrapper policy."""
+    model = CustomGlobalFourDegree()
+    state = model.state
+    with state.settings.unlock():
+        model.set_parameter(state)
+        state.settings.nx, state.settings.ny, state.settings.nz = 3, 2, 1
+    state.initialize_variables()
+    assert float(state.variables.temp_restoring) == 0.0
+    assert float(state.variables.salt_restoring) == 1.0
+    assert float(state.variables.salinity_restoring_timescale) == 126144000.0
+    assert state.var_meta["salinity_restoring_timescale"].units == "s"
 
 
 @pytest.mark.fast_always
