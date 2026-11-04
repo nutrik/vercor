@@ -19,7 +19,7 @@ pytestmark = pytest.mark.fast_always
 
 @pytest.fixture(scope="module")
 def example() -> ModuleType:
-    return importlib.import_module("vercor.setups.gallery.run_veris_calibration")
+    return importlib.import_module("vercor.setups.gallery.veris_calibration")
 
 
 @pytest.fixture(scope="module")
@@ -152,7 +152,7 @@ def test_fresh_process_forcing_honors_float64_policy() -> None:
 import jax, numpy as np
 jax.config.update('jax_enable_x64', False)
 from vercor.dtypes import DTypePolicy
-from vercor.setups.gallery.run_veris_calibration import _cold_fields
+from vercor.setups.gallery.veris_calibration import _cold_fields
 fields = _cold_fields((2, 3), policy=DTypePolicy(enable_x64=True))
 assert all(value.dtype == np.float64 for value in fields.values()), 'ERROR forcing precision was truncated'
 """

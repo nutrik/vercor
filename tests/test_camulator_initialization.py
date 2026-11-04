@@ -579,7 +579,7 @@ def test_gallery_rejects_unavailable_vapor_before_model_construction(
     monkeypatch: pytest.MonkeyPatch, channel: str | None
 ) -> None:
     import io
-    from vercor.setups.gallery import run_camulator_with_veros as gallery
+    from vercor.setups.gallery import camulator_with_veros as gallery
 
     if channel is None:
         monkeypatch.delenv("VERCOR_CAMULATOR_WATER_VAPOR_VARIABLE", raising=False)
@@ -607,7 +607,7 @@ def test_gallery_loads_exact_native_initial_diagnostics(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Any
 ) -> None:
     import io
-    from vercor.setups.gallery import run_camulator_with_veros as gallery
+    from vercor.setups.gallery import camulator_with_veros as gallery
 
     start = datetime(2000, 1, 1)
     path = tmp_path / "native-initial.nc"

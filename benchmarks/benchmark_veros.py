@@ -127,7 +127,7 @@ def _build_coupler(args: argparse.Namespace) -> Any:
                 dtype=dtype, backend="jax" if args.execution == "jax" else "host"
             ),
         )
-    from vercor.setups.gallery.run_veris_veros_jcm import build_coupler
+    from vercor.setups.gallery.veris_veros_jcm import build_coupler
 
     coupler = build_coupler(
         clock=Clock(datetime(2000, 1, 3), 86400.0, args.steps, calendar="gregorian"),

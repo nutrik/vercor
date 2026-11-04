@@ -169,7 +169,7 @@ The six ``air_*`` fields describe the bottom sigma-center state at
 ``surface_flux.t0`` enters precipitation phase diagnosis only, through the
 ``near_surface_air_temperature`` mapper keyword.
 
-The runnable ``run_veris_veros_jcm.build_coupler`` uses the public paired
+The runnable ``veris_veros_jcm.build_coupler`` uses the public paired
 factories and explicit quantity/coverage recipes. See :doc:`../setup-gallery`
 for the route ownership, equations, spinup/initial lag and native single-marine
 channel limitation.

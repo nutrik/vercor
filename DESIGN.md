@@ -636,7 +636,7 @@ module paths and lifecycle. There are no former-name aliases. The field,
 recipe, mask-helper and forcing-mode migration is documented in
 `docs/coupling-fields.rst`.
 
-`run_veris_veros_jcm.py` reuses the paired native factories and the sequential
+`veris_veros_jcm.py` reuses the paired native factories and the sequential
 LND → CICE → OCN → ATM workflow. Ice exports current per-ice temperature and
 native category/snow albedo, plus current concentration. Ocean exports current
 `(1-A)*SST` after its native advance; full SST/SSS/currents/SSH remain available

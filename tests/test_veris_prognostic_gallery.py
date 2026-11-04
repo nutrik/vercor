@@ -58,7 +58,7 @@ def test_pair_rejects_incompatible_ocean_before_initialization(
 
 
 def test_packaged_prognostic_example_exists_with_standard_contract() -> None:
-    module = importlib.import_module("vercor.setups.gallery.run_veris_veros_era5")
+    module = importlib.import_module("vercor.setups.gallery.veris_veros_era5")
     assert callable(module.run_setup) and callable(module._make_coupler)
 
 
@@ -81,7 +81,7 @@ def test_prognostic_gallery_assembles_bidirectional_total_feedback(
     )
     from vercor.regridding import conservative
 
-    module = importlib.import_module("vercor.setups.gallery.run_veris_veros_era5")
+    module = importlib.import_module("vercor.setups.gallery.veris_veros_era5")
     grid, _ = small_ocean()
     fields = surface_fields()
     ice = CallableComponent(
@@ -156,7 +156,7 @@ def test_new_templates_are_lazy_and_copyable(tmp_path: Any) -> None:
 
     result = CliRunner().invoke(cli, ["show-setups"])
     assert result.exit_code == 0
-    for stem in ("run_veris_calibration", "run_veris_veros_era5"):
+    for stem in ("veris_calibration", "veris_veros_era5"):
         assert stem in result.output
         copied = CliRunner().invoke(cli, ["copy-setup", stem, "--to", str(tmp_path)])
         assert copied.exit_code == 0, copied.output
@@ -174,7 +174,7 @@ def block(name, *args, **kwargs):
     return original(name, *args, **kwargs)
 builtins.__import__ = block
 from vercor.setups import VerisVerosSetup, make_veris_veros
-from vercor.setups.gallery import run_veris_calibration, run_veris_veros_era5
+from vercor.setups.gallery import veris_calibration, veris_veros_era5
 assert not {'veris', 'veros'} & sys.modules.keys()
 """
     subprocess.run(
@@ -203,7 +203,7 @@ def _prognostic_coupler(
     from vercor.regridding import conservative
     from vercor.setups import make_veris_veros
     from vercor.setups._external import veros_gcm_state
-    from vercor.setups.gallery.run_veris_calibration import _cold_fields
+    from vercor.setups.gallery.veris_calibration import _cold_fields
 
     setup = surface_setup_class(execution=execution)
     monkeypatch.setattr(
@@ -350,7 +350,7 @@ def test_prognostic_run_setup_delegates_cli_controls(
 ) -> None:
     from vercor.output import OutputTarget
 
-    module = importlib.import_module("vercor.setups.gallery.run_veris_veros_era5")
+    module = importlib.import_module("vercor.setups.gallery.veris_veros_era5")
     captured: dict[str, Any] = {}
 
     class Runner:

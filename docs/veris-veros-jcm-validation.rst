@@ -7,7 +7,7 @@ the unused prescribed-land import route is removed. The record below describes
 the preceding integration; :doc:`exchange-coverage` documents current contracts
 and the reviewed dependency exception.
 
-This record concerns the functional coupling in ``run_veris_veros_jcm.py``.
+This record concerns the functional coupling in ``veris_veros_jcm.py``.
 The execution order is LND, CICE (native Veris), OCN (prognostic Veros), ATM
 (JCM). Source code, tests, native data and the shared output coordinator are
 reused; no additional model or integration loop was introduced.

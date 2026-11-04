@@ -107,12 +107,12 @@ that local copy:
 
 ```console
 vercor show-setups
-vercor copy-setup run_jcm_with_veros \
-  --to ~/vercor-setups/run_jcm_with_veros
+vercor copy-setup jcm_with_veros \
+  --to ~/vercor-setups/jcm_with_veros
 vercor run \
   --loglevel info \
   --float-type float64 \
-  ~/vercor-setups/run_jcm_with_veros/run_jcm_with_veros.py
+  ~/vercor-setups/jcm_with_veros/jcm_with_veros.py
 ```
 
 `vercor --version` reports the installed distribution version. `VERCOR_SETUP_DIR`

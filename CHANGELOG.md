@@ -19,6 +19,9 @@ versioning; pre-releases may still refine new contracts.
 
 ### Changed
 
+- Remove the `run_` prefix from bundled setup gallery filenames and case names.
+  Use, for example, `vercor copy-setup jcm_with_veros` and import
+  `vercor.setups.gallery.jcm_with_veros`.
 - Name bundled lowest-model-level meteorology with six explicit `air_*` keys.
   Distinguish JCM's `air_pressure_3d` from CAMulator's
   `model_level_air_pressure`, and name JCM's phase-only `t0` input
