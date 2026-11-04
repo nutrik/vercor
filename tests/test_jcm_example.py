@@ -22,7 +22,7 @@ from vercor.setups import JCMInputs
 GALLERY_DIRECTORY = (
     Path(__file__).resolve().parents[1] / "vercor" / "setups" / "gallery"
 )
-GALLERY_MODULE = "vercor.setups.gallery.run_jcm_with_era5data"
+GALLERY_MODULE = "vercor.setups.gallery.jcm_with_era5data"
 
 
 class _FakeCoupler:
@@ -47,7 +47,7 @@ def blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
     return real_import(name, globals, locals, fromlist, level)
 
 builtins.__import__ = blocked_import
-from vercor.setups.gallery import run_jcm_with_era5data as example
+from vercor.setups.gallery import jcm_with_era5data as example
 assert callable(example.build_coupler)
 """
     environment = os.environ.copy()

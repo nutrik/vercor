@@ -38,7 +38,7 @@ from vercor.recipes import (
 def test_gallery_assembles_exact_sequence_and_prescribed_forcing(
     monkeypatch: pytest.MonkeyPatch, float_type: str
 ) -> None:
-    gallery = importlib.import_module("vercor.setups.gallery.run_veris_dataveros_era5")
+    gallery = importlib.import_module("vercor.setups.gallery.veris_dataveros_era5")
     grid, _ = small_ocean()
     all_fields = surface_fields()
     ocean = DataComponent(
@@ -108,7 +108,7 @@ def test_gallery_assembles_exact_sequence_and_prescribed_forcing(
 def test_gallery_run_contract_and_cli_copy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    gallery = importlib.import_module("vercor.setups.gallery.run_veris_dataveros_era5")
+    gallery = importlib.import_module("vercor.setups.gallery.veris_dataveros_era5")
     captured: dict[str, Any] = {}
 
     @dataclass
@@ -125,10 +125,10 @@ def test_gallery_run_contract_and_cli_copy(
     assert captured["loglevel"] == "warning" and captured["float_type"] == "float32"
     assert captured["output"].directory == Path(".")
     result = CliRunner().invoke(
-        cli, ["copy-setup", "run_veris_dataveros_era5", "--to", str(tmp_path)]
+        cli, ["copy-setup", "veris_dataveros_era5", "--to", str(tmp_path)]
     )
     assert result.exit_code == 0, result.output
-    copied = tmp_path / "run_veris_dataveros_era5.py"
+    copied = tmp_path / "veris_dataveros_era5.py"
     assert isinstance(gallery.__file__, str)
     assert copied.read_bytes() == Path(gallery.__file__).read_bytes()
 
@@ -180,7 +180,7 @@ import numpy as np
 import xarray as xr
 from vercor.output import OutputSpec, OutputTarget, PeriodOutput
 from vercor.setups import VerisConfig
-from vercor.setups.gallery.run_veris_dataveros_era5 import _make_coupler
+from vercor.setups.gallery.veris_dataveros_era5 import _make_coupler
 explicit = sys.argv[2] == 'True'
 config = None
 if explicit:

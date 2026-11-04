@@ -62,7 +62,7 @@ def native_coupler(
     period = (
         OutputSpec(period=PeriodOutput(frequency="step")) if output else OutputSpec()
     )
-    coupler = import_module("vercor.setups.gallery.run_veris_veros_jcm").build_coupler(
+    coupler = import_module("vercor.setups.gallery.veris_veros_jcm").build_coupler(
         jcm_inputs=JCMInputs(coords, terrain, forcing),
         clock=Clock(datetime(2000, 1, 3, 12), 1800.0, steps, calendar="gregorian"),
         veris_config=VerisConfig(
@@ -172,14 +172,14 @@ def test_gallery_routes_preserve_surface_ownership(
 
 
 def test_cli_copy_and_lazy_optional_imports(tmp_path: Path) -> None:
-    assert "run_veris_veros_jcm" in CliRunner().invoke(cli, ["show-setups"]).output
+    assert "veris_veros_jcm" in CliRunner().invoke(cli, ["show-setups"]).output
     result = CliRunner().invoke(
-        cli, ["copy-setup", "run_veris_veros_jcm", "--to", str(tmp_path)]
+        cli, ["copy-setup", "veris_veros_jcm", "--to", str(tmp_path)]
     )
     assert result.exit_code == 0, result.output
-    module = import_module("vercor.setups.gallery.run_veris_veros_jcm")
+    module = import_module("vercor.setups.gallery.veris_veros_jcm")
     assert isinstance(module.__file__, str)
-    assert (tmp_path / "run_veris_veros_jcm.py").read_bytes() == Path(
+    assert (tmp_path / "veris_veros_jcm.py").read_bytes() == Path(
         module.__file__
     ).read_bytes()
     subprocess.run(
@@ -193,7 +193,7 @@ def block(name,*a,**k):
     if name.split('.')[0] in {'jcm','veris','veros'}: raise ImportError('optional blocked')
     return original(name,*a,**k)
 builtins.__import__=block
-from vercor.setups.gallery.run_veris_veros_jcm import build_coupler, run_setup
+from vercor.setups.gallery.veris_veros_jcm import build_coupler, run_setup
 assert not {'jcm','veris','veros'} & sys.modules.keys()
 """,
         ],
@@ -215,7 +215,7 @@ assert not {'jcm','veris','veros'} & sys.modules.keys()
 def test_incompatible_explicit_modes_are_rejected_before_models(
     kwargs: dict[str, Any],
 ) -> None:
-    module = import_module("vercor.setups.gallery.run_veris_veros_jcm")
+    module = import_module("vercor.setups.gallery.veris_veros_jcm")
     with pytest.raises(
         ValueError, match="Gregorian|model_level|export|seaice_coupling"
     ):
@@ -227,7 +227,7 @@ def test_precision_is_selected_before_native_factory(
 ) -> None:
     import jax
 
-    module = import_module("vercor.setups.gallery.run_veris_veros_jcm")
+    module = import_module("vercor.setups.gallery.veris_veros_jcm")
 
     class FactoryReached(Exception):
         pass
@@ -249,7 +249,7 @@ def test_precision_is_selected_before_native_factory(
 def test_injected_pair_cannot_receive_overrides() -> None:
     from types import SimpleNamespace
 
-    module = import_module("vercor.setups.gallery.run_veris_veros_jcm")
+    module = import_module("vercor.setups.gallery.veris_veros_jcm")
     with pytest.raises(ValueError, match="pair.*overrides"):
         module.build_coupler(
             pair=SimpleNamespace(),

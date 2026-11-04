@@ -15,25 +15,25 @@ import pytest
 
 from vercor.cli import cli
 
-
-@pytest.mark.parametrize(
-    "module_name",
-    (
-        "custom_component_wrapping",
-        "profile_runtime",
-        "run_camulator_with_veros",
-        "run_data_driver",
-        "run_jcm_with_era5data",
-        "run_jcm_with_slab",
-        "run_jcm_with_veros",
-        "run_jcm_with_verosdata",
-        "run_slab_driver",
-        "run_veros_with_era5data",
-        "run_veris_dataveros_era5",
-        "run_veris_calibration",
-        "run_veris_veros_era5",
-    ),
+_BUNDLED_SETUP_NAMES = (
+    "camulator_with_veros",
+    "custom_component_wrapping",
+    "data_driver",
+    "jcm_with_era5data",
+    "jcm_with_slab",
+    "jcm_with_veros",
+    "jcm_with_verosdata",
+    "profile_runtime",
+    "slab_driver",
+    "veris_calibration",
+    "veris_dataveros_era5",
+    "veris_veros_era5",
+    "veris_veros_jcm",
+    "veros_with_era5data",
 )
+
+
+@pytest.mark.parametrize("module_name", _BUNDLED_SETUP_NAMES)
 def test_every_bundled_setup_exposes_keyword_only_run_contract(
     module_name: str,
 ) -> None:
@@ -325,9 +325,7 @@ def test_show_setups_lists_sorted_public_bundled_stems() -> None:
 
     assert result.exit_code == 0, result.output
     names = result.output.splitlines()
-    assert names == sorted(names)
-    assert "run_jcm_with_veros" in names
-    assert "__init__" not in names
+    assert names == sorted(_BUNDLED_SETUP_NAMES)
 
 
 def test_show_setups_adds_direct_public_files_from_each_external_directory(
@@ -434,15 +432,15 @@ def test_show_setups_rejects_packaged_and_external_duplicate_names(
 ) -> None:
     external = tmp_path / "external"
     external.mkdir()
-    duplicate = external / "run_jcm_with_veros.py"
+    duplicate = external / "jcm_with_veros.py"
     duplicate.write_text("", encoding="utf-8")
     monkeypatch.setenv("VERCOR_SETUP_DIR", str(external))
 
     result = CliRunner().invoke(cli, ["show-setups"])
 
     assert result.exit_code == 1
-    assert "duplicate setup: run_jcm_with_veros" in result.output
-    assert "vercor.setups.gallery/run_jcm_with_veros.py" in result.output
+    assert "duplicate setup: jcm_with_veros" in result.output
+    assert "vercor.setups.gallery/jcm_with_veros.py" in result.output
     assert str(duplicate) in result.output
 
 
@@ -459,31 +457,32 @@ def test_copy_help_lists_discovered_setups_and_environment_guidance(
 
     assert result.exit_code == 0, result.output
     assert "Available setups:" in result.output
-    assert "run_jcm_with_veros" in result.output
+    assert "jcm_with_veros" in result.output
     assert "local_template" in result.output
     assert "VERCOR_SETUP_DIR" in result.output
-    assert "vercor copy-setup run_jcm_with_veros --to" in result.output
+    assert "vercor copy-setup jcm_with_veros --to" in result.output
 
 
-def test_copy_setup_by_stem_copies_packaged_bytes() -> None:
+@pytest.mark.parametrize("module_name", _BUNDLED_SETUP_NAMES)
+def test_copy_setup_by_stem_copies_packaged_bytes(module_name: str) -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
-        result = runner.invoke(cli, ["copy-setup", "run_jcm_with_veros"])
-        copied = Path("run_jcm_with_veros.py")
+        result = runner.invoke(cli, ["copy-setup", module_name])
+        copied = Path(f"{module_name}.py")
         packaged = resources.files("vercor.setups.gallery").joinpath(copied.name)
 
         assert result.exit_code == 0, result.output
         assert copied.read_bytes() == packaged.read_bytes()
-        assert "run_jcm_with_veros.py" in result.output
+        assert copied.name in result.output
 
 
 def test_copy_setup_accepts_python_filename() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
-        result = runner.invoke(cli, ["copy-setup", "run_slab_driver.py"])
+        result = runner.invoke(cli, ["copy-setup", "slab_driver.py"])
 
         assert result.exit_code == 0, result.output
-        assert Path("run_slab_driver.py").is_file()
+        assert Path("slab_driver.py").is_file()
 
 
 def test_copy_setup_creates_destination_directory_and_parents() -> None:
@@ -493,11 +492,11 @@ def test_copy_setup_creates_destination_directory_and_parents() -> None:
 
         result = runner.invoke(
             cli,
-            ["copy-setup", "run_jcm_with_veros", "--to", str(destination)],
+            ["copy-setup", "jcm_with_veros", "--to", str(destination)],
         )
 
         assert result.exit_code == 0, result.output
-        assert (destination / "run_jcm_with_veros.py").is_file()
+        assert (destination / "jcm_with_veros.py").is_file()
 
 
 def test_copy_setup_reuses_existing_destination_directory() -> None:
@@ -508,11 +507,11 @@ def test_copy_setup_reuses_existing_destination_directory() -> None:
 
         result = runner.invoke(
             cli,
-            ["copy-setup", "run_jcm_with_veros.py", "--to", str(destination)],
+            ["copy-setup", "jcm_with_veros.py", "--to", str(destination)],
         )
 
         assert result.exit_code == 0, result.output
-        assert (destination / "run_jcm_with_veros.py").is_file()
+        assert (destination / "jcm_with_veros.py").is_file()
 
 
 def test_copy_setup_copies_external_template_bytes(
@@ -603,9 +602,9 @@ def test_copy_setup_removes_partial_destination_after_stream_failure(
     monkeypatch.setattr("vercor.cli.shutil.copyfileobj", failing_copyfileobj)
     runner = CliRunner()
     with runner.isolated_filesystem():
-        target = Path("run_jcm_with_veros.py")
+        target = Path("jcm_with_veros.py")
 
-        result = runner.invoke(cli, ["copy-setup", "run_jcm_with_veros"])
+        result = runner.invoke(cli, ["copy-setup", "jcm_with_veros"])
 
         assert result.exit_code != 0
         assert not target.exists()
@@ -619,7 +618,7 @@ def test_copy_setup_rejects_file_as_destination_directory() -> None:
 
         result = runner.invoke(
             cli,
-            ["copy-setup", "run_jcm_with_veros", "--to", str(target)],
+            ["copy-setup", "jcm_with_veros", "--to", str(target)],
         )
 
         assert result.exit_code != 0
@@ -631,12 +630,12 @@ def test_copy_setup_preserves_existing_file_inside_to_directory() -> None:
     with runner.isolated_filesystem():
         directory = Path("target")
         directory.mkdir()
-        destination = directory / "run_jcm_with_veros.py"
+        destination = directory / "jcm_with_veros.py"
         destination.write_text("keep me", encoding="utf-8")
 
         result = runner.invoke(
             cli,
-            ["copy-setup", "run_jcm_with_veros", "--to", str(directory)],
+            ["copy-setup", "jcm_with_veros", "--to", str(directory)],
         )
 
         assert result.exit_code == 1
@@ -650,27 +649,27 @@ def test_copy_setup_rejects_duplicate_catalog_names(
 ) -> None:
     external = tmp_path / "external"
     external.mkdir()
-    duplicate = external / "run_jcm_with_veros.py"
+    duplicate = external / "jcm_with_veros.py"
     duplicate.write_text("", encoding="utf-8")
     monkeypatch.setenv("VERCOR_SETUP_DIR", str(external))
 
     runner = CliRunner()
     with runner.isolated_filesystem():
-        result = runner.invoke(cli, ["copy-setup", "run_jcm_with_veros"])
+        result = runner.invoke(cli, ["copy-setup", "jcm_with_veros"])
 
     assert result.exit_code == 1
-    assert "duplicate setup: run_jcm_with_veros" in result.output
-    assert "vercor.setups.gallery/run_jcm_with_veros.py" in result.output
+    assert "duplicate setup: jcm_with_veros" in result.output
+    assert "vercor.setups.gallery/jcm_with_veros.py" in result.output
     assert str(duplicate) in result.output
 
 
 def test_copy_setup_preserves_existing_destination() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
-        destination = Path("run_jcm_with_veros.py")
+        destination = Path("jcm_with_veros.py")
         destination.write_text("keep me", encoding="utf-8")
 
-        result = runner.invoke(cli, ["copy-setup", "run_jcm_with_veros"])
+        result = runner.invoke(cli, ["copy-setup", "jcm_with_veros"])
 
         assert result.exit_code != 0
         assert "already exists" in result.output
@@ -684,10 +683,10 @@ def test_copy_setup_preserves_existing_destination() -> None:
         (".", "must be a direct setup name"),
         ("..", "must be a direct setup name"),
         (".py", "must name a Python setup"),
-        ("../run_slab_driver", "must be a direct setup name"),
-        ("nested/run_slab_driver", "must be a direct setup name"),
-        (r"nested\run_slab_driver", "must be a direct setup name"),
-        ("run_slab_driver.txt", "must name a Python setup"),
+        ("../slab_driver", "must be a direct setup name"),
+        ("nested/slab_driver", "must be a direct setup name"),
+        (r"nested\slab_driver", "must be a direct setup name"),
+        ("slab_driver.txt", "must name a Python setup"),
         ("__init__", "must name a public setup"),
     ),
 )

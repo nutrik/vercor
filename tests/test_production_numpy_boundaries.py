@@ -16,7 +16,7 @@ ALLOWED_NUMPY_BOUNDARIES = {
     "vercor/setups/_external/camulator_fields.py",
     "vercor/setups/_external/veros_data.py",
     # Host observation validation/SciPy interface; the differentiated loss is JAX.
-    "vercor/setups/gallery/run_veris_calibration.py",
+    "vercor/setups/gallery/veris_calibration.py",
     "vercor/types.py",
 }
 

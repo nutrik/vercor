@@ -456,7 +456,7 @@ def _global_coupler(
     from vercor.setups._external.veris import make_veris
     from vercor.setups._data.veros_ocean import make_veros_data_ocean
     from vercor.setups._veris import VerisVerosDataSetup
-    from vercor.setups.gallery.run_veris_dataveros_era5 import _make_coupler
+    from vercor.setups.gallery.veris_dataveros_era5 import _make_coupler
     import veris
 
     snapshot = load_veros_data_snapshot()

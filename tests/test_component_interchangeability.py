@@ -418,7 +418,7 @@ def test_data_gallery_displays_explicit_diagnostic_imports(
 ) -> None:
     """Every gallery-only import reaches a table metric or its surface plot."""
     from types import SimpleNamespace
-    from vercor.setups.gallery import run_data_driver as gallery
+    from vercor.setups.gallery import data_driver as gallery
 
     grid = _grid("air")
     ocean_grid = RectilinearGrid(

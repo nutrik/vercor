@@ -308,18 +308,18 @@ vercor.setups._veris
 vercor.setups.gallery
 vercor.setups.gallery.custom_component_wrapping
 vercor.setups.gallery.profile_runtime
-vercor.setups.gallery.run_camulator_with_veros
-vercor.setups.gallery.run_data_driver
-vercor.setups.gallery.run_jcm_with_era5data
-vercor.setups.gallery.run_jcm_with_slab
-vercor.setups.gallery.run_jcm_with_veros
-vercor.setups.gallery.run_jcm_with_verosdata
-vercor.setups.gallery.run_slab_driver
-vercor.setups.gallery.run_veris_calibration
-vercor.setups.gallery.run_veris_dataveros_era5
-vercor.setups.gallery.run_veris_veros_era5
-vercor.setups.gallery.run_veris_veros_jcm
-vercor.setups.gallery.run_veros_with_era5data
+vercor.setups.gallery.camulator_with_veros
+vercor.setups.gallery.data_driver
+vercor.setups.gallery.jcm_with_era5data
+vercor.setups.gallery.jcm_with_slab
+vercor.setups.gallery.jcm_with_veros
+vercor.setups.gallery.jcm_with_verosdata
+vercor.setups.gallery.slab_driver
+vercor.setups.gallery.veris_calibration
+vercor.setups.gallery.veris_dataveros_era5
+vercor.setups.gallery.veris_veros_era5
+vercor.setups.gallery.veris_veros_jcm
+vercor.setups.gallery.veros_with_era5data
 vercor.setups._jcm
 vercor.setups._lazy_imports
 vercor.setups._output
@@ -410,10 +410,10 @@ second component adapter, duplicate accumulator, or native period-file path.
   `veros_gcm`, `veros_gcm_state`, `veros_output`, `veros_runtime`,
   `veros_runtime_settings`, `veros_setup`, and `veros_state`.
 - Runnable gallery: `vercor.setups.gallery`, `custom_component_wrapping`,
-  `profile_runtime`, `run_camulator_with_veros`, `run_data_driver`,
-  `run_jcm_with_era5data`, `run_jcm_with_slab`, `run_jcm_with_veros`,
-  `run_jcm_with_verosdata`, `run_slab_driver`, and
-  `run_veros_with_era5data`.
+  `profile_runtime`, `camulator_with_veros`, `data_driver`,
+  `jcm_with_era5data`, `jcm_with_slab`, `jcm_with_veros`,
+  `jcm_with_verosdata`, `slab_driver`, and
+  `veros_with_era5data`.
 - Remaining setup owners: `vercor.setups._jcm`, `vercor.setups._lazy_imports`,
   `vercor.setups._slab`, `vercor.setups._slab.atmosphere`,
   `vercor.setups._slab.land`, `vercor.setups._slab.ocean`,

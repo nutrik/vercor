@@ -39,7 +39,7 @@ For standalone Veris with prescribed Veros ocean data, install a source checkout
 containing the integration with ``python -m pip install ".[veris,veros]"``.
 The ``veris`` extra pins the maintained standalone native model; ``veros``
 provides the setup-only global ocean geometry and climatology. The gallery
-``run_veris_dataveros_era5`` supplies ERA5 forcing and uses the standard
+``veris_dataveros_era5`` supplies ERA5 forcing and uses the standard
 ``vercor copy-setup`` and ``vercor run`` commands (see :doc:`../setup-gallery`).
 
 The combined JCM/Veris lane uses released JCM 3.0.0 and Veris v0.2.1.
@@ -102,8 +102,8 @@ In order to perform your first coupled run, you can copy a pre-configured setup 
 
 .. code-block:: console
 
-   vercor copy-setup run_veros_with_era5data \
-     --to ~/vercor-setups/run_veros_with_era5data
+   vercor copy-setup veros_with_era5data \
+     --to ~/vercor-setups/veros_with_era5data
 
 Alternatively, you can create your own setup script from scratch. In this case, you need to define the longitude-latitude locations of a component's fields
 with :class:`~vercor.grids.RectilinearGrid`; the shared start time, coupler time step, and number of steps with
@@ -126,7 +126,7 @@ If you choose to run the copied above pre-configured setup, execute:
    vercor run \
      --loglevel info \
      --float-type float64 \
-     ~/vercor-setups/run_veros_with_era5data/run_veros_with_era5data.py
+     ~/vercor-setups/veros_with_era5data/veros_with_era5data.py
 
 For the alternative setup (given above) execute:
 

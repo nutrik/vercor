@@ -27,7 +27,7 @@ from vercor.output import OutputTarget
 from vercor.recipes import (
     ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
 )
-from vercor.setups.gallery import run_camulator_with_veros
+from vercor.setups.gallery import camulator_with_veros
 
 
 @pytest.mark.fast_always
@@ -57,7 +57,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     monkeypatch.setenv("VERCOR_CAMULATOR_WATER_VAPOR_VARIABLE", "VAPOR")
     monkeypatch.setenv("VERCOR_CAMULATOR_INITIAL_DIAGNOSTICS", str(diagnostic_path))
     monkeypatch.setattr(
-        run_camulator_with_veros,
+        camulator_with_veros,
         "open",
         lambda path: io.StringIO(
             "data:\n  variables: [U, V, T, VAPOR]\npredict:\n  start_datetime: '1981-01-03 00:00:00'\n"
@@ -147,7 +147,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         ),
     )
 
-    monkeypatch.setattr(run_camulator_with_veros, "make_veros_gcm", lambda **_: ocean)
+    monkeypatch.setattr(camulator_with_veros, "make_veros_gcm", lambda **_: ocean)
 
     def make_atmosphere(*, config: Any) -> Any:
         assert config.water_vapor_variable == "VAPOR"
@@ -157,9 +157,9 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         assert_allclose_compact(config.initial_diagnostics["FLNS"], -21600 * 3.0)
         return atmosphere
 
-    monkeypatch.setattr(run_camulator_with_veros, "make_camulator_gcm", make_atmosphere)
+    monkeypatch.setattr(camulator_with_veros, "make_camulator_gcm", make_atmosphere)
     monkeypatch.setattr(
-        run_camulator_with_veros,
+        camulator_with_veros,
         "make_camulator_land",
         lambda *args, **kwargs: land,
     )
@@ -169,7 +169,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     captured: dict[str, Any] = {}
 
     monkeypatch.setattr(
-        run_camulator_with_veros,
+        camulator_with_veros,
         "Clock",
         lambda *args, **kwargs: real_clock(
             start=kwargs["start"],
@@ -179,7 +179,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         ),
     )
     monkeypatch.setattr(
-        run_camulator_with_veros,
+        camulator_with_veros,
         "OutputTarget",
         lambda _: OutputTarget(
             tmp_path,
@@ -199,9 +199,9 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
             captured["final_state"] = final_state
             return final_state
 
-    monkeypatch.setattr(run_camulator_with_veros, "Coupler", _RecordingCoupler)
+    monkeypatch.setattr(camulator_with_veros, "Coupler", _RecordingCoupler)
 
-    run_camulator_with_veros.run_setup(loglevel="error", float_type="float32")
+    camulator_with_veros.run_setup(loglevel="error", float_type="float32")
 
     assert native_steps == [0, 1]
     coupler = cast(Coupler, captured["coupler"])
@@ -237,7 +237,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
 @pytest.mark.fast_always
 def test_veris_gallery_uses_public_import_owners() -> None:
     """Keep the runnable gallery usable as an ordinary copied setup script."""
-    path = Path("vercor/setups/gallery/run_veris_dataveros_era5.py")
+    path = Path("vercor/setups/gallery/veris_dataveros_era5.py")
     tree = ast.parse(path.read_text())
     for node in ast.walk(tree):
         if (

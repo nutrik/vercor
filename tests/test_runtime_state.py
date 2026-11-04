@@ -634,13 +634,13 @@ def test_runtime_package_does_not_reexport_focused_module_symbols() -> None:
 
 
 def test_examples_use_coupler_runtime_component_view_factory() -> None:
-    slab_driver_source = Path("vercor/setups/gallery/run_slab_driver.py").read_text(
+    slab_driver_source = Path("vercor/setups/gallery/slab_driver.py").read_text(
         encoding="utf-8"
     )
-    data_driver_source = Path("vercor/setups/gallery/run_data_driver.py").read_text(
+    data_driver_source = Path("vercor/setups/gallery/data_driver.py").read_text(
         encoding="utf-8"
     )
-    jcm_slab_source = Path("vercor/setups/gallery/run_jcm_with_slab.py").read_text(
+    jcm_slab_source = Path("vercor/setups/gallery/jcm_with_slab.py").read_text(
         encoding="utf-8"
     )
 
@@ -650,7 +650,13 @@ def test_examples_use_coupler_runtime_component_view_factory() -> None:
 
 
 def test_examples_import_component_contracts_from_canonical_owner() -> None:
-    for path in Path("vercor/setups/gallery").glob("run_*.py"):
+    paths = tuple(
+        path
+        for path in Path("vercor/setups/gallery").glob("*.py")
+        if not path.name.startswith("_")
+    )
+    assert paths, "No public gallery examples were checked"
+    for path in paths:
         source = path.read_text(encoding="utf-8")
         assert "from vercor import Component" not in source
         assert "from vercor import DataComponent" not in source

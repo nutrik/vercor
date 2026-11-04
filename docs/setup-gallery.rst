@@ -3,14 +3,18 @@
 Setup gallery
 =============
 
+Case names match their Python filenames without ``.py``. The former ``run_``
+filename prefix has been removed; for example, ``jcm_with_veros`` copies
+``jcm_with_veros.py``.
+
 This page gives an overview of the available model setups. To copy the setup file to the current working directory, you can make use of the ``vercor copy-setup`` command.
 
 Example:
 
 .. code-block:: console
 
-   vercor copy-setup run_jcm_with_veros \
-     --to ~/vercor-setups/run_jcm_with_veros
+   vercor copy-setup jcm_with_veros \
+     --to ~/vercor-setups/jcm_with_veros
 
 
 .. list-table:: Available setups
@@ -29,51 +33,51 @@ Example:
      - Profile a synthetic slab coupling run.
      - None
      - No
-   * - ``run_slab_driver``
+   * - ``slab_driver``
      - Run and plot the bundled slab topology.
      - Matplotlib
      - No
-   * - ``run_data_driver``
+   * - ``data_driver``
      - Couple ERA data components and plot diagnostics.
      - Matplotlib
      - Yes
-   * - ``run_jcm_with_slab``
+   * - ``jcm_with_slab``
      - Couple JCM to slab ocean and land components.
      - JCM, Matplotlib
      - Yes
-   * - ``run_jcm_with_era5data``
+   * - ``jcm_with_era5data``
      - Couple JCM to ERA5 ocean forcing.
      - JCM
      - Yes
-   * - ``run_jcm_with_veros``
+   * - ``jcm_with_veros``
      - Couple JCM atmosphere/land to Veros.
      - JCM, Veros
      - Yes
-   * - ``run_jcm_with_verosdata``
+   * - ``jcm_with_verosdata``
      - Couple JCM to Veros-format ocean data.
      - JCM
      - Yes
-   * - ``run_veros_with_era5data``
+   * - ``veros_with_era5data``
      - Couple Veros to ERA5 atmosphere and land data.
      - Veros
      - Yes
-   * - ``run_veris_dataveros_era5``
+   * - ``veris_dataveros_era5``
      - Run Veris with prescribed Veros ocean and ERA5 data.
      - Veris, Veros
      - Yes
-   * - ``run_veris_veros_era5``
+   * - ``veris_veros_era5``
      - Couple prognostic Veris and Veros with prescribed ERA5 air.
      - Veris, Veros
      - Yes
-   * - ``run_veris_veros_jcm``
+   * - ``veris_veros_jcm``
      - Couple JCM land/atmosphere, prognostic Veros and native Veris sea ice.
      - JCM, Veris, Veros
      - Yes
-   * - ``run_veris_calibration``
+   * - ``veris_calibration``
      - Recover native h0 from synthetic concentration with a cold-forcing holdout.
      - Veris
      - No
-   * - ``run_camulator_with_veros``
+   * - ``camulator_with_veros``
      - Couple CAMulator atmosphere/land to Veros.
      - CAMulator, Veros
      - Yes
@@ -274,8 +278,8 @@ From a source checkout containing this integration, install and copy the setup:
 .. code-block:: console
 
    python -m pip install ".[veris,veros]"
-   vercor copy-setup run_veris_dataveros_era5 --to ~/vercor-setups/run_veris_dataveros_era5
-   vercor run ~/vercor-setups/run_veris_dataveros_era5/run_veris_dataveros_era5.py --loglevel info --float-type float64
+   vercor copy-setup veris_dataveros_era5 --to ~/vercor-setups/veris_dataveros_era5
+   vercor run ~/vercor-setups/veris_dataveros_era5/veris_dataveros_era5.py --loglevel info --float-type float64
 
 The native revision is pinned by the ``veris`` extra. Native integration uses
 one-hour coupled dynamics/thermodynamics steps inside daily coupling intervals.
@@ -295,7 +299,7 @@ establish observed climate skill.
 Prognostic sea ice and ocean
 ----------------------------
 
-``run_veris_veros_era5`` uses ``make_veris_veros`` to initialize one native ocean
+``veris_veros_era5`` uses ``make_veris_veros`` to initialize one native ocean
 and share its exact geometry with sea ice. The daily ``LND -> CICE -> OCN -> ATM``
 sequence is explicitly lagged: ice receives the latest ocean/air state, ocean
 receives the current ice interval means, then ERA5 advances. Heat, total bulk
@@ -308,7 +312,7 @@ staggered stress conservation.
 Synthetic parameter recovery
 -----------------------------
 
-``run_veris_calibration`` needs no external data assets. It fits h0 (m) from
+``veris_calibration`` needs no external data assets. It fits h0 (m) from
 synthetic concentration using public state replacement, a fixed wet observation
 mask including ice-free cells, and a residual scale of 1e-3. Its reusable
 ``calibrate_lead_closing_thickness`` accepts a Coupler, fixed initial RunState,
@@ -326,7 +330,7 @@ concentration quantization limits recovery accuracy relative to float64.
 Coupled Veris, Veros and JCM
 ----------------------------
 
-Copy ``run_veris_veros_jcm`` with the standard CLI, or import its public
+Copy ``veris_veros_jcm`` with the standard CLI, or import its public
 ``build_coupler`` function. The default is 365 daily Gregorian intervals starting
 2000-01-03, after two days of native JCM climatological spinup. The builder
 selects precision before constructing models, initializes the ocean once, and
