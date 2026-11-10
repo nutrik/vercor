@@ -22,7 +22,7 @@
 - No global `jax_debug_nans`, numerical fudge factor, public runtime switch, registry, or public API expansion is allowed.
 - Physics values remain JAX-traced, precision remains owned by `RuntimeOptions.dtype`, and runtime state remains immutable.
 - JAX code must not branch in Python on traced values.
-- Optional JCM, Veros, CAMulator, Torch, TensorFlow, and CREDIT imports remain lazy.
+- Optional JCM and Veros imports remain lazy.
 - Tests precede production changes, and every commit follows a passing full unit suite as required by `AGENTS.md`.
 - `PROGRESS.md`, `DESIGN.md`, and `DEPENDENCIES.md` must match the implemented result before completion.
 
@@ -36,7 +36,7 @@
 - Modify `vercor/_runtime/field_transfer.py`: validate time-selected sent fields.
 - Modify `vercor/_runtime/exchange_dispatch.py`: validate raw regridding outputs and mask scalar transfers without evaluating `NaN * 0` as a propagated value.
 - Modify `vercor/_interpolators/bilinear_rectilinear.py`, `vercor/_interpolators/_bilinear_extrapolation.py`, and `vercor/_interpolators/conservative_remap_rectilinear.py`: replace masked zero-denominator divisions with the shared safe primitive.
-- Modify `vercor/setups/_external/jax_gcm_fields.py`, `vercor/setups/_external/veros_state.py`, and `vercor/setups/_external/camulator_fields.py`: replace broad `nan_to_num` cleanup with NaN-only replacement that rejects infinities; guard CAMulator zero-variance normalization.
+- Modify `vercor/setups/_external/jax_gcm_fields.py`, `vercor/setups/_external/veros_state.py`: replace broad `nan_to_num` cleanup with NaN-only replacement that rejects infinities.
 - Modify the existing numerical/component test files named in Tasks 3-5: add explicit transform coverage beside each owner rather than creating a parallel component test hierarchy.
 - Modify `docs/api-architecture-review.md`, `DEPENDENCIES.md`, `DESIGN.md`, and `PROGRESS.md`: keep the private inventory, dependency order, stable design, and audit evidence synchronized.
 
@@ -55,7 +55,6 @@
 **Interfaces:**
 - Consumes: `vercor.exceptions.CouplerError`, `jax.Array`, `jax.debug.callback`, and JAX array primitives.
 - Produces: `require_active_finite(values: Any, *, active_mask: Any | None, owner: str) -> None`.
-- Produces: `require_strictly_positive(values: Any, *, owner: str) -> None`.
 - Produces: `replace_missing_nan(values: Any, *, owner: str, fill_value: float = 0.0) -> jax.Array`.
 - Produces: `safe_masked_divide(numerator: Any, denominator: Any, *, where: Any, inactive_value: Any) -> jax.Array`.
 - Produces for tests: `assert_finite_jvp_vjp(objective: Callable[[Any], jax.Array], primal: Any, tangent: Any, *, rtol: float = 1e-6, atol: float = 1e-8) -> None`.
@@ -181,7 +180,7 @@ def test_safe_masked_divide_has_finite_jvp_and_vjp() -> None:
     )
 ```
 
-Also test that a mask whose shape is not a trailing suffix raises a contextual `CouplerError`, `require_strictly_positive` rejects zero/negative/non-finite values in eager and compiled execution, and `replace_missing_nan` replaces NaN but rejects both infinities.
+Also test that a mask whose shape is not a trailing suffix raises a contextual `CouplerError`, `replace_missing_nan` replaces NaN but rejects both infinities.
 
 - [ ] **Step 2: Run the focused tests and record the intended RED result**
 
@@ -259,14 +258,6 @@ def require_active_finite(
     invalid_count = jnp.count_nonzero(~valid)
     requirement = "finite values in the active domain and no infinity elsewhere"
     _require_zero(invalid_count, owner, requirement)
-
-
-def require_strictly_positive(values: Any, *, owner: str) -> None:
-    """Reject non-finite, zero, or negative numerical values."""
-
-    array = jnp.asarray(values)
-    invalid_count = jnp.count_nonzero(~jnp.isfinite(array) | (array <= 0))
-    _require_zero(invalid_count, owner, "strictly positive finite values")
 
 
 def replace_missing_nan(
@@ -664,21 +655,19 @@ git commit -m "fix: make masked regridding derivatives finite"
 **Files:**
 - Modify: `vercor/setups/_external/jax_gcm_fields.py`
 - Modify: `vercor/setups/_external/veros_state.py`
-- Modify: `vercor/setups/_external/camulator_fields.py`
 - Modify: `tests/test_slab_kernels.py`
 - Modify: `tests/test_data_component_kernels.py`
 - Modify: `tests/test_fluxes_utilities.py`
 - Modify: `tests/test_helpers_coverage.py`
 - Modify: `tests/test_tools_assets_and_regridding.py`
 - Modify: `tests/test_dtypes.py`
-- Modify: `tests/test_camulator_component_kernels.py`
 - Modify: `tests/test_external_components_coverage.py`
 - Modify: `tests/test_coupler_runtime.py`
 - Modify: `PROGRESS.md`
 
 **Interfaces:**
-- Consumes: Task 1 `replace_missing_nan`, `require_active_finite`, `require_strictly_positive`, and `assert_finite_jvp_vjp`.
-- Produces: the existing JCM, Veros, CAMulator, slab, data, flux, and vertical-coordinate interfaces with explicit finite transform evidence.
+- Consumes: Task 1 `replace_missing_nan`, `require_active_finite`, and `assert_finite_jvp_vjp`.
+- Produces: the existing JCM, Veros, slab, data, flux, and vertical-coordinate interfaces with explicit finite transform evidence.
 - Guarantees: broad adapter cleanup never converts infinity into a finite maximum value.
 
 - [ ] **Step 1: Extend slab and data kernel tests to explicit JVP/VJP coverage**
@@ -722,7 +711,7 @@ In `tests/test_helpers_coverage.py`, add a finite scalar JVP/VJP objective for `
 
 - [ ] **Step 3: Write RED tests proving adapter cleanup rejects infinity**
 
-Add parameterized tests beside the current JCM, Veros, and CAMulator cleanup tests:
+Add parameterized tests beside the current JCM and Veros cleanup tests:
 
 ```python
 @pytest.mark.parametrize("bad_value", [jnp.inf, -jnp.inf])
@@ -744,20 +733,6 @@ def test_veros_surface_forcing_rejects_infinity() -> None:
             True,
         )
 
-
-def test_camulator_surface_forcing_rejects_infinity_and_zero_variance() -> None:
-    with pytest.raises(CouplerError, match="CAMulator.*surface temperature.*infinity"):
-        prepare_camulator_surface_forcing(
-            jnp.asarray([[jnp.inf, 280.0]]),
-            jnp.asarray([[jnp.nan, jnp.nan]]),
-            jnp.zeros((1, 2)),
-        )
-    with pytest.raises(CouplerError, match="standard deviation.*strictly positive"):
-        prepare_camulator_surface_forcing(
-            jnp.full((2, 2), 280.0),
-            jnp.zeros((2, 2)),
-            jnp.zeros((2, 2)),
-        )
 ```
 
 Add compiled variants expecting `JaxRuntimeError` with the same owner fragments.
@@ -767,10 +742,10 @@ Add compiled variants expecting `JaxRuntimeError` with the same owner fragments.
 Run:
 
 ```bash
-/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/test_camulator_component_kernels.py tests/test_external_components_coverage.py -q -n0 --tb=short -k "rejects_infinity or zero_variance"
+/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/test_external_components_coverage.py -q -n0 --tb=short -k "rejects_infinity or zero_variance"
 ```
 
-Expected: infinity cases fail because `nan_to_num` converts infinity to finite extrema; the constant CAMulator case fails because it returns NaNs instead of raising contextually.
+Expected: infinity cases fail because `nan_to_num` converts infinity to finite extrema.
 
 - [ ] **Step 5: Replace broad cleanup with NaN-only replacement and guard normalization**
 
@@ -789,42 +764,31 @@ sea_surface_temperature_array = replace_missing_nan(
 
 In Veros `_prepare`, accept an `owner` argument and use `replace_missing_nan(field_jax, owner=owner)` before transpose/axis expansion. Supply `Veros taux surface forcing`, `Veros tauy surface forcing`, `Veros qnet surface forcing`, and `Veros qnec surface forcing` as labels.
 
-In CAMulator surface preparation, replace `nan_to_num` for `sst` and `skt` with `replace_missing_nan`. Compute `mean` and `standard_deviation` with ordinary `jnp.mean`/`jnp.std` after replacement, call:
-
-```python
-require_strictly_positive(
-    standard_deviation,
-    owner="CAMulator surface-temperature standard deviation",
-)
-```
-
-then divide. Validate both returned arrays with `require_active_finite(..., active_mask=None, ...)`. Do not add an epsilon or select an arbitrary normalized fallback.
-
 - [ ] **Step 6: Add explicit JVP/VJP coverage to optional adapters**
 
 Use `assert_finite_jvp_vjp` on valid, nonconstant representative inputs for:
 
 - JCM `cleanup_surface_temperature_fields`, `prepare_surface_temperature_forcing`, and a scalar objective over `map_jcm_output_fields`;
 - Veros `update_veros_interior`, `extract_surface_temperature`, and `prepare_surface_forcing_fields`;
-- CAMulator `prepare_camulator_surface_forcing`, `prepare_camulator_dynamic_forcing_chunk`, `prepare_camulator_sst_input`, and a scalar objective over `map_camulator_prediction_arrays`.
+
 
 In `tests/test_coupler_runtime.py::test_real_jax_gcm_runtime_seeds_and_advances_jcm_2_carry`, retain `value_and_grad` and add an explicit `jax.vjp(full_coupler_loss, coupled_surface_temperature)` pullback. Assert the returned cotangent is finite and agrees with the existing forward tangent under the scalar inner-product identity.
 
-Veros and CAMulator native host calls remain primal-only. Their existing runtime tests must additionally assert every returned runtime field is finite before host application.
+Veros native host calls remain primal-only. Their existing runtime tests must additionally assert every returned runtime field is finite before host application.
 
 - [ ] **Step 7: Run complete component and adapter GREEN tests**
 
 Run:
 
 ```bash
-/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/test_slab_kernels.py tests/test_data_component_kernels.py tests/test_fluxes_utilities.py tests/test_helpers_coverage.py tests/test_tools_assets_and_regridding.py tests/test_dtypes.py tests/test_camulator_component_kernels.py tests/test_external_components_coverage.py tests/test_coupler_runtime.py -q -n0 --tb=short
+/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/test_slab_kernels.py tests/test_data_component_kernels.py tests/test_fluxes_utilities.py tests/test_helpers_coverage.py tests/test_tools_assets_and_regridding.py tests/test_dtypes.py tests/test_external_components_coverage.py tests/test_coupler_runtime.py -q -n0 --tb=short
 ```
 
 Expected: every implemented bundled kernel has finite eager/JIT/JVP/VJP evidence where differentiable; host-only paths have finite primal evidence; infinity and zero-variance failures are contextual.
 
 - [ ] **Step 8: Record the bundled-component audit evidence**
 
-Update the active `PROGRESS.md` entry with the exact slab, data, geometry/mask, dtype, flux/vertical, JCM, Veros, and CAMulator focused counts. Record infinity-cleanup and zero-variance RED/GREEN results and distinguish real optional-model tests from fake-boundary tests.
+Update the active `PROGRESS.md` entry with the exact slab, data, geometry/mask, dtype, flux/vertical, JCM and Veros focused counts. Record infinity-cleanup and zero-variance RED/GREEN results and distinguish real optional-model tests from fake-boundary tests.
 
 - [ ] **Step 9: Run the required pre-commit regression gates**
 
@@ -841,7 +805,7 @@ Expected: fast/full suites and whitespace pass with only known third-party warni
 - [ ] **Step 10: Commit the bundled-component audit**
 
 ```bash
-git add vercor/setups/_external/jax_gcm_fields.py vercor/setups/_external/veros_state.py vercor/setups/_external/camulator_fields.py tests/test_slab_kernels.py tests/test_data_component_kernels.py tests/test_fluxes_utilities.py tests/test_helpers_coverage.py tests/test_tools_assets_and_regridding.py tests/test_dtypes.py tests/test_camulator_component_kernels.py tests/test_external_components_coverage.py tests/test_coupler_runtime.py PROGRESS.md
+git add vercor/setups/_external/jax_gcm_fields.py vercor/setups/_external/veros_state.py tests/test_slab_kernels.py tests/test_data_component_kernels.py tests/test_fluxes_utilities.py tests/test_helpers_coverage.py tests/test_tools_assets_and_regridding.py tests/test_dtypes.py tests/test_external_components_coverage.py tests/test_coupler_runtime.py PROGRESS.md
 git commit -m "fix: enforce finite bundled component numerics"
 ```
 
@@ -922,7 +886,7 @@ Add a concise invariant to `DESIGN.md` sections 1, 6, and 10:
   arithmetic so output-free JVP and VJP cannot inherit inactive-branch NaNs.
 ```
 
-Add a dated top entry to `PROGRESS.md` containing a compact matrix with rows for slab, data, flux/vertical, bilinear, conservative, exchange/runtime, JCM, Veros, CAMulator, and composed Coupler paths. Columns are `Primal/JIT`, `JVP`, `VJP`, `Inactive NaN`, and `Fail-fast`; use `pass`, `primal-only`, or `not applicable` based on actual test evidence. Record each first-source numerical repair and the exact final gate counts. Do not claim optional real-model coverage for a dependency or data path that was skipped.
+Add a dated top entry to `PROGRESS.md` containing a compact matrix with rows for slab, data, flux/vertical, bilinear, conservative, exchange/runtime, JCM, Veros, and composed Coupler paths. Columns are `Primal/JIT`, `JVP`, `VJP`, `Inactive NaN`, and `Fail-fast`; use `pass`, `primal-only`, or `not applicable` based on actual test evidence. Record each first-source numerical repair and the exact final gate counts. Do not claim optional real-model coverage for a dependency or data path that was skipped.
 
 - [ ] **Step 5: Run formatting and static verification**
 
@@ -943,7 +907,7 @@ Expected: Black exits zero, flake8 reports zero findings, mypy reports no issues
 Run:
 
 ```bash
-/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/test_numerical_safety.py tests/test_runtime_exchange.py tests/test_slab_kernels.py tests/test_data_component_kernels.py tests/test_fluxes_utilities.py tests/test_camulator_component_kernels.py tests/test_external_components_coverage.py tests/test_coupler_runtime.py tests/test_v0_4_workflow_execution.py -q -n0 --tb=short
+/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/test_numerical_safety.py tests/test_runtime_exchange.py tests/test_slab_kernels.py tests/test_data_component_kernels.py tests/test_fluxes_utilities.py tests/test_external_components_coverage.py tests/test_coupler_runtime.py tests/test_v0_4_workflow_execution.py -q -n0 --tb=short
 /Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/ -q --fast --tb=short
 /Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/ -q --tb=short
 /Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/ -q --cov=vercor --cov-branch --tb=short

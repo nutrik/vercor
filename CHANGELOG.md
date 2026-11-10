@@ -39,13 +39,11 @@ versioning; pre-releases may still refine new contracts.
   Use, for example, `vercor copy-setup jcm_with_veros` and import
   `vercor.setups.gallery.jcm_with_veros`.
 - Name bundled lowest-model-level meteorology with six explicit `air_*` keys.
-  Distinguish JCM's `air_pressure_3d` from CAMulator's
-  `model_level_air_pressure`, and name JCM's phase-only `t0` input
+  Name JCM's full-column pressure `air_pressure_3d` and its phase-only `t0` input
   `near_surface_air_temperature` without asserting a 2 m height.
 - Rename shared recipes by physical contract, the JCM-backed factory/config to
   `make_jcm_atmosphere` / `JCMAtmosphereConfig`, and Veros surface-forcing modes
-  to `bulk_meteorology` / `surface_fluxes`. Spell out public mask helpers and
-  identify CAMulator's combined surface-temperature packer. Former names have
+  to `bulk_meteorology` / `surface_fluxes`. Spell out public mask helpers. Former names have
   no compatibility aliases; units, signs, staggering and coverage are retained.
 - Derive gallery routes, execution order and topology roles from component
   names. Document the migration and physical contracts in
@@ -60,8 +58,6 @@ versioning; pre-releases may still refine new contracts.
   field precision in monthly interpolation and period output.
 - Write accepted list, tuple, and scalar provider coordinates through the shared
   host-array boundary before defining NetCDF dimensions.
-- Accept nanosecond CAMulator forcing times and reject missing records,
-  inconsistent native cadence, and unsupported calendars before native stepping.
 - Keep JCM evolving state exclusively in payloads and validate native save
   intervals before bootstrap or spinup.
 - Distinguish JCM bottom-level air variables from near-surface temperature and
@@ -203,7 +199,7 @@ versioning; pre-releases may still refine new contracts.
   coupling step.
 - Period-average filenames and timestamps preserve each averaging window's
   identity.
-- Veros and CAMulator runtime payloads are functionally owned and defensively
+- Veros runtime payloads are functionally owned and defensively
   copied.
 - Veros linear-solver caches remain valid for the lifetime of runtime payloads.
 - JAXGCM runtime calculations consistently apply the configured dtype.
@@ -215,12 +211,6 @@ versioning; pre-releases may still refine new contracts.
 - The 0.4 API does not include legacy compatibility adapters; use the current
   researcher and developer guides.
 - No legacy adapter namespace is included.
-
-### Known limitations
-
-- CAMulator still requires a separately installed compatible MILES-CREDIT
-  environment; an exact compatible release is not pinned.
-- CAMulator spinup remains unsupported.
 
 ## [0.4.0a1] - 2026-07-14
 
@@ -242,7 +232,7 @@ versioning; pre-releases may still refine new contracts.
 - Coupler assembly is constructor-only and prepared configuration is private.
 - `RunState` is opaque and exposes immutable field replacement.
 - Runtime precision is owned only by `RuntimeOptions.dtype`.
-- Bundled slab, JCM, Veros, and CAMulator factories use the 0.4 component and
+- Bundled slab, JCM, and Veros factories use the 0.4 component and
   output contracts.
 - Bundled slab and data factories accept per-component `OutputSpec` overrides;
   omission matches external configurations with no period policy.

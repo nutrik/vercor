@@ -60,7 +60,7 @@ clean tree. The final handoff and external validation receipt record delivery.
 ## Execution Notes
 
 - Baseline `conda run -n scipy pytest tests/ -q --fast` aborted all four
-  Python 3.14 native workers during Torch import before useful results.
+  Python 3.14 native workers during optional native dependency import before useful results.
 - Pre-flight: one task; no cross-task interface conflicts. User authorization
   fixes the checkout, branch and commit/push delivery method.
 

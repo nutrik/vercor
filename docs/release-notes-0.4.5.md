@@ -13,7 +13,7 @@ Earth-system workflows.
 - Added a no-NaN active-domain policy and neutralized masked undefined
   arithmetic while retaining NaN as an inactive missing-data sentinel.
 - Corrected setup gallery masks, dtype initialization, conservative ocean
-  cutoffs, NetCDF boolean output, and CAMulator composition coverage.
+  cutoffs and NetCDF boolean output.
 - Removed noisy per-step JAXGCM surface-temperature logging.
 
 ## Upgrade
@@ -31,9 +31,3 @@ stable extension modules.
 
 JCM setups require the pinned `dinosaur==1.3.6` and `jcm==2.0.1` optional
 dependencies supplied by `vercor[jcm]`.
-
-## Known limitations
-
-CAMulator requires a separately installed compatible MILES-CREDIT
-environment; an exact compatible release is not pinned. CAMulator spinup
-remains unsupported. No legacy compatibility adapter namespace is included.

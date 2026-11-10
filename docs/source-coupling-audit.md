@@ -9,27 +9,23 @@ Current final-source combined coverage, fresh artifacts and native gallery
 acceptance are recorded in the final-review I1 fix section below. Task 8/9
 receipt sections are historical pre-I1 source evidence and are superseded
 for current acceptance.
-Historical archives are unchanged.
+Historical measurements below describe their original source revisions.
+Command excerpts omit retired integration cases and are not new receipts.
 
-The source inventory remains 179 Python modules. There are 104 `test_*.py`
-modules after the new CAMulator initialization and component substitution
-suites. The inventory below covers every current source module, including
+The historical audit covered 179 Python modules and 104 `test_*.py` modules.
+The inventory below describes retained source owners, including
 CLI/gallery entry points and package initializers. The complete dependency
 layers and public/private manifests remain in `DEPENDENCIES.md`
 and `docs/api-architecture-review.md`.
 
 ## Approved decisions and costs
 
-The following four recorded rulings remain authoritative; they are copied
+The following retained recorded rulings remain authoritative; they are copied
 verbatim so the decision and cost survive removal of the temporary workspace.
 
 Ruling: Work in the existing requested feat/veris-seaice checkout — the user selected this branch and IDE workspace, the only tracked edits are this task's approved documentation, and the baseline is verified; creating another branch or force-sharing the checked-out branch would add avoidable coordination risk — cost if wrong: approved edits remain visible in the user's current checkout rather than a separate directory.
 
 Ruling: Treat artifact builds, strict Sphinx, combined coverage, and installed-package/gallery acceptance as the final Task 9 gate; retain focused, static, fast/full stock, and applicable AD gates before each implementation commit — the approved plan explicitly assigns comprehensive artifact acceptance to Task 9, while the specification verification paragraph describes it collectively before delivery; repeating artifact builds per small commit adds no distinct acceptance guarantee — cost if wrong: an intermediate local commit may reveal an artifact/documentation issue only in Task 9, and must be fixed before final completion.
-
-Ruling: Require an explicit gallery vapor-channel declaration validated against loaded native input and prediction layouts — the published available configuration declares Qtot only and no vapor-trained checkpoint/channel exists locally, so automatically selecting a vapor name would invent a physical capability — cost if wrong: gallery callers must supply a compatible checkpoint and its actual vapor channel rather than rely on an automatic selection.
-
-Ruling: Retain existing inference-only torch.jit.trace after all new bootstrap validation, while initial-field mapping makes no model/stepper calls — tracing invokes the native model on zeros but no prognostic state or cursor assignment is demonstrated; removing an existing inference optimization without native/performance evidence exceeds the proven correction — cost if wrong: a native model with hidden forward side effects may still need tracing changes; native CREDIT/performance validation is unavailable and this limit remains explicit.
 
 ## Final removal decisions
 
@@ -49,7 +45,6 @@ Ruling: Retain existing inference-only torch.jit.trace after all new bootstrap v
 | `flatten_exchange_fields` | Runtime contracts and tests | Existing `fields._flatten_field_items` owns flatten order. |
 | `tree_as_real_dtype`, `tree_unwrap_leading_dims`, `tree_stack` | Tests only | Production `tree_as_runtime_dtype` and `tree_mean`; category/complex precision and mean semantics preserved. |
 | `canonicalize_surface_field` | Tests only | Explicit time-last layout functions; static native land transpose at its owner. |
-| `initialize_camulator_runtime_fields` | Tests only | Component preparation owns stores; actual native decoded startup fields come from `SetupResult`. |
 | `prepare_veris_forcing` | Tests only | `prepare_veris_forcing_pack(...).native_forcing`; same forcing, conservation and AD assertions. |
 | JCM default-parameter convenience | Tests only | Native parameter attributes and production `change_jcm_parameter_values`. |
 | JCM prediction-output convenience | Tests only | Runtime provider/snapshot extraction from payload. The private extraction implementation remains necessary. |
@@ -80,8 +75,7 @@ adapter. There is no unresolved removal promised by this audit.
 | JCM optional vertical-layer/float0/struct accessors | Native provider/snapshot coordinate and variable extraction | Native coordinate alternatives and differentiation sentinel conversion; no mutable setup-state fallback. |
 | JCM epoch presence guard | `JAXGCMSetupState.setup` | Detect clock mismatch across setup reuse; not a default for guaranteed policy attributes. |
 | `_runtime_veris_constants` | Veris initialize/advance and parameter replacement | Reapply native dependent constants and coupler-owned freshwater density. |
-| CAMulator input/prediction converters and shared meteorology mapper | Bootstrap and runtime prediction | Distinct native inverse transforms and channel layouts, one traced pressure/height/density/thermodynamics owner. |
-| Native output-provider factories | JCM/Veros/Veris/CAMulator setup factories | Bind setup resources to providers that sample immutable runtime payloads; native snapshots remain separate from periodic means. |
+| Native output-provider factories | JCM/Veros/Veris setup factories | Bind setup resources to providers that sample immutable runtime payloads; native snapshots remain separate from periodic means. |
 | Output session initialization/schema helpers | Execution coordinator and provider sampling | Opt-in output lifetime, shape/dtype consistency and host transfer; no backend-owned I/O. |
 | `_host_arrays`, dtype allocation functions | Diagnostics/output and physical setup/kernels | Explicit host-transfer versus traced arrays, float32/float64 and int32 policy. |
 | Public regridding factories and private concrete classes | Exchange factories / runtime preparation | Public stable signatures; separate bilinear interpolation/vector and conservative integral behavior. |
@@ -109,15 +103,9 @@ coverage reconciliation remains limited to machine precision.
 
 Slab atmosphere sensible/latent heat now follows downward sign; ocean
 restoring damps SST anomalies; land moisture responds with the correct
-latent-flux sign before clipping. Coefficients were not retuned. CAMulator
-radiation divides accumulated energy by `3600 * lead_time_periods` once and
-adds surface emission once to signed net longwave. Startup decodes the latest
-native input frame and requires exact-time supplemental TS/FSNS/FLNS only
-for channels absent from that input, plus an explicit vapor channel in input
-and output layouts. `Qtot` is total water and
-is rejected as vapor. Existing inference tracing is retained after validation.
+latent-flux sign before clipping. Coefficients were not retuned.
 
-Prescribed ERA5/ERA-Interim oceans, ERA5 atmosphere/land and CAMulator land
+Prescribed ERA5/ERA-Interim oceans and ERA5 atmosphere/land
 export without fictitious feedback. Slab atmosphere reads SST, slab ocean
 reads two turbulent heat fluxes, and slab land reads latent heat. The data
 gallery explicitly declares and displays diagnostic imports. The substitution
@@ -176,7 +164,7 @@ Two tests were renamed/migrated; no behavioral test was simply deleted:
 | test_data_forcing_replays_into_jax_gcm_runtime_under_jit_grad_and_jvp | Removed redundant identity overwrite; JCM fields, finite evolution, replay, JVP/VJP checks retained. |
 | test_run_validates_regridders_and_fractional_masks | Missing regridder is still tested via locally corrupted immutable prepared topology; all missing/wrong fractional masks remain tested. |
 | test_runtime_store_finiteness_uses_route_mask_only_for_inbound_stores | Removed no-op topology replacement; stored received support, inactive NaN and outgoing finiteness assertions retained. |
-| test_component_models_coverage.py, test_camulator_component_kernels.py, test_dynamic_mask_exchanges.py | Only removed mandatory endpoint flag at real contract-builder call sites; all contract, mask and numerical assertions retained. |
+| test_component_models_coverage.py, test_dynamic_mask_exchanges.py | Only removed mandatory endpoint flag at real contract-builder call sites; all contract, mask and numerical assertions retained. |
 | tests/_runtime_helpers.py::run_scanned_coupler | Removed unused validate_state bypass; same canonical preparation plus selected JAX backend remains exercised. |
 
 The retained route/public API suites protect unknown endpoints, fan-in conflicts, per-route scalar/vector capabilities, policy masks, received versus current support, supplied-state schemas, lifecycle identity, and original author component identity in lifecycle callbacks. Topology contexts bind original author objects directly.
@@ -209,30 +197,10 @@ No tests were deleted and no unique assertion was removed.
 
 The additional runtime expectation was discovered by the focused gate and approved by the controller as necessary migration. Its assertion was retained. The first focused run had 123 passed and exactly this one expected old-algebra failure; XML: /private/tmp/vercor-task4-focused.xml.
 
-## Earlier assertion migrations: Task 5
-
-No tests or unique assertions were deleted.
-
-| Existing test | Migration | Surviving assertions |
-| --- | --- | --- |
-| test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions | Parameterized at exactly 3600,10800,21600 seconds; SW input/expectation changes from 8 W/m² to the specified 100 W/m²; LW stays -3 W/m² net | Jitted actual mapper, bottom-level U/V/T/humidity arrays, both radiation expectations, height/density/potential-temperature shapes and finiteness, independent hybrid-height comparison, original finite temperature JVP/VJP |
-| same mapper test | Local mapped_arrays helper permits independent perturbations without a second production path | Added analytic JVP/VJP and centered finite differences for SW energy, LW energy, TS and duration; expected gradients [4/t,4/t,4*sigma*sum(TS**3),-4*97/t] follow the literal four-cell radiation law |
-| test_camulator_runtime_step_is_reproducible_from_one_payload | Stand-in output accessor now supplies physical channel shapes/energies; mapper wrapper delegates to the actual mapper rather than returning a constant temperature; native3h/interval6h fixture is consistent | Both StepResults, cursor advance and unchanged original cursor, unchanged original native tensor, finite fields, reproducible prediction, dynamic-forcing shape/values, SST shape, JAX total TS, total TS and temperature9 arrays, captured prediction2, two output samples and [1,2] sample sequence |
-| same runtime test | Hybrid coefficients now have the actual interface/full-level counts needed by the real mapper | Added independent SW100 and downward LW sigma*280**4-3 assertions; no assertion was removed |
-
-## Earlier assertion migrations: Task 6
-
-- Deleted test_camulator_runtime_field_initializer_returns_jax_arrays: nonempty mapping, all-JAX leaves, total_surface_temperature/temperature_3d/specific_humidity_3d presence, native horizontal shape and exact initial temperature survive in test_native_bootstrap_maps_latest_input_without_advancing. The obsolete expected zero temperature is replaced with independent physical 280 K, not dropped. Generic runtime zero prefill remains owned by component/spec preparation and test_camulator_runtime_field_names_have_lightweight_contract_owner.
-- Deleted test_camulator_gcm_setup_returns_initial_runtime_payload: every original payload assertion (native model_state identity, forecast_hour=1, no output predictions/samples, start_ix=0, model_substeps=1, timestep_counter=0) survives in test_native_bootstrap_maps_latest_input_without_advancing, alongside physical export/time/inverse-method/trace/native-call assertions.
-- The remaining runtime reproducibility fixture now builds explicit test-owned zero storage instead of invoking the deleted production initializer; all its model-state, cursor, output-provider, radiation-duration and substep assertions remain. Its declared fake vapor channel is explicit and typed by actual TensorVariableIndex metadata.
-- Existing prediction sign/native-duration/IFS-height/gradient and all output/forcing/tensor-layout tests remain. No skips, timeouts or weakenings were introduced.
-
 ## Earlier declaration migrations: Task 7
 
 No test function was deleted. Data-driver/public-data-ocean declarations retain
-exchange assertions through explicit diagnostic specs. The CAMulator-land
-radiation case now rejects the unsupported route early; its cursor, type,
-temperature and repeated-step assertions survive. Removed slab fixture inputs
+exchange assertions through explicit diagnostic specs. Removed slab fixture inputs
 were physically unread; precision, shapes, real regridding, JIT/JVP/VJP,
 closed-form SST and required heat assertions remain. Wind rotation and store
 coverage remain in dynamic-mask, bulk substitution and native forcing suites.
@@ -265,7 +233,7 @@ JAX 0.11.2 upper-bound installer exception is unchanged.
 | 4 / `b38ce0b` | 6 independent slab physical-direction failures | Unit 29 + gallery 2; focus 124 / 1295 / 2222 | Fast 287.281 s; full 303.573 s; analytic restoring JVP/VJP/FD; Black/mypy 297, lint 0. |
 | 5 / `de0b582` | 3 duration/substep failures + 8 invalid durations | 83 / 1296 / 2232 | Fast 212.237 s; full 244.246 s; 1/3/6 h radiation, energy/TS/duration JVP/VJP/FD; Black/mypy 297, lint 0. |
 | 6 / `5b85691` | Startup 14, host errors 5, singleton 3, native timestamp 2 | 222 / 1328 / 2263 | Final fast 202.978 s; full 238.996 s; installed artifact/public boundaries; Black/mypy 298, lint 0. |
-| 7 / `dbd858f` | 4 declaration contracts + CAMulator land | 135 (includes 41 new cases) / 1369 / 2304 | Fast 337.860 s; full 356.055 s; exact-fork AD 15 in 676.436 s; Black/mypy 300, lint 0. |
+| 7 / `dbd858f` | 4 declaration contracts | 135 (includes 41 new cases) / 1369 / 2304 | Fast 337.860 s; full 356.055 s; exact-fork AD 15 in 676.436 s; Black/mypy 300, lint 0. |
 
 Exact stock gate command convention for these receipts:
 
@@ -342,11 +310,8 @@ historical `test_logs` snippets and is reported separately from maintained code.
 ## Scientific and execution limits
 
 The slab latent/moisture closures remain toy models, not a certified water
-inventory budget. Native CREDIT, compatible vapor-channel checkpoints and
-startup diagnostic data were unavailable; CAMulator evidence exercises actual
-adapter/conversion code with stand-ins and temporary NetCDF files, not native
-climate skill or inference performance. Supported native geometry, explicit
-species, forcing units and time alignment remain prerequisites. Host tracing,
+inventory budget. Supported native geometry, explicit species, forcing units
+and time alignment remain prerequisites. Host tracing,
 binary-transition derivatives, higher derivatives and long-term climate skill
 are not certified. Continuous-field JIT/JVP/VJP/finite differences, native
 versus wrapper rollouts, inactive NaN versus infinity, payload/solver ownership,
@@ -358,14 +323,13 @@ aliases, field registry or alternate runtime were introduced by consolidation.
 
 Every Python module is listed once by its package directory below. Files without
 an ordinary import caller are package roots, lazy exports or CLI-discovered
-gallery entry points, not evidence of dead code. The 164 non-gallery modules
-are explicitly listed in dependency layers; the 15 gallery modules form the
-application layer. Numerical/runtime mechanisms are covered by the removal
+gallery entry points, not evidence of dead code. The retained non-gallery modules are explicitly listed in dependency layers;
+the gallery modules form the application layer. Numerical/runtime mechanisms are covered by the removal
 and retention tables above. No additional production module is removed in Task 8.
 
 | Directory | Retained files | Responsibility / callers |
 | --- | --- | --- |
-| `vercor` (30) | `__init__.py`, `_field_names.py`, `_host_arrays.py`, `_numerical_safety.py`, `_pytree.py`, `_run_order.py`, `_setup_runner.py`, `assets.py`, `calendar.py`, `cli.py`, `clock.py`, `coupler.py`, `dtypes.py`, `exceptions.py`, `exchanges.py`, `field_layout.py`, `fields.py`, `forcing_data.py`, `forcing_index.py`, `grid_geometry.py`, `grid_masks.py`, `grids.py`, `jax_logging.py`, `physics.py`, `recipes.py`, `regridding.py`, `state.py`, `time_selection.py`, `topology.py`, `types.py` | Public owner facades, physical/static policies, canonical field/time/grid utilities and private transfer/CLI foundations; downstream runtime, setups and external users. |
+| `vercor` (31) | `__init__.py`, `_averaging.py`, `_field_names.py`, `_host_arrays.py`, `_numerical_safety.py`, `_pytree.py`, `_run_order.py`, `_setup_runner.py`, `assets.py`, `calendar.py`, `cli.py`, `clock.py`, `coupler.py`, `dtypes.py`, `exceptions.py`, `exchanges.py`, `field_layout.py`, `fields.py`, `forcing_data.py`, `forcing_index.py`, `grid_geometry.py`, `grid_masks.py`, `grids.py`, `jax_logging.py`, `physics.py`, `recipes.py`, `regridding.py`, `state.py`, `time_selection.py`, `topology.py`, `types.py` | Public owner facades, physical/static policies, canonical field/time/grid utilities and private transfer/CLI foundations; downstream runtime, setups and external users. |
 | `vercor/_interpolators` (6) | `__init__.py`, `_bilinear_extrapolation.py`, `_bilinear_geometry.py`, `_bilinear_weights.py`, `bilinear_rectilinear.py`, `conservative_remap_rectilinear.py` | Bilinear geometry/weights/extrapolation and conservative overlap integrals; concrete regridders. |
 | `vercor/_logging` (5) | `__init__.py`, `callback.py`, `config.py`, `host.py`, `protocols.py` | Host/callback logging and configuration; CLI/Coupler/runtime. |
 | `vercor/_regridders` (4) | `__init__.py`, `base.py`, `bilinear.py`, `conservative.py` | Concrete scalar/vector capabilities and shared dispatch; public regridding factories. |
@@ -373,13 +337,13 @@ and retention tables above. No additional production module is removed in Task 8
 | `vercor/components` (12) | `__init__.py`, `_adapter.py`, `_callable_wrappers.py`, `_contracts.py`, `_protocol.py`, `_runtime_fields.py`, `base.py`, `contexts.py`, `contracts.py`, `data.py`, `runtime_execution.py`, `setup_validation.py` | Public structural author contracts and sole private lifecycle/payload/step adapter; preparation and runtime execution. |
 | `vercor/diagnostics` (4) | `__init__.py`, `fields.py`, `plotting.py`, `tables.py` | Tables, fields and plots; explicit gallery diagnostic consumers. |
 | `vercor/fluxes` (4) | `__init__.py`, `bulk_formula_cesm.py`, `utilities.py`, `vertical_coordinates.py` | CESM bulk fluxes, vertical coordinates and numerically safe utilities; surface forcing and native conversion. |
-| `vercor/output` (6) | `__init__.py`, `_dataset.py`, `_netcdf.py`, `_period.py`, `_runtime.py`, `_session.py` | Public opt-in output contracts and private session/schema/accumulation/NetCDF owners; execution coordinator. |
+| `vercor/output` (8) | `__init__.py`, `_dataset.py`, `_netcdf.py`, `_period.py`, `_runtime.py`, `_scan.py`, `_selection.py`, `_session.py` | Public opt-in output contracts and private session/schema/accumulation/NetCDF owners; execution coordinator. |
 | `vercor/runtime` (1) | `__init__.py` | Public backend/workflow/context contracts; Coupler and external extensions. |
 | `vercor/setups` (8) | `__init__.py`, `_jcm.py`, `_lazy_imports.py`, `_output.py`, `_surface_fluxes.py`, `_time_helpers.py`, `_veris.py`, `config.py` | Lazy public factory table, frozen configuration, paired JCM/Veris construction and shared physical/output/time helpers; external users and galleries. |
 | `vercor/setups/_data` (10) | `__init__.py`, `_component_helpers.py`, `_field_helpers.py`, `assets.py`, `era5_atmosphere.py`, `era5_land.py`, `era5_ocean.py`, `erainterim_ocean.py`, `jcm_land.py`, `veros_ocean.py` | Prescribed forcing and explicit layouts/assets; public lazy factories and paired setups. |
-| `vercor/setups/_external` (40) | `__init__.py`, `_camulator_wind_filtering.py`, `_jax_gcm_pytree.py`, `camulator.py`, `camulator_contracts.py`, `camulator_fields.py`, `camulator_forcing.py`, `camulator_gcm_state.py`, `camulator_imports.py`, `camulator_init.py`, `camulator_land.py`, `camulator_output.py`, `camulator_runtime.py`, `camulator_runtime_settings.py`, `camulator_stepper.py`, `camulator_tensors.py`, `camulator_wind_filter.py`, `jax_gcm.py`, `jax_gcm_fields.py`, `jax_gcm_output.py`, `jax_gcm_runtime.py`, `jax_gcm_state.py`, `jax_gcm_surface.py`, `jax_gcm_tools.py`, `veris.py`, `veris_fluxes.py`, `veris_forcing.py`, `veris_output.py`, `veris_parameters.py`, `veris_runtime.py`, `veros_data.py`, `veros_fluxes.py`, `veros_gcm.py`, `veros_gcm_state.py`, `veros_output.py`, `veros_runtime.py`, `veros_runtime_settings.py`, `veros_setup.py`, `veros_setup_jax.py`, `veros_state.py` | Native model configuration, payload/forcing/step/output adapters; public lazy factories, paired setups and shared surface coupling. |
+| `vercor/setups/_external` (26) | `__init__.py`, `_jax_gcm_pytree.py`, `jax_gcm.py`, `jax_gcm_fields.py`, `jax_gcm_output.py`, `jax_gcm_runtime.py`, `jax_gcm_state.py`, `jax_gcm_surface.py`, `jax_gcm_tools.py`, `veris.py`, `veris_fluxes.py`, `veris_forcing.py`, `veris_output.py`, `veris_parameters.py`, `veris_runtime.py`, `veros_data.py`, `veros_fluxes.py`, `veros_gcm.py`, `veros_gcm_state.py`, `veros_host_state.py`, `veros_output.py`, `veros_runtime.py`, `veros_runtime_settings.py`, `veros_setup.py`, `veros_setup_jax.py`, `veros_state.py` | Native model configuration, payload/forcing/step/output adapters; public lazy factories, paired setups and shared surface coupling. |
 | `vercor/setups/_slab` (5) | `__init__.py`, `atmosphere.py`, `land.py`, `ocean.py`, `seaice.py` | Traced pedagogical kernels and structural factories; public lazy factories and galleries. |
-| `vercor/setups/gallery` (15) | `__init__.py`, `custom_component_wrapping.py`, `profile_runtime.py`, `camulator_with_veros.py`, `data_driver.py`, `jcm_with_era5data.py`, `jcm_with_slab.py`, `jcm_with_veros.py`, `jcm_with_verosdata.py`, `slab_driver.py`, `veris_calibration.py`, `veris_dataveros_era5.py`, `veris_veros_era5.py`, `veris_veros_jcm.py`, `veros_with_era5data.py` | CLI-discovered application layer: explicit physical/diagnostic routes, public factory examples and profiling/calibration entry points. |
+| `vercor/setups/gallery` (14) | `__init__.py`, `custom_component_wrapping.py`, `profile_runtime.py`, `data_driver.py`, `jcm_with_era5data.py`, `jcm_with_slab.py`, `jcm_with_veros.py`, `jcm_with_verosdata.py`, `slab_driver.py`, `veris_calibration.py`, `veris_dataveros_era5.py`, `veris_veros_era5.py`, `veris_veros_jcm.py`, `veros_with_era5data.py` | CLI-discovered application layer: explicit physical/diagnostic routes, public factory examples and profiling/calibration entry points. |
 
 ## Task 8 verification
 
@@ -544,10 +508,8 @@ at upstream `jcm/data/bc/interpolate.py:53` and `:105`; fork AD JAX scatter
 cast warnings when present; the existing gallery warning that skips the
 whole-grid ocean-mask conservation comparison for differing latitude bounds.
 This does not certify the skipped comparison. Independent conservative-route
-and support regressions remain separate. CREDIT/checkpoints/native tracing
-side effects and performance, host/binary-transition/higher derivatives,
+and support regressions remain separate. Host/binary-transition/higher derivatives,
 arbitrary unsupported geometry and long-term climate skill remain uncertified.
-CAMulator boundary stand-ins are never represented as native execution.
 
 Original requirement closure is explicit: (0) actual stock >=1.7.0 and unchanged
 fork pin/cache ownership; (1) complete 179-module inventory and retired/retained
@@ -630,32 +592,8 @@ this documentation-only local delivery state.
 
 ## Final review I1 fix and M1 evidence retention (2026-10-19)
 
-The final whole-branch review of `e1d417a..a20cb96` found one Important
-correctness issue: bootstrap required supplemental time before checking native
-TS/FSNS/FLNS availability. The existing bootstrap now determines missing native
-channels first. A complete native input accepts `initial_diagnostics=None`;
-a mixed input consumes only missing channels. Consumed supplemental values
-retain scalar exact-time, finite grid-shape validation before input decoding.
-The real accessor, latest input inverse, shared mapper, native energy duration,
-vapor checks, payload/cursor/noise ownership and retained inference trace are
-unchanged. No alternate initialization or weather approximation was added.
-
-The two successful-setup regressions use the real accessor and the existing
-fixture's SST forcing/lifecycle. They assert independent physical exports,
-latest-history decoding, original native tensor identity/content, no advance
-and zero prediction calls. Mixed input intentionally includes unusable unused
-TS/FSNS supplements, proving native precedence. Existing missing/wrong-time,
-shape, finite-value and vapor failures remain. On the reviewed base, the
-complete-native/None case failed with `initial diagnostics require time`, and
-the mixed case passed. Both pass with the minimal existing-owner fix.
-
-Test construction initially removed the fixture's SST forcing: selecting an
-empty xarray variable list dropped the cursor time index and raised KeyError
-before bootstrap. Preserving the authentic fixture forcing fixed the test
-construction; no unrelated cursor behavior changed. An initial focused command
-also named nonexistent `test_camulator_forcing.py`; the corrected focus uses
-the actual initialization, component-kernel and contract-boundary files. Both
-initial logs are retained rather than counted as successful RED/GREEN evidence.
+The historical final review of `e1d417a..a20cb96` identified and resolved one
+correctness issue before the final acceptance receipts below.
 
 The earlier Task9 receipt sections describe the superseded pre-I1 source.
 Their partial raw-data disappearance remains an unresolved historical limit;
@@ -717,20 +655,15 @@ suppression or exploratory nitpicky policy. Existing upstream JCM/xarray
 compat-default warnings and the skipped unequal-latitude whole-grid ocean-mask
 comparison remain visible in gallery logs. These do not certify future
 upstream defaults or the skipped global comparison; independent route
-conservation and supported-mask tests remain. Native CREDIT/checkpoint/vapor
-training, hidden tracing effects, host/binary-transition/higher derivatives,
+conservation and supported-mask tests remain. Host/binary-transition/higher derivatives,
 unsupported geometry, toy slab inventories, native-default Veris refinement
-and long-term climate/performance are still uncertified. This I1 correction
-certifies adapter boundaries only, not a native CAMulator run. All four
-previous rulings/costs and earlier removal/assertion maps remain intact.
+and long-term climate/performance are still uncertified. The retained
+previous rulings/costs and earlier removal/assertion maps remain above.
 
 Current final-source commands (all logs/XML use `vercor-finalfix-` prefixes):
 
 ```bash
 # python below is /private/tmp/vercor-time-ci/envs/scipy/bin/python
-python -m pytest tests/test_camulator_initialization.py -q -n0 -k uses_native_diagnostics --tb=short --basetemp=/private/tmp/vercor-finalfix-red-corrected --junitxml=/private/tmp/vercor-finalfix-red-corrected.xml
-python -m pytest tests/test_camulator_initialization.py tests/test_camulator_component_kernels.py -q -n0 --tb=short --basetemp=/private/tmp/vercor-finalfix-green-corrected --junitxml=/private/tmp/vercor-finalfix-green-corrected.xml
-python -m pytest tests/test_camulator_contract_boundaries.py -q -n0 --tb=short --basetemp=/private/tmp/vercor-finalfix-contracts --junitxml=/private/tmp/vercor-finalfix-contracts.xml
 COVERAGE_FILE=/private/tmp/vercor-finalfix.coverage.stock VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets python -m pytest tests/ -q -m 'not veros_autodiff' --cov=vercor --cov-branch --cov-report= --cov-fail-under=0 --tb=short --basetemp=/private/tmp/vercor-finalfix-full --junitxml=/private/tmp/vercor-finalfix-full.xml
 JAX_ENABLE_X64=true PYTHONPATH=/private/tmp/vercor-cleanup-ad.BvXQyJ COVERAGE_FILE=/private/tmp/vercor-finalfix.coverage.ad VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets python -m pytest tests/test_veros_autodiff_rollouts.py tests/test_veris_prognostic_autodiff.py tests/test_veris_veros_jcm_autodiff.py -q -n0 -m veros_autodiff --cov=vercor --cov-branch --cov-report= --cov-fail-under=0 --tb=short --basetemp=/private/tmp/vercor-finalfix-ad --junitxml=/private/tmp/vercor-finalfix-ad.xml
 VEROS_ASSET_DIR=/private/tmp/vercor-cleanup-assets python -m pytest tests/ -q --fast -m 'not veros_autodiff' --tb=short --basetemp=/private/tmp/vercor-finalfix-fast --junitxml=/private/tmp/vercor-finalfix-fast.xml

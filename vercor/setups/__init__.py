@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from vercor.setups.config import (
-    CAMulatorConfig,
     JCMAtmosphereConfig,
     JCMLandAtmosphereConfig,
     Spinup,
@@ -31,11 +30,6 @@ from vercor.setups._jcm import (
 )
 
 _LAZY_EXPORTS = {
-    "make_camulator_gcm": _LazyExport("_external.camulator", "make_camulator_gcm"),
-    "make_camulator_land": _LazyExport(
-        "_external.camulator_land",
-        "make_camulator_land",
-    ),
     "make_era5_atmosphere": _LazyExport(
         "_data.era5_atmosphere", "make_era5_atmosphere"
     ),
@@ -59,7 +53,6 @@ _LAZY_EXPORTS = {
 }
 
 __all__ = [
-    "CAMulatorConfig",
     "JCMAtmosphereConfig",
     "JCMLandAtmosphereConfig",
     "JCMLandAtmosphereSetup",

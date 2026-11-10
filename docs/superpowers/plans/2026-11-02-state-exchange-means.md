@@ -6,7 +6,7 @@
 
 **Architecture:** Keep sampling, mapping and temporal reduction in the existing native adapters. Canonical fields are diagnosed before averaging; immutable native payloads retain endpoint state. Generic dispatch, public protocols and prescribed-data selection retain their ownership.
 
-**Tech Stack:** Python 3.12, JAX, JCM 3, Veros stock/exact JAX fork, Veris, Torch adapter stand-ins, pytest, Black, flake8, mypy, Sphinx, gh.
+**Tech Stack:** Python 3.12, JAX, JCM 3, Veros stock/exact JAX fork, Veris, pytest, Black, flake8, mypy, Sphinx, gh.
 
 **Spec:** `docs/superpowers/specs/2026-11-02-state-exchange-means-design.md`
 
@@ -40,15 +40,6 @@
 - [x] Run JCM fast tests and record expected mean/endpoint failures.
 - [x] Implement compact sampling and mapped-state reduction; retain initialization and applied forcing echoes.
 - [x] Run focused JCM tests including actual native continuation/save cadence and differentiation.
-
-### Task 2: CAMulator mapped prediction means
-
-**Files:** `vercor/setups/_external/camulator_runtime.py`; `tests/test_camulator_temporal_fluxes.py`.
-
-**Interfaces:** `step_camulator_runtime(...) -> StepResult` reduces every key returned by the canonical mapper across `mapped_samples`. Native payload and prediction history remain endpoint/history values.
-
-- [x] Update endpoint expectations to analytic means for 1/2/3 windows, including pressure, wind, humidity and nonlinear derived quantities; preserve native output assertions.
-- [x] Run RED; reduce all mapped fields; run focused GREEN.
 
 ### Task 3: Veros surface means
 

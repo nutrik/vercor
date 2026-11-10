@@ -381,30 +381,6 @@ def test_missing_producer_field_fails_before_receiving_physics() -> None:
         ).run()
 
 
-def test_camulator_land_is_prescribed(monkeypatch: pytest.MonkeyPatch) -> None:
-    from vercor.setups._external import camulator_land
-
-    monkeypatch.setattr(
-        camulator_land,
-        "load_camulator_forcing_context",
-        lambda **_: {
-            "conf": {"data": {"lead_time_periods": 6}},
-            "forcing_dataset_raw": None,
-        },
-    )
-    monkeypatch.setattr(
-        camulator_land,
-        "create_land_mask_from_ocean",
-        lambda **_: (jnp.ones((2, 2)), jnp.ones((2, 2))),
-    )
-    assert (
-        camulator_land.make_camulator_land(
-            "unused", _grid("air"), _grid("ocean")
-        ).spec.inputs
-        == ()
-    )
-
-
 def test_host_producer_rejects_differentiable_backend() -> None:
     from vercor.exceptions import ComponentError
 

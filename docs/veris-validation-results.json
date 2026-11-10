@@ -116,22 +116,7 @@
     "vercor/setups/_data/jcm_land.py": "9aac306ed1a4e3d1847fb7231c1f293a9a9cc3af82a69f286ef7d616422c3841",
     "vercor/setups/_data/veros_ocean.py": "364d244da7aa1d4a4d71065a5794143431c6b11b7bb8bfdb1a88d280ef014e37",
     "vercor/setups/_external/__init__.py": "5e66907071a4bd96aa21cc113f6f2bf65152af294734f2471da1637f06d142a4",
-    "vercor/setups/_external/_camulator_wind_filtering.py": "8ceb4f8403a975eddfb306e0bbf6612174972aac9003aec12cad4fd67ee57738",
     "vercor/setups/_external/_jax_gcm_pytree.py": "6754bf76350297b91a81be2cf9fffeb3d8b272437510c72000c89a45873439ca",
-    "vercor/setups/_external/camulator.py": "01907e7daf0f5de71f357388062093704ac164e84b16727f7d2b4c7481744154",
-    "vercor/setups/_external/camulator_contracts.py": "a8b1dd91db27598cbdf8c4db75334314434f2d08236dbe111616e60b0842acee",
-    "vercor/setups/_external/camulator_fields.py": "599509816abef21d1966701a0eb64ab8a3899ceaea565a5681c27e989b38127b",
-    "vercor/setups/_external/camulator_forcing.py": "586153bb08864043a367dea08fccc6983f27cdea5600c407e0d204f83bfdaba9",
-    "vercor/setups/_external/camulator_gcm_state.py": "09a9c7b2361a28e00c42072d2040dbe7778cd89c26e097ea5469b0467901b566",
-    "vercor/setups/_external/camulator_imports.py": "a51a4bf56878d3707b1f3b72b0338c91ae72a92c9a6338e4f4ecdf038a75ef11",
-    "vercor/setups/_external/camulator_init.py": "2a059308a9a59c26375357f93184a2ec38231c8b164e1c0ae20b82cb89142c1b",
-    "vercor/setups/_external/camulator_land.py": "f77e2d989ee2d2188e3c5e8d9f5e387c1a9bae78f3d81d6f3d9424ecb189de9c",
-    "vercor/setups/_external/camulator_output.py": "9d156d7fe5e3758c4ffbfdb3300948544348983db0a317a4c36a53be646f23cb",
-    "vercor/setups/_external/camulator_runtime.py": "38350a05d3e6b3d9c7c0b8adb049cebaf585a078639e70b4c485ed90338e20af",
-    "vercor/setups/_external/camulator_runtime_settings.py": "70d521ec0fd42e44404a5bcc6c4cd1346a04d5e3803870c5d33f56228d825565",
-    "vercor/setups/_external/camulator_stepper.py": "f515d58cfd4dac63539842b6cd69306df255b5c516fbf18c1376ffcef1c014ee",
-    "vercor/setups/_external/camulator_tensors.py": "ee4704a00965f2f9b6093d5b56b1dd549efecf5aad6c5d1c763dc63f043fe3c9",
-    "vercor/setups/_external/camulator_wind_filter.py": "0f9f575ac7249f33f2c6f89d3ce0ecd6cf2b849803370df6bd6fd956c7a809eb",
     "vercor/setups/_external/jax_gcm.py": "6f5bea754b57af7cff5ac61d9e601b917344d7095f044179b473f0a04de5309c",
     "vercor/setups/_external/jax_gcm_fields.py": "655936c5dbed60e413d14a02096222588704acc70960e2fdd8e2ca66857a16eb",
     "vercor/setups/_external/jax_gcm_output.py": "3b07b2a5967f7f151c69d7d00cc6ac9bf07eb5831f1eebdf76b1ee2f5168303b",
@@ -169,7 +154,6 @@
     "vercor/setups/gallery/__init__.py": "69655e0f2b4b39975c1f382937e645796885f3d0ed54e1d24c599504ecb55b67",
     "vercor/setups/gallery/custom_component_wrapping.py": "9b3729facfc7971290a9626e7c3fad8dc5c874cc62a09725855ae4a02c9f502b",
     "vercor/setups/gallery/profile_runtime.py": "b4c653db5bc37c58867f78cb09a6db6194914f63c73f8a6ec05a3b1a5ffbeb26",
-    "vercor/setups/gallery/run_camulator_with_veros.py": "6b56f96cfcf607727897f4add219fd71ca8a3420f04889a9ead8025b0941ea91",
     "vercor/setups/gallery/run_data_driver.py": "b511856dda128df967b12bfbe20f3ea9550473565d4ac0e477860aaaaf95591e",
     "vercor/setups/gallery/run_jcm_with_era5data.py": "e1d46ae96a84b9f2352083c82c65f35b07289694b6b664a3ef04ca656ce6b866",
     "vercor/setups/gallery/run_jcm_with_slab.py": "f73e1ebbbe2acadc40ff57a1b40416d921729f81efde6042a9f1ce6788b29139",
@@ -1799,5 +1783,6 @@
     "scipy": "1.17.1",
     "veros": "1.6.2",
     "veros_autodiff_commit": "7a8c964cf00b5aa0713c995edd760643a431b3c9"
-  }
+  },
+  "source_hash_scope_note": "Historical source revision and measured results are unchanged. Hashes for files belonging to a retired integration have been omitted; this map is a retained-file subset of the original snapshot."
 }

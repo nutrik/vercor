@@ -66,7 +66,7 @@ The deck contains 14 slides and targets approximately 22 minutes, leaving
 9. **JAX-native and host-side models can coexist—with clear trade-offs** — show
    capability boundaries for compiled differentiable and host execution.
 10. **VerCOR already includes useful building blocks** — present slab models,
-    forcing data, JCM, Veros, and CAMulator as examples, with optional
+    forcing data, JCM and Veros as examples, with optional
     dependency and current-compatibility caveats.
 11. **Wrapping a model requires four explicit contracts** — identity/grid,
     field specification, explicit state/payload, and a functional step.
@@ -146,8 +146,7 @@ claim or externally sourced asset will contain a `[Sources]` block in speaker
 notes.
 
 The deck will distinguish the currently published `0.4.3` interface from
-development-only setup-gallery functionality and will not imply that CAMulator
-compatibility is fully pinned.
+development-only setup-gallery functionality.
 
 ## Quality and acceptance criteria
 

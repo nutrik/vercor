@@ -88,13 +88,10 @@ def test_setup_implementation_modules_are_private_after_boundary_redesign() -> N
     import vercor.setups as setup_facade
 
     public_factory_names = {
-        "CAMulatorConfig",
         "JCMAtmosphereConfig",
         "JCMLandAtmosphereConfig",
         "JCMLandAtmosphereSetup",
         "load_jcm_inputs",
-        "make_camulator_gcm",
-        "make_camulator_land",
         "make_era5_atmosphere",
         "make_era5_land",
         "make_era5_ocean",
@@ -709,15 +706,11 @@ def test_shallow_setup_regridding_grid_and_exchange_imports() -> None:
 @pytest.mark.fast_always
 def test_model_setup_factories_use_the_public_setup_owner() -> None:
     from vercor.setups._data.jcm_land import make_jcm_land
-    from vercor.setups._external.camulator import make_camulator_gcm
-    from vercor.setups._external.camulator_land import make_camulator_land
     from vercor.setups._external.jax_gcm import make_jcm_atmosphere
     from vercor.setups._external.veros_gcm import make_veros_gcm
     from vercor.setups._jcm import make_jcm_land_atmosphere
 
     expected_factories = {
-        "make_camulator_gcm": make_camulator_gcm,
-        "make_camulator_land": make_camulator_land,
         "make_jcm_atmosphere": make_jcm_atmosphere,
         "make_jcm_land": make_jcm_land,
         "make_jcm_land_atmosphere": make_jcm_land_atmosphere,
@@ -1049,8 +1042,6 @@ def test_private_setup_state_objects_do_not_borrow_component_methods() -> None:
     for path in (
         Path("vercor/setups/_external/jax_gcm.py"),
         Path("vercor/setups/_external/veros_gcm.py"),
-        Path("vercor/setups/_external/camulator.py"),
-        Path("vercor/setups/_external/camulator_land.py"),
     ):
         source = path.read_text(encoding="utf-8")
         for marker in forbidden_markers:
@@ -1187,7 +1178,6 @@ def test_setup_helper_and_external_output_ownership_boundaries() -> None:
         for path in (
             "vercor/setups/_external/jax_gcm_output.py",
             "vercor/setups/_external/veros_output.py",
-            "vercor/setups/_external/camulator_output.py",
         )
     )
 
@@ -1242,11 +1232,6 @@ def test_external_runtime_helpers_use_concrete_setup_state_annotations() -> None
         "vercor/setups/_external/veros_runtime.py": (
             "VerosGCMSetupState",
             "vercor.setups._external.veros_gcm_state",
-            "resources",
-        ),
-        "vercor/setups/_external/camulator_runtime.py": (
-            "CAMulatorGCMSetupState",
-            "vercor.setups._external.camulator_gcm_state",
             "resources",
         ),
     }
@@ -1356,7 +1341,6 @@ def test_common_exchange_recipes_are_centralized_for_examples() -> None:
         Path("vercor/setups/gallery/jcm_with_verosdata.py"),
         Path("vercor/setups/gallery/jcm_with_era5data.py"),
         Path("vercor/setups/gallery/jcm_with_slab.py"),
-        Path("vercor/setups/gallery/camulator_with_veros.py"),
         Path("vercor/setups/gallery/data_driver.py"),
         Path("vercor/setups/gallery/veros_with_era5data.py"),
         Path("vercor/setups/gallery/profile_runtime.py"),
@@ -1421,85 +1405,6 @@ def test_veros_factory_binds_current_runtime_step_and_setup() -> None:
         encoding="utf-8"
     )
     assert "resources._veros_state" not in runtime_source
-
-
-@pytest.mark.fast_always
-def test_camulator_adapters_share_runtime_cursor_state_transition_helper() -> None:
-    for path in (Path("vercor/setups/_external/camulator_gcm_state.py"),):
-        source = path.read_text(encoding="utf-8")
-        assert "CamulatorRuntimeCursor" in source, path
-        assert "runtime_forcing_index(" not in source, path
-        assert "timestep_counter += 1" not in source, path
-
-    for path in (
-        Path("vercor/setups/_external/camulator.py"),
-        Path("vercor/setups/_external/camulator_land.py"),
-    ):
-        source = path.read_text(encoding="utf-8")
-        assert "runtime_forcing_index(" not in source, path
-        assert "timestep_counter += 1" not in source, path
-
-
-@pytest.mark.fast_always
-def test_camulator_gcm_factory_passes_runtime_step_directly() -> None:
-    gcm_source = Path("vercor/setups/_external/camulator.py").read_text(
-        encoding="utf-8"
-    )
-    state_source = Path("vercor/setups/_external/camulator_gcm_state.py").read_text(
-        encoding="utf-8"
-    )
-    tree = ast.parse(state_source)
-    setup_state_class = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "CAMulatorGCMSetupState"
-    )
-
-    assert "step" not in {
-        node.name
-        for node in setup_state_class.body
-        if isinstance(node, ast.FunctionDef)
-    }
-    assert "from functools import partial" in gcm_source
-    assert (
-        "import vercor.setups._external.camulator_runtime as _camulator_runtime"
-        in gcm_source
-    )
-    step_bindings = [
-        node
-        for node in ast.walk(ast.parse(gcm_source))
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "partial"
-        and node.args
-        and isinstance(node.args[0], ast.Attribute)
-        and node.args[0].attr == "step_camulator_runtime"
-    ]
-    assert len(step_bindings) == 1
-    assert isinstance(step_bindings[0].args[1], ast.Name)
-    assert step_bindings[0].args[1].id == "resources"
-    assert {keyword.arg for keyword in step_bindings[0].keywords} == {
-        "sample_native_output"
-    }
-    assert "LifecycleHooks(setup=resources.setup)" in gcm_source
-    setup_attributes = {
-        target.attr
-        for node in ast.walk(setup_state_class)
-        if isinstance(node, (ast.Assign, ast.AnnAssign))
-        for target in (node.targets if isinstance(node, ast.Assign) else (node.target,))
-        if isinstance(target, ast.Attribute)
-        and isinstance(target.value, ast.Name)
-        and target.value.id == "self"
-    }
-    assert setup_attributes.isdisjoint(
-        {
-            "state",
-            "runtime_cursor",
-            "_output_prediction",
-            "_output_prediction_samples",
-            "forecast_hour",
-        }
-    )
 
 
 @pytest.mark.fast_always
@@ -1601,10 +1506,8 @@ def test_jcm_galleries_enable_dtype_before_native_model_construction(
 @pytest.mark.fast_always
 def test_data_and_callable_factories_return_core_contract_instances() -> None:
     from vercor.setups._data.era5_land import make_era5_land
-    from vercor.setups._external.camulator import make_camulator_gcm
 
     assert callable(make_era5_land)
-    assert callable(make_camulator_gcm)
     grid = make_test_grid(name="component-protocol-instances")
     assert isinstance(DataComponent("DATA", grid), Component)
     assert isinstance(CallableComponent("CALLABLE", grid, lambda fields: {}), Component)
@@ -1629,7 +1532,7 @@ def test_unrelated_setup_imports_do_not_initialize_optional_adapters(
         "import sys\n"
         f"statement = {import_statement!r}\n"
         "exec(statement)\n"
-        "heavy = {'torch', 'jcm', 'dinosaur', 'veros'} & set(sys.modules)\n"
+        "heavy = {'jcm', 'dinosaur', 'veros'} & set(sys.modules)\n"
         "assert not heavy, sorted(heavy)\n"
     )
 
@@ -1642,9 +1545,6 @@ def test_unrelated_setup_imports_do_not_initialize_optional_adapters(
     )
     output = completed.stdout + completed.stderr
     forbidden_markers = (
-        "CREDIT modules not fully available",
-        "credit.postblock not available",
-        "Credit module not found",
         "Importing core modules",
         "Using computational backend",
         "Runtime settings are now locked",

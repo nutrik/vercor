@@ -35,9 +35,3 @@ the documented stable extension modules.
 JCM setups use the pinned optional dependencies supplied by `vercor[jcm]`.
 The differentiable Veros lane requires the supported JAX-capable fork;
 ordinary `vercor[veros]` installations continue to use stock host execution.
-
-## Known limitations
-
-CAMulator requires a separately installed compatible MILES-CREDIT
-environment; an exact compatible release is not pinned. CAMulator spinup
-remains unsupported.

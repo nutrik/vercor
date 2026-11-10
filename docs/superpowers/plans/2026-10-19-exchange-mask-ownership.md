@@ -94,7 +94,7 @@ and binary restrictions; runtime context supplies component masks and geometry.
 **Files:** `vercor/components/contracts.py`,
 `vercor/_runtime/field_transfer.py`, `vercor/output/_session.py`,
 `vercor/setups/_data/jcm_land.py`,
-`vercor/setups/_external/camulator_land.py`, `vercor/setups/_jcm.py`,
+`vercor/setups/_jcm.py`,
 existing component, output, lifecycle and JCM surface tests.
 
 **Interfaces:** Extend `select_runtime_field` with explicit field-name/mask
@@ -106,28 +106,25 @@ fractional coverage field through existing ComponentMaskSpec.
   priming, sends and output; reject record-shaped masks.
 - [x] Remove the blanket current-only transfer restriction and pass declared
   mask metadata through the two selector call sites, retaining mask validation.
-- [x] Retain computed JCM/CAMulator land fractions; reuse land-owned coverage
+- [x] Retain computed JCM land fractions; reuse land-owned coverage
   for JCM terrain in both modes. Avoid separately recomputing its fraction.
 - [x] Run component-mask, time-selection, output and land-factory tests.
 
 ## Task 4: Migrate native consumers and all bundled declarations
 
-**Files:** `vercor/setups/_external/{jax_gcm_fields,jax_gcm_runtime,jax_gcm,
-camulator_fields}.py`, `vercor/setups/gallery/*.py`, `vercor/recipes.py`,
+**Files:** `vercor/setups/_external/{jax_gcm_fields,jax_gcm_runtime,jax_gcm}.py`, `vercor/setups/gallery/*.py`, `vercor/recipes.py`,
 examples and external extension fixture, affected setup/gallery tests.
 
 **Interfaces:** Ordinary JCM gets independent intensive native land temperature,
-SST and moisture. JCM3 has no published land-specific turbulent channels; remove unused prescribed-land flux routes. CAMulator receives remapped
-source-area temperature contributions. Existing coupled JCM marine products
+SST and moisture. JCM3 has no published land-specific turbulent channels; remove unused prescribed-land flux routes. Existing coupled JCM marine products
 and total Veris feedback retain their audited binary/component conventions.
 
 - [x] Add RED fractional-coast tests for ordinary JCM native forcing channels,
-  total-temperature diagnostics and soil feedback; add CAMulator source-product
-  remapping tests and executable route-semantic contracts.
+  total-temperature diagnostics, soil feedback and executable route-semantic
+  contracts.
 - [x] Update ordinary JCM fields/native forcing and remove unavailable land feedback channels;
   remove the old intensive-temperature sum path.
-- [x] Migrate CAMulator contribution routes/consumer without changing its
-  established ML-mask branch. Use conservative scalar area contributions.
+
 - [x] Audit and declare every gallery/example/fixture field's quantity; split
   mixed-semantics routes. Keep local flux densities intensive and preweighted
   total ocean feedback source_flux with binary coverage. No bundled consumer

@@ -116,7 +116,10 @@ Reproduction
 Download :download:`the benchmark <exchange-profiling-benchmark.py.txt>` and
 :download:`the trace analyzer <exchange-profiling-analysis.py.txt>` as
 ``benchmark.py`` and ``analyze.py`` into ``/private/tmp/vercor-exchange-profile``.
-The benchmark records versions and hashes of every production Python source.
+The benchmark originally recorded versions and hashes of every production
+Python source. The retained results preserve the original revisions and
+numerical measurements; their source-hash maps omit files from a retired
+integration and therefore describe subsets of the original snapshots.
 The baseline imports a separate ``git archive abc4494`` source tree. Use the
 same reviewed dependency environment for both processes; the local commands are::
 

@@ -67,17 +67,6 @@ def assign_model_timestep_alignment(
     return alignment
 
 
-def runtime_forcing_index(
-    *,
-    start_ix: int,
-    timestep_counter: int,
-    model_substeps: int,
-) -> int:
-    """Return the forcing index for a setup adapter's current coupling step."""
-
-    return int(start_ix) + int(timestep_counter) * int(model_substeps)
-
-
 def run_logged_spinup(
     *,
     steps: int,

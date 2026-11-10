@@ -15,7 +15,7 @@ retained native adapters and assertion migrations are recorded in
 - Represent runtime state as immutable registered PyTrees.
 - Make component, route, workflow, backend, topology, and output ownership
   unambiguous.
-- Keep optional JCM, Veros, and CAMulator frameworks lazy.
+- Keep optional JCM, Veros, and Veris frameworks lazy.
 - Validate author and backend boundaries before corrupt state reaches a physics
   step.
 - Keep public contracts small while allowing third-party structural plugins.
@@ -40,7 +40,7 @@ retained native adapters and assertion migrations are recorded in
 
 The stable release does not provide registries, entry-point discovery, Pydantic
 models, fan-in reducers, a public prepared graph, fractional subcycling,
-restart files, or a CAMulator dependency pin. Ambiguous target-field fan-in is
+or restart files. Ambiguous target-field fan-in is
 rejected.
 
 ## 2. Public boundary
@@ -91,8 +91,7 @@ cadence. Its native step returns endpoint state, eight horizontal flux histories
 normalized surface pressure and four bottom-level dynamics histories. With the
 default wrapper JIT enabled, host/mixed paths avoid materializing unused full
 diagnostic histories; disabling wrapper JIT can retain those native temporaries.
-CAMulator averages every native prediction's mapped meteorology and decoded
-radiation rates. Veros accumulates canonical native surfaces; Veris accumulates
+Veros accumulates canonical native surfaces; Veris accumulates
 ice fraction, temperature and diagnosed albedo alongside its mean fluxes.
 Prescribed records retain their existing time selection, and slab components
 use one coupling-sized step. Plugin authors own internal native sampling.
@@ -219,7 +218,7 @@ numerical kernels neutralize inactive operands before nonlinear arithmetic so
 output-free JVP and VJP cannot inherit inactive-branch NaNs.
 State validation completes schema, topology, and central route/component field
 finiteness checks before invoking component-author lifecycle validation.
-JCM, Veris, and CAMulator validate their owned numeric payload/native leaves
+JCM and Veris validate their owned numeric payload/native leaves
 at native transition boundaries while preserving each adapter's established
 JAX-transform or host-only differentiation boundary. Veros currently relies on
 central exported-field validation; hidden deep native-state validation needs
@@ -298,11 +297,9 @@ named and implicit axes receive index coordinates.
 nonnegative integer counts. The session merges these directly with ordinary
 samples and computes means only at completed write boundaries. The run-specific
 static `StepContext.output_variables` request is None when period output is off
-and an empty tuple when all variables are requested. CAMulator uses it to reduce
-selected native prediction output immediately while mandatory exchange mapping
-still diagnoses every native endpoint before averaging. The payload retains an
-endpoint prediction and fixed-size sums/counts, with no prediction history. `PeriodOutput.variables` uses identical empty/subset/unknown behavior
-for runtime, JCM, Veros, CAMulator, and third-party providers.
+and an empty tuple when all variables are requested. `PeriodOutput.variables`
+uses identical empty/subset/unknown behavior for runtime, JCM, Veros, Veris,
+and third-party providers.
 Bundled slab and data factories default to `OutputSpec()` with no period
 policy, matching bundled external configuration defaults. They accept a
 complete keyword-only `OutputSpec`, allowing cadence, variable selection,
@@ -365,13 +362,13 @@ absolute-step, and schema discriminators where needed.
 
 Enabled output rejects traced runtime leaves before provider or writer calls.
 Execution backends and model steps never receive an output session and never
-choose cadence or paths. JCM, Veros, and CAMulator retain only native state
+choose cadence or paths. JCM, Veros, and Veris retain only native state
 needed for sampling and final snapshots.
 
 ## 9. Bundled setups and plugins
 
 `vercor.setups` is the sole public lazy export table. Attribute access loads a
-lightweight factory; JCM/Dinosaur, Veros, CREDIT, Torch, TensorFlow, and runtime
+lightweight factory; JCM/Dinosaur, Veros, Veris, and runtime
 configuration are deferred until invocation. Missing optional dependencies
 produce factory-oriented errors without affecting core import.
 
@@ -403,13 +400,9 @@ and an integer is the process status. CLI choices are lowercase ``trace``,
 those choices to the Coupler log level and ``DTypePolicy``/``RuntimeOptions``
 dtype policy.
 
-Bundled slab, data, JCM, Veros, Veris, and CAMulator factories return the same
+Bundled slab, data, JCM, Veros, and Veris factories return the same
 structural components used by external plugins. JCM/Veros spinup is
-controlled only by `Spinup.enabled`. CAMulator enabled spinup is rejected
-because it is not implemented. CAMulator forcing alignment is explicitly
-`strict` or `forcing_start`; both policies require a standard-library
-`datetime` clock because no-leap and 360-day CAMulator conversion is not
-implemented.
+controlled only by `Spinup.enabled`.
 
 Standalone Veris uses native `initialize_experiment` and pure `advance` with
 immutable state/diagnostics and traced physical constants in the component
@@ -471,8 +464,7 @@ Bottom sigma-center temperature, humidity, winds, density, and potential
 temperature use `air_temperature`, `air_specific_humidity`, `air_u_velocity`,
 `air_v_velocity`, `air_density` and `air_potential_temperature`, with their common
 `model_level_height`; only the phase diagnosis uses t0. JCM's `air_pressure_3d`
-retains `(sigma_level, latitude, longitude)` pressure in Pa; CAMulator's
-`model_level_air_pressure` is the horizontal lowest-level pressure in Pa.
+retains `(sigma_level, latitude, longitude)` pressure in Pa.
 VerCOR computes the rigid-lid virtual salt flux on the ocean grid as
 `-S_ref * (rain + snow - E) / rho_fw`, with upward-positive evaporation `E`
 from the existing bulk calculation. `PhysicalConstants` owns traced
@@ -522,7 +514,7 @@ altitude above ground. The adapter anchors the pressure ratio at the surface
 and uses the lowest model-level virtual temperature for the unresolved
 surface-to-center layer.
 
-ERA5 and CAMulator instead use the distinct ECMWF hybrid-sigma coordinate.
+ERA5 instead uses the distinct ECMWF hybrid-sigma coordinate.
 Interface pressure is `A + B * ps`; temperature, specific humidity, and
 interfaces enter the height kernel top-to-bottom. The kernel follows the IFS
 half-level hydrostatic discretization, integrates upward from zero surface

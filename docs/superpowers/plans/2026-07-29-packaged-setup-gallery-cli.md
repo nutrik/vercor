@@ -27,7 +27,6 @@
 - Move: `examples/__init__.py` → `vercor/setups/gallery/__init__.py`
 - Move: `examples/custom_component_wrapping.py` → `vercor/setups/gallery/custom_component_wrapping.py`
 - Move: `examples/profile_runtime.py` → `vercor/setups/gallery/profile_runtime.py`
-- Move: `examples/run_camulator_with_veros.py` → `vercor/setups/gallery/run_camulator_with_veros.py`
 - Move: `examples/run_data_driver.py` → `vercor/setups/gallery/run_data_driver.py`
 - Move: `examples/run_jcm_with_era5data.py` → `vercor/setups/gallery/run_jcm_with_era5data.py`
 - Move: `examples/run_jcm_with_slab.py` → `vercor/setups/gallery/run_jcm_with_slab.py`
@@ -569,7 +568,6 @@ define the ten public script names as literal expected inventory and assert:
 gallery_names = {
     "vercor/setups/gallery/custom_component_wrapping.py",
     "vercor/setups/gallery/profile_runtime.py",
-    "vercor/setups/gallery/run_camulator_with_veros.py",
     "vercor/setups/gallery/run_data_driver.py",
     "vercor/setups/gallery/run_jcm_with_era5data.py",
     "vercor/setups/gallery/run_jcm_with_slab.py",

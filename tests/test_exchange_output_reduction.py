@@ -139,21 +139,3 @@ def test_exchange_samples_and_output_variables_are_independent(
                 assert ("diagnostic" in dataset.variables) == (
                     not selection or "diagnostic" in selection
                 )
-
-
-def test_camulator_output_requests_do_not_change_any_exchange_field() -> None:
-    from dataclasses import replace
-    from tests.test_camulator_temporal_fluxes import _native_window_case
-    from vercor.setups._external.camulator_runtime import step_camulator_runtime
-
-    resources, fields, context, payload = _native_window_case(3, 3600)
-    baseline = step_camulator_runtime(resources, fields, context, payload)
-    for selection in ((), ("TS",), ("sea_surface_temperature",)):
-        result = step_camulator_runtime(
-            resources, fields, replace(context, output_variables=selection), payload
-        )
-        assert tuple(result.fields) == tuple(baseline.fields)
-        for name, value in result.fields.items():
-            np.testing.assert_array_equal(value, baseline.fields[name])
-        assert result.payload.forecast_hour == 4
-        assert result.payload.cursor.current_index() == 3

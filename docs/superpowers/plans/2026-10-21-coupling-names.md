@@ -34,7 +34,7 @@ native arrays and physical computations.
   and full-column/lowest-level pressure shapes and literal pressure values.
 - [x] Run focused tests; require failures at the missing new names/keyword.
 - [x] Migrate shared recipe names, air keys, pressure fields, JCM concrete
-  factory/config/owners, Veros forcing modes and CAMulator surface packer.
+  factory/config/owners, Veros forcing modes.
 - [x] Update callers and existing tests without changing their physics assertions.
 - [x] Run mapper, forcing, interchangeability and boundary tests; expect success.
 

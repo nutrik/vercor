@@ -39,9 +39,9 @@
 
 ### Task 2: Native exchange reuse and JCM streaming mapping
 
-**Files:** `vercor/setups/_external/{veros_state,camulator_runtime,jax_gcm_runtime,veris_runtime}.py`; exchange/temporal regression tests.
+**Files:** `vercor/setups/_external/{veros_state,jax_gcm_runtime,veris_runtime}.py`; exchange/temporal regression tests.
 
-**Interfaces:** Task 1's scalar-count accumulator in Veros/CAMulator/JCM; shared mean division for Veris's existing weighted integrals. Add private `_mean_jcm_sample_fields` to fold the existing compact history with `lax.scan`, returning no scan trajectory.
+**Interfaces:** Task 1's scalar-count accumulator in Veros/JCM; shared mean division for Veris's existing weighted integrals. Add private `_mean_jcm_sample_fields` to fold the existing compact history with `lax.scan`, returning no scan trajectory.
 
 - [x] Write regression tests before source changes for native/output independence and finite behavior; retain existing independent nonlinear/endpoint/continuation/AD oracles.
 - [x] Replace duplicate native reductions; preserve invalid native sample propagation.
@@ -64,10 +64,10 @@
 - User approved the design via the asynchronous question; no further approval gate is needed.
 - Execution is inline with a final independent reviewer; full-suite-before-commit policy takes precedence over incremental plan commits.
 
-- RED7/GREEN86 shared-kernel/output tests; RED1 JCM fold then focused93 GREEN. Four runtime lanes preserve exchange values for disabled/all/subset period output. CAMulator native and canonical selections preserve every exchange field. Existing nonlinear, singleton, native continuation, masks and AD oracles pass in focused checks.
+- RED7/GREEN86 shared-kernel/output tests; RED1 JCM fold then focused93 GREEN. Four runtime lanes preserve exchange values for disabled/all/subset period output. Existing nonlinear, singleton, native continuation, masks and AD oracles pass in focused checks.
 - Independent review found no actionable findings; focused reviewer tests passed. Post-review buffer optimization changes scan inputs to scalar indices so native histories remain invariant, with a static singleton bypass; final numerical/scan tests26 pass.
 - Compiled CPU/f64 synthetic mapper-only benchmark (64x32, eight sigma levels): at48 samples fused-vmap temporary storage11,010,048bytes versus66,116bytes for streaming, max normalized field difference7.93e-16. Warm medians0.557ms versus1.175ms; singleton both0.089ms. This is a memory/speed tradeoff for the isolated compiled reduction, not an end-to-end model/GPU performance claim. Compact native histories remain. Evidence: /private/tmp/vercor-exchange-benchmark.json and its reproducer script.
-- Failed approaches: Python3.14 native worker abort; initial count reduction promoted to int64; incomplete CAMulator stand-in input-only field selection; scan introspection assumed an older JAX num_carry key; initial scan sliced/staged raw histories; benchmark initially requested default float32 mapping with a float64 tolerance. Corrected each without relaxing physical tolerances or modifying installed environments.
+
 
 - Final gates: full stock2716, exact-forkAD18, fast1755, additional native exact-JAX temporal14 all pass with zero failures/errors/skips. Exact collected-case union2734/2734; all330 source/test SHA256 values unchanged. Combined branch coverage92.58050665521684%; raw stock/AD coverage files/hashes preserved. Black330/mypy330/repositoryflake8zero/compileall/strictSphinx/diff checks pass. Machine receipt: /private/tmp/vercor-exchange-final-results.json.
 - Final repeated CPU benchmark confirms temporary-memory figures. At48samples the prior host vmap-plus-per-field-mean call takes1.710ms versus1.244ms for cached streaming; fused compiled reference0.495ms versus1.172ms. Singleton host0.443ms versus0.092ms. These are synthetic mapper/reducer measurements only, not full-model/GPU certification.

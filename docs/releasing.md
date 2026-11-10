@@ -29,8 +29,7 @@ token only in the tag-only `publish-release` job.
 - Confirm `pyproject.toml` and `CHANGELOG.md` use the intended version.
 - Confirm the package root and canonical owner manifests match live signatures.
 - Confirm optional JCM and Veros versions in the verification environment.
-- Leave CAMulator uninstalled and unpinned until an exact compatible release is
-  verified.
+
 
 Perform the read-only review before requesting commit authority:
 

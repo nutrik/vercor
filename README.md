@@ -32,7 +32,7 @@ automatic differentiation, and gradient-based experiments.
 - Use bilinear or conservative regridding.
 - Run Gregorian, no-leap, or 360-day calendars.
 - Use bundled slab atmosphere, ocean, land, and sea-ice components.
-- Connect optional JCM, Veros, and CAMulator models.
+- Connect optional JCM, Veros, and Veris models.
 - Supply static or time-dependent forcing data.
 - Preserve immutable state across JAX transformations.
 - Enable period averages, final fields, and snapshots when requested.
@@ -54,10 +54,6 @@ Install an optional extra before using a bundled JCM or Veros setup:
 python -m pip install "vercor[jcm]"
 python -m pip install "vercor[veros]"
 ```
-
-CAMulator additionally requires NCAR's
-[MILES-CREDIT](https://github.com/NCAR/miles-credit). A compatible CREDIT
-release has not yet been confirmed or pinned.
 
 Version `0.4.6` is the current release. Upgrade an older installation for the
 published stable API:

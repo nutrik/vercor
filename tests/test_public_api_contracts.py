@@ -4,7 +4,7 @@ from datetime import datetime
 import importlib
 from inspect import signature
 from pathlib import Path
-from typing import Any, cast, get_type_hints
+from typing import get_type_hints
 
 import jax.numpy as jnp
 import pytest
@@ -355,13 +355,6 @@ def test_output_and_setup_configs_use_final_names() -> None:
     spinup = vercor.setups.Spinup(enabled=True)
     veros = vercor.setups.VerosConfig(spinup=spinup, output=output)
     jax_gcm = vercor.setups.JCMAtmosphereConfig(spinup=spinup, output=output)
-    camulator = vercor.setups.CAMulatorConfig(
-        config_path="config.yml", spinup=spinup, output=output
-    )
-    forcing_aligned_camulator = vercor.setups.CAMulatorConfig(
-        config_path="config.yml",
-        time_alignment="forcing_start",
-    )
 
     assert PeriodOutput().frequency == "step"
     assert OutputSpec().period is None
@@ -370,19 +363,10 @@ def test_output_and_setup_configs_use_final_names() -> None:
     assert veros.output.period is period
     assert period.frequency == "month"
     assert jax_gcm.jitted is True
-    assert camulator.device == "cuda"
-    assert camulator.time_alignment == "strict"
-    assert forcing_aligned_camulator.time_alignment == "forcing_start"
-    with pytest.raises(ValueError, match="time_alignment must be"):
-        vercor.setups.CAMulatorConfig(
-            config_path="config.yml",
-            time_alignment=cast(Any, "invalid"),
-        )
     for setup_name in (
         "Spinup",
         "VerosConfig",
         "JCMAtmosphereConfig",
-        "CAMulatorConfig",
     ):
         assert setup_name in vercor.setups.__all__
         assert hasattr(vercor.setups, setup_name)

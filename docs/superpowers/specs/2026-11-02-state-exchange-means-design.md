@@ -46,9 +46,7 @@ initial instant; it has no completed interval to average.
   exports, including the pressure profile. Keep endpoint `JCMState` and exact
   native carry. Do not return complete vertical/physics histories from the
   compiled wrapper. Sampling remains independent of `save_interval`.
-- **CAMulator:** reuse the already mapped native prediction block and reduce
-  every canonical prediction field rather than only radiation. Preserve
-  native model state, cursor, output samples, and applied surface forcing.
+
 - **Veros:** extract canonical surfaces after each native step and accumulate
   only these small arrays. Return their means and the final native payload in
   host and differentiable JAX paths. Diagnose the open-water temperature

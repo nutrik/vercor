@@ -1,5 +1,9 @@
 # 2026-05-15
 
+Historical measurements and test counts describe the original source revisions.
+Command excerpts omit cases belonging to a retired integration; these edited
+excerpts are not new execution receipts.
+
 ## Conservative Bilinear Helper Cleanup
 
 - Removed the unused private `_geo_to_cart(...)` helper from the bilinear
@@ -12,8 +16,7 @@
   context aliases, `vercor.runtime.components` reexports, setup lazy exports and
   setup forcing reexport, `ComponentForcingData._read_forcing()`,
   `Coupler._run_scanned_runtime()`, `_runtime_state_from_components()`,
-  regridder class/factory APIs, `Exchange.create()`, and CAMulator accessor
-  helper methods with unclear external risk.
+  regridder class/factory APIs and `Exchange.create()`.
 
 ## Validation (Conservative Bilinear Helper Cleanup, 2026-05-15)
 
@@ -244,9 +247,6 @@
 
 ## Runtime/Setup Helper Boundary Cleanup
 
-- Added `CamulatorRuntimeCursor` so CAMulator atmosphere and land adapters share
-  forcing-index initialization, counter reset, index lookup, and counter
-  advancement through one helper instead of duplicating state transitions.
 - Moved generic component step-result application into
   `vercor.components._runtime_fields.apply_step_result(...)`; callable wrappers
   now use the same runtime-field primitive as `Component.apply_step_result(...)`.
@@ -255,24 +255,14 @@
 
 ## Validation (Runtime/Setup Helper Boundary Cleanup, 2026-05-15)
 
-- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py::test_camulator_runtime_cursor_initializes_indexes_and_advances tests/test_api_boundaries.py::test_component_base_internals_are_private_modules tests/test_api_boundaries.py::test_camulator_adapters_share_runtime_cursor_state_transition_helper tests/test_api_boundaries.py::test_jcm_land_uses_single_coordinate_conversion_helper tests/test_data_component_kernels.py::test_jcm_land_coordinate_helper_supports_jit -q --tb=short`
-  - failed before implementation on missing `CamulatorRuntimeCursor`, missing
-    runtime-field `apply_step_result`, remaining direct CAMulator cursor state,
-    and the leftover JCM coordinate wrapper
-- `conda run -n scipy pytest tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
-  - failed before the cursor semantic fix because the CAMulator atmosphere
-    cursor advanced once per model substep instead of once per coupling step
-    (`2 == 1`)
-  - passed after advancing the cursor once after each non-empty forcing block
-- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py::test_camulator_runtime_cursor_initializes_indexes_and_advances tests/test_api_boundaries.py::test_component_base_internals_are_private_modules tests/test_api_boundaries.py::test_camulator_adapters_share_runtime_cursor_state_transition_helper tests/test_api_boundaries.py::test_jcm_land_uses_single_coordinate_conversion_helper tests/test_data_component_kernels.py::test_jcm_land_coordinate_helper_supports_jit tests/test_component_base_coverage.py::test_apply_step_result_updates_fields_and_payload tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
+- `conda run -n scipy pytest tests/test_api_boundaries.py::test_component_base_internals_are_private_modules tests/test_api_boundaries.py::test_jcm_land_uses_single_coordinate_conversion_helper tests/test_data_component_kernels.py::test_jcm_land_coordinate_helper_supports_jit -q --tb=short`
+
+- `conda run -n scipy pytest tests/test_api_boundaries.py::test_component_base_internals_are_private_modules tests/test_api_boundaries.py::test_jcm_land_uses_single_coordinate_conversion_helper tests/test_data_component_kernels.py::test_jcm_land_coordinate_helper_supports_jit tests/test_component_base_coverage.py::test_apply_step_result_updates_fields_and_payload -q --tb=short`
   - passed after implementation
-- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py tests/test_data_component_kernels.py tests/test_component_base_coverage.py tests/test_camulator_component_kernels.py -q --tb=short`
+- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py tests/test_data_component_kernels.py tests/test_component_base_coverage.py -q --tb=short`
   - passed
 - `conda run -n scipy black vercor setups tests`
-  - first reformatted `setups/data/camulator_land.py`
-  - final run left all 131 files unchanged
-  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
-    warning
+
 - `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
   - passed (`0`)
 - `conda run -n scipy mypy vercor setups tests`
@@ -290,9 +280,7 @@
   for the repeated JCM setup path that generates JCM inputs, builds JCM land,
   patches `terrain.fmask` from the land mask, and constructs JAXGCM with the
   caller's explicit options.
-- Refactored CAMulator `StateVariableAccessor` index-map construction through
-  shared private primitives for available indexed variables and unavailable
-  configured variables, preserving state/input/output tensor contracts.
+
 - Routed remaining multi-exchange runnable setup scripts through
   `setups.coupler_helpers.add_exchanges(...)` while keeping exchange recipes
   explicit in each script.
@@ -311,16 +299,11 @@
   - failed before implementation on the old timestep wording and missing
     `setups.jcm_setup_helpers`
   - passed after implementing the helper and correcting the error text
-- `conda run -n scipy pytest tests/test_camulator_component_kernels.py::test_state_variable_accessor_builds_exact_index_maps tests/test_camulator_component_kernels.py::test_state_variable_accessor_uses_shared_index_map_builders -q --tb=short`
-  - failed before implementation on the missing shared index-map helpers
-  - passed after refactoring `StateVariableAccessor`
 - `conda run -n scipy pytest tests/test_api_boundaries.py::test_multi_exchange_setup_scripts_use_shared_add_exchanges_helper -q --tb=short`
   - failed before implementation on direct `cpl.add_exchange(...)` usage in
     runnable setup scripts
   - passed after routing multi-exchange scripts through `add_exchanges(...)`
 - `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py -q --tb=short`
-  - passed after implementation
-- `conda run -n scipy pytest tests/test_camulator_component_kernels.py -q --tb=short`
   - passed after implementation
 - `conda run -n scipy pytest tests/test_api_boundaries.py -q --tb=short`
   - passed after implementation
@@ -395,7 +378,7 @@
   factory-created components.
 - Extended setup lifecycle helpers with common timestep assignment, spinup
   logging, forcing-index calculation, and default-field seeding primitives.
-  JAXGCM, Veros, CAMulator atmosphere, and CAMulator land use the helpers where
+  JAXGCM and Veros use the helpers where
   behavior is identical.
 - Added `setups.coupler_helpers` and routed runnable setup component
   registration/run-sequence setup through `build_coupler(...)`; exchange
@@ -434,11 +417,8 @@
 
 - Added `setups._time_helpers.align_model_timestep(...)` as the shared
   setup-time validation path for coupling/model timestep divisibility in
-  JAXGCM, Veros, CAMulator atmosphere, and CAMulator land adapters.
-- Added `setups.external.camulator_state.initialize_camulator_forcing_cursor(...)`
-  so CAMulator atmosphere and CAMulator land share forcing index lookup,
-  initialization timestamp formatting, and start-time mismatch warnings without
-  importing the full CAMulator adapter from the land forcing module.
+  JAXGCM and Veros adapters.
+
 - Removed private setup-state borrowing of `Component` methods from
   `_JAXGCMState` and `_VerosGCMState`; tests now pass real component objects
   into lifecycle hooks to match the production factory path.
@@ -452,17 +432,13 @@
   - The first lifecycle-helper test run failed at import because the planned
     helper module did not exist yet; after adding the helper, the boundary test
     correctly failed on remaining private `Component` method borrowing.
-  - The first full-suite run exposed an over-broad source-boundary assertion:
-    `initialize_camulator_forcing_cursor` intentionally contains the old
-    substring. The assertion now forbids the heavy `initialize_camulator(` call
-    shape instead.
 
 ## Validation (Setup Lifecycle Helper Consolidation, 2026-05-14)
 
 - `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py::test_private_setup_state_objects_do_not_borrow_component_methods -q --tb=short`
   - failed as expected before implementation on missing helper/boundary paths
   - passed after adding helpers and removing private method borrowing
-- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py tests/test_data_component_kernels.py tests/test_external_components_coverage.py::test_jax_gcm_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up tests/test_external_components_coverage.py::test_jax_gcm_initialize_builds_default_forcing_when_missing tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_veros_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_veros_initialize_can_spin_up_and_extract_surface_temperature tests/test_external_components_coverage.py::test_veros_step_sets_forcing_fields_and_refreshes_sst tests/test_external_components_coverage.py::test_veros_step_nan_cleans_forcing_fields_before_set_variable tests/test_camulator_component_kernels.py::test_camulator_land_stores_jax_runtime_arrays tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
+- `conda run -n scipy pytest tests/test_setup_lifecycle_helpers.py tests/test_api_boundaries.py tests/test_data_component_kernels.py tests/test_external_components_coverage.py::test_jax_gcm_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up tests/test_external_components_coverage.py::test_jax_gcm_initialize_builds_default_forcing_when_missing tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_veros_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_veros_initialize_can_spin_up_and_extract_surface_temperature tests/test_external_components_coverage.py::test_veros_step_sets_forcing_fields_and_refreshes_sst tests/test_external_components_coverage.py::test_veros_step_nan_cleans_forcing_fields_before_set_variable -q --tb=short`
   - passed after implementation
 - `conda run -n scipy black vercor setups tests`
   - passed
@@ -472,14 +448,10 @@
   - first reported one unused import in the new helper test
   - passed after removing it (`0`)
 - `conda run -n scipy mypy vercor setups tests`
-  - first reported the CAMulator cursor helper's start-time parameter was typed
-    too narrowly for VerCOR model-date clocks
-  - passed after widening that parameter (`129 source files`)
+
 - `conda run -n scipy pytest tests/ -q --fast --tb=short`
   - passed after implementation
 - `conda run -n scipy pytest tests/ -q --tb=short`
-  - first failed on the over-broad CAMulator land boundary assertion noted
-    above
   - passed after narrowing the assertion
   - note: JAX emitted the existing dtype promotion `FutureWarning` in the
     JAXGCM runtime gradient test
@@ -498,8 +470,7 @@
   API.
 - Removed component-like compatibility methods from private external setup
   state objects: `_JAXGCMState.step_runtime_state`,
-  `_VerosGCMState.step_host_runtime_state`, and
-  `_CAMulatorGCMState.step_host_runtime_state`.
+  `_VerosGCMState.step_host_runtime_state`.
 - Narrowed private JAXGCM/Veros setup hooks to the production factory hook
   signatures rather than supporting direct test-only calls.
 - Preserved intentional compatibility surfaces: `vercor.runtime.components`
@@ -524,11 +495,11 @@
     `fill_value` API
   - first implementation run found NaN gradients from the old masking pattern;
     passed after switching the shared helper to `jnp.where`
-- `conda run -n scipy pytest tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps tests/test_external_components_coverage.py::test_jax_gcm_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up tests/test_external_components_coverage.py::test_jax_gcm_initialize_builds_default_forcing_when_missing tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_veros_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_veros_initialize_can_spin_up_and_extract_surface_temperature tests/test_external_components_coverage.py::test_veros_step_sets_forcing_fields_and_refreshes_sst tests/test_external_components_coverage.py::test_veros_step_nan_cleans_forcing_fields_before_set_variable tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
+- `conda run -n scipy pytest tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps tests/test_external_components_coverage.py::test_jax_gcm_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_jax_gcm_initialize_uses_provided_forcing_and_can_spin_up tests/test_external_components_coverage.py::test_jax_gcm_initialize_builds_default_forcing_when_missing tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_veros_initialize_validates_timestep_multiple tests/test_external_components_coverage.py::test_veros_initialize_can_spin_up_and_extract_surface_temperature tests/test_external_components_coverage.py::test_veros_step_sets_forcing_fields_and_refreshes_sst tests/test_external_components_coverage.py::test_veros_step_nan_cleans_forcing_fields_before_set_variable -q --tb=short`
   - failed as expected before removing the private state-level step wrappers
   - passed after moving tests to production hook/callable paths and removing the
     wrappers
-- `conda run -n scipy pytest tests/test_data_component_kernels.py tests/test_example_jax_helpers.py tests/test_conservative_rectilinear_regridder.py tests/test_api_boundaries.py tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_veros_step_sets_forcing_fields_and_refreshes_sst tests/test_external_components_coverage.py::test_veros_step_nan_cleans_forcing_fields_before_set_variable tests/test_camulator_component_kernels.py::test_camulator_step_uses_jax_prepared_forcing_boundaries -q --tb=short`
+- `conda run -n scipy pytest tests/test_data_component_kernels.py tests/test_example_jax_helpers.py tests/test_conservative_rectilinear_regridder.py tests/test_api_boundaries.py tests/test_runtime_state.py::test_runtime_module_does_not_own_component_specific_steps tests/test_external_components_coverage.py::test_jax_gcm_step_maps_outputs_and_respects_output_gate tests/test_external_components_coverage.py::test_veros_step_sets_forcing_fields_and_refreshes_sst tests/test_external_components_coverage.py::test_veros_step_nan_cleans_forcing_fields_before_set_variable -q --tb=short`
   - passed after implementation
 - `conda run -n scipy black vercor setups tests`
   - passed
@@ -554,41 +525,27 @@
 
 - Added a shared `setups._lazy_imports` helper and moved `setups.data` /
   `setups.external` package exports behind PEP 562 `__getattr__` lazy loading,
-  so unrelated setup imports do not initialize optional CAMulator or Veros
+  so unrelated setup imports do not initialize optional Veros
   adapters.
-- Deferred CREDIT output/core/postblock imports to CAMulator execution
-  boundaries. Missing CREDIT now raises a clear `ImportError` only when
-  CAMulator forcing/model/output functionality is actually used.
+
 - Preserved package-level setup exports and module aliases such as
   `from setups.external import jax_gcm as jax_gcm_module`.
-- Found an import-order issue in the local environment where importing Torch
-  before xarray aborts on duplicate OpenMP runtime initialization; reordered
-  `camulator_state` imports to keep the module importable without unsafe
-  OpenMP environment overrides.
 - Failed approaches / corrections:
   - The first regression run confirmed all unrelated setup imports emitted the
-    reported CREDIT warnings and Veros startup messages.
-  - After lazy package exports and deferred CREDIT imports, the direct
-    `camulator_state` import exposed the Torch/xarray OpenMP abort; reordering
-    those imports fixed the remaining subprocess failure.
-  - The first flake8 pass exposed one unused import in the new lazy-import
-    helper; removing it restored a clean lint run.
+    Veros startup messages.
 
 ## Validation (Lazy Optional Setup Adapter Imports, 2026-05-14)
 
 - `conda run -n scipy pytest tests/ -v --fast 2>&1 | tail -20`
   - passed baseline before implementation (`111 passed, 277 deselected`)
 - `conda run -n scipy pytest tests/test_api_boundaries.py::test_unrelated_setup_imports_do_not_initialize_optional_adapters -q --tb=short`
-  - failed as expected before implementation on CREDIT warning output from all
-    covered imports
-  - passed after lazy setup exports, deferred CREDIT imports, and the
-    Torch/xarray import-order correction
-- `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_camulator_component_kernels.py -q --tb=short`
+
+- `conda run -n scipy pytest tests/test_api_boundaries.py -q --tb=short`
   - passed after implementation
 - `conda run -n scipy black vercor setups tests`
   - passed
   - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
-    warning and reformatted `setups/external/camulator.py` on the first run;
+    warning and reformatted on the first run;
     the final run left all 124 files unchanged
 - `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
   - first reported one unused import in `setups/_lazy_imports.py`
@@ -607,7 +564,7 @@
 - Added a top-level `setups` package and moved runnable setup scripts plus
   slab, data, and external concrete component definitions out of
   `vercor.components`.
-- Converted slab, forcing-data, JAXGCM, Veros, CAMulator, and CAMulator-land
+- Converted slab, forcing-data, JAXGCM and Veros
   definitions to snake_case factory functions backed by `data_component(...)`,
   `differentiable_component(...)`, and `host_component(...)`.
 - Extended core component factories with optional lifecycle hooks for
@@ -663,8 +620,7 @@
 - Routed `VerCOR.*` child loggers through the canonical parent handler and made
   injected Python loggers passed to `Coupler` enter the same configuration
   boundary before JAX callback wrapping.
-- Replaced direct root warnings in the CAMulator state import boundary with the
-  default VerCOR logger.
+
 - Updated logging tests to capture at the VerCOR logger boundary instead of
   relying on root `caplog` propagation.
 - Failed approaches / corrections:
@@ -685,7 +641,7 @@
     canonical owned handler
 - `conda run -n scipy pytest tests/test_coupler_coverage.py::test_setup_logger_installs_canonical_owned_handler_format tests/test_coupler_coverage.py::test_setup_logger_routes_child_loggers_through_parent_canonical_handler tests/test_coupler_coverage.py::test_coupler_configures_injected_python_logger_with_canonical_boundary tests/test_coupler_coverage.py::test_coupler_wraps_injected_python_logger_for_scanned_runtime tests/test_coupler_coverage.py::test_setup_logger_formats_traced_values_under_scan tests/test_coupler_coverage.py::test_scanned_runtime_passes_callback_logger_to_components tests/test_coupler_coverage.py::test_scanned_runtime_logs_host_equivalent_progress_messages tests/test_coupler_coverage.py::test_scanned_runtime_suppresses_info_below_log_level -q --tb=short`
   - passed after implementation and test-capture updates
-- `conda run -n scipy pytest tests/test_camulator_component_kernels.py::test_camulator_constructor_logs_save_forecast_path tests/test_tools_assets_and_regridding.py::test_check_remap_conservation_handles_skip_and_mismatch -q --tb=short`
+- `conda run -n scipy pytest tests/test_tools_assets_and_regridding.py::test_check_remap_conservation_handles_skip_and_mismatch -q --tb=short`
   - passed after replacing root `caplog` expectations
 - `conda run -n scipy pytest tests/test_external_components_coverage.py::test_jax_gcm_write_output_persists_mean_dataset -q --tb=short`
   - passed after replacing the final root `caplog` expectation
@@ -823,22 +779,18 @@
 - Corrected ECMWF/ERA-style hybrid-sigma altitude calculations when the top
   half-level pressure is zero by applying the documented top-layer
   `dlog_p = log(p_next / 0.1)` and `alpha = log(2)` treatment.
-- Routed the CAMulator model-level-height diagnostic through the shared
-  hybrid-sigma altitude helper to remove the duplicated formula path.
+
 - Failed approaches / corrections:
-  - The first red-test command used the wrong Camulator test node and failed
-    during test collection; rerunning with the exact test name reached the
-    intended sigma and hybrid failures.
 
 ## Validation (Hypsometric Altitude Corrections, 2026-05-12)
 
-- `conda run -n scipy pytest tests/test_hypsometric.py::test_specific_humidity_uses_exact_virtual_temperature_without_mixing_ratio_denominator tests/test_fluxes_utilities.py::test_get_altitudes_hybrid_sigma_levels_handles_zero_top_half_level tests/test_camulator_component_kernels.py::test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions -q --tb=short`
+- `conda run -n scipy pytest tests/test_hypsometric.py::test_specific_humidity_uses_exact_virtual_temperature_without_mixing_ratio_denominator tests/test_fluxes_utilities.py::test_get_altitudes_hybrid_sigma_levels_handles_zero_top_half_level -q --tb=short`
   - failed as expected before implementation: moist sigma thickness was
     955.5581 m instead of 936.4468 m, and zero-top hybrid altitude returned
     `nan` at the top returned level.
-- `conda run -n scipy pytest tests/test_hypsometric.py tests/test_fluxes_utilities.py::test_get_altitudes_hybrid_sigma_levels_returns_finite_increasing_profile tests/test_fluxes_utilities.py::test_get_altitudes_hybrid_sigma_levels_handles_zero_top_half_level tests/test_camulator_component_kernels.py::test_map_camulator_prediction_arrays_supports_jit_and_preserves_conventions -q --tb=short`
+- `conda run -n scipy pytest tests/test_hypsometric.py tests/test_fluxes_utilities.py::test_get_altitudes_hybrid_sigma_levels_returns_finite_increasing_profile tests/test_fluxes_utilities.py::test_get_altitudes_hybrid_sigma_levels_handles_zero_top_half_level -q --tb=short`
   - passed after implementation.
-- `conda run -n scipy pytest tests/test_hypsometric.py tests/test_fluxes_utilities.py tests/test_camulator_component_kernels.py -q --tb=short`
+- `conda run -n scipy pytest tests/test_hypsometric.py tests/test_fluxes_utilities.py -q --tb=short`
   - passed.
 - `conda run -n scipy pytest tests/ -q --fast --tb=short`
   - passed.
@@ -1377,7 +1329,7 @@
 - `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_api_boundaries.py -q --tb=short`
   - first failed on recursive helper wiring
   - passed after wiring private callable-wrapper factory imports
-- `conda run -n scipy pytest tests/test_component_models_coverage.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q --tb=short`
+- `conda run -n scipy pytest tests/test_component_models_coverage.py tests/test_external_components_coverage.py -q --tb=short`
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -1404,7 +1356,7 @@
   allowing slab components to rely on their module-level field specs without
   duplicate initialize hooks.
 - Refactored bundled data adapters to use `update_settings(...)`; refactored
-  CAMulator, JAXGCM, and Veros defaults onto `grid_field_defaults(...)` where
+  JAXGCM and Veros defaults onto `grid_field_defaults(...)` where
   it keeps field contracts clearer; and used `apply_step_result(...)` for
   JAXGCM field-plus-payload updates.
 - Updated the custom component wrapping example and design/dependency docs to
@@ -1422,7 +1374,7 @@
 - `conda run -n scipy pytest tests/test_component_base_coverage.py::test_base_initialize_seeds_declared_defaults tests/test_component_base_coverage.py::test_update_settings_is_chainable tests/test_component_base_coverage.py::test_grid_field_defaults_expands_default_value_and_overrides tests/test_component_base_coverage.py::test_apply_step_result_updates_fields_and_payload -q --tb=short`
   - failed as expected before implementation on missing helper behavior
   - passed after base helper implementation
-- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q --tb=short`
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_external_components_coverage.py -q --tb=short`
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -1464,13 +1416,13 @@
 
 ## Validation (Component Authoring API Polish and Adapter Rewrite, 2026-05-07)
 
-- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q --tb=short`
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_external_components_coverage.py -q --tb=short`
   - failed as expected before implementation on the missing polished API and
     bundled adapter declarations
   - passed after base and adapter refactors
 - `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_api_boundaries.py -q --tb=short`
   - passed
-- `conda run -n scipy pytest tests/test_component_models_coverage.py tests/test_external_components_coverage.py tests/test_slab_kernels.py tests/test_camulator_component_kernels.py -q --tb=short`
+- `conda run -n scipy pytest tests/test_component_models_coverage.py tests/test_external_components_coverage.py tests/test_slab_kernels.py -q --tb=short`
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -1565,7 +1517,7 @@
   - failed as expected before implementation because the public facade was
     missing
   - passed after implementation (`34 passed`)
-- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_slab_kernels.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py tests/test_api_boundaries.py -q --tb=short`
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_slab_kernels.py tests/test_external_components_coverage.py tests/test_api_boundaries.py -q --tb=short`
   - passed after slab/example/JAXGCM refactors
 - `conda run -n scipy pytest tests/test_coupler_runtime.py::test_data_forcing_components_run_inside_runtime tests/test_coupler_runtime.py::test_erainterim_ocean_monthly_forcing_replays_to_slab_atmosphere_with_real_regridder tests/test_coupler_runtime.py::test_jcm_land_daily_forcing_replays_to_data_atmosphere_under_jit_and_grad -q --tb=short`
   - passed after the lightweight-fixture field-spec fallback
@@ -1597,7 +1549,7 @@
 - Added grid-shaped seed helpers (`seed_zero_field()`, `seed_zero_fields()`,
   `seed_constant_field()`) and `require_runtime_fields()` for subclass
   validators.
-- Refactored bundled data, slab, JAXGCM, CAMulator, and Veros adapters to use
+- Refactored bundled data, slab, JAXGCM, and Veros adapters to use
   helper methods for setup field seeding and runtime field updates where their
   lifecycle contracts allow it.
 - Added `examples/custom_component_wrapping.py` with data-only, differentiable
@@ -1614,9 +1566,6 @@
     `DataComponent.wrap()` signature and untyped mixin attributes; the final
     implementation uses a targeted override ignore plus explicit casts in the
     shared callable mixin.
-  - The first full-suite run exposed the same base-initialization fixture issue
-    in CAMulator step coverage; the fixture now uses the component runtime-field
-    initializer before host stepping.
 
 ## Validation (Helper-First Component Wrapping API, 2026-05-07)
 
@@ -1628,8 +1577,7 @@
 - `conda run -n scipy black vercor examples tests`
   - passed
   - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check
-    warning and reformatted `tests/test_camulator_component_kernels.py`
-- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
+    warning and reformatted - `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
   - passed (`0`)
 - `conda run -n scipy mypy vercor examples tests`
   - passed (`105 source files`)
@@ -1685,8 +1633,8 @@
   and final-output paths with logging through either the coupler logger or the
   default `VerCOR` Python logger.
 - Threaded the coupler logger into mask conservation checks during
-  `Coupler.initialize()` and added optional logger injection for CAMulator
-  initialization/noise helpers and JAXGCM output writes.
+  `Coupler.initialize()` and added optional logger injection for JAXGCM
+  output writes.
 - Kept standalone diagnostics and examples unchanged because their stdout
   behavior is user-facing and outside the coupler lifecycle scope.
 - Updated `DESIGN.md` to document the default logger fallback and explicit
@@ -1694,15 +1642,12 @@
 - Failed approaches / corrections:
   - The first red test run failed during collection because
     `DEFAULT_LOGGER_NAME` and `get_default_logger()` did not exist yet.
-  - The first green test run exposed that optional CREDIT imports are absent in
-    the local environment; the CAMulator logging test now monkeypatches those
-    optional symbols explicitly.
   - The first mypy run exposed that the test recording logger had narrower
     method signatures than `LoggerLike`; the helper now matches the protocol.
 
 ## Validation (Coupler Lifecycle Logging, 2026-05-06)
 
-- `conda run -n scipy pytest tests/test_coupler_coverage.py::test_default_logger_uses_vercor_logger_name tests/test_tools_assets_and_regridding.py::test_check_remap_conservation_handles_skip_and_mismatch tests/test_camulator_component_kernels.py::test_camulator_constructor_logs_save_forecast_path tests/test_camulator_component_kernels.py::test_add_init_noise_logs_through_injected_logger tests/test_camulator_component_kernels.py::test_initialize_camulator_logs_lifecycle_through_injected_logger tests/test_external_components_coverage.py::test_jax_gcm_write_output_persists_mean_dataset -q --tb=short`
+- `conda run -n scipy pytest tests/test_coupler_coverage.py::test_default_logger_uses_vercor_logger_name tests/test_tools_assets_and_regridding.py::test_check_remap_conservation_handles_skip_and_mismatch tests/test_external_components_coverage.py::test_jax_gcm_write_output_persists_mean_dataset -q --tb=short`
   - failed as expected before implementation because the default logger
     interface was missing
   - passed after implementation (`6 passed`)
@@ -1745,7 +1690,7 @@
   - failed as expected before implementation because default settings were not
     class-level annotations and custom settings were absent from `dir()`
   - passed after implementation
-- `conda run -n scipy pytest tests/test_settings.py tests/test_dtypes.py tests/test_fluxes_utilities.py tests/test_camulator_component_kernels.py -q --fast --tb=short`
+- `conda run -n scipy pytest tests/test_settings.py tests/test_dtypes.py tests/test_fluxes_utilities.py -q --fast --tb=short`
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -2397,19 +2342,16 @@
   coverage; runtime send tests now use only the canonical runtime send helper.
 - Renamed the removed-component-API regression test so the active suite no
   longer carries legacy/wrapper terminology in test names.
-- Cleaned stale CAMulator bridge commentary while preserving the required
-  host-backed `HostRuntimeComponent.step_host_runtime_state()` boundary.
 - No `DEPENDENCIES.md` update was needed because module ownership and runtime
   dependency order did not change.
 - No failed implementation approaches. Remaining marker hits are negative
-  regression guards, current JAX/Python compatibility wording, or external
-  CAMulator package names.
+  regression guards or current JAX/Python compatibility wording.
 
 ## Validation (Residual Compatibility Marker Cleanup, 2026-04-29)
 
 - `conda run -n scipy pytest tests/ -q --fast --tb=short`
   - passed before edits
-- `conda run -n scipy pytest tests/test_runtime_state.py tests/test_component_base_coverage.py tests/test_coupler_coverage.py tests/test_camulator_component_kernels.py tests/test_external_components_coverage.py -q --fast --tb=short`
+- `conda run -n scipy pytest tests/test_runtime_state.py tests/test_component_base_coverage.py tests/test_coupler_coverage.py tests/test_external_components_coverage.py -q --fast --tb=short`
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -2428,7 +2370,7 @@
 - Consolidated runtime stepping into one explicit helper:
   - replaced the separate pure and host-enabled runtime step wrappers with
     `step_runtime_component(..., allow_host_runtime=...)`
-  - kept CAMulator and Veros behind the required `HostRuntimeComponent` bridge
+  - kept Veros behind the required `HostRuntimeComponent` bridge
   - cached the runtime dispatch context once per `run()` / scanned-runtime call
     instead of rebuilding it for every component step
 - Simplified `Regridder.__call__()` by removing scalar/vector wrapper methods
@@ -2461,28 +2403,24 @@
 
 - Slimmed `vercor.components` to export only the base component contracts.
   Concrete examples/tests now import slab, data, and external model components
-  from their owning modules, so optional Veros/CAMulator adapters are not loaded
+  from their owning modules, so optional Veros adapters are not loaded
   by importing `vercor.components`.
 - Removed the thin `vercor.runtime_contracts` module:
   - moved exchange-field flattening, unique field appending, and runtime contract
     construction next to `RuntimeComponentContract` in `vercor.runtime`
   - updated architecture coverage to guard the deleted module and direct example imports
-- Kept CAMulator and Veros as explicit host-runtime bridges while simplifying internals:
+- Kept Veros as explicit host-runtime bridges while simplifying internals:
   - Veros host stepping now delegates forcing writes, substeps, and SST refresh to
     focused helpers
-  - CAMulator host stepping now delegates output writes and prediction-to-runtime
-    field mapping to focused helpers
-  - CAMulator land now loads only CAMulator config/raw forcing and no longer
-    imports the full CAMulator atmosphere adapter for land-surface temperature forcing
-- Updated `DEPENDENCIES.md` to document runtime contract ownership in `vercor.runtime`
-  and the forcing-only CAMulator land boundary.
+
+- Updated `DEPENDENCIES.md` to document runtime contract ownership in `vercor.runtime`.
 - No failed implementation approaches. The cleanup stayed at ownership/import
   boundaries and host-adapter helper extraction; physics kernels and runtime behavior
   were not intentionally changed.
 
 ## Validation (Source Boundary Simplification, 2026-04-29)
 
-- `conda run -n scipy pytest tests/test_runtime_state.py tests/test_component_base_coverage.py tests/test_tools_components_and_plotting.py tests/test_camulator_component_kernels.py tests/test_external_components_coverage.py -q --fast --tb=short`
+- `conda run -n scipy pytest tests/test_runtime_state.py tests/test_component_base_coverage.py tests/test_tools_components_and_plotting.py tests/test_external_components_coverage.py -q --fast --tb=short`
   - passed
 - `conda run -n scipy pytest tests/ -q --fast --tb=short`
   - passed
@@ -2507,15 +2445,13 @@
 - Made Veros runtime configuration explicit:
   - replaced the wildcard runtime-settings side-effect import with `configure_veros_runtime()`
   - kept the configuration call before Veros setup imports while moving ordinary imports above it
-- Simplified CAMulator bridge internals:
-  - removed stale old-source header/commentary and unused `num_ts` / chunk-size state
-  - added all host-written CAMulator data fields to the runtime-field initializer
+
 - Updated `DEPENDENCIES.md` to document the explicit Veros runtime-settings boundary.
 - The first flake8 pass exposed E402 warnings from the intentional Veros configure-before-import ordering; the final version keeps only the delayed Veros imports after configuration and marks those imports with targeted `noqa: E402`.
 
 ## Validation (Internal Runtime Compatibility Seam Cleanup, 2026-04-29)
 
-- `conda run -n scipy pytest tests/test_runtime_state.py tests/test_camulator_component_kernels.py -q --fast --tb=short`
+- `conda run -n scipy pytest tests/test_runtime_state.py -q --fast --tb=short`
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -2544,7 +2480,7 @@
   - `Coupler` and grid-mask helpers now type against the base `Component` contract instead of concrete component unions
   - `vercor.types` now keeps only the shared runtime-array alias
 - Removed the `RuntimeComponentContract.empty()` convenience constructor; call sites now use `RuntimeComponentContract()` directly.
-- Added architecture regression coverage for the forcing-data boundary, removed legacy flux names, removed empty-contract helper, and preserved host-backed CAMulator/Veros bridge ownership.
+- Added architecture regression coverage for the forcing-data boundary, removed legacy flux names, removed empty-contract helper, and preserved host-backed Veros bridge ownership.
 - Updated `DEPENDENCIES.md` with `vercor.forcing_data` and the simplified coupler component contract.
 - No failed implementation approaches. The cleanup stayed limited to compatibility surfaces and kept example-level `vercor.components` model imports stable.
 
@@ -2576,7 +2512,7 @@
   - `vercor.grid_masks` for grid lookup, land/ocean mask creation, and remap checks
 - Deleted `vercor/tools.py` instead of keeping a compatibility re-export layer.
 - Made the host runtime bridge public:
-  - `HostRuntimeComponent.step_host_runtime_state()` is now the explicit CAMulator/Veros bridge
+  - `HostRuntimeComponent.step_host_runtime_state()` is now the explicit Veros bridge
   - runtime dispatch still selects it only after `isinstance(component, HostRuntimeComponent)`
 - Removed implicit empty-contract compatibility in generic runtime helpers:
   - runtime helper functions now require a concrete `RuntimeComponentContract`
@@ -2609,7 +2545,7 @@
   - pure, host-enabled, and outgoing-prime runtime helpers now receive one dispatch context
 - Removed stale compatibility surfaces:
   - deleted unused `RuntimeFieldStore.subset()` and `RuntimeFieldStore.to_mapping()`
-  - deleted unused deprecated CAMulator wind post-processing wrapper
+
 - Consolidated JAXGCM runtime field ownership:
   - added one set of runtime field constants/helpers for initialization, prefill, and validation
 - Added architecture regression coverage so redundant contract wrappers, mapping-style field-store helpers, and deprecated wind wrapper are not reintroduced.
@@ -2640,8 +2576,8 @@
   - added `vercor.runtime_driver` for outgoing priming, per-component dispatch/receive/step/send, and host-adapter detection
 - Kept public orchestration stable:
   - `Coupler` remains the facade for registration, initialization, runtime-state creation, `run()`, `compile_runtime()`, runtime views, and final output
-  - scanned runtime still rejects CAMulator/Veros host-backed adapters before JIT execution
-  - CAMulator and Veros still use the explicit `HostRuntimeComponent` bridge
+  - scanned runtime still rejects Veros host-backed adapters before JIT execution
+  - Veros still use the explicit `HostRuntimeComponent` bridge
 - Tightened diagnostics around runtime views:
   - plotting/table helpers now consume `RuntimeComponentView` instead of probing arbitrary component/runtime objects
   - examples now pass `cpl.runtime_component_view(...)` into diagnostics helpers
@@ -2674,7 +2610,7 @@
   - `vercor.components` still exports component classes and base context/bridge types
   - `Coupler` imports base contracts directly from `vercor.components.base`
 - Preserved the explicit non-differentiable bridge:
-  - CAMulator atmosphere, CAMulator land, and Veros remain `HostRuntimeComponent` adapters
+  - Veros remain `HostRuntimeComponent` adapters
   - scanned/compiled runtime still rejects host-backed adapters
 - Added/updated architecture regression coverage so generic runtime helpers stay out of `Component` and compatibility APIs remain absent.
 - Updated `DEPENDENCIES.md` to document the new runtime-components helper layer.
@@ -2683,7 +2619,7 @@
 
 - `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_runtime_state.py tests/test_coupler_coverage.py tests/test_coupler_runtime.py tests/test_runtime_compile_cache.py -q --fast --tb=short`
   - passed
-- `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py tests/test_component_models_coverage.py -q --fast --tb=short`
+- `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_component_models_coverage.py -q --fast --tb=short`
   - passed
 - `conda run -n scipy pytest tests/ -q --fast --tb=short`
   - passed
@@ -2704,7 +2640,7 @@
   - `Coupler.initialize()` now passes only start time, timestep, run sequence, settings, and logger to components
   - runtime stepping now passes one context object to pure and host-backed component step boundaries
 - Kept non-differentiable host bridges explicit:
-  - CAMulator atmosphere, CAMulator land, and Veros still inherit `HostRuntimeComponent`
+  - Veros still inherit `HostRuntimeComponent`
   - host stepping remains restricted to `Coupler.run()`; scanned/compiled runtime still rejects host-backed components
 - Removed residual duplicated metadata:
   - runtime NetCDF output private writer now reads component name/grid from `RuntimeComponentView`
@@ -2715,7 +2651,7 @@
 
 ## Validation (Targeted Runtime Boundary Cleanup, 2026-04-28)
 
-- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_coupler_coverage.py tests/test_runtime_state.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q --fast --tb=short`
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_coupler_coverage.py tests/test_runtime_state.py tests/test_external_components_coverage.py -q --fast --tb=short`
   - passed
 - `conda run -n scipy pytest tests/ -q --fast --tb=short`
   - passed
@@ -2740,7 +2676,7 @@
   - runtime receive/send/validation now use explicit coupler-owned contracts
   - tests assert production code does not reintroduce component-owned private field lists
 - Kept non-differentiable host bridges explicit:
-  - CAMulator and Veros remain `HostRuntimeComponent` adapters
+  - Veros remain `HostRuntimeComponent` adapters
   - host stepping still receives runtime state, settings, time, and logger only
 - Updated `DEPENDENCIES.md` to document contract ownership and seed-state responsibilities.
 
@@ -2771,7 +2707,7 @@
 - Simplified component stepping context:
   - `Component.step_runtime_state()` and `HostRuntimeComponent._step_host_runtime_state()` no longer receive the full coupler object
   - runtime stepping passes settings, optional time, and optional logger only
-  - CAMulator, CAMulator land, Veros, JAXGCM, slab components, and tests were updated to the slimmer signature
+  - Veros, JAXGCM, slab components, and tests were updated to the slimmer signature
 - Tightened runtime-state authority in tests by removing a stale helper that copied stepped runtime fields back into `component.data`.
 - Added architecture regressions for removed aliases and host bridge signatures.
 
@@ -2799,15 +2735,14 @@
   - kept compatibility imports from `vercor.tools`, `vercor.components`, and `vercor.components.base`
   - `Component` no longer owns runtime output writer implementations
 - Tightened host-backed bridge data flow:
-  - CAMulator atmosphere and land update `RuntimeFieldStore` directly instead of round-tripping through dictionaries
   - Veros flux coupling now consumes `RuntimeFieldStore` directly
-  - host adapters still isolate non-differentiable CAMulator/Veros mutation behind `HostRuntimeComponent`
+  - host adapters still isolate non-differentiable Veros mutation behind `HostRuntimeComponent`
 - Updated examples to request runtime views through `Coupler.runtime_component_view()`.
 - Added architecture regressions for focused runtime-view/output ownership, host adapter store access, and example view construction.
 
 ## Validation (Residual Runtime Bridge Cleanup, 2026-04-28)
 
-- `conda run -n scipy pytest tests/test_runtime_state.py tests/test_component_base_coverage.py tests/test_coupler_coverage.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py tests/test_tools_components_and_plotting.py -q --fast --tb=short`
+- `conda run -n scipy pytest tests/test_runtime_state.py tests/test_component_base_coverage.py tests/test_coupler_coverage.py tests/test_external_components_coverage.py tests/test_tools_components_and_plotting.py -q --fast --tb=short`
   - passed
 - `conda run -n scipy pytest tests/ -q --fast --tb=short`
   - passed
@@ -2825,13 +2760,12 @@
 
 - Made the non-differentiable host boundary explicit:
   - added `HostRuntimeComponent` for adapters that require Python/host-side mutation
-  - Veros, CAMulator atmosphere, and CAMulator land now inherit that contract
+  - Veros now inherit that contract
   - `Coupler` dispatches host steps with `isinstance(..., HostRuntimeComponent)` instead of introspecting for private methods
   - `compile_runtime()` now raises a clear `CouplerError` when host-backed adapters are registered
 - Removed the base runtime-to-component sync compatibility hook:
   - deleted `Component._sync_data_from_runtime_state()`
   - host adapters read from `RuntimeComponentState.data` mappings directly
-  - CAMulator and CAMulator land return updated runtime states without copying runtime fields back into `self.data`
   - Veros flux coupling now receives explicit Veros state and runtime fields instead of the whole component instance
 - Consolidated runtime diagnostic/output views:
   - replaced plotting-side `ComponentFieldView` usage with `RuntimeComponentView`
@@ -2841,7 +2775,7 @@
 
 ## Validation (Incremental Runtime Bridge Simplification, 2026-04-28)
 
-- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_coupler_coverage.py tests/test_runtime_state.py tests/test_external_tools_coverage.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py tests/test_tools_components_and_plotting.py -q --fast --tb=short`
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_coupler_coverage.py tests/test_runtime_state.py tests/test_external_tools_coverage.py tests/test_external_components_coverage.py tests/test_tools_components_and_plotting.py -q --fast --tb=short`
   - passed
 - `conda run -n scipy pytest tests/test_external_components_coverage.py -q --fast --tb=short`
   - passed
@@ -2868,7 +2802,7 @@
   - import/export field lists now stay on registered component instances
   - runtime state helpers now replace component states by explicit name
 - Kept non-differentiable host bridges explicit and private:
-  - Veros, CAMulator atmosphere, and CAMulator land now expose `_step_host_runtime_state()`
+  - Veros now expose `_step_host_runtime_state()`
   - scanned runtime continues through pure `step_runtime_state()` and does not execute those host mutations
 - Replaced loose plotting `(component, runtime_state)` tuples with `ComponentFieldView`.
 - Updated final runtime NetCDF output metadata so `write_runtime_component_to_netcdf()` receives the component name explicitly.
@@ -2878,7 +2812,7 @@
 
 - `conda run -n scipy pytest tests/test_runtime_state.py tests/test_component_base_coverage.py tests/test_runtime_exchange.py tests/test_coupler_runtime.py -q --fast --tb=short`
   - passed
-- `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py tests/test_tools_components_and_plotting.py -q --fast --tb=short`
+- `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_tools_components_and_plotting.py -q --fast --tb=short`
   - passed
 - `conda run -n scipy pytest tests/ -q --fast --tb=short`
   - passed
@@ -2944,7 +2878,7 @@
   - changed `Coupler.finalize(final_state, ...)` to write outputs from the returned runtime state
 - Kept host-backed adapter synchronization explicit and private:
   - added `Component._sync_data_from_runtime_state()`
-  - updated Veros, CAMulator, and CAMulatorLand to synchronize only their adapter-owned mutable `data` before host-side stepping
+  - updated Veros to synchronize only their adapter-owned mutable `data` before host-side stepping
 - Updated examples, plotting/table helpers, and tests to read from runtime states instead of wrapper fields.
 - `DEPENDENCIES.md` did not require an update because the output writer stayed in the existing component base module and no dependency order changed.
 
@@ -2958,7 +2892,7 @@
 
 ## Validation (Runtime API De-Compatibility Refactor, 2026-04-28)
 
-- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_coupler_coverage.py tests/test_coupler_runtime.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q --tb=short`
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_coupler_coverage.py tests/test_coupler_runtime.py tests/test_external_components_coverage.py -q --tb=short`
   - passed
 - `conda run -n scipy pytest tests/test_component_models_coverage.py tests/test_tools_components_and_plotting.py tests/test_component_base_coverage.py tests/test_coupler_coverage.py -q --tb=short`
   - passed
@@ -3009,7 +2943,6 @@
 - Made `new_flux_atmOcn()` compatible with `jax.jit` and reverse-mode AD by replacing the dynamic `lax.while_loop` attempt with a fixed two-step `lax.fori_loop` using masked carry updates.
 - Tightened direct boundary adapters so JAX kernels run internally and NumPy conversion happens only where the external runtimes need it:
   - `vercor/components/external/veros_gcm.py`
-  - `vercor/components/external/camulator.py`
   - `vercor/components/external/jax_gcm.py`
 
 ## Tests Added / Updated
@@ -3094,9 +3027,6 @@
 
 - `CustomGlobalFourDegree.set_diagnostics()` is wrapped by Veros runtime validation, so calling it directly in a unit test raises a `TypeError` unless the argument is a real `VerosState`. The test now calls the underlying routine function instead of going through the runtime wrapper.
 - Per task instructions, no coverage work was added for:
-  - `vercor/components/data/camulator_land.py`
-  - `vercor/components/external/camulator.py`
-  - `vercor/components/external/camulator_state.py`
   - `vercor/components/external/windpp.py`
 
 ## Second JAX Translation Slice 2A: Grid and Bilinear Regridding
@@ -3547,39 +3477,6 @@
 
 - The first test-only pass fed JAX arrays into `DummyGridComponent`, but that helper was still typed as `dict[str, np.ndarray]`, so `mypy` rejected the updated coverage. The final version widens that test helper to the existing `RuntimeArray` alias instead of changing any production interface.
 
-## Eighth JAX Translation Slice 8A: CAMulator Boundary
-
-- Translated the in-scope CAMulator adapter boundary while preserving the explicit Torch, xarray, CREDIT, and file-output boundaries:
-  - `vercor/components/external/camulator.py`
-    - added a JAX-backed runtime-field initializer for exchange storage
-    - added `_prepare_camulator_surface_forcing()` for NaN cleanup, land-mask fallback, and rescaling through `jax.numpy`
-    - added `_map_camulator_prediction_arrays()` to map host-transferred CAMulator tensor outputs into JAX-backed VerCOR runtime fields
-    - kept all Torch tensor creation, xarray output, and NetCDF writes host-side
-  - `vercor/components/data/camulator_land.py`
-    - initialized and stepped land surface temperature storage with JAX arrays
-- Added `tests/test_camulator_component_kernels.py`:
-  - `jax.jit` coverage for the CAMulator surface-forcing and prediction-mapping helpers
-  - reverse-mode gradient smoke test for surface-forcing preparation
-  - flux sign, pressure/height, shape, and JAX runtime-storage checks
-  - lightweight patched CAMulatorLand coverage without real CAMulator model files
-- Updated `DEPENDENCIES.md` to describe the CAMulator adapter and land forcing layer.
-
-## Validation (Slice 8A CAMulator Boundary, 2026-04-24)
-
-- `conda run -n scipy pytest tests/test_camulator_component_kernels.py -q`
-  - passed
-- `conda run -n scipy black vercor examples tests`
-  - passed
-  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check warning but completed successfully
-- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
-  - passed (`0`)
-- `conda run -n scipy mypy vercor examples tests`
-  - passed
-- `conda run -n scipy pytest tests/ -q --fast`
-  - passed
-- `conda run -n scipy pytest tests/ -q`
-  - passed
-
 ## Notes / Failed Approaches (Slice 8A)
 
 - The first flake8 pass surfaced an unrelated stale `numpy` import in `tests/_tools_support.py`; removing it restored the project lint count to `0`.
@@ -3636,24 +3533,19 @@
     - Veros grid mask derivation now uses JAX-backed array logic
     - initialized and refreshed sea-surface temperature storage is now explicitly JAX-backed
     - NumPy conversion remains at the Veros state mutation boundary
-  - `vercor/components/external/camulator.py`
-    - CAMulator static component mask construction now enters VerCOR as a JAX array
-    - Torch, xarray, and NetCDF host boundaries remain unchanged
   - `vercor/components/external/jax_gcm_tools.py`
     - public helper annotations were widened from NumPy-only arrays to the shared `RuntimeArray` alias
 - Extended targeted coverage:
   - `tests/test_external_components_coverage.py`
     - lightweight JAXGCM constructor coverage for JAX-backed grid and sigma-level storage
     - Veros constructor and runtime SST storage coverage for JAX-backed arrays
-  - `tests/test_camulator_component_kernels.py`
-    - lightweight CAMulatorGCM constructor coverage for JAX-backed static masks
 - `DEPENDENCIES.md` did not require changes because no new module-level dependency edge was introduced.
 
 ## Validation (Slice 9A External Adapter Boundary Cleanup, 2026-04-24)
 
-- `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py tests/test_external_tools_coverage.py -q`
+- `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_external_tools_coverage.py -q`
   - passed
-- `conda run -n scipy mypy vercor/components/external/jax_gcm.py vercor/components/external/veros_gcm.py vercor/components/external/camulator.py vercor/components/external/jax_gcm_tools.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py`
+- `conda run -n scipy mypy vercor/components/external/jax_gcm.py vercor/components/external/veros_gcm.py vercor/components/external/jax_gcm_tools.py tests/test_external_components_coverage.py `
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -3699,39 +3591,7 @@
 
 - No failed implementation approaches. The slice kept Veros object mutation host-side and only moved the VerCOR-side flux/SST handoff later in the boundary.
 
-## Ninth JAX Translation Slice 9C: CAMulator Forcing Boundary Cleanup
-
-- Tightened the remaining CAMulator forcing-input boundary while preserving Torch, xarray, CREDIT, and NetCDF as explicit external runtime boundaries:
-  - added JAX helpers in `vercor/components/external/camulator.py` for dynamic forcing layout conversion and CAMulator SST input expansion
-  - added a single explicit JAX-to-host-to-Torch transfer helper for CAMulator step inputs
-  - replaced inline dynamic forcing `np.stack(...)` and inline SST `torch.tensor(np.asarray(...))` staging in `CAMulatorGCM.step()`
-  - replaced static forcing `np.stack(...)` in `vercor/components/external/camulator_state.py` with xarray `to_array(...)` staging before the Torch boundary
-- Extended `tests/test_camulator_component_kernels.py` with:
-  - `jax.jit` coverage for dynamic forcing layout conversion and SST input expansion
-  - static forcing order/shape coverage through the xarray/Torch helper
-  - lightweight patched `CAMulatorGCM.step()` coverage confirming dynamic forcing shape, SST tensor shape, and JAX-backed total surface temperature storage
-- `DEPENDENCIES.md` did not require changes because no new module-level dependency edge was introduced.
-
-## Validation (Slice 9C CAMulator Forcing Boundary Cleanup, 2026-04-24)
-
-- `conda run -n scipy pytest tests/test_camulator_component_kernels.py -q`
-  - passed
-- `conda run -n scipy black vercor examples tests`
-  - passed
-  - note: Black emitted the existing Python 3.13 vs target-3.14 safety-check warning but completed successfully
-- `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`
-  - passed (`0`)
-- `conda run -n scipy mypy vercor examples tests`
-  - passed
-- `conda run -n scipy pytest tests/ -q --fast`
-  - passed
-- `conda run -n scipy pytest tests/ -q`
-  - passed
-
 ## Notes / Failed Approaches (Slice 9C)
-
-- The first helper implementation used `torch.as_tensor()` directly on a JAX host transfer, which produced a read-only NumPy-array warning from Torch. The final helper copies the host array before constructing the Torch tensor.
-- The first `mypy` pass rejected fake test accessors assigned to `CAMulatorGCM` attributes; the final test casts the manually constructed component to `Any` because this is intentionally patched wrapper coverage rather than normal construction.
 
 ## Tenth JAX Translation Slice 10A: Shared Runtime Array Boundaries
 
@@ -3781,22 +3641,16 @@
     - widened `set_variable()` to accept mixed `RuntimeArray` inputs
     - moved the JAX-to-host conversion inside the Veros mutable-state boundary
     - stopped converting prepared forcing fields to NumPy before calling `set_variable()`
-  - `vercor/components/external/camulator.py`
-    - removed the adapter-local JAX-to-host helper
-    - reused the shared host-transfer helper for Torch tensor staging and CAMulator output mapping inputs
-    - removed the now-unused NumPy import from the adapter
 - Extended focused boundary tests:
   - `tests/test_external_components_coverage.py`
     - asserts JAXGCM forcing copy receives host NumPy arrays with the existing transpose convention
     - asserts Veros `set_variable()` accepts JAX-backed inputs and stores host arrays at the mutation boundary
     - asserts `VerosGCM.step()` passes JAX-backed prepared forcing fields into `set_variable()`
-  - `tests/test_camulator_component_kernels.py`
-    - asserts CAMulator Torch staging copies host data so mutating the tensor does not mutate the JAX source
 - `DEPENDENCIES.md` did not require changes because no new module-level dependency edge was introduced.
 
 ## Validation (Slice 10B External Host Transfer Centralization, 2026-04-24)
 
-- `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q`
+- `conda run -n scipy pytest tests/test_external_components_coverage.py -q`
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -3805,8 +3659,7 @@
   - passed (`0`)
 - `conda run -n scipy mypy vercor examples tests`
   - passed
-- `conda run -n scipy pytest tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q`
-  - passed after Black reformatted `vercor/components/external/camulator.py`
+- `conda run -n scipy pytest tests/test_external_components_coverage.py -q`
 - `conda run -n scipy pytest tests/ -q --fast`
   - passed
 - `conda run -n scipy pytest tests/ -q`
@@ -3814,7 +3667,7 @@
 
 ## Notes / Failed Approaches (Slice 10B)
 
-- No failed implementation approaches. The slice keeps NumPy, xarray, Torch, Matplotlib, and Veros object mutation as explicit host-only boundaries.
+- No failed implementation approaches. The slice keeps NumPy, xarray, Matplotlib, and Veros object mutation as explicit host-only boundaries.
 
 ## Eleventh JAX Translation Slice 11A: ERA5 Land Adapter
 
@@ -3901,14 +3754,10 @@
     - added `_prepare_jcm_land_runtime_fields()` for JAX-backed coordinate conversion plus transposed land temperature and soil-moisture storage
     - kept `_coordinates_in_degrees()` as the existing public test helper and routed it through the shared coordinate logic
     - `JCMLand.__init__()` now stores both land-surface temperature and soil moisture from the helper output
-  - `vercor/components/data/camulator_land.py`
-    - added `_prepare_camulator_land_surface_temperature()` for JAX-backed CAMulator land-temperature storage
-    - `CAMulatorLand.step()` now uses the helper at the xarray-to-runtime boundary
 - Extended focused coverage:
   - `tests/test_data_component_kernels.py`
     - `jax.jit` coverage for the new JCM land runtime helper
     - reverse-mode gradient smoke coverage for JCM land temperature and soil-moisture passthrough
-    - `jax.jit` coverage for the CAMulator land temperature helper
   - `tests/test_component_models_coverage.py`
     - asserts JCM land `soil_moisture` is JAX-backed, matching the existing temperature assertion
   - `tests/test_production_numpy_boundaries.py`
@@ -3917,7 +3766,7 @@
 
 ## Validation (Slice 12A Land Adapter JAX Boundary Cleanup, 2026-04-24)
 
-- `conda run -n scipy pytest tests/test_data_component_kernels.py tests/test_component_models_coverage.py tests/test_camulator_component_kernels.py tests/test_production_numpy_boundaries.py -q`
+- `conda run -n scipy pytest tests/test_data_component_kernels.py tests/test_component_models_coverage.py tests/test_production_numpy_boundaries.py -q`
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -3939,7 +3788,6 @@
 
 - Tightened the production NumPy-boundary audit now that the NumPy-to-JAX migration phase is reduced to explicit host-only boundaries:
   - `tests/test_production_numpy_boundaries.py`
-    - removed the stale CAMulator-state allowance from the direct NumPy boundary set
     - changed the assertion from subset matching to exact matching so new direct production NumPy imports fail immediately
     - preserved `veros.core.operators.numpy as npx` as a Veros backend boundary rather than a direct NumPy dependency
 - Confirmed the remaining direct NumPy imports are intentionally limited to:
@@ -3980,7 +3828,7 @@
   - `vercor/coupler.py`
     - routed `interpolate_and_dispatch_fields()` through the pure exchange dispatcher while preserving `Shared` / `TimedNamedArray` wrapper behavior
     - added `run_differentiable()` using `jax.lax.scan` over static run-sequence and exchange metadata
-- The differentiable runtime currently supports VerCOR-owned slab components end to end. File I/O, plotting, Veros mutable state, Torch/CAMulator, xarray, and NetCDF remain explicit host-only boundaries.
+- The differentiable runtime currently supports VerCOR-owned slab components end to end. File I/O, plotting, Veros mutable state, xarray, and NetCDF remain explicit host-only boundaries.
 - Updated `DEPENDENCIES.md` with the new runtime layer.
 
 ## Tests Added (Slice 13A)
@@ -4055,7 +3903,7 @@
 - Hardened the pure slab differentiable runtime for non-identical component grids without changing the public `run_differentiable(initial_state=None)` or `create_differentiable_state(prefill_missing=True)` APIs:
   - added mixed-grid four-slab coverage with ATM/LND on a 2x2 grid and OCN/ICE on a 3x3 grid
   - exercised real conservative OCN -> ATM remapping and real bilinear ATM -> OCN / OCN -> ICE remapping inside `jax.lax.scan`
-  - kept external adapters, file I/O, plotting, Torch/CAMulator, xarray, NetCDF, and Veros object mutation outside the differentiable runtime path
+  - kept external adapters, file I/O, plotting, xarray, NetCDF, and Veros object mutation outside the differentiable runtime path
 - Strengthened differentiable-runtime preflight validation in `vercor/coupler.py`:
   - exported source fields must exist before entering the scan
   - source/data/incoming runtime fields must match their owning component grid shape
@@ -4096,7 +3944,7 @@
   - `Coupler.run_differentiable()` now scans over precomputed step metadata instead of deriving forcing times inside the traced body
   - runtime field sending now supports direct 2D fields, monthly interpolated forcing cubes, and daily time-sliced forcing arrays
   - differentiable component validation now accepts VerCOR slab components plus pure data-forcing adapters (`ERA5Atmosphere`, `ERA5Ocean`, `ERA5Land`, `ERAInterimOcean`, and `JCMLand`)
-  - external runtime boundaries, including CAMulator-backed land forcing, were rejected at this stage; Slice 16A replaced this with unified runtime-state acceptance
+
 - Added a pure data-component runtime step for `ERA5Atmosphere`:
   - combines imported land and sea surface temperatures into `total_surface_temperature`
   - keeps other supported data-forcing components as no-op steps whose runtime behavior is forcing replay through `send_component_fields()`
@@ -4112,7 +3960,6 @@
   - a lightweight real data-component coupler using manually constructed `ERA5Ocean`, `ERA5Land`, and `ERA5Atmosphere` instances without asset downloads
   - gradient coverage through data-forcing replay into the atmosphere diagnostic
   - a data-to-slab runtime path using a real bilinear regridder
-  - unsupported CAMulator land-boundary validation coverage
 
 ## Validation (Slice 14A, 2026-04-24)
 
@@ -4203,7 +4050,7 @@
   - added JAXGCM support detection and preflight payload validation
   - added a pure JAXGCM runtime step that prepares surface-temperature forcing, calls the existing JCM step function, maps JCM outputs back into runtime fields, and skips prediction history / file output
 - Preserved explicit host/runtime boundaries at this stage; this was superseded by Slice 16A:
-  - CAMulator and Veros were still rejected by `run_differentiable()`
+  - Veros were still rejected by `run_differentiable()`
   - JAXGCM imperative `step()` still owns host transfers and output writing outside the pure runtime path
 - Pre-seeded JAXGCM runtime output fields, including 3D pressure from sigma-level count, so `jax.lax.scan` carries a stable PyTree structure.
 - Updated `DEPENDENCIES.md` with the JAXGCM runtime payload dependency edge.
@@ -4252,12 +4099,11 @@
   - ERA5Atmosphere data-runtime diagnostics now require land, sea, and total surface temperature fields up front
   - JAXGCM runtime states now validate all pre-seeded 2D output fields plus the sigma-level pressure field before traced execution
 - Clarified unsupported external boundary errors at this stage; this was superseded by Slice 16A:
-  - CAMulator components were reported as explicit host/runtime boundaries
   - VerosGCM was reported as an explicit host/runtime boundary
 - Extended differentiable integration coverage:
   - data-forcing ERA5Ocean now replays into a JAXGCM runtime component under `jax.jit`, `jax.grad`, and `jax.jvp`
   - missing slab required data, missing import/export data, and missing JAXGCM preseeded pressure now raise `CouplerError` before traced execution
-  - CAMulatorLand and VerosGCM rejection tests also asserted their VerCOR boundary data remained JAX-backed; Slice 16A replaced these with runtime-acceptance tests
+  - VerosGCM rejection tests also asserted their VerCOR boundary data remained JAX-backed; Slice 16A replaced these with runtime-acceptance tests
 - `DEPENDENCIES.md` did not require changes because no new module-level dependency edge was introduced.
 
 ## Validation (Slice 15B, 2026-04-27)
@@ -4296,15 +4142,15 @@
   - slab atmosphere, ocean, land, and sea-ice runtime steps now live in their component files
   - ERA5 atmosphere surface-temperature diagnostics now live in `vercor/components/data/era5_atmosphere.py`
   - JAXGCM runtime payload, validation, and immutable step logic now live in `vercor/components/external/jax_gcm.py`
-  - CAMulatorGCM and VerosGCM expose host-backed runtime-step overrides in their own component files
-- Removed CAMulator and Veros runtime-validation rejection paths. They now create and validate runtime state through the same component interface, with host internals remaining explicit component-owned boundaries.
-- Updated runtime/coupler tests so `Coupler.run()` is verified against runtime dispatch/receive/step/send order, and CAMulatorLand / VerosGCM are accepted by runtime state creation instead of rejected.
+  - VerosGCM expose host-backed runtime-step overrides in their own component files
+- Removed Veros runtime-validation rejection paths. They now create and validate runtime state through the same component interface, with host internals remaining explicit component-owned boundaries.
+- Updated runtime/coupler tests so `Coupler.run()` is verified against runtime dispatch/receive/step/send order, and VerosGCM are accepted by runtime state creation instead of rejected.
 
 ## Validation (Slice 16A, 2026-04-27)
 
 - `conda run -n scipy pytest tests/test_runtime_state.py tests/test_runtime_exchange.py tests/test_differentiable_coupler_runtime.py tests/test_coupler_coverage.py -q`
   - passed
-- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q`
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_component_models_coverage.py tests/test_external_components_coverage.py -q`
   - passed
 - `conda run -n scipy pytest tests/test_runtime_state.py tests/test_runtime_exchange.py tests/test_differentiable_coupler_runtime.py tests/test_coupler_coverage.py tests/test_component_base_coverage.py -q`
   - passed
@@ -4332,7 +4178,7 @@
 - Removed remaining duplicated compatibility helpers:
   - deleted stale slab/data runtime validators from `vercor/coupler.py`
   - deleted `is_supported_differentiable_component()` and `step_slab_component_state()` from `vercor/runtime.py`
-  - removed no-op CAMulatorGCM and VerosGCM `step_runtime_state()` overrides so both use the shared base host-boundary implementation
+  - removed no-op VerosGCM `step_runtime_state()` overrides so both use the shared base host-boundary implementation
   - removed the old non-runtime `Component.send_fields()` interpolation/time-slice fallback
 - Updated tests so compatibility methods are checked as runtime delegates, while `create_runtime_state()` is covered as the canonical state factory.
 - `DEPENDENCIES.md` did not require changes because no new module-level dependency edge was introduced.
@@ -4354,8 +4200,6 @@
   - passed
 
 ## Notes / Failed Approaches (Slice 16B)
-
-- An intermediate lint run caught a stale unused `Any` import in `vercor/components/external/camulator.py` after removing its no-op runtime override. The import was removed and flake8 then reported `0`.
 
 ## Sixteenth JAX Translation Slice 16C: Unified Runtime Cleanup Completion
 
@@ -4390,7 +4234,7 @@
 
 ## Notes / Failed Approaches (Slice 16C)
 
-- No failed implementation approaches. The slice kept Veros, CAMulator, Torch, xarray, NetCDF, and file output as explicit component-owned host boundaries while unifying the VerCOR runtime interface around immutable runtime state.
+- No failed implementation approaches. The slice kept Veros, xarray, NetCDF, and file output as explicit component-owned host boundaries while unifying the VerCOR runtime interface around immutable runtime state.
 
 ## Sixteenth JAX Translation Slice 16D: Remove Legacy Differentiable API
 
@@ -4428,14 +4272,11 @@
 - Completed the unified-runtime audit / hardening pass requested after Slice 16D:
   - confirmed the legacy divergent public APIs remain absent (`run_differentiable`, `create_differentiable_state`, and `interpolate_and_dispatch_fields`)
   - confirmed generic runtime.py remains limited to immutable runtime state plus exchange dispatch, with component-specific runtime stepping kept in component modules
-  - added direct `Coupler.run(..., commit_wrappers=False)` coverage for `CAMulatorGCM` so CAMulator atmosphere, CAMulator land, Veros, slab, data, and JAXGCM adapters are all covered through the canonical runtime-state path
 - No production code changes were required; the slice only added targeted regression coverage.
 - `DEPENDENCIES.md` did not require changes because no new module dependency edge was introduced.
 
 ## Validation (Slice 16E, 2026-04-27)
 
-- `conda run -n scipy pytest tests/test_coupler_runtime.py::test_run_accepts_camulator_gcm_runtime_boundary -q`
-  - passed
 - `conda run -n scipy pytest tests/ -q --fast`
   - passed
 - `conda run -n scipy black vercor examples tests`
@@ -4450,8 +4291,6 @@
 
 ## Notes / Failed Approaches (Slice 16E)
 
-- No failed implementation approaches. The audit found only the missing direct CAMulatorGCM runtime-acceptance coverage, which is now locked by a lightweight test that avoids model-file, Torch, and xarray execution boundaries.
-
 ## Sixteenth JAX Translation Slice 16F: Runtime-First Component API Cleanup
 
 - Completed the remaining wrapper-era component cleanup:
@@ -4462,8 +4301,6 @@
 - Replaced the last production `component.import_fields(...)` call in `Coupler._commit_runtime_incoming_fields()` with direct assignment of runtime-built `Shared` incoming fields.
 - Removed redundant no-op `initialize()` / `step()` implementations from data-forcing components and redundant `step()` wrappers from slab components and `ERA5Atmosphere`.
 - Moved host-backed adapter stepping into component-owned runtime overrides:
-  - `CAMulatorLand.step_runtime_state()`
-  - `CAMulatorGCM.step_runtime_state()`
   - `VerosGCM.step_runtime_state()`
 - Updated `JAXGCM.step_runtime_state()` so host bookkeeping, prediction storage, logging, and optional output happen when `time` and `coupler` are supplied, while scanned runtime execution remains side-effect free.
 - Extended regression coverage so the removed component import/export API is absent, base `step()` delegates through runtime state, `Coupler` no longer calls `import_fields`, and external runtime stepping remains in component files.
@@ -4471,7 +4308,7 @@
 
 ## Validation (Slice 16F, 2026-04-27)
 
-- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_runtime_state.py tests/test_coupler_runtime.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q`
+- `conda run -n scipy pytest tests/test_component_base_coverage.py tests/test_runtime_state.py tests/test_coupler_runtime.py tests/test_external_components_coverage.py -q`
   - passed
 - `conda run -n scipy black vercor examples tests`
   - passed
@@ -4488,7 +4325,6 @@
 ## Notes / Failed Approaches (Slice 16F)
 
 - The first focused test run exposed old tests that constructed host-backed external components through `__new__()` and called `step()` directly, bypassing the base runtime state expected by the new compatibility wrapper. The tests now call `step_runtime_state()` with explicit `RuntimeComponentState` objects for those patched adapter-boundary cases.
-- The first `mypy` pass rejected `CAMulatorLand.step_runtime_state()` because it accepted the broader `CustomDateTime` alias while `commit_runtime_state()` expects `ModelDateTime`; the annotation was narrowed to the base runtime contract.
 
 ## Wrapper Runtime Startup Prefill Fix
 
@@ -4544,7 +4380,7 @@
   - `step_slab_component_state`
   - `is_supported_differentiable_component`
 - Rechecked patched external-component tests that construct components through `__new__()`:
-  - host-backed Veros and CAMulator boundary tests now call `step_runtime_state()` with explicit `RuntimeComponentState` objects where they exercise runtime behavior
+  - host-backed Veros boundary tests now call `step_runtime_state()` with explicit `RuntimeComponentState` objects where they exercise runtime behavior
   - remaining direct `step()` tests cover the current compatibility wrapper, not removed APIs
 - No stale behavior tests were found, so no unit tests were removed.
 - Confirmed the production NumPy-boundary audit still limits direct NumPy imports to explicit host/type/output boundary modules:

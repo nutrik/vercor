@@ -74,7 +74,7 @@ final Mermaid text is recorded in `diagram-notes.txt`.
 Run:
 
 ```bash
-grep -nE "performance|speedup|faster|benchmark|fully differentiable|CAMulator" \
+grep -nE "performance|speedup|faster|benchmark|fully differentiable" \
   .codex/vercor-research-presentation/source-notes.txt
 ```
 
@@ -152,7 +152,7 @@ compiled differentiable execution from host execution.
 - [ ] **Step 5: Implement slides 10–12**
 
 - slide 10: building blocks overview covering slab components, forcing data,
-  JCM, Veros, and CAMulator with compatibility caveats;
+  JCM and Veros with compatibility caveats;
 - slide 11: four contracts with one compact annotated structural-component
   example;
 - slide 12: five-stage integration pathway.

@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the public protocol-first design and immutable prepared runtime boundary. Simplify only private owners: delete unread state, put shared behavior on existing cohesive classes/helpers, return topology maps directly, remove one-use modules, shrink interpolator PyTrees, and copy Veros state once per forcing update.
 
-**Tech Stack:** Python 3.13, JAX, NumPy, pytest/pytest-xdist, mypy, Black, flake8, h5netcdf/xarray, optional Veros and CAMulator adapters.
+**Tech Stack:** Python 3.13, JAX, NumPy, pytest/pytest-xdist, mypy, Black, flake8, h5netcdf/xarray, optional Veros adapters.
 
 ## Global Constraints
 
@@ -26,7 +26,6 @@
 - `vercor/output/_dataset.py`: shared output-dimension inference; `_session.py` owns immutable accumulation.
 - `vercor/_runtime/topology*.py`, `surface_masks.py`, `initialization.py`, `prepared.py`: direct immutable topology-map flow.
 - `vercor/_runtime/facade.py`: constructs run context and coordinates execution directly; `runner.py` is removed.
-- `vercor/setups/_external/camulator*.py`: supported named-checkpoint initialization only; no inert spinup state.
 - `vercor/_interpolators/bilinear_rectilinear.py`: only operational interpolation leaves and static metadata.
 - `vercor/setups/_external/veros_state.py`: one copy/unlock for a four-field forcing update.
 - Existing focused tests remain with their subsystem; private layout assertions are replaced with behavioral invariants.
@@ -662,83 +661,6 @@ git add vercor/_runtime/facade.py vercor/_runtime/runner.py tests/_runtime_helpe
 git commit -m "refactor: remove runtime execution wrappers"
 ```
 
-### Task 6: Remove unreachable CAMulator modes and inert spinup state
-
-**Files:**
-- Modify: `vercor/setups/_external/camulator_init.py`
-- Modify: `vercor/setups/_external/camulator_imports.py`
-- Modify: `vercor/setups/_external/camulator_gcm_state.py`
-- Modify: `vercor/setups/_external/camulator.py`
-- Modify: `tests/test_camulator_component_kernels.py`
-- Modify: `tests/test_external_components_coverage.py`
-- Modify: `tests/test_setup_boundaries.py`
-
-**Interfaces:**
-- Produces: `initialize_camulator(config_path: str, model_name: str, device: str = "cuda", logger: LoggerLike | None = None) -> dict[str, Any]`.
-- Preserves: factory-level rejection of `Spinup(enabled=True)` before optional runtime configuration.
-
-- [ ] **Step 1: Write failing supported-path tests**
-
-Update the initialization test to assert only the named loader is used:
-
-```python
-monkeypatch.setattr(
-    camulator_imports,
-    "load_model_name",
-    lambda conf, model_name, load_weights: _Model(),
-)
-assert not hasattr(camulator_imports, "distributed_model_wrapper")
-assert not hasattr(camulator_imports, "load_model_state")
-assert not hasattr(camulator_imports, "load_model")
-```
-
-Add to the factory boundary test by monkeypatching `CAMulatorGCMSetupState` and recording constructor kwargs:
-
-```python
-assert "spinup_time" not in state_kwargs
-assert "do_spinup" not in state_kwargs
-```
-
-Remove CAMulator-GCM tests that manufacture `spinup_steps`; retain JAXGCM and Veros spinup tests.
-
-- [ ] **Step 2: Run tests to verify RED**
-
-```bash
-/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest \
-  tests/test_camulator_component_kernels.py \
-  tests/test_external_components_coverage.py \
-  tests/test_setup_boundaries.py -q --tb=short
-```
-
-Expected: deleted-import and constructor-argument assertions fail.
-
-- [ ] **Step 3: Implement the supported named-checkpoint path**
-
-Change `initialize_camulator` to require `model_name: str`, always call:
-
-```python
-log.info(f"Loading model: {model_name}")
-model = camulator_imports.load_model_name(
-    conf,
-    model_name,
-    load_weights=True,
-).to(current_device)
-```
-
-Delete `load_model`, `distributed_model_wrapper`, and `load_model_state` globals/imports; delete the unreachable distributed block. Remove `spinup_time` and `do_spinup` from `CAMulatorGCMSetupState`, remove `spinup_steps` calculation, and stop passing those arguments from `make_camulator_gcm`.
-
-- [ ] **Step 4: Run focused tests and fast suite**
-
-Run Step 2 and the fast suite. Expected: all pass and missing-dependency errors remain unchanged.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add vercor/setups/_external/camulator* tests/test_camulator_component_kernels.py \
-  tests/test_external_components_coverage.py tests/test_setup_boundaries.py
-git commit -m "refactor: remove unsupported camulator modes"
-```
-
 ### Task 7: Shrink bilinear interpolator PyTree state
 
 **Files:**
@@ -994,7 +916,7 @@ Expected: Black completes, flake8 reports zero errors, mypy succeeds, compileall
   tests/test_v0_4_output_providers.py \
   tests/test_runtime_state.py \
   tests/test_runtime_facade_boundaries.py \
-  tests/test_camulator_component_kernels.py \
+  \
   tests/test_external_components_coverage.py \
   tests/test_external_tools_coverage.py -q --tb=short
 ```

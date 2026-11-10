@@ -20,8 +20,7 @@ full Veros-state copies.
   policies, and output providers.
 - Preserve exact runtime validation coverage and error semantics. This change
   does not remove validation calls whose redundancy has not been profiled.
-- Preserve lazy imports for JCM/JAXGCM, Veros, CAMulator, Torch, TensorFlow,
-  CREDIT, and other optional frameworks.
+- Preserve lazy imports for JCM/JAXGCM, Veros, and other optional frameworks.
 - Use test-driven changes. Refactoring tests should assert observable behavior
   and invariants rather than require unnecessary private module placement.
 - Do not change ignored public physics parameters, public field-name catalogs,
@@ -40,9 +39,7 @@ Delete state that has no reader or runtime effect:
 - the unused virtual-temperature helper in `vercor.fluxes.utilities`;
 - setup-only `_data_files` and `_hybrid_coefficients` attributes;
 - `FieldStore.get_or_zeros_like()` and `RuntimeTopologyMaps.empty()`;
-- unreachable CAMulator distributed-mode imports and branches; and
-- inert CAMulator spinup state after retaining the factory's explicit rejection
-  of enabled spinup.
+
 
 No replacement abstraction will be introduced for deleted state. If a future
 feature needs one of these values, it must add it at the real point of use with
@@ -137,8 +134,7 @@ then compare updated values with the pre-refactor behavior.
 All supported exceptions and validation messages remain unchanged unless they
 name a deleted private type. Removing wrappers must not broaden caught
 exceptions or suppress component, topology, output, JAX, or external-framework
-errors. CAMulator continues to reject enabled spinup explicitly before model
-initialization.
+errors.
 
 Private-layout tests affected by the cleanup will be replaced with positive
 tests for retained invariants: frozen topology mappings, component lookup
@@ -155,7 +151,7 @@ by the fast suite. Before the final commit, run:
 3. mypy on `vercor`, `examples`, and `tests`.
 4. `compileall` for source, examples, and tests.
 5. Focused component, regridding, interpolator, output, runtime/topology,
-   CAMulator, JAXGCM, and Veros tests.
+   JAXGCM and Veros tests.
 6. `pytest tests/ -q --fast`.
 7. The complete parallel test suite and branch coverage gate.
 8. `git diff --check`.

@@ -75,8 +75,6 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     import vercor.diagnostics as diagnostics_module
     import vercor.diagnostics.fields as diagnostic_fields_module
     from vercor.fluxes.bulk_formula_cesm import compute_ocean_surface_fluxes
-    from vercor.setups._external.camulator import make_camulator_gcm
-    from vercor.setups._external.camulator_land import make_camulator_land
     from vercor.setups._external.jax_gcm import make_jcm_atmosphere
     from vercor.setups._external.veros_gcm import make_veros_gcm
     from vercor.setups._jcm import make_jcm_land_atmosphere
@@ -87,8 +85,6 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert (
         diagnostics_module.ComponentMetric is diagnostic_fields_module.ComponentMetric
     )
-    assert make_camulator_gcm.__module__ == "vercor.setups._external.camulator"
-    assert make_camulator_land.__module__ == ("vercor.setups._external.camulator_land")
     assert make_jcm_atmosphere.__module__ == "vercor.setups._external.jax_gcm"
     assert make_jcm_land_atmosphere.__module__ == "vercor.setups._jcm"
     assert make_veros_gcm.__module__ == "vercor.setups._external.veros_gcm"
@@ -204,12 +200,6 @@ def test_runtime_modules_use_current_domain_owners() -> None:
         encoding="utf-8"
     )
     veros_setup_source = Path("vercor/setups/_external/veros_setup.py").read_text(
-        encoding="utf-8"
-    )
-    camulator_source = Path("vercor/setups/_external/camulator.py").read_text(
-        encoding="utf-8"
-    )
-    camulator_land_source = Path("vercor/setups/_external/camulator_land.py").read_text(
         encoding="utf-8"
     )
     veros_runtime_settings_source = Path(
@@ -475,11 +465,6 @@ def test_runtime_modules_use_current_domain_owners() -> None:
     assert "getattr(" not in diagnostics_source
     assert "def make_jcm_atmosphere" in jax_gcm_source
     assert "def make_veros_gcm" in veros_source
-    assert "def make_camulator_gcm" in camulator_source
-    assert "def make_camulator_land" in camulator_land_source
-    assert "load_camulator_forcing_context" in camulator_land_source
-    assert "initialize_camulator(" not in camulator_land_source
-    assert "vercor.setups._external.camulator import" not in camulator_land_source
     assert (
         "from vercor.setups._external.veros_runtime_settings import *"
         not in veros_source
@@ -494,12 +479,6 @@ def test_runtime_modules_use_current_domain_owners() -> None:
         "configure_veros_runtime("
     ) < veros_factory_source.index("_load_veros_implementation()")
     assert "def configure_veros_runtime" in veros_runtime_settings_source
-    signature = camulator_land_source.split("def step(", 1)[1].split(") ->", 1)[0]
-    assert "coupler" not in signature
-    assert "context" in signature
-    assert "logger" not in signature
-    assert "runtime_settings" not in signature
-    assert "component_state.fields.to_mapping()" not in camulator_land_source
     assert "def compute_ocean_surface_fluxes" in flux_source
 
 

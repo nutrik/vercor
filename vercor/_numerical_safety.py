@@ -96,14 +96,6 @@ def require_mask_values(values: Any, *, owner: str, binary: bool) -> None:
     )
 
 
-def require_strictly_positive(values: Any, *, owner: str) -> None:
-    """Reject non-finite, zero, or negative numerical values."""
-
-    array = jnp.asarray(values)
-    invalid_count = jnp.count_nonzero(~jnp.isfinite(array) | (array <= 0))
-    _require_zero(invalid_count, owner, "strictly positive finite values")
-
-
 def replace_missing_nan(
     values: Any,
     *,

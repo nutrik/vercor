@@ -114,7 +114,7 @@ Task-focused pages cover backend selection, output configuration, and safe use
 of the repository examples. Expected failures are explained beside the
 relevant action and summarized on the troubleshooting page:
 
-- missing optional JCM, Veros, or CAMulator dependencies;
+- missing optional JCM or Veros dependencies;
 - exchange fields not declared by both endpoints;
 - host components forced onto the JAX backend;
 - payload PyTree structure, shape, or dtype changes in compiled execution; and

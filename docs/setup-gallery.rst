@@ -77,10 +77,6 @@ Example:
      - Recover native h0 from synthetic concentration with a cold-forcing holdout.
      - Veris
      - No
-   * - ``camulator_with_veros``
-     - Couple CAMulator atmosphere/land to Veros.
-     - CAMulator, Veros
-     - Yes
 
 The table identifies the extra dependency and input-data expectation for each
 setup. ``None`` means that the setup has no model-specific optional package
@@ -214,53 +210,6 @@ JCM
 Its pluggable dynamical-core interface currently ships with the `Dinosaur <https://github.com/neuralgcm/dinosaur>`__
 spectral backend and couples it to modular SPEEDY, Held-Suarez, and ECHAM-style physics packages.
 
-CAMulator
-+++++++++
-
-`CAMulator <https://doi.org/10.48550/arXiv.2504.06007>`__ is an auto-regressive
-machine-learned (ML) emulator of the `Community Atmosphere Model version 6 <https://www.cesm.ucar.edu/models/cam>`__ (CAM6)
-that simulates the next atmospheric state given prescribed sea-surface temperatures
-and incoming solar radiation. It is developed as part of the
-`NSF NCAR Community Research Earth Digital Intelligence Twin project <https://miles-credit.readthedocs.io/en/latest/>`__.
-CAMulator achieves these results with a 350 times speedup over CAM6, making it an efficient alternative for generating large ensembles.
-
-CAMulator configuration paths and checkpoint paths are machine-specific.
-Reconfigure those paths, their associated data, and the checkpoint before
-running a CAMulator driver. The coupled gallery additionally requires
-``VERCOR_CAMULATOR_WATER_VAPOR_VARIABLE`` naming a real vapor-specific
-prognostic variable in the selected model's input and prediction layouts, and
-``VERCOR_CAMULATOR_INITIAL_DIAGNOSTICS`` pointing to native initial-condition
-NetCDF data with ``time``, ``latitude``, ``longitude`` and ``TS/FSNS/FLNS``.
-It selects the exact configured native start time and uses a Gregorian clock.
-The published ``Qtot``-only configuration represents total water and cannot
-supply vapor humidity; it fails explicitly. There is no known locally tested
-vapor-trained checkpoint, and setting an invented channel name does not make
-that checkpoint compatible.
-
-``CAMulatorConfig.initial_diagnostics`` owns a defensive copy of supplied
-setup values. Its ``time`` must equal the effective initial cursor time
-(including explicit ``time_alignment="forcing_start"``). Missing input
-``TS`` is kelvin; ``FSNS`` and ``FLNS`` are downward-positive J/m² accumulated
-over the configured native forecast step. These required absent-input
-channels cannot be reconstructed from a prediction without advancing time.
-Setup decodes only the latest normalized history frame with CREDIT's separate
-``inverse_transform_input``. The pure meteorology kernel is shared with
-prediction mapping and uses traced physical constants for humidity, lowest-level
-pressure, height, density, potential temperature and winds. There is no
-reference-weather or total-water partition fallback.
-
-CAMulator uses the same six ``air_*`` exchange keys as the other bulk-forcing
-producers. Its horizontal ``model_level_air_pressure`` is the lowest hybrid
-level pressure in Pa, distinct from JCM's full-column ``air_pressure_3d``.
-The private ``prepare_camulator_surface_temperature_input`` packs rescaled
-combined land/ocean surface temperature into the native input tensor.
-
-Initial exports are evaluated before existing inference tracing and do not
-advance native prognostic state or cursor or resample initialization noise.
-The immutable runtime payload retains the same initialized model-state sample.
-Host-boundary stand-ins verify startup, energy conversion and finite bulk
-forcing; unavailable CREDIT, model weights and native data prevent a native
-climate or tracing-performance certification.
 
 Veris forcing conventions
 -------------------------
