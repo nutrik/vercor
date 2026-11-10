@@ -15,16 +15,12 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OPTIONAL_MODULE_ROOTS = {
-    "credit",
     "dinosaur",
     "jax_gcm",
     "jcm",
-    "tensorflow",
-    "torch",
     "veros",
 }
 RUNTIME_ENVIRONMENT_KEYS = (
-    "TF_CPP_MIN_LOG_LEVEL",
     "OMP_NUM_THREADS",
     "MKL_NUM_THREADS",
 )
@@ -125,10 +121,10 @@ else:
         "import vercor; import vercor.setups",
         "import vercor.setups as setups; dir(setups)",
         (
-            "from vercor.setups import (CAMulatorConfig, JCMAtmosphereConfig, "
+            "from vercor.setups import (JCMAtmosphereConfig, "
             "JCMLandAtmosphereConfig, Spinup, VerosConfig); "
             "Spinup(); JCMAtmosphereConfig(); VerosConfig(); "
-            "CAMulatorConfig(config_path='config.yml'); JCMLandAtmosphereConfig()"
+            "JCMLandAtmosphereConfig()"
         ),
     ),
 )
@@ -149,7 +145,6 @@ def test_public_import_and_config_access_are_optional_dependency_free(
     (
         ("make_jcm_atmosphere", "vercor.setups._external.jax_gcm"),
         ("make_veros_gcm", "vercor.setups._external.veros_gcm"),
-        ("make_camulator_gcm", "vercor.setups._external.camulator"),
     ),
 )
 def test_lazy_factory_attribute_access_loads_only_lightweight_factory_module(
@@ -199,15 +194,6 @@ def test_vercor_setups_is_the_only_setup_lazy_export_registry() -> None:
             "factory()",
             "requires the Veros package.*pip install veros",
         ),
-        (
-            "make_camulator_gcm",
-            ("credit", "torch"),
-            (
-                "factory(config=setups.CAMulatorConfig("
-                "config_path='missing.yml', device='cpu'))"
-            ),
-            "CREDIT modules are required.*credit is installed",
-        ),
     ),
 )
 def test_missing_optional_dependencies_fail_at_factory_invocation(
@@ -224,39 +210,6 @@ def test_missing_optional_dependencies_fail_at_factory_invocation(
 
     assert result["type"] == "ImportError"
     assert re.search(message, result["message"]) is not None
-
-
-@pytest.mark.fast_always
-def test_camulator_enabled_spinup_fails_before_runtime_configuration(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import vercor.setups as setups
-    import vercor.setups._external.camulator_runtime_settings as runtime_settings
-
-    configuration_calls: list[None] = []
-
-    def unexpected_runtime_configuration() -> None:
-        configuration_calls.append(None)
-        pytest.fail("CAMulator runtime must not be configured for unsupported spinup")
-
-    monkeypatch.setattr(
-        runtime_settings,
-        "configure_camulator_runtime",
-        unexpected_runtime_configuration,
-    )
-
-    with pytest.raises(
-        ValueError,
-        match="CAMulator spinup is not implemented.*Spinup\\(enabled=False\\)",
-    ):
-        setups.make_camulator_gcm(
-            config=setups.CAMulatorConfig(
-                config_path="unused.yml",
-                spinup=setups.Spinup(enabled=True),
-            )
-        )
-
-    assert configuration_calls == []
 
 
 @pytest.mark.fast_always

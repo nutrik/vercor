@@ -35,7 +35,7 @@ each component step.
 - Exposing JCM's pluggable dycore or physics composition as new VerCOR public
   configuration.
 - Changing VerCOR's public root or setup API.
-- Refactoring unrelated slab, Veros, CAMulator, runtime, or output code.
+- Refactoring unrelated slab, Veros, runtime, or output code.
 - Adding compatibility shims for unreleased JCM or Dinosaur development heads.
 
 ## Dependency Policy

@@ -4,10 +4,10 @@ Troubleshooting
 An optional setup cannot be imported
 ------------------------------------
 
-**Symptom.** Importing an optional JCM, Veros, or CAMulator setup fails.
+**Symptom.** Importing an optional JCM, Veros, or Veris setup fails.
 
 **Cause.** The selected setup needs its optional model package or its required
-external data. CAMulator has no documented compatible dependency pin.
+external data.
 
 **Action.** Install and configure the dependency required by the selected
 driver; see :doc:`researchers/running` for the packaged setup gallery and its data

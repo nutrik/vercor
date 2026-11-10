@@ -2,8 +2,7 @@
 
 ## Goal
 
-Align omitted-output behavior across bundled slab, data, JAXGCM, Veros, and
-CAMulator components. Slab and data factories retain complete per-component
+Align omitted-output behavior across bundled slab, data, JAXGCM and Veros components. Slab and data factories retain complete per-component
 `OutputSpec` configurability, but omission no longer silently enables
 step-period averages.
 
@@ -52,7 +51,7 @@ The aligned default applies to:
 - direct JCM land construction; and
 - `JCMLandAtmosphereConfig.land_output`.
 
-JAXGCM, Veros, and CAMulator retain their existing model-native provider and
+JAXGCM and Veros retain their existing model-native provider and
 snapshot-writer installation. Those are adapter-specific representations of
 native model state and are not duplicated for slab/data components, whose
 runtime fields are already covered by final-field output.
@@ -78,7 +77,7 @@ def resolve_output(output: OutputSpec | None = None) -> OutputSpec:
 All slab factories, the shared data helper, and direct JCM land reuse this
 resolver. The step-specific helper is removed. `JCMLandAtmosphereConfig` uses
 `field(default_factory=OutputSpec)` directly, matching `JAXGCMConfig`,
-`VerosConfig`, and `CAMulatorConfig`.
+and `VerosConfig`.
 
 No runtime provider, accumulator, cadence, filename, backend, component
 kernel, or NetCDF writer changes. The output session continues to install its

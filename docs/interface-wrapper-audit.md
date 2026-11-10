@@ -28,8 +28,8 @@ modules (25,882 lines at the baseline), then traced actual construction,
 lifecycle, execution, exchange, output, and gallery call sites. Three independent
 read-only reviews covered native adapters, slab/data/output paths, and
 exchange/remapping. Numerical probes established the findings below. This is
-an interface and implementation audit; it does not certify a native CAMulator
-checkpoint, long-term climate skill, or a generic restart format.
+an interface and implementation audit; it does not certify long-term climate
+skill or a generic restart format.
 
 The source inventory covers 30 root modules, 29 private runtime modules, 12
 component modules, 40 external-adapter modules, 10 prescribed-data modules,
@@ -63,8 +63,6 @@ outputs, initial fields, execution, lifecycle, transfer, output, and masks.
 | JCM atmosphere | CallableComponent, JAX; setup/prefill/validate; native construction at factory | Frozen native state/physics carry/forcing payload; Gregorian epoch and integer native substeps; ordinary intensive SST or explicit water/ice source products | Native provider and snapshot through shared coordinator; unnecessary host mirrors F7; deferred save-interval validation F8 |
 | Veros global | CallableComponent; host stock or capability-gated JAX fork; setup hook | Full native payload; generic host copy before mutation, fork copy for JAX. Global bulk meteorology or total-flux mode | Shared native provider/snapshot. Process-wide backend lock and fixed native climatology need explicit compatibility limits |
 | Veris | CallableComponent, JAX; setup hook and pure native advance | Frozen state/diagnostics/constants/budgets; static wet support, evolving Area; explicit face conversion and fresh forcing each substep | Shared native provider/snapshot; interval-mean total ocean fluxes and per-ice properties; endpoint native payload |
-| CAMulator atmosphere | CallableComponent, host; setup hook, no implemented spinup | Frozen payload with cloned Torch state, cursor, forecast hour, predictions; declared vapor channel; Gregorian datetime forcing | Shared native provider/snapshot; timestamp and partial-block defects F5/F6; native float32 is intentional |
-| CAMulator land | CallableComponent, host; setup hook | Immutable forcing cursor; selects prescribed TS at interval start; fractional land support | Default OutputSpec; unlike other land factories, no explicit output argument |
 | Coupler / orchestrator | Constructor-only assembly; lazy preparation; initial_state and run | Same receive/step/send for all backends; exact plans/chunks, immutable stores, current versus received coverage, declared precision | One output lifecycle; optional native snapshots, no generic restart loader/finalizer protocol |
 
 Primary implementation anchors: `vercor/components/_protocol.py:96`,
@@ -87,8 +85,6 @@ established before remediation; final status and regression evidence follow.
 | F2 | P2 | `vercor/_interpolators/_bilinear_weights.py:42-88` | Indices use clipped/wrapped longitude while weights use raw longitude. Nonperiodic source `[0,10]`, targets `[-5,5,15]` gives `[10,5,10]` instead of `[0,5,10]`; periodic equivalent targets `[45,405,765]` give `[.5,1,1]` instead of `[.5,.5,.5]`. Compute both indices and weights from the same mapped longitude. |
 | F3 | P2 | `vercor/components/_adapter.py:264-300`, `_runtime/field_transfer.py:51-60`, `output/_session.py:316-323` | Non-current policy accepts one-record or static fields. At February 1 a one-record monthly/daily output-only component completes and writes four NaNs; a static monthly field slices the latitude axis. Enforce time-first 12-month / 365-day selectable records, exempt grid-shaped declared masks, and validate setup/prefill/selection through shared infrastructure. |
 | F4 | P2 | `vercor/output/_netcdf.py:37-43,70` | Public OutputVariable accepts Python lists/tuples/scalars, but writer dimension checks require `.shape` before conversion. A custom provider with list coordinate `[0.,1.]` fails after opening its output file. Normalize once at the host writer boundary and define dimensions from that array. |
-| F5 | P1 | `vercor/setups/_external/camulator_runtime.py:37-53,85-86` | NumPy datetime64[ns].item returns an integer; coercion then reads `.year` and fails before inference. Convert datetime-like host values explicitly, validate missing/unsupported times, and preserve standard datetime output. |
-| F6 | P1 | `vercor/setups/_external/camulator_runtime.py:73-85,197-208` | A request for two native forcing records with only one remaining executes one model step, then advances a full coupling cursor. Reject empty/partial blocks before inference; retain payload on failure. Native cadence must agree with the declared interval. |
 | F7 | P2 | `vercor/setups/_external/jax_gcm_runtime.py:478-524` | Forced-host JCM writes unused evolving `_state` and `forcing` mirrors on setup resources. Runtime and providers already use payload; no current corruption was demonstrated. Remove the second evolving authority and verify repeatability/resource identity. |
 | F8 | P3 | `vercor/setups/_external/jax_gcm_state.py:208-240` | A six-hour coupling interval with the default one-day native save interval passes setup but fails on first native execution. Released JCM requires model step to divide save interval and save interval to divide coupling interval. Validate these configuration relations before bootstrap/spinup; do not silently change sampling. |
 
@@ -98,26 +94,23 @@ no-leap forcing axis: Gregorian leap day repeats the preceding no-leap record,
 and a 360-day clock maps dates into the same 365-day record axis
 (`vercor/forcing_index.py:32-46,63-84`).
 
-Two additional boundary checks belong to F3/F6. With global x64 capability
+An additional boundary check belongs to F3. With global x64 capability
 enabled, monthly float32 fields were promoted by float64 interpolation weights;
 exchange stores cast them back, while period output retained float64. Selection
-must preserve the field dtype. Also Clock.start is a standard datetime even for
-synthetic calendars; checking its Python type alone cannot reject CAMulator's
-unsupported no-leap/360-day calendars. Both CAMulator setup paths must validate
-SetupContext.calendar explicitly, before execution or dataset lookup.
+must preserve the field dtype.
 
 ## Field and recipe compatibility
 
 | Exchange contract | Supported producers / consumers | Physical requirements and limits |
 | --- | --- | --- |
-| Atmosphere to ocean bulk forcing | ERA5, JCM, configured CAMulator -> Veros bulk mode | Bottom-level T/theta K, q kg/kg, density kg/m3, height m, wind m/s, radiation W/m2, precipitation kg/m2/s; intensive. Slab atmosphere lacks this contract. |
-| Observed 10 m atmosphere to sea ice | ERA5 -> Veris observed_10m | Separate actual 10 m winds plus colocated model-level thermodynamics. JCM/CAMulator cannot supply observed winds by renaming model-level winds. |
-| Model-level atmosphere to sea ice | JCM -> Veris model_level | Raw downward shortwave and open-water albedo plus bottom-level air; bulk solve diagnoses reference winds. Current ERA5/CAMulator declarations lack the complete recipe. |
+| Atmosphere to ocean bulk forcing | ERA5, JCM -> Veros bulk mode | Bottom-level T/theta K, q kg/kg, density kg/m3, height m, wind m/s, radiation W/m2, precipitation kg/m2/s; intensive. Slab atmosphere lacks this contract. |
+| Observed 10 m atmosphere to sea ice | ERA5 -> Veris observed_10m | Separate actual 10 m winds plus colocated model-level thermodynamics. JCM cannot supply observed winds by renaming model-level winds. |
+| Model-level atmosphere to sea ice | JCM -> Veris model_level | Raw downward shortwave and open-water albedo plus bottom-level air; bulk solve diagnoses reference winds. Current ERA5 declarations lack the complete recipe. |
 | Ocean to Veris forcing | Prescribed Veros snapshot or total-flux Veros -> Veris | SST K, SSS g/kg, face currents m/s, SSH m; exact shared grid/explicit face shifts. Ordinary SST-only ocean components are incomplete. |
 | Veris total ocean boundary | Veris -> Veros surface_fluxes | Interval-mean downward heat W/m2, freshwater and salt kg/m2/s, stress Pa; source_flux with binary source coverage. Scalars conservative, stress vector-capable bilinear. |
 | Water/ice surface composition | Veris and open-water Veros -> JCM seaice_coupling | Form area products on the source grid. Per-ice T/albedo use component fraction; preweighted ice/open-water contributions use binary support. |
-| Ordinary surface temperatures | Prescribed/slab/native surface -> ordinary JCM or slab ATM | K and intensive. CAMulator instead expects source_flux land/ocean contributions before summing them. Field name equality does not imply equal area semantics. |
-| Land state to JCM | JCM/slab land -> JCM | Land temperature K plus dimensionless soil availability. ERA5/CAMulator land provide only temperature. |
+| Ordinary surface temperatures | Prescribed/slab/native surface -> ordinary JCM or slab ATM | K and intensive. Field name equality does not imply equal area semantics. |
+| Land state to JCM | JCM/slab land -> JCM | Land temperature K plus dimensionless soil availability. ERA5 land provides only temperature. |
 | Turbulent heat to slabs | Slab ATM or JCM -> toy ocean/land | Downward W/m2. JCM grid-mean flux applied to toy tiles does not establish separately closed tile budgets. |
 
 One scalar/vector dispatcher owns source weighting, covered normalization and
@@ -137,7 +130,7 @@ fields/grids to RuntimeOptions.dtype. Native payload precision is adapter-owned;
 the generic binding copies arbitrary payload leaves rather than blindly casting
 native categorical or opaque state.
 
-JCM and Veris use pure native transitions. Veros host and CAMulator require
+JCM and Veris use pure native transitions. Veros host requires
 framework-specific mutable native operations within the copied payload boundary.
 Veros host/JAX settings lock process-wide, so separate processes are required.
 These adaptations preserve the public interface and are justified. An additional
@@ -185,25 +178,17 @@ These are not claims of reproduced bundled-model failures:
    rather than binding arbitrary Coupler start/calendar. Reusing one Veros author
    component across Couplers may also accumulate enabled spinup. These need
    explicit date/reuse policy and executable native evidence before a change.
-5. CAMulator declares latent/sensible heat and zero precipitation without a
-   native turbulent/precipitation diagnosis. The supplied Veros bulk path
-   recomputes turbulent fluxes, but a third-party route must not treat placeholder
-   zero exports as measured physical fluxes. Checkpoint vapor semantics and
-   native CREDIT execution remain uncertified here.
 6. Native states and interval rates have distinct temporal support. The
    2026-10-30 repair integrates every native JCM surface rate, diagnoses phases
-   before averaging and averages CAMulator radiation across its complete block.
-   Meteorology remains endpoint state; prescribed CAMulator land remains
-   interval-start TS. Held inputs and explicit sequential feedback still require
+   before averaging. Meteorology remains endpoint state at that historical
+   revision. Held inputs and explicit sequential feedback still require
    coupling-interval convergence studies for transient accuracy.
 7. Output coordinate schemas validate dimensions/dtypes/attributes, while
    same-schema coordinate values may move between samples. A period mean then
    retains the latest coordinates. Moving-grid support or rejection needs an
    explicit provider policy. Public NumPy buffers can also alias OutputVariable
    values; frozen mappings alone do not freeze arbitrary array buffers.
-8. CAMulator land lacks the output argument offered by other land factories;
-   wrapper declarations can still be composed by applications. Add it only for a
-   concrete need, keeping one OutputSpec owner rather than another I/O pathway.
+
 
 ## Recommended standard and reusable template
 
@@ -242,7 +227,7 @@ Detailed local evidence is retained under `/private/tmp/vercor-interface-audit*`
 
 ### Implemented remediation
 
-All eight verified finding groups are implemented using their existing owners:
+All six retained finding groups are implemented using their existing owners:
 
 | Finding | Result and regression evidence |
 | --- | --- |
@@ -250,8 +235,6 @@ All eight verified finding groups are implemented using their existing owners:
 | F2 | Bilinear cell fractions use mapped longitude. Scalar/vector whole-turn and endpoint tests cover float32/64; independently derived source JVP/VJP expectations remain explicit in `tests/test_bilinear_rectilinear_regridder.py`. |
 | F3 | One helper validates setup, prefill and selector layouts; monthly weights adopt field dtype. Tests cover valid surface/level records, static masks, invalid records, float32/64 AD and identical send/output precision. Short synthetic fixtures now use complete climatologies while preserving selected values and gradient-zero regions. |
 | F4 | Shared writer converts coordinate/data values to host once before checking dimensions. Public provider runs persist list/tuple/scalar coordinates and attributes. Output-free execution gains no host conversion. |
-| F5 | CAMulator converts nanosecond/microsecond datetime scalars and scalar arrays correctly and rejects NaT before inference. |
-| F6 | CAMulator checks complete forcing blocks and native timestamp cadence, including initialized nonzero-index cursors. Both setup hooks reject non-Gregorian calendars before noise, mutation or dataset lookup. Failure tests verify no native calls or payload advancement. |
 | F7 | JCM no longer mutates setup-owner state/forcing during host execution; its runtime returns StepResult directly. Tests verify unchanged resources, equivalent repeated transitions from one payload, and real native forcing inputs. |
 | F8 | JCM validates positive save interval, model-step divisibility and coupling-interval divisibility before bootstrap. Invalid configurations now fail at the owning lifecycle boundary. |
 
@@ -292,7 +275,7 @@ Twine was absent in both existing environments, so it ran from a temporary
 target directory; neither conda environment was modified. The AD lane retains
 the existing native int64-to-int32 scatter FutureWarning and two upstream JCM/
 xarray FutureWarnings. These warnings also appear in the preceding naming-run
-receipt and were not suppressed. Native CREDIT/checkpoint execution, Veros deep
+receipt and were not suppressed. Veros deep
 state validity/calendar policy, generic restart, and the scientific limits above
 remain outside this validation claim.
 
@@ -373,9 +356,9 @@ preserved in the final verification receipt.
 ## Temporal exchange remediation (2026-10-30)
 
 The follow-up audit identified sparse JCM rate sampling, precipitation phase
-partition after averaging, last-window-only CAMulator radiation, and stale
+partition after averaging and stale
 record selection when prescribed sources followed their consumers. The repairs
-use the existing mapper, native step and dispatch owners. JCM/CAMulator state
+use the existing mapper, native step and dispatch owners. JCM state
 outputs at that repair retained endpoints while relevant rates integrated every native window.
 The JCM compiled return projects to eight horizontal histories: actual T31L8
 float64 daily return shape falls from about421 MiB to29.46 MiB including endpoint
@@ -394,8 +377,7 @@ Independent temporal regressions cover native-rate integrals, nonlinear phases,
 endpoint/categorical ownership, diagnostic-save independence, host/JAX/mixed/
 custom clock selection, current feedback, masks, gradients and native pressure
 units. Native output endpoint samples remain distinct from exchanged interval
-means. Prescribed climatology weather covariance, held external forcing,
-CAMulator placeholder precipitation/turbulence and native CREDIT compatibility
+means. Prescribed climatology weather covariance and held external forcing
 remain explicit limitations. Detailed execution and final gate evidence live in
 `docs/superpowers/plans/2026-10-30-temporal-exchange.md` and `PROGRESS.md`.
 
@@ -403,7 +385,7 @@ remain explicit limitations. Detailed execution and final gate evidence live in
 
 The approved follow-up replaces evolving endpoint state exports with the mean
 of every mapped post-native-step sample. This covers JCM atmospheric state and
-derived diagnostics, all CAMulator prediction fields, Veros surface state and
+derived diagnostics, Veros surface state and
 open-water contribution, and Veris ice fraction, temperature and diagnosed
 albedo. Nonlinear diagnostics are evaluated before reduction. Single-step
 components retain endpoint exchange; initialization and prescribed record

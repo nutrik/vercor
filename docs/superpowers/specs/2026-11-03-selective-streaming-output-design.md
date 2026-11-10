@@ -41,25 +41,20 @@ The user approved the recommended approach and implementation on 2026-11-03.
 - Reuse the existing immutable `_OutputAccumulator` for finite sums/counts. Compute
   period means only at completed write boundaries; retain partial windows across
   execution chunks and reset only completed windows. No step trajectory is stored.
-- Replace CAMulator's native prediction history and stack-based mapped means with
-  immediate per-prediction reduction. Decode nonlinear diagnostics before summing,
-  retain only endpoint prediction/model continuation plus fixed-size reductions,
-  and avoid native output extraction when period output is disabled. A default-
-  disabled static `StepContext.output_variables` request (None disabled, empty
-  tuple all) carries the run-specific policy into native stepping. A reduced frame
-  can supply `reduction_counts` per variable: counted variable values are reduced
-  sums, counts have the same shape, and counts are nonnegative integers. The shared
-  session validates these arrays and merges sums/counts without an intermediate
-  mean. Variables without reduction counts retain ordinary sampling semantics. Snapshots use
-  the endpoint. Do not alter other adapters' physics integration histories where
-  those histories are required by their native stepping API.
+- A default-disabled static `StepContext.output_variables` request (None disabled,
+  empty tuple all) carries run-specific selection into native stepping. A frame
+  may supply nonnegative integer `reduction_counts` with the same shape as its
+  summed variable values. The shared session validates and merges these sums
+  and counts directly; variables without counts retain ordinary sampling.
+  Native physics histories required for stepping remain at their existing owners.
+
 
 ## Validation and delivery
 
 Write failing behavior tests first for default completeness, selective extraction
 (including poisoned unselected values), unknown names, finite counts, reset and
 constant accumulator size. Exercise JAX scans, host, mixed and custom drivers;
-verify native endpoint behavior and streaming CAMulator equivalence. Run formatting,
+verify native endpoint behavior. Run formatting,
 linting, typing, fast/full tests and applicable isolated AD checks; document any
 pre-existing environment failures. Update design/dependencies/progress, review the
 final diff, commit only intended paths, push with GitHub CLI authentication and
@@ -68,7 +63,7 @@ verify the remote branch SHA.
 ## Builder review
 
 Read-only review identified the required native/canonical union, run-specific
-CAMulator step policy, and preservation of per-cell finite counts. These are
+selection and preservation of per-cell finite counts. These are
 incorporated above. Internal callback signatures and helper placement are left
 to implementation; no additional model or backend policy is introduced.
 
@@ -81,8 +76,6 @@ to implementation; no additional model or backend policy is introduced.
   Unknown selections fail with component context; subset ordering is retained.
 - Counted native frames match independent finite native-sample sums/counts,
   including changing missing-data patterns and all-missing cells.
-- CAMulator continuation and endpoint snapshots match existing results, native
-  nonlinear exchange diagnostics are diagnosed before reduction, and repeated runs
-  with output enabled/disabled do not mutate setup resources or retain history.
+
 - Accumulator leaf shapes and storage bytes remain constant as step count grows;
   means are evaluated only at completed cadence boundaries.

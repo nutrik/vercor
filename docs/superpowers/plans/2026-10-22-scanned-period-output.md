@@ -101,7 +101,7 @@ the in-chat design. Execute inline with specialist adapter/review assistance.
   contract and can limit accelerator speedups for payload-heavy custom hooks.
 - Ruling: no extra worktree or design approval round: user selected the current
   feature branch and explicitly requested implementing the presented design.
-- Python3.14 scipy full collection aborts in Torch/OpenMP; approved existing
+- Python3.14 scipy full collection aborts in native OpenMP; approved existing
   scipy312/native overlay used, environments unchanged. Stock and exact Veros
   fork run separately per CI; preliminary mixed-lane/sandbox errors were not
   physics regressions. Public fixture generated under Python3.12 to preserve

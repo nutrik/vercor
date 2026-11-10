@@ -107,12 +107,7 @@ Streaming native samples
 ------------------------
 
 The output session stores only fixed-size sums, finite counts and current
-coordinates. CAMulator reduces each decoded native prediction immediately and
-retains its endpoint separately for continuation and snapshots. It does not
-stack predictions. Nonlinear exchange diagnostics are still computed for each
-native prediction before their exchange mean is formed. When native output
-requires inverse scaling, period extraction reuses the decode already required
-for exchange physics and transfers only selected output channels.
+coordinates.
 
 Providers that already reduced native samples can supply
 ``OutputFrame(reduction_counts={...})``. For each counted variable, its values

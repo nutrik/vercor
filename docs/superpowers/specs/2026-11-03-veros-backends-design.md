@@ -57,7 +57,7 @@ Python 3.12 stock/exact-fork targets under `/private/tmp`; the old temporary
 directories contain no package files. Verify imported module paths, versions,
 fork commit provenance, JAX/JAXlib, NumPy/SciPy, JCM/Veris versions, dtype,
 device, CPU/thread configuration and source revision. Preserve installed
-environments. The normal Python 3.14 `scipy` orientation aborted importing Torch.
+environments. The normal Python 3.14 `scipy` orientation aborted importing an optional native dependency.
 
 Use the real native ACC setup for an asset-independent ocean comparison and
 the actual global four-degree Veris/Veros/JCM gallery for the coupled result.

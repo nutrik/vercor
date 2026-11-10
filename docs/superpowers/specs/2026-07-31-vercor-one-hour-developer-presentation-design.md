@@ -186,7 +186,7 @@ from primary sources and be cited in the corresponding slide notes.
   static configuration.
 - Distinguish published `0.4.3` functionality from development-only
   setup-gallery work.
-- Describe CAMulator compatibility as optional and not currently pinned.
+
 - Avoid performance or scalability claims without repository evidence.
 
 ## Quality and acceptance criteria

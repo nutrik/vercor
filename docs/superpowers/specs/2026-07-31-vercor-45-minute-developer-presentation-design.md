@@ -153,8 +153,7 @@ documentation:
 Every substantive slide will contain a `[Sources]` block in its speaker notes.
 Claims about JAX, output, and optional integrations will remain within what the
 repository substantiates. The deck will distinguish stable public 0.4 behavior
-from development-only work and will not imply that CAMulator compatibility is
-pinned.
+from development-only work.
 
 ## Accuracy boundaries
 
@@ -167,8 +166,7 @@ pinned.
 - Describe physical values as traced inputs and precision/execution policy as
   static configuration.
 - Avoid performance or scalability claims without repository evidence.
-- Describe current optional-model limitations explicitly, including unpinned
-  CAMulator compatibility.
+- Describe current optional-model limitations explicitly.
 
 ## Quality and acceptance criteria
 

@@ -80,7 +80,6 @@ these removals after checking their callers against the implementation baseline:
 | `flatten_exchange_fields` forwarding helper | Use the existing `_flatten_field_items` owner. |
 | Test-only `tree_as_real_dtype`, `tree_unwrap_leading_dims`, and `tree_stack` | Retain production `tree_as_runtime_dtype` and `tree_mean`; preserve integer, complex, and category dtype guarantees there. |
 | Test-only `canonicalize_surface_field` | Use the explicit canonical layout functions. |
-| Test-only `initialize_camulator_runtime_fields` | Component preparation owns field storage and initialization. |
 | Test-only `prepare_veris_forcing` forwarder | Use the production forcing pack and preserve native forcing, conservation, and gradient assertions. |
 | Unused JCM default-parameter and prediction-output convenience wrappers | Retain the current gallery construction and provider/snapshot extraction owners. |
 | Public `forcing_index.ForcingYearType` alias | Use canonical `calendar.YearType`; update the public inventory and migration documentation. |
@@ -150,58 +149,6 @@ Retain the existing toy conversion coefficient and clipping bounds, documenting
 their meaning. Add direction tests away from clipping plus endpoint and
 derivative checks. Do not describe the toy coefficient as a certified water
 inventory budget.
-
-## CAMulator initialization and radiation
-
-Decode the latest initial input frame with CREDIT's `inverse_transform_input`,
-not its prediction-output inverse transform. Reuse the existing tensor accessor
-and thermodynamic/height kernels to obtain current meteorology without a native
-model advance, cursor change, noise resampling, or hidden mutable field cache.
-Prediction and bootstrap mapping share the same physical conversion owner.
-
-Add one setup-data declaration, `CAMulatorConfig.initial_diagnostics`, a
-defensively owned optional mapping containing `time` and native `TS`, `FSNS`,
-and `FLNS` arrays. `time` identifies the effective initial timestamp selected
-by the existing runtime cursor, including `forcing_start` alignment.
-`TS` is K; radiation is signed accumulated J/m2 over the configured native
-forecast step, matching the supported ERA5-scaled CAMulator training contract.
-During setup, require these diagnostics when they are unavailable in the native
-initial input tensor. Validate grid shape, finite values, and time alignment;
-missing diagnostics fail before coupling rather than being guessed from a
-reference atmosphere or replaced with zero forcing. The mapping supplies
-initialization data only; `SetupResult` and the existing runtime payload remain
-the sole field/state owners. The gallery must show how its initial diagnostics
-come from the corresponding native initial-condition data at the selected start.
-
-Native `Qtot` names total water. The atmosphere bulk contract requires vapor
-specific humidity. Add `CAMulatorConfig.water_vapor_variable`, an optional
-native channel name whose declaration promises vapor specific humidity in
-kg/kg. Require that channel in both initial input and prediction layouts;
-the known total-water channel `Qtot` cannot satisfy it. A missing declaration,
-unavailable channel, or `Qtot` selection produces a clear setup error;
-do not invent a saturation adjustment to recover an unpredicted species.
-Document this requirement and update the CAMulator gallery to supply a
-compatible configured channel explicitly. A checkpoint without that channel
-cannot be certified as a drop-in bulk-forcing atmosphere.
-
-Convert accumulated radiation with
-`native_step_seconds = 3600 * conf['data']['lead_time_periods']`.
-Keep the existing signed net-longwave to downward-longwave conversion,
-including surface emission, with one duration conversion. Reject invalid
-durations before arithmetic. Test at least 1-, 3-, and 6-hour native intervals
-with fixed independent rate expectations and exercise multiple native
-substeps per coupling interval. Support the existing accumulated-energy
-training contract; do not infer unmarked W/m2 data or add a unit-guessing path.
-
-The upstream contracts are visible at CREDIT revision
-`bc078d7a39300fb8c8fe867a22ec218a5e02da11`:
-[input transformation](https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/credit/transforms/transforms_global.py),
-[native energy conversion](https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/credit/postblock/gen1.py),
-[flux units and signs](https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/credit/postblock/conservation.py),
-and [CAMulator channels and timing](https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/climate/camulator_config.yml).
-The local environment lacks CREDIT and native checkpoint data. Real native
-execution remains a separately identified validation limit; stand-in boundary
-tests cannot be reported as native climate validation.
 
 ## Interchangeability and test consolidation
 

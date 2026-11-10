@@ -259,7 +259,7 @@ suites, and isolated native Veros AD tests. Upstream supports differentiation
 through state and forcing; its configuration and native constants are static.
 Do not claim gradients through those constants or across binary mask changes.
 
-The default Python 3.14 `scipy` environment aborts importing Torch with duplicate
+The default Python 3.14 `scipy` environment aborts importing an optional native dependency with duplicate
 OpenMP initialization. The existing Python 3.12 environment at
 `/private/tmp/vercor-time-ci/envs/scipy` is named `scipy` and supports the baseline.
 Stock and JAX-native Veros tests require separate Python processes because

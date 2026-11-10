@@ -49,7 +49,7 @@ Expected: the workspace contains `node_modules/@oai/artifact-tool`.
 
 Create `source-notes.txt` with 14 numbered sections. Each section records the
 exact repository file and heading that supports every non-trivial claim on the
-corresponding slide. Qualify JAX, output, CAMulator, and host-execution claims
+corresponding slide. Qualify JAX, output, and host-execution claims
 exactly as described in `DESIGN.md` and `PROGRESS.md`.
 
 - [ ] **Step 3: Create the four Mermaid diagrams through Mermaid Chart**
@@ -101,7 +101,7 @@ Record the returned Mermaid definitions and document identifiers in
 Run:
 
 ```bash
-rg -n "performance|speedup|benchmark|fully differentiable|CAMulator|host" \
+rg -n "performance|speedup|benchmark|fully differentiable|host" \
   .codex/vercor-developer-presentation/source-notes.txt
 ```
 

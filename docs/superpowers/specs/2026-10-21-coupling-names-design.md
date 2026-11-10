@@ -14,9 +14,8 @@ with no compatibility aliases, registry, new execution path or numerical change.
   `air_u_velocity`, `air_v_velocity`, `air_potential_temperature`, and
   `air_specific_humidity`. Keep `model_level_height`, actual `temperature_2m`
   observations/toy diagnostics, and actual `u_velocity_10m`/`v_velocity_10m`
-  diagnostics distinct. Do not rename native JCM/CAMulator variables.
-- JCM's full vertical pressure field becomes `air_pressure_3d`; CAMulator's
-  lowest-level field becomes `model_level_air_pressure`. Preserve shapes,
+  diagnostics distinct. Do not rename native JCM variables.
+- JCM's full vertical pressure field becomes `air_pressure_3d`. Preserve shapes,
   ordering and Pa units. No additional exported field is needed.
 - JCM's phase-only mapper argument becomes `near_surface_air_temperature`.
   It remains native SPEEDY t0, without an asserted 2 m height, and never replaces
@@ -32,9 +31,7 @@ with no compatibility aliases, registry, new execution path or numerical change.
   local variables. Keep the existing complementary land/ocean topology.
 - Galleries derive routes, run order, state lookup and policy roles from the
   actual components' names. Explicit instance-name defaults remain configurable.
-- Rename `prepare_camulator_sst_input` to
-  `prepare_camulator_surface_temperature_input` because it packs the combined
-  surface. Retain native channel names at their translation boundaries.
+
 - The specifically JCM-backed public factory/configuration become
   `make_jcm_atmosphere` and `JCMAtmosphereConfig`. Corresponding private setup
   state/payload owners explicitly identify JCM; existing module paths can stay.

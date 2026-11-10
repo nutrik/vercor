@@ -11,7 +11,7 @@ See :doc:`../coupling-fields` for the physical field contracts and migration
 of setup, recipe and forcing-mode names.
 
 .. automodule:: vercor.setups
-   :members: CAMulatorConfig, JCMAtmosphereConfig, JCMLandAtmosphereConfig, JCMLandAtmosphereSetup, JCMInputs, Spinup, VerosConfig, VerisConfig, VerisVerosDataSetup, VerisVerosSetup, load_jcm_inputs, make_slab_atmosphere, make_slab_land, make_slab_ocean, make_slab_seaice, make_jcm_land_atmosphere, make_camulator_gcm, make_camulator_land, make_era5_atmosphere, make_era5_land, make_era5_ocean, make_erainterim_ocean, make_jcm_atmosphere, make_jcm_land, make_veros_gcm, make_veris, make_veris_verosdata, make_veris_veros
+   :members: JCMAtmosphereConfig, JCMLandAtmosphereConfig, JCMLandAtmosphereSetup, JCMInputs, Spinup, VerosConfig, VerisConfig, VerisVerosDataSetup, VerisVerosSetup, load_jcm_inputs, make_slab_atmosphere, make_slab_land, make_slab_ocean, make_slab_seaice, make_jcm_land_atmosphere, make_era5_atmosphere, make_era5_land, make_era5_ocean, make_erainterim_ocean, make_jcm_atmosphere, make_jcm_land, make_veros_gcm, make_veris, make_veris_verosdata, make_veris_veros
    :show-inheritance:
 
 

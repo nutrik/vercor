@@ -15,8 +15,8 @@ nonfinite native samples must still propagate to existing physics checks, rather
 than silently disappear as missing diagnostic samples. This avoids allocating
 one redundant count array per native field whose samples are all required.
 
-Veros and CAMulator use the same streaming accumulator in their existing native
-loops. JCM scans its compact native sample history, diagnosing nonlinear canonical
+Veros uses the same streaming accumulator in its existing native
+loop. JCM scans its compact native sample history, diagnosing nonlinear canonical
 fields before adding each sample; it no longer materializes a second trajectory
 of mapped fields. Its native API still returns compact histories, so this does
 not claim to remove native-model trajectory allocation. Veris keeps its validated

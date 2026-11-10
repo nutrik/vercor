@@ -96,7 +96,6 @@ jobs:
               tests/test_setup_boundaries.py::test_lazy_factory_attribute_access_loads_only_lightweight_factory_module
               tests/test_setup_boundaries.py::test_vercor_setups_is_the_only_setup_lazy_export_registry
               tests/test_setup_boundaries.py::test_missing_optional_dependencies_fail_at_factory_invocation
-              tests/test_setup_boundaries.py::test_camulator_enabled_spinup_fails_before_runtime_configuration
               tests/test_setup_boundaries.py::test_setup_subprocess_helpers_honor_installed_package_root
               tests/test_distribution_boundaries.py
           - environment: jcm
@@ -246,7 +245,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r docs/requirements.txt
           python -m pip install flit_core==3.12.0
-          python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           python tools/install_coupled_models.py
       - name: Verify standalone Veris provenance
         run: >-

@@ -29,8 +29,7 @@ The differentiable default is `Coupler.run(output=None)`. That path performs no
 I/O and retains JVP and reverse-mode behavior. An `OutputTarget` opts into the
 single coordinator for provider sampling, selection, immutable accumulation,
 host transfer, period files, final fields, and snapshots. Optional JCM, Veros,
-and CAMulator dependencies remain lazy. CAMulator is source-tested but is not
-installed or pinned for this release.
+and Veris dependencies remain lazy.
 
 Component identity is immutable through every lifecycle callback: the declared
 name, grid, and specification remain author-owned configuration. External model
@@ -79,8 +78,7 @@ deferred internal cleanup.
 | Broad root reexports and aliases had multiple apparent owners. | Imports drifted and users could not tell which module defined compatibility. | Keep exactly six root conveniences and one canonical public owner for every advanced symbol. | **must change** |
 | Mutable coupler assembly and lifecycle replacement of `name`, `grid`, or `spec` could change identity after registration. | Public component maps, prepared bindings, routes, and runtime state could disagree. | Use constructor-only assembly, preserve the original identity references, and revalidate after setup, prefill, and validation callbacks. | **must change** |
 | Reflection over arbitrary author attributes tried to infer configuration identity. | Harmless caches looked like configuration while hidden mutable state escaped validation. | Validate only the explicit structural contract and the three static identity attributes. | **must change** |
-| Veros and CAMulator evolution lived on adapter closures. | Reusing or supplying a `RunState` was not reproducible, and output could sample a different run. | Seed native state in `SetupResult.payload`, return replacements in `StepResult`, and sample output contexts only. | **must change** |
-| CAMulator silently reindexed mismatched starts and accepted model-calendar clocks it cannot represent. | A run could use the wrong forcing index or fail later during host execution. | Require explicit `strict` or `forcing_start` policy and reject non-standard-library datetime clocks during lifecycle setup. | **must change** |
+| Veros evolution lived on adapter closures. | Reusing or supplying a `RunState` was not reproducible, and output could sample a different run. | Seed native state in `SetupResult.payload`, return replacements in `StepResult`, and sample output contexts only. | **must change** |
 | Static typing and runtime introspection used different regridder-factory definitions. | Built-ins and plugins could satisfy one checker while violating the other. | Define one runtime-checkable `RegridderFactory` protocol requiring the source and target grids. | **must change** |
 | During alpha hardening, plugin metadata excluded `0.4.0a1`, the alpha it was intended to test, while installation bypassed dependency resolution. | The fixture had not proved a normally installable third-party extension. | The stable fixture now requires `vercor>=0.4.0,<0.5` and installs with ordinary resolution against built artifacts. | **must change** |
 | Component-specific output markers and native accumulators duplicated cadence. | Compiled execution could skip output, and native adapters disagreed about paths and means. | Keep provider sampling at components but give one private session cadence, accumulation, host transfer, and file ownership. | **must change** |
@@ -129,7 +127,7 @@ signatures from installed artifacts.
   "vercor.recipes": ["ATMOSPHERE_TO_LAND_RADIATION_FIELDS", "ATMOSPHERE_TO_LAND_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_RADIATION_FIELDS", "ATMOSPHERE_TO_OCEAN_STATE_FIELDS", "ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS", "OBSERVED_10M_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS", "MODEL_LEVEL_ATMOSPHERE_TO_SEAICE_FORCING_FIELDS", "LAND_TO_ATMOSPHERE_STATE_FIELDS", "LAND_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_SURFACE_FIELDS", "OCEAN_TO_ATMOSPHERE_OPEN_WATER_FIELDS", "OCEAN_TO_SEAICE_SURFACE_FIELDS", "OCEAN_TO_SEAICE_FORCING_FIELDS", "ATMOSPHERE_TO_LAND_LATENT_HEAT_FLUX_FIELDS", "ATMOSPHERE_TO_OCEAN_TURBULENT_HEAT_FLUX_FIELDS", "SEAICE_TO_OCEAN_TOTAL_FLUX_FIELDS", "SEAICE_TO_ATMOSPHERE_SURFACE_FIELDS", "SEAICE_COVERAGE_FIELDS"],
   "vercor.regridding": ["Regridder", "RegridderFactory", "VectorRegridder", "bilinear", "conservative"],
   "vercor.runtime": ["ExecutionBackend", "ExecutionChunk", "ExecutionContext", "ExecutionPlan", "RuntimeDriver", "RuntimeOptions", "SequentialWorkflow", "StepPlan", "Workflow", "WorkflowContext"],
-  "vercor.setups": ["CAMulatorConfig", "JCMAtmosphereConfig", "JCMLandAtmosphereConfig", "JCMLandAtmosphereSetup", "JCMInputs", "Spinup", "VerosConfig", "VerisConfig", "load_jcm_inputs", "make_slab_atmosphere", "make_slab_land", "make_slab_ocean", "make_slab_seaice", "make_jcm_land_atmosphere", "VerisVerosDataSetup", "VerisVerosSetup", "make_camulator_gcm", "make_camulator_land", "make_era5_atmosphere", "make_era5_land", "make_era5_ocean", "make_erainterim_ocean", "make_jcm_atmosphere", "make_jcm_land", "make_veris", "make_veris_veros", "make_veris_verosdata", "make_veros_gcm", "replace_veris_parameters"],
+  "vercor.setups": ["JCMAtmosphereConfig", "JCMLandAtmosphereConfig", "JCMLandAtmosphereSetup", "JCMInputs", "Spinup", "VerosConfig", "VerisConfig", "load_jcm_inputs", "make_slab_atmosphere", "make_slab_land", "make_slab_ocean", "make_slab_seaice", "make_jcm_land_atmosphere", "VerisVerosDataSetup", "VerisVerosSetup", "make_era5_atmosphere", "make_era5_land", "make_era5_ocean", "make_erainterim_ocean", "make_jcm_atmosphere", "make_jcm_land", "make_veris", "make_veris_veros", "make_veris_verosdata", "make_veros_gcm", "replace_veris_parameters"],
   "vercor.state": ["ComponentState", "FieldLookupScope", "FieldScope", "RunState"],
   "vercor.time_selection": ["datetime_to_seconds_in_year", "get_periodic_interval"],
   "vercor.topology": ["ExchangeTopologyPatch", "SurfaceMaskPolicy", "TopologyContext", "TopologyPolicy"],
@@ -263,22 +261,7 @@ vercor.setups._data.erainterim_ocean
 vercor.setups._data.jcm_land
 vercor.setups._data.veros_ocean
 vercor.setups._external
-vercor.setups._external._camulator_wind_filtering
 vercor.setups._external._jax_gcm_pytree
-vercor.setups._external.camulator
-vercor.setups._external.camulator_contracts
-vercor.setups._external.camulator_fields
-vercor.setups._external.camulator_forcing
-vercor.setups._external.camulator_gcm_state
-vercor.setups._external.camulator_imports
-vercor.setups._external.camulator_init
-vercor.setups._external.camulator_land
-vercor.setups._external.camulator_output
-vercor.setups._external.camulator_runtime
-vercor.setups._external.camulator_runtime_settings
-vercor.setups._external.camulator_stepper
-vercor.setups._external.camulator_tensors
-vercor.setups._external.camulator_wind_filter
 vercor.setups._external.jax_gcm
 vercor.setups._external.jax_gcm_fields
 vercor.setups._external.jax_gcm_output
@@ -308,7 +291,6 @@ vercor.setups._veris
 vercor.setups.gallery
 vercor.setups.gallery.custom_component_wrapping
 vercor.setups.gallery.profile_runtime
-vercor.setups.gallery.camulator_with_veros
 vercor.setups.gallery.data_driver
 vercor.setups.gallery.jcm_with_era5data
 vercor.setups.gallery.jcm_with_slab
@@ -397,32 +379,28 @@ second component adapter, duplicate accumulator, or native period-file path.
 
 ### Bundled setup implementations
 
-- Data package: `vercor.setups._data`, `_component_helpers`, `_field_helpers`,
-  `assets`, `era5_atmosphere`, `era5_land`, `era5_ocean`,
-  `erainterim_ocean`, and `jcm_land`.
-- External package: `vercor.setups._external`, `_camulator_wind_filtering`,
-  `_jax_gcm_pytree`, `camulator`, `camulator_contracts`, `camulator_fields`,
-  `camulator_forcing`, `camulator_gcm_state`, `camulator_imports`,
-  `camulator_init`, `camulator_land`, `camulator_output`, `camulator_runtime`,
-  `camulator_runtime_settings`, `camulator_stepper`, `camulator_tensors`,
-  `camulator_wind_filter`, `jax_gcm`, `jax_gcm_fields`, `jax_gcm_output`,
-  `jax_gcm_runtime`, `jax_gcm_state`, `jax_gcm_surface`, `jax_gcm_tools`, `veros_fluxes`,
-  `veros_gcm`, `veros_gcm_state`, `veros_output`, `veros_runtime`,
-  `veros_runtime_settings`, `veros_setup`, and `veros_state`.
-- Runnable gallery: `vercor.setups.gallery`, `custom_component_wrapping`,
-  `profile_runtime`, `camulator_with_veros`, `data_driver`,
-  `jcm_with_era5data`, `jcm_with_slab`, `jcm_with_veros`,
-  `jcm_with_verosdata`, `slab_driver`, and
-  `veros_with_era5data`.
-- Remaining setup owners: `vercor.setups._jcm`, `vercor.setups._lazy_imports`,
-  `vercor.setups._slab`, `vercor.setups._slab.atmosphere`,
-  `vercor.setups._slab.land`, `vercor.setups._slab.ocean`,
-  `vercor.setups._slab.seaice`, `vercor.setups._time_helpers`, and
-  `vercor.setups.config`.
+- Data package: `vercor.setups._data`, `_component_helpers`, `_field_helpers`, `assets`,
+  `era5_atmosphere`, `era5_land`, `era5_ocean`, `erainterim_ocean`, `jcm_land`, `veros_ocean`.
+- External package: `vercor.setups._external`, `_jax_gcm_pytree`, `jax_gcm`, `jax_gcm_fields`,
+  `jax_gcm_output`, `jax_gcm_runtime`, `jax_gcm_state`, `jax_gcm_surface`, `jax_gcm_tools`,
+  `veris`, `veris_fluxes`, `veris_forcing`, `veris_output`, `veris_parameters`, `veris_runtime`,
+  `veros_data`, `veros_fluxes`, `veros_gcm`, `veros_gcm_state`, `veros_host_state`,
+  `veros_output`, `veros_runtime`, `veros_runtime_settings`, `veros_setup`, `veros_setup_jax`,
+  `veros_state`.
+- Runnable gallery: `vercor.setups.gallery`, `custom_component_wrapping`, `data_driver`,
+  `jcm_with_era5data`, `jcm_with_slab`, `jcm_with_veros`, `jcm_with_verosdata`,
+  `profile_runtime`, `slab_driver`, `veris_calibration`, `veris_dataveros_era5`,
+  `veris_veros_era5`, `veris_veros_jcm`, `veros_with_era5data`.
+- Remaining setup owners: `vercor.setups._jcm`, `vercor.setups._veris`,
+  `vercor.setups._lazy_imports`, `vercor.setups._output`,
+  `vercor.setups._surface_fluxes`, `vercor.setups._slab`,
+  `vercor.setups._slab.atmosphere`, `vercor.setups._slab.land`,
+  `vercor.setups._slab.ocean`, `vercor.setups._slab.seaice`,
+  `vercor.setups._time_helpers`, and `vercor.setups.config`.
 
 Public setup access is always through `vercor.setups`. Private factories defer
-JCM/Dinosaur, Veros, CREDIT, Torch, and TensorFlow imports until invocation.
-JCM, Veros, and CAMulator expose ordinary output providers and snapshot
+JCM/Dinosaur, Veros, and Veris imports until invocation.
+JCM, Veros, and Veris expose ordinary output providers and snapshot
 writers; they do not own cadence, paths, period accumulation, or writes.
 
 ## 6. Setup-agnostic plugin architecture
@@ -455,8 +433,7 @@ components and use the same constructor and output contracts. Slab and data
 factories accept a complete keyword-only `OutputSpec`; omission selects
 `OutputSpec()` with no period policy, matching external configuration defaults.
 Paired JCM configuration owns land and atmosphere output independently. CI has
-installed base, JCM, and Veros lanes. CAMulator remains lazy and source-tested
-because a compatible external release is not yet pinned.
+installed base, JCM, and Veros lanes.
 
 The [source and coupling audit](source-coupling-audit.md) records the complete
 current source inventory, removed private alternatives, necessary adapters and
@@ -472,8 +449,7 @@ guides for imports and construction; primary 0.4 modules remain alias-free.
 No legacy compatibility adapter namespace or executable pre-redesign evidence
 ships. No earlier API is restored. Current gallery compositions omit feedback
 routes into prescribed producers and imports unused by slab kernels. Explicit
-DataComponent diagnostics remain supported; CAMulator applications must provide
-a real vapor-channel declaration and timestamped native initial diagnostics.
+DataComponent diagnostics remain supported.
 See the [migration and evidence record](source-coupling-audit.md).
 
 Compatibility within the 0.4.x line is defined by canonical public owner
@@ -594,6 +570,5 @@ installed-sdist probes verify the public surface and PEP 561 marker outside the
 checkout.
 
 Deferred features stay deferred: no registry, entry-point discovery, Pydantic,
-fan-in reducer, public prepared graph, fractional subcycling, or CAMulator
-dependency pin. No tag, push, publication, or release upload is part of
+fan-in reducer, public prepared graph, or fractional subcycling. No tag, push, publication, or release upload is part of
 preparing the stable release.

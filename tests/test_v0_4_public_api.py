@@ -228,7 +228,6 @@ PUBLIC_MODULE_EXPORTS = {
         "WorkflowContext",
     ),
     "vercor.setups": (
-        "CAMulatorConfig",
         "JCMAtmosphereConfig",
         "JCMLandAtmosphereConfig",
         "JCMLandAtmosphereSetup",
@@ -244,8 +243,6 @@ PUBLIC_MODULE_EXPORTS = {
         "make_jcm_land_atmosphere",
         "VerisVerosDataSetup",
         "VerisVerosSetup",
-        "make_camulator_gcm",
-        "make_camulator_land",
         "make_era5_atmosphere",
         "make_era5_land",
         "make_era5_ocean",

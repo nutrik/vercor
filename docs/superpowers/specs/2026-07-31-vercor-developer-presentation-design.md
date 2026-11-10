@@ -132,8 +132,7 @@ documentation:
 Claims about JAX or external model integrations will remain within what these
 sources substantiate. Every slide with a non-trivial claim or external asset
 will contain a `[Sources]` block in its speaker notes. The deck will distinguish
-stable public 0.4 behavior from development-only work and will not imply that
-CAMulator compatibility is pinned.
+stable public 0.4 behavior from development-only work.
 
 ## Quality and acceptance criteria
 

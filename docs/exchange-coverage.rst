@@ -11,7 +11,7 @@ A component's grid declares immutable binary support. ``ComponentMaskSpec``
 references current grid-shaped binary and fractional fields; fractions must be
 finite, in [0, 1], and zero outside static support. Declared mask fields remain
 current even when other data fields select daily or interpolated monthly records.
-JCM and CAMulator land factories retain their computed ``land_fraction``.
+JCM land factories retain their computed ``land_fraction``.
 
 Topology validates geometry and may restrict binary route support. It cannot
 provide fractional coverage or expand the target's static support. The existing
@@ -74,9 +74,6 @@ Bundled field audit
      - ``intensive``
      - Native closures consume local values or local flux densities. A field
        named flux does not by itself require an area contribution.
-   * - CAMulator land temperature and SST
-     - ``source_flux``; conservative
-     - The existing consumer sums land/ocean temperature contributions.
    * - Veris temperature and albedo to coupled JCM
      - ``source_flux``; component coverage
      - Forms ``R(W*A*Tice)`` and ``R(W*A*alpha)`` before marine composition.
@@ -96,7 +93,7 @@ semantics, fractional coasts, evolving and zero coverage, conservation and AD.
 Input use and component substitution
 ------------------------------------
 
-Prescribed ERA5 atmosphere/land/ocean, ERA-Interim ocean and CAMulator land
+Prescribed ERA5 atmosphere/land/ocean and ERA-Interim ocean
 factories have no physical feedback inputs. Their outputs follow the prescribed
 records, even when another component changes. The data gallery explicitly wraps
 its factory declarations in ``DataComponent`` declarations with diagnostic
@@ -145,9 +142,8 @@ Preweighted Veris exports use binary source coverage and receive one area
 factor. Continuous JAX fields and fractions retain analytic JVP/VJP and finite
 difference checks; binary transitions are discrete. Host components retain
 physical parity on the host path and fail early on the differentiable backend.
-Native ERA5/JCM conversions, Veros/Veris face geometry and CAMulator vapor-species
-capability checks remain separate regressions. No native CAMulator execution is
-certified by synthetic substitution.
+Native ERA5/JCM conversions and Veros/Veris face geometry remain separate
+regressions. Synthetic substitution does not certify native climate skill.
 
 Intentional numerical and API changes
 -------------------------------------
@@ -176,31 +172,6 @@ fluxes warm the mixed layer; the independent ocean restoring tendency is
 latent heat (evaporation) dries soil and positive latent heat wets it.
 The latent and moisture coefficients remain toy closures and do not certify
 a physical water budget.
-CAMulator's existing ML land-mask branch is retained. Its inverse-transformed
-``FSNS`` and ``FLNS`` are downward-positive energies in J/m² accumulated over
-one native forecast step. The mapper requires ``native_step_seconds`` from the
-existing model timestep (``3600 * data.lead_time_periods``), independently of
-how many native steps fit in a coupling interval. It rejects non-positive and
-non-finite durations, divides each energy by that native duration once, and
-recovers downward longwave as ``sigma * TS**4 + FLNS / native_step_seconds``.
-Surface emission is added exactly once. The adapter does not infer rate units
-or guess a different training contract.
-Startup uses timestamp-matched native ``TS/FSNS/FLNS`` diagnostics for channels
-absent from the initial input, with the same forecast-step duration. Initial
-and predicted meteorology share one pure hybrid-coordinate mapping, including
-canonical ``surface_pressure`` and lowest-level ``pressure`` in Pa. Specific
-humidity must come from an explicitly declared vapor-specific native channel
-available in both input and prediction; ``Qtot`` is rejected as total water.
-
-This follows CREDIT revision
-``bc078d7a39300fb8c8fe867a22ec218a5e02da11``:
-`native energy conversion <https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/credit/postblock/gen1.py>`_,
-`energy units and signs <https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/credit/postblock/conservation.py>`_,
-and `CAMulator timing <https://github.com/NCAR/miles-credit/blob/bc078d7a39300fb8c8fe867a22ec218a5e02da11/climate/camulator_config.yml>`_.
-The 1-, 3-, and 6-hour mapper checks and two-substep host runtime test use
-stand-in predictions. CREDIT and its checkpoint are unavailable locally;
-these checks certify conversion and adapter behavior, not native climate skill.
-
 Released models and the dependency exception
 --------------------------------------------
 
@@ -244,7 +215,7 @@ environment with Dinosaur 1.5.1 and Flax 0.12.10.
 Final source and coupling cleanup acceptance
 --------------------------------------------
 
-After the final-review CAMulator I1 correction, actual stock Veros 1.7.0 uses
+After the historical final-review I1 correction, actual stock Veros 1.7.0 uses
 the same Veris/JCM/JAX provenance above. Fresh full stock 2,294, fresh fast
 1,367 and fresh exact-fork native AD 15 tests pass without failures, errors
 or skips. Combined aggregate coverage passes the unchanged 90% gate at
@@ -255,12 +226,6 @@ processes, with fresh branch coverage after the source change. Historical
 pre-I1 Task9 receipts are superseded for current acceptance. Both current raw
 lanes were archived before combining expendable copies, and their hashes and
 existence were verified unchanged afterward.
-
-A complete native CAMulator input now accepts ``initial_diagnostics=None``;
-mixed native/supplemental input consumes only absent TS/FSNS/FLNS channels.
-Consumed supplements still require exact effective time, finite values and
-grid shape. The existing latest-input accessor, physical conversions, vapor
-capability and runtime payload ownership remain the sole implementation path.
 
 Fresh wheel/sdist build, Twine, outside-checkout installed extension
 runtime/strict typing, slab and CLI probes pass. The actual final wheel imports
@@ -280,12 +245,12 @@ The durable ``docs/source-coupling-audit.md`` records every source retention,
 removal, surviving test assertion, original requirement, exact receipt and
 failed approach, including the historical missing partial coverage datasets.
 Current evidence is in ``test_logs/source-coupling-cleanup/final-fix/``.
-Native CREDIT/checkpoint execution remains unavailable; CAMulator boundary
-stand-ins do not certify native model skill. The short coupled run does not
+The short coupled run does not
 certify long-term climate or binary-transition/host AD. All cleanup delivery
 is local, with no push, merge or publication.
+
 Prescribed surfaces beyond an ocean domain
------------------------------------------
+------------------------------------------
 
 The paired JCM setup distinguishes the ocean grid's geometric footprint from
 its wet-cell coverage. Within that footprint, the ocean mask defines the

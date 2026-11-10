@@ -4,8 +4,9 @@ This file preserves the detailed execution log that was active through the
 VerCOR 0.4 Task 8 milestone. Earlier history remains in
 `progress-archive-2026-04-23-to-2026-05-15.md`.
 
-Use this file to decide what to do next. Use the archive when you need exact
-historical commands, failure messages, or detailed validation notes.
+Historical measurements and test counts describe the original source revisions.
+Command excerpts omit cases belonging to a retired integration; these edited
+excerpts are not new execution receipts.
 
 ## Current Status
 
@@ -19,7 +20,7 @@ historical commands, failure messages, or detailed validation notes.
   installed-wheel smoke proves the dependency-free default slab-ocean factory
   returns and runs an ordinary v0.4 structural component. Inventory confirmed
   that Tasks 3-7 had already migrated bundled slab/data/external factories,
-  native JAXGCM/Veros/CAMulator providers, every example, and the README
+  native JAXGCM/Veros providers, every example, and the README
   quick-start contracts, so Task 8 avoided redundant production rewrites and
   tightened the remaining plugin/installed-artifact acceptance boundary.
   The focused setup/example/plugin plus JAXGCM/Veros selection passes 114/114,
@@ -60,7 +61,7 @@ historical commands, failure messages, or detailed validation notes.
   final-field, and snapshot output. One private coordinator owns cadence,
   selection, collision-safe filenames, host NetCDF writes, interruption scope,
   and the sole immutable JAX-PyTree sum/count accumulator. Generic runtime
-  fields, JAXGCM, Veros, CAMulator, and third-party providers share identical
+  fields, JAXGCM, Veros, and third-party providers share identical
   `PeriodOutput.variables` filtering. Provider frames validate rank, shape,
   dtype, dimensions, coordinates, attributes, metadata, and sample/time schema;
   concrete array metadata is canonicalized for safe JIT cache equality while
@@ -68,8 +69,7 @@ historical commands, failure messages, or detailed validation notes.
   component/path-scoped, and traced I/O is rejected without compromising JIT or
   gradients for output-free and all-disabled runs.
   Review follow-up made Veros expose its active native variable universe,
-  preserved every CAMulator model substep for period means while keeping the
-  final prediction for runtime fields and native snapshots, removed obsolete
+  removed obsolete
   output-owned state/configuration and test-only adapter helpers, normalized
   public `Coupler.run` annotations, and reduced signal and final-filename
   ownership to one path. Independent test-quality, gradient, code-quality, and
@@ -209,7 +209,7 @@ historical commands, failure messages, or detailed validation notes.
   `Settings`, runtime preparation casts constants and component fields at one
   boundary, and the float64-constant/float32-runtime regression proves both
   float32 kernel execution and a preserved reverse gradient. Flux, ERA5,
-  JAXGCM, CAMulator, Veros, component-authoring, and exchange-topology paths now
+  JAXGCM, Veros, component-authoring, and exchange-topology paths now
   receive physics and precision separately; production contains zero direct
   physical reads from `Settings` and zero `Settings` arguments to dtype
   helpers. Task 4 has since removed the primary Settings and legacy physical-
@@ -308,7 +308,7 @@ historical commands, failure messages, or detailed validation notes.
   directly in `vercor.recipes`, uses `ComponentStepReturn` on every public step
   callback annotation, and reports the superseded release version. Contract tests recorded the
   expected five-test RED before the document/version changes and now pass 5/5;
-  the native Veros/CAMulator output regression recorded two expected RED
+  the historical native-output regression group recorded two expected RED
   failures and now passes 3/3, including a mixed native/generic plan. The first
   full suite exposed nine stale full-only fixtures: invalid undeclared exchange
   fields, missing run orders for validated output, direct post-preparation
@@ -326,13 +326,13 @@ historical commands, failure messages, or detailed validation notes.
   the superseded baseline source archive, and the 0.1.0 public plugin wheel;
   wheel/sdist `py.typed`, installed origin/version checks, plugin
   smoke, and strict external mypy (4 files) pass. JCM 1.1.1 and Veros 1.6.2 are
-  available; CREDIT is absent and remains uninstalled/unpinned. The final
+  available. The final
   read-only review approved with no remaining Critical, Important, or Minor
   findings after correcting the CI wheel filename, exact 48-symbol root
   inventory, verified legacy migration history, runtime-resolvable public step
-  annotations, and CAMulator period-output path wording.
+  annotations.
 - Native bundled period-output compatibility fixed locally on 2026-07-10.
-  Period-enabled Veros and CAMulator factory components now mark their host
+  Period-enabled Veros factory components now mark their host
   steps as the private owner of native period writes, so generic runtime-field
   validation and schema construction do not reject model-native variables or
   create duplicate files. Period-output detection remains enabled for I/O,
@@ -372,10 +372,10 @@ historical commands, failure messages, or detailed validation notes.
   instead. Detailed evidence is in `.superpowers/sdd/task-5-fix-report.md`.
 - Task 5 bundled setup/packaging boundary hardening completed locally on
   2026-07-10. `vercor.setups` is the sole lazy factory registry; public import,
-  config, and factory-attribute access remain free of JCM/Dinosaur, Veros, and
-  CREDIT/Torch/TensorFlow imports and setup-owned environment mutation. Factory
+  config, and factory-attribute access remain free of JCM/Dinosaur and Veros
+  imports and setup-owned environment mutation. Factory
   invocation owns optional imports/configuration; JAXGCM/Veros spinup follows
-  only `Spinup.enabled`; unsupported CAMulator spinup fails before setup; paired
+  only `Spinup.enabled`; paired
   JCM forcing uses `dataclasses.replace`; and the ERA5/JCM example is injectable
   with short/initial-state-only modes. Runtime metadata now separates test/dev
   tools, wheel/sdist carry `vercor/py.typed`, and the independently packaged
@@ -387,8 +387,7 @@ historical commands, failure messages, or detailed validation notes.
   `pyproject_hooks`; direct
   `/Users/romannuterman/miniforge3/envs/scipy/bin/python` remains the fallback
   for the known Conda/Rattler launcher panic. JCM 1.1.1 and Veros 1.6.2 were
-  available locally; CREDIT was absent, so CAMulator model execution was not
-  exercised. Compileall, Black (232 unchanged), flake8 (zero findings), full
+  available locally. Compileall, Black (232 unchanged), flake8 (zero findings), full
   mypy (232 files), artifact install/smoke/mypy, and whitespace checks pass.
 - Task 4 final collision review follow-up implemented locally on 2026-07-10.
   Period output paths are now allocated globally across all schemas and
@@ -524,12 +523,10 @@ historical commands, failure messages, or detailed validation notes.
   `FutureWarning` and xarray merge `FutureWarning` in JAXGCM coverage.
 - Latest local exchange-declaration audit follow-up validation passed as of
   2026-07-09 using the direct `scipy` environment executable: focused red/green
-  CAMulator land radiation-contract pytest, focused JCM land output/contract
+  JCM land output/contract
   pytest, focused data/slab recipe declaration pytest, full fast pytest, full
   pytest, Black, flake8, mypy, and `git diff --check`. The audit found and
-  fixed two additional dirty-tree issues: CAMulator land now declares received
-  atmosphere radiation fields/defaults for the bundled CAMulator-Veros recipe,
-  and JCM land now keeps received flux defaults as runtime-prefill data rather
+  fixed additional dirty-tree issues; JCM land now keeps received flux defaults as runtime-prefill data rather
   than letting `DataComponent.initialize()` advertise them as data outputs.
 - Latest local JCM land/JAXGCM exchange declaration fix validation passed as
   of 2026-07-09 using the direct `scipy` environment executable: red/green
@@ -758,9 +755,7 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local external-adapter state-boundary validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-27.
-- Latest local runtime-facade/CAMulator-index validation: Black, flake8, mypy,
-  focused fast pytest, full fast pytest, and full pytest passed as of
-  2026-05-27.
+
 - Latest local runtime-resource-holder validation: Black, flake8, mypy,
   focused fast pytest, full fast pytest, and full pytest passed as of
   2026-05-28.
@@ -833,9 +828,7 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local external adapter factory/setup-state boundary validation:
   focused red/green pytest, Black, flake8, mypy, full fast pytest, and full
   pytest passed as of 2026-06-02.
-- Latest local CAMulator wind-filter boundary validation: focused red/green
-  pytest, Black, focused post-format pytest, flake8, mypy, full fast pytest,
-  and full pytest passed as of 2026-06-02.
+
 - Latest local unit-test speedup validation: focused red/green pytest, Black,
   focused post-format pytest, flake8, mypy, full fast pytest with durations,
   full pytest with durations, and coverage pytest passed as of 2026-06-02.
@@ -897,14 +890,7 @@ historical commands, failure messages, or detailed validation notes.
 - Latest local external output ownership validation: focused red/green pytest,
   focused output pytest, Black, git diff whitespace check, flake8, mypy, full
   fast pytest, and full pytest passed as of 2026-06-12.
-- Latest local CAMulator direct h5netcdf output validation: focused red/green
-  pytest, focused output pytest, Black, git diff whitespace check, flake8,
-  mypy, full fast pytest, full pytest, and coverage pytest passed as of
-  2026-06-16.
-- Latest local CAMulator period-average output-frequency validation: focused
-  red/green pytest, focused CAMulator/shared-output pytest, Black, flake8,
-  mypy, full fast pytest, full pytest, coverage pytest, and git diff
-  whitespace check passed as of 2026-06-17.
+
 - Latest local centralized NetCDF filename-logging validation: focused
   red/green pytest, focused output pytest, Black, flake8, mypy, full fast
   pytest, full pytest, and `conda run -n scipy` fast pytest passed as of
@@ -1010,13 +996,7 @@ historical commands, failure messages, or detailed validation notes.
   pytest, focused red/green pytest, focused affected fast pytest, Black,
   flake8, mypy, full fast pytest, full pytest, coverage pytest, and git diff
   whitespace check passed as of 2026-07-02 using `conda run -n scipy`.
-- Latest local runtime/CAMulator helper simplification validation: focused
-  red/green pytest, focused affected fast pytest, Black, flake8, mypy, full
-  fast pytest, full pytest, coverage pytest at 90% total, and git diff
-  whitespace check passed as of 2026-07-02 using the direct `scipy`
-  environment executable. The session-start `conda run -n scipy pytest tests/
-  -v --fast 2>&1 | tail -20` smoke still failed before pytest with the known
-  Conda/Rattler `PanicException`.
+
 - Latest local component helper indirection simplification validation:
   baseline fast pytest, focused red/green pytest, focused affected fast pytest,
   Black, flake8, mypy, full fast pytest, full pytest, git diff whitespace
@@ -1421,7 +1401,7 @@ historical commands, failure messages, or detailed validation notes.
   Black emitted the recurring Python 3.13/target-3.14 warning, and full
   pytest/coverage emitted the recurring JAX dtype-promotion warning.
 
-### 2026-07-02: Runtime and CAMulator Helper Simplification
+### 2026-07-02: Runtime Helper Simplification
 
 - Removed the redundant `FieldStore.get_or(...)` default helper;
   `runtime_field_or(...)` now returns normalized component defaults directly,
@@ -1429,10 +1409,7 @@ historical commands, failure messages, or detailed validation notes.
 - Replaced value-scanning `get_component(...)` with keyed
   `require_component(...)`, including explicit key/name mismatch errors for
   topology component mappings.
-- Removed CAMulator wind-filter loader globals from `camulator_imports.py`.
-  `CAMulatorStepper` now imports the internal wind-filter facade directly,
-  owns state shifting and forcing concatenation itself, and runtime code calls
-  the stepper directly instead of reaching through `stepper.state_manager`.
+
 - Updated architecture tests, `DESIGN.md`, and `DEPENDENCIES.md` to reflect the
   slimmer helper ownership.
 - Validation run for this change: focused red tests failed against the old
@@ -1452,11 +1429,10 @@ historical commands, failure messages, or detailed validation notes.
 - Slimmed runtime dispatch and component host-runtime detection by dropping
   redundant all-exchanges storage/filtering, the one-line host-runtime
   predicate, and the duplicated differentiable method on the host protocol.
-- Inlined one-case output adapter factories into JAXGCM, Veros, and CAMulator
+- Inlined one-case output adapter factories into JAXGCM and Veros
   setup-state constructors, and inlined single-use ERA5/JCM land data prep
   helpers at their public factory boundaries.
-- Made `CamulatorRuntimeCursor.initialize(...)` command-only while keeping the
-  pure cursor calculation helper value-returning and directly tested.
+
 - Updated architecture tests to verify behavior/public boundaries instead of
   preserving private helper placement.
 - Required validation passed:
@@ -1535,8 +1511,7 @@ historical commands, failure messages, or detailed validation notes.
   from period-average accumulation and writes it through the existing
   period-output NetCDF pipeline using a temporary accumulator.
 - JAXGCM snapshots read the final runtime payload `JCMState`, Veros snapshots
-  read `VerosGCMSetupState._veros_state`, and CAMulator records the latest
-  prediction in both increment-output and period-output modes. Snapshot output
+  read `VerosGCMSetupState._veros_state`. Snapshot output
   no longer uses runtime `data` values or `component.spec.outputs`.
 - Focused red/green coverage added for adapter snapshots, provider-based
   finalize orchestration, native external snapshot contents, and API-boundary
@@ -1655,7 +1630,7 @@ historical commands, failure messages, or detailed validation notes.
 
 ### 2026-06-30: External Setup-Step and Remapper Derived-State Simplification
 
-- Removed one-line Veros and CAMulator GCM setup-state `step()` delegates.
+- Removed one-line Veros GCM setup-state `step()` delegates.
   Their factories now pass `partial(...step_*_runtime, state)` directly to
   the host component boundary, matching the existing JAXGCM factory pattern.
 - Removed conservative remapper cached derived fields
@@ -1664,9 +1639,8 @@ historical commands, failure messages, or detailed validation notes.
   needs a class-specific post-unflatten hook.
 - Updated boundary/PyTree tests to guard the simplified behavior. The first
   full pytest run exposed a stale runtime-state source assertion that assumed
-  Veros and CAMulator GCM setup-state files must still define `def step(`;
-  that assertion now only inspects the remaining CAMulator land inline step
-  and explicitly verifies the removed setup-state delegates stay absent.
+  Veros GCM setup-state files must still define `def step(`;
+  that assertion now explicitly verifies the removed setup-state delegates stay absent.
 - Validation run for this change: baseline fast pytest passed; focused red
   tests first failed on the existing setup-state delegates and remapper cached
   derived attributes. After implementation, focused affected pytest, Black,
@@ -1745,17 +1719,16 @@ historical commands, failure messages, or detailed validation notes.
 
 - Added `ComponentOutputAdapter.record_period_average_if_due()` as the shared
   output path for "accumulate sample, check cadence, write if due" behavior.
-- Added JAXGCM, Veros, and CAMulator package-internal output adapter factories
-  plus record helpers so model-specific extraction, coordinates, metadata, and
-  CAMulator forecast-increment output remain beside each external adapter while
+- Added JAXGCM and Veros package-internal output adapter factories
+  plus record helpers so model-specific extraction, coordinates and metadata remain beside each external adapter while
   period-average orchestration goes through the shared adapter boundary.
-- Rewired JAXGCM, Veros, and CAMulator setup states and runtime output paths to
+- Rewired JAXGCM and Veros setup states and runtime output paths to
   use those helpers, and updated API-boundary and focused output tests to guard
   against local write-closure duplication returning to runtime modules.
 - Validation run for this change: focused red tests first failed on the missing
   generic adapter method and missing model-specific factory/record helpers.
   After implementation,
-  `/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/test_output_adapters.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py tests/test_api_boundaries.py -q --tb=short`,
+  `/Users/romannuterman/miniforge3/envs/scipy/bin/python -m pytest tests/test_output_adapters.py tests/test_external_components_coverage.py tests/test_api_boundaries.py -q --tb=short`,
   `/Users/romannuterman/miniforge3/envs/scipy/bin/black vercor examples tests`,
   `/Users/romannuterman/miniforge3/envs/scipy/bin/flake8 . --count --exit-zero --max-line-length=120 --statistics`,
   `/Users/romannuterman/miniforge3/envs/scipy/bin/mypy vercor examples tests`,
@@ -1775,13 +1748,11 @@ historical commands, failure messages, or detailed validation notes.
 - Removed the hidden `Clock._iter_impl` dispatch attribute; `Clock.iter()` now
   branches directly between Gregorian and model-calendar iterators while
   preserving existing calendar behavior.
-- Removed unused CAMulator wind-filter convenience exports
-  `wind_filter()` and `simple_wind_artifact_filter()` while keeping the
-  config-driven runtime post-processing facade and private tensor mechanics.
+
 - Removed the unused `jax_real_array_copy()` dtype helper and kept the active
   dtype policy helpers used by production code.
 - Validation run for this change: focused red tests first failed on the old
-  clock dispatch attribute, CAMulator wind-filter wrappers, and dtype copy
+  clock dispatch attribute and dtype copy
   helper, then the same focused suite passed after implementation. Black,
   flake8, mypy, focused affected pytest, full fast pytest, full pytest, and
   coverage pytest at 90% total coverage passed with `conda run -n scipy`. The
@@ -1794,9 +1765,6 @@ historical commands, failure messages, or detailed validation notes.
 
 ### 2026-06-29: Unused Helper API Cleanup
 
-- Removed unused CAMulator stepper convenience methods and accessor attributes
-  so the runtime path owns model input assembly, postprocessing, and state
-  shifting directly.
 - Removed the one-line period-average accumulation wrapper; the shared output
   adapter now calls its owned accumulator directly.
 - Removed the unused generic PyTree concatenation helper and its concat-only
@@ -1813,10 +1781,8 @@ historical commands, failure messages, or detailed validation notes.
 - Added `vercor.output.ComponentOutputAdapter` as the shared owner for
   external component period-average accumulation, mean conversion, cadence, and
   NetCDF write lifecycle.
-- Replaced model-specific period-output wrapper routines in JAXGCM, Veros, and
-  CAMulator with small extraction, coordinate, path, and metadata helpers that
-  runtimes compose through the adapter. CAMulator immediate forecast-increment
-  output remains model-specific.
+- Replaced model-specific period-output wrapper routines in JAXGCM and Veros with small extraction, coordinate, path, and metadata helpers that
+  runtimes compose through the adapter.
 - Updated architecture/dependency docs and boundary tests so shared
   period-output helper calls live in `vercor.output.adapters`, not in each
   external component output module.
@@ -1851,55 +1817,16 @@ historical commands, failure messages, or detailed validation notes.
 ### 2026-06-19: Centralized NetCDF Filename Logging
 
 - Moved NetCDF filename log emission into the shared `write_netcdf_dataset`
-  boundary and routed period-average and CAMulator forecast-increment writers
+  boundary and routed period-average writers
   through that single logging path.
 - Added regression coverage for shared-writer logger injection, exact-once
-  period-file logging, CAMulator forecast/average filename logging, and scalar
+  period-file logging and scalar
   data-variable writes. The scalar test covers the h5py rule that scalar
   datasets cannot use gzip filter options.
 - Validation run for this change: focused red/green pytest, focused output
   pytest, Black, flake8, mypy, full fast pytest, full pytest, and
   `conda run -n scipy pytest tests/ -q --fast --tb=short` passed. The existing
   Black Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
-
-### 2026-06-17: CAMulator Period-Average Output Frequency
-
-- Added `output_frequency` to the CAMulator GCM public factory and setup state.
-  `None` preserves per-forecast-increment output; configured `day`, `month`, or
-  `year` streams CAMulator prediction tensors into the shared period-average
-  accumulator and writes average files under the configured forecast output
-  folder.
-- Added CAMulator output helpers for period accumulation and average-file
-  writing through shared `vercor.output` primitives while keeping CAMulator
-  tensor metadata, `predict.save_vars` filtering, and forecast-increment output
-  in `camulator_output.py`.
-- Updated the CAMulator/Veros example and architecture/dependency docs for the
-  unified external output interface.
-- Validation run for this change: focused red/green pytest, focused
-  CAMulator/shared-output pytest, Black, flake8, mypy, full fast pytest, full
-  pytest, coverage pytest, and `git diff --check` passed. The existing Black
-  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
-
-### 2026-06-16: CAMulator Direct h5netcdf Output
-
-- Replaced CAMulator forecast-increment output delegation to CREDIT
-  `make_xarray`/NetCDF helpers with VerCOR-owned tensor shaping and direct
-  `h5netcdf` writing through the shared output variable boundary.
-- Moved CAMulator output metadata loading into `camulator_output.py`, kept
-  model/parser/transform CREDIT imports in `camulator_imports.py`, and wired
-  runtime output to use the setup state's existing tensor transformer for
-  `predict.climate_rescale_output`.
-- Added unsupported-option validation for xarray-only CREDIT output features
-  such as pressure interpolation, ptype, and CREDIT-specific encoding dicts.
-- Red/green notes: new output tests first failed because direct helper APIs and
-  the `state_transformer` writer argument were missing; after implementation,
-  the fast suite exposed the new NumPy import as an explicit host-output
-  boundary, so `tests/test_production_numpy_boundaries.py` now lists
-  `camulator_output.py`.
-- Validation run for this change: focused CAMulator/output pytest, Black,
-  `git diff --check`, flake8, mypy, full fast pytest, full pytest, and coverage
-  pytest passed. The existing Black Python 3.13/target-3.14 warning and JAX
-  dtype-promotion warning remain.
 
 ### 2026-06-12: External Output Adapter Ownership Boundary
 
@@ -2040,12 +1967,11 @@ historical commands, failure messages, or detailed validation notes.
 - Simplified JAXGCM factory wiring so setup state binds runtime-owned lifecycle
   hooks directly, and removed the one-line callback delegate layer from
   `jax_gcm_state`.
-- Removed the unused CAMulator `accessor_state` setup attribute while keeping
-  the runtime-used input/output accessors.
+
 - Updated `DESIGN.md`, `DEPENDENCIES.md`, and architecture/PyTree tests to
   document and enforce the simplified boundaries.
 - Red/green notes: the focused cleanup tests first failed on the old cached
-  fields, dead validator, callback delegates, and CAMulator accessor; after the
+  fields, dead validator and callback delegates; after the
   cleanup the same focused suite passed.
 - Validation run for this change: the focused red cleanup tests failed for the
   expected old symbols, then the same focused suite passed after
@@ -2185,26 +2111,22 @@ historical commands, failure messages, or detailed validation notes.
 - Removed private pass-through helpers that only forwarded to canonical
   implementations: flux `_as_jax_array()` aliases, JAXGCM/Veros output
   `_jax_array()` aliases, the bilinear interpolator source-mask delegate,
-  forcing-data legacy transpose/flip delegates, and the CAMulator land
-  temperature-normalization delegate.
+  forcing-data legacy transpose/flip delegates.
 - Replaced call sites with direct `as_jax_real_array(...)`,
   `_extrapolation.valid_scalar_source_mask(...)`, and `jnp.flip(...)` calls.
   Public compatibility aliases and documented facade/accessor boundaries were
   left unchanged.
-- Removed the stale CAMulator helper-only test while keeping component-level
-  JAX-array storage coverage.
 - The precise cleanup scan reported no removed-helper definitions or call sites:
-  `rg -n "def (_as_jax_array|_jax_array|_prepare_camulator_land_surface_temperature|_legacy_transpose_to_time_last_order|_flip_legacy_latitude_axis)\b|_ensure_src_mask\b|\b(_as_jax_array|_jax_array|_prepare_camulator_land_surface_temperature|_legacy_transpose_to_time_last_order|_flip_legacy_latitude_axis)\(" vercor tests examples`,
+  `rg -n "def (_as_jax_array|_jax_array|_legacy_transpose_to_time_last_order|_flip_legacy_latitude_axis)\b|_ensure_src_mask\b|\b(_as_jax_array|_jax_array|_legacy_transpose_to_time_last_order|_flip_legacy_latitude_axis)\(" vercor tests examples`,
 - Validation run for this change:
-  `conda run -n scipy pytest tests/test_fluxes_utilities.py tests/test_bilinear_rectilinear_interpolator.py tests/test_forcing_data.py tests/test_jax_gcm_output_frequency.py tests/test_data_component_kernels.py tests/test_camulator_component_kernels.py tests/test_external_components_coverage.py -q --tb=short`,
+  `conda run -n scipy pytest tests/test_fluxes_utilities.py tests/test_bilinear_rectilinear_interpolator.py tests/test_forcing_data.py tests/test_jax_gcm_output_frequency.py tests/test_data_component_kernels.py tests/test_external_components_coverage.py -q --tb=short`,
   `conda run -n scipy black vercor examples tests`,
   `git diff --check`,
   `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
   `conda run -n scipy mypy vercor examples tests`,
   `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
   `conda run -n scipy pytest tests/ -q --tb=short` passed. The broader
-  substring cleanup scan still matches preserved public/test names such as
-  `torch_tensor_from_jax_array`.
+  substring cleanup scans can still match preserved public/test names.
 
 ### 2026-06-10: Internal Naming Consistency Pass
 
@@ -2493,54 +2415,17 @@ historical commands, failure messages, or detailed validation notes.
   Coverage remained source-focused at 90% total. The existing Black Python
   3.13/target warning and JAX dtype-promotion warning remain.
 
-### 2026-06-02: CAMulator Wind-Filter Boundary Refactor
-
-- Split CAMulator wind artifact tensor mechanics into private
-  `vercor.setups._external._camulator_wind_filtering`, which now owns PyTorch
-  mask/kernel artifact construction, field filtering, and selected in-place
-  tensor updates.
-- Kept `vercor.setups._external.camulator_wind_filter` as the public facade for
-  configuration loading/validation, compatibility functions, and the existing
-  log-and-skip failure policy used during optional post-processing.
-- Added focused behavior and architecture coverage for shape-stable wind-filter
-  artifacts, target-only tensor mutation, log-and-skip failure handling, and the
-  public-to-private wind-filter boundary. Updated `DESIGN.md` and
-  `DEPENDENCIES.md` for the new owner split.
-- Validation run for this change:
-  focused red
-  `conda run -n scipy pytest tests/test_camulator_component_kernels.py tests/test_api_boundaries.py -q --fast --tb=short`
-  failed as expected on missing
-  `vercor.setups._external._camulator_wind_filtering` and the missing private
-  boundary file assertion. Focused green with the same command passed after
-  implementation. Then `conda run -n scipy black vercor examples tests`,
-  focused post-format pytest with the same command,
-  `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
-  `conda run -n scipy mypy vercor examples tests`,
-  `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
-  `conda run -n scipy pytest tests/ -q --tb=short` passed. The existing Black
-  Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
-- Failed approaches recorded: the first flake8 pass found one Black-formatted
-  computed slice with E203 in `_camulator_wind_filtering.py`; rewriting the
-  split helper to use explicit `start`/`end` variables fixed the style issue.
-
 ### 2026-06-02: External Adapter Factory/Setup-State Boundary Refactor
 
 - Removed the public `JCMState` compatibility aliases from
   `vercor.setups._external` and `vercor.setups._external.jax_gcm`; the canonical
   state bundle owner is now only `vercor.setups._external.jax_gcm_state`.
-- Split CAMulator atmosphere setup-state ownership into
-  `vercor.setups._external.camulator_gcm_state.CAMulatorGCMSetupState`, leaving
-  `vercor.setups._external.camulator` as a thin `make_camulator_gcm(...)`
-  factory that binds the host-component lifecycle methods.
 - Updated boundary/runtime tests, `DESIGN.md`, and `DEPENDENCIES.md` for the
-  stricter JAXGCM public surface and CAMulator setup-state owner.
+  stricter JAXGCM public surface.
 - Validation run for this change:
   initial focused red
-  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_camulator_component_kernels.py tests/test_coupler_runtime.py -q --fast --tb=short`
-  first exposed an over-eager test import of the not-yet-created CAMulator
-  setup-state module; after moving that assertion back to the boundary test,
-  the same focused red command failed as expected on the remaining `JCMState`
-  alias and missing `camulator_gcm_state.py`. Focused green with the same
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_coupler_runtime.py -q --fast --tb=short`
+  failed as expected on the remaining `JCMState` alias. Focused green with the same
   command passed after implementation. Then
   `conda run -n scipy black vercor examples tests`,
   focused post-format pytest with the same boundary/runtime command,
@@ -2548,17 +2433,10 @@ historical commands, failure messages, or detailed validation notes.
   `conda run -n scipy mypy vercor examples tests`, and
   `conda run -n scipy pytest tests/ -q --fast --tb=short` passed. The first
   full `conda run -n scipy pytest tests/ -q --tb=short` exposed one stale
-  full-only boundary assertion in `tests/test_runtime_state.py` that still
-  looked for `def step(...)` in `camulator.py`; the exact failing test then
-  passed after retargeting it to `camulator_gcm_state.py`. Final Black,
+  boundary assertion that was corrected in the test harness. Final Black,
   focused boundary/runtime pytest, flake8, mypy, full fast pytest, and full
   pytest all passed. The existing Black Python 3.13/target-3.14 warning and
   JAX dtype-promotion warning remain.
-- Failed approaches recorded: the initial top-level import of
-  `camulator_gcm_state` in the CAMulator kernel tests caused collection to fail
-  before the intended red boundary assertion, and the first full suite run found
-  a stale boundary test that still treated the CAMulator factory as the
-  setup-state owner. Both were corrected in the test harness.
 
 ### 2026-06-02: Asset and Forcing-Data Boundary Refactor
 
@@ -2578,8 +2456,7 @@ historical commands, failure messages, or detailed validation notes.
 - Updated `DESIGN.md` and `DEPENDENCIES.md` for the refined asset and
   forcing-data boundaries, including removal of the obsolete
   data-component-reader-class wording.
-- The broader audit findings for public `JCMState` reexport cleanup and
-  CAMulator setup-state splitting were intentionally left out of this
+- The broader audit finding for public `JCMState` reexport cleanup was intentionally left out of this
   asset/forcing-data pass and completed in the later 2026-06-02 external
   adapter factory/setup-state boundary refactor.
 - Validation run for this change:
@@ -2734,13 +2611,12 @@ historical commands, failure messages, or detailed validation notes.
 ### 2026-06-01: External Adapter Helper Boundary Refactor
 
 - Renamed exported external-adapter helper functions to public
-  package-internal names in JAXGCM, CAMulator, and Veros setup modules, while
+  package-internal names in JAXGCM and Veros setup modules, while
   leaving underscored helpers as local implementation details.
 - Removed private underscored helpers and setup-state classes from literal
   external adapter `__all__` exports.
 - Updated external runtime call sites so adapter modules no longer reach through
-  another module's private helper namespace for JAXGCM field mapping,
-  CAMulator tensor/field staging, CAMulator optional-dependency loading, or
+  another module's private helper namespace for JAXGCM field mapping or
   Veros host-state mutation helpers.
 - Strengthened architecture coverage so external adapter `__all__` exports
   cannot drift back to private names and runtime helpers use the named
@@ -2752,16 +2628,12 @@ historical commands, failure messages, or detailed validation notes.
   pytest for the missing public helper names/private `__all__` exports, focused
   green after implementation,
   `conda run -n scipy black vercor examples tests`,
-  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_external_components_coverage.py tests/test_camulator_component_kernels.py -q --fast --tb=short`,
+  `conda run -n scipy pytest tests/test_api_boundaries.py tests/test_external_components_coverage.py -q --fast --tb=short`,
   `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
   `conda run -n scipy mypy vercor examples tests`,
   `conda run -n scipy pytest tests/ -q --fast --tb=short`, and
   `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black Python
   3.13/target-3.14 warning and JAX dtype-promotion warning remain.
-- Failed approach recorded: the first focused red run imported renamed
-  CAMulator helpers directly from the module and failed at collection time.
-  The test was adjusted to access helpers through the module object so the red
-  phase exercised the intended missing boundary attributes.
 
 ### 2026-06-01: Component Lifecycle Boundary Refactor
 
@@ -3128,15 +3000,13 @@ historical commands, failure messages, or detailed validation notes.
 - Added `vercor._runtime.facade.RuntimeInputs` so `Coupler` passes one
   grouped internal runtime input bundle into facade helpers instead of repeated
   component/exchange/resource parameter clumps.
-- Added lightweight CAMulator runtime field contract ownership in
-  `vercor.setups._external.camulator_contracts`, leaving tensor/field mapping
-  code focused on runtime arrays.
+
 - Split reusable architecture-test helpers out of `tests/test_api_boundaries.py`
   and added focused tests for field layout, component boundaries, runtime facade
-  boundaries, and CAMulator contracts.
+  boundaries.
 - Validation run for this change:
   focused new boundary pytest,
-  focused API/runtime/component/CAMulator fast pytest,
+  focused API/runtime/component fast pytest,
   `conda run -n scipy pytest tests/ -q --fast --tb=short`,
   `conda run -n scipy black vercor examples tests`,
   `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
@@ -3204,15 +3074,13 @@ historical commands, failure messages, or detailed validation notes.
 - Removed obsolete compatibility aliases and methods:
   `vercor.setups._external.jax_gcm.JAXGCMRuntimePayload`,
   the external setup lazy payload export, `ComponentSettings`,
-  `ComponentForcingData._read_forcing()`, CAMulator dictionary metadata
-  accessors, and private `Coupler` runtime resource/scanned-run shims.
+  `ComponentForcingData._read_forcing()` and private `Coupler` runtime resource/scanned-run shims.
 - Added test-only runtime helpers for focused scanned-runtime and
   state-from-components coverage without restoring production compatibility
   methods.
-- Updated boundary tests, runtime/coupler/cache/interrupt/forcing/CAMulator
-  tests, `DESIGN.md`, and `DEPENDENCIES.md` for the canonical API paths.
+
 - Validation run for this change:
-  focused obsolete-API/CAMulator/forcing pytest,
+  focused obsolete-API/forcing pytest,
   `conda run -n scipy black vercor examples tests`,
   `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
   `conda run -n scipy mypy vercor examples tests`,
@@ -3242,7 +3110,7 @@ historical commands, failure messages, or detailed validation notes.
   `conda run -n scipy pytest tests/ -q --tb=short`. The existing Black
   Python 3.13/target-3.14 warning and JAX dtype-promotion warning remain.
 
-### 2026-05-27: Runtime Facade and CAMulator Tensor Index Refactor
+### 2026-05-27: Runtime Facade Refactor
 
 - Added `vercor._runtime.facade` as the high-level orchestration boundary used by
   `Coupler` for runtime-state creation, validation, dispatch/run context
@@ -3250,12 +3118,9 @@ historical commands, failure messages, or detailed validation notes.
 - Slimmed `vercor.coupler` so it delegates runtime internals through the facade
   while retaining then-current test delegates; later cleanup removed the
   private compatibility methods.
-- Added typed `TensorVariableIndex` metadata for CAMulator tensor access; the
-  temporary dictionary metadata accessor was later removed in favor of
-  `StateVariableAccessor.get_var_index(...)`.
-- Updated boundary/CAMulator tests, `DESIGN.md`, and `DEPENDENCIES.md`.
+
 - Validation run for this change:
-  focused runtime/API/Coupler/CAMulator fast pytest,
+  focused runtime/API/Coupler fast pytest,
   `conda run -n scipy black vercor examples tests`,
   `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
   `conda run -n scipy mypy vercor examples tests`,
@@ -3265,20 +3130,18 @@ historical commands, failure messages, or detailed validation notes.
 
 ### 2026-05-27: External Adapter State Boundary Refactor
 
-- Added private runtime-state protocols for JAXGCM, Veros, and CAMulator
+- Added private runtime-state protocols for JAXGCM and Veros
   runtime helpers so adapter runtime modules no longer accept unbounded setup
   state objects in their public helper signatures.
 - Replaced JAXGCM factory lambda lifecycle wiring with named callbacks bound by
   `functools.partial`, and replaced the Veros host step lambda with a named
   private step adapter.
 - Kept Veros optional runtime settings lazy by importing `runtime_settings`
-  inside `configure_veros_runtime()`, and made CAMulator wind-filter
-  configuration fail with explicit `ValueError`s while removing mutable function
-  defaults.
+  inside `configure_veros_runtime()`.
 - Updated boundary/focused tests, `DESIGN.md`, and `DEPENDENCIES.md` for the
   tightened external-adapter state ownership map.
 - Validation run for this change:
-  focused external/API/CAMulator fast pytest,
+  focused external/API fast pytest,
   `conda run -n scipy black vercor examples tests`,
   `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
   `conda run -n scipy mypy vercor examples tests`,
@@ -3314,11 +3177,9 @@ historical commands, failure messages, or detailed validation notes.
 
 - Added focused runtime owners for external adapter behavior:
   `jax_gcm_runtime.py` owns JAXGCM runtime payload, defaults, prefill,
-  validation, stepping, and host recording; `camulator_runtime.py` owns
-  CAMulator datetime coercion, prediction-block execution, and runtime step
-  mapping; `veros_runtime.py` owns Veros flux application, host substeps, and
+  validation, stepping, and host recording; `veros_runtime.py` owns Veros flux application, host substeps, and
   SST refresh.
-- Slimmed `jax_gcm.py`, `camulator.py`, and `veros_gcm.py` back toward
+- Slimmed `jax_gcm.py` and `veros_gcm.py` back toward
   optional-dependency loading, model construction, setup initialization, spinup,
   and factory wiring while preserving existing public factories. The JAXGCM
   runtime payload is now owned by `jax_gcm_runtime.py` rather than reexported by
@@ -3478,12 +3339,12 @@ historical commands, failure messages, or detailed validation notes.
   repeated raw `Exchange(...)` wiring.
 - Lazied the paired JCM setup helper's optional JCM imports, moved JCM land
   type-only optional imports behind `TYPE_CHECKING`, and extracted focused
-  JAXGCM host-recording and CAMulator prediction-block helpers.
+  JAXGCM host-recording helpers.
 - Updated `DESIGN.md`, `DEPENDENCIES.md`, and boundary tests for the new
   ownership map.
 - Validation run for this change:
   focused component/runtime/API fast pytest,
-  focused setup/CAMulator/external fast pytest,
+  focused setup/external fast pytest,
   focused runtime-cache fast pytest,
   `conda run -n scipy pytest tests/ -q --fast --tb=short`,
   `conda run -n scipy black vercor examples tests`,
@@ -3558,9 +3419,7 @@ historical commands, failure messages, or detailed validation notes.
 ### 2026-05-27: Deprecated Compatibility Import Facade Removal
 
 - Removed obsolete one-hop compatibility modules:
-  `vercor._runtime.components`, `vercor.setups._data.camulator_land`,
-  `vercor.setups._data.forcing`, `vercor.setups._external.camulator_state`,
-  `vercor.setups._external.windpp`, and `vercor.setups.jax_array_helpers`.
+  `vercor._runtime.components`, `vercor.setups._data.forcing`, `vercor.setups._external.windpp`, and `vercor.setups.jax_array_helpers`.
 - Routed remaining imports to canonical owners: runtime component-state,
   field-transfer, and validation helpers; `vercor.forcing_data.read_forcing`;
   calendar datetime classes; vertical-coordinate helpers; grid identity; and
@@ -3592,13 +3451,10 @@ historical commands, failure messages, or detailed validation notes.
   `vercor._runtime.topology` so `Coupler` delegates topology policy.
 - Split broad external adapters:
   `jax_gcm_fields.py` owns JCM field mapping and surface-temperature helpers,
-  `camulator_fields.py`/`camulator_tensors.py`/`camulator_init.py`/
-  `camulator_runtime_settings.py` own CAMulator field, tensor, init-noise, and
-  environment setup helpers, and `veros_setup.py`/`veros_fluxes.py`/
+  and `veros_setup.py`/`veros_fluxes.py`/
   `veros_state.py` own Veros setup, flux, and host-state helpers.
 - Kept adapter factory/state compatibility while removing moved helper symbols
-  from old external adapter facades; narrowed
-  `vercor.setups._data.camulator_land` to the public land factory only.
+  from old external adapter facades.
 - Centralized common example exchange field lists in
   `vercor._exchange_recipes`, added slab land/ocean recipe separation,
   and widened `Exchange.field_names` to accept immutable recipe sequences.
@@ -3624,8 +3480,7 @@ historical commands, failure messages, or detailed validation notes.
   `vercor.fluxes.vertical_coordinates`; later cleanup removed the old flux
   utility import aliases.
 - Moved setup helper ownership to `vercor.host_arrays` and
-  `vercor.diagnostics.fields`; moved CAMulator land, CAMulator output, CAMulator
-  wind filtering, and JAXGCM output helpers under `vercor.setups._external`.
+  `vercor.diagnostics.fields`; moved JAXGCM output helpers under `vercor.setups._external`.
 - Updated `DESIGN.md`, `DEPENDENCIES.md`, examples, and boundary tests for the
   new ownership map.
 - Required validation passed:
@@ -3651,12 +3506,10 @@ historical commands, failure messages, or detailed validation notes.
   registries, and diagnostics fields/tables/plotting.
 - Moved mask math into `vercor.grid_masks` and component topology lookup into
   `vercor._runtime.topology`.
-- Split CAMulator optional imports, forcing cursors, tensor accessors, stepping,
-  and initialization into focused modules before later cleanup removed the
-  `camulator_state.py` facade.
+
 - Focused checks passed for API boundaries, component factories, setup imports,
   runtime-boundary imports, shared helper ownership, assets/diagnostics
-  separation, and CAMulator decomposition.
+  separation.
 - Required validation passed:
   `conda run -n scipy black vercor examples tests`,
   `conda run -n scipy flake8 . --count --exit-zero --max-line-length=120 --statistics`,
@@ -3692,9 +3545,7 @@ historical commands, failure messages, or detailed validation notes.
 - Split runtime exchange dispatch into scalar and vector primitives while
   preserving existing behavior: scalar exchanges apply fractional masks, vector
   exchanges do not.
-- Added `CamulatorRuntimeCursor` so CAMulator atmosphere and land adapters share
-  forcing-index initialization, counter reset, index lookup, and counter
-  advancement.
+
 - Moved generic component step-result application into
   `vercor.components._runtime_fields.apply_step_result(...)` so callable
   wrappers and base components use the same primitive.
@@ -3706,8 +3557,7 @@ historical commands, failure messages, or detailed validation notes.
 - Added `setups.jcm_setup_helpers.build_jcm_land_atmosphere_components(...)`
   for repeated JCM setup construction, land-mask patching, and JAXGCM option
   forwarding.
-- Refactored CAMulator `StateVariableAccessor` index-map construction through
-  shared private primitives.
+
 - Routed remaining multi-exchange runnable setup scripts through
   `setups.coupler_helpers.add_exchanges(...)`.
 - Corrected `align_model_timestep(...)` non-divisible error text so it states
@@ -3728,7 +3578,7 @@ historical commands, failure messages, or detailed validation notes.
 - Extended setup lifecycle helpers for timestep assignment, spinup logging,
   forcing-index calculation, and default-field seeding.
 - Added runnable setup helpers while keeping exchange recipes explicit.
-- Consolidated common setup adapter paths for JAXGCM, Veros, CAMulator, ERA5,
+- Consolidated common setup adapter paths for JAXGCM, Veros, ERA5,
   ERA-Interim, and JCM where behavior is shared.
 - Added lazy optional setup imports so missing optional packages fail only when
   those adapters are used.
@@ -3800,7 +3650,7 @@ historical commands, failure messages, or detailed validation notes.
 
 - Expanded Coupler, Veros, clock, and flux-kernel coverage.
 - Translated flux, grid, bilinear, conservative remapping, slab, Veros, JAXGCM,
-  CAMulator, ERA5, ERA-Interim, and data-forcing boundaries toward JAX-first
+  ERA5, ERA-Interim, and data-forcing boundaries toward JAX-first
   runtime paths.
 - Added differentiable public runtime and hardened mixed-grid/data-forcing
   runtime execution.
@@ -3814,8 +3664,7 @@ historical commands, failure messages, or detailed validation notes.
 - Do not fix numerical discrepancies with fudge factors. Earlier successful
   fixes traced missing terms, sign/index errors, dtype/layout issues, or
   boundary ownership mistakes instead.
-- CAMulator cursor advancement must occur once after each non-empty forcing
-  block, not once per model substep.
+
 - Masked surface fields should use `jnp.where(mask, field, jnp.nan)` rather
   than multiply-by-NaN masking, which produced NaN gradients on valid cells.
 - Source-boundary assertions should be precise. Several earlier failures came

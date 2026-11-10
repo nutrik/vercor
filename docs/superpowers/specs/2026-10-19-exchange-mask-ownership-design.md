@@ -130,11 +130,8 @@ documentation and executable setup contracts.
   exports. The slab demonstration retains explicit grid-mean forcing as an
   acknowledged approximation; never reconstruct a land flux by dividing a
   combined land/ocean flux by land fraction.
-- CAMulator's combined skin-temperature input requires area contributions.
-  Form land/ocean contributions at their sources and remap before combining,
-  rather than multiplying separately remapped temperature and coverage.
-  Split any local state fields from such contribution routes.
-- JCM/CAMulator land components retain their already-computed land fraction
+
+- JCM land components retain their already-computed land fraction
   as a declared current coverage field through `ComponentMaskSpec`.
 
 Static current mask fields must coexist with daily/monthly forcing records.

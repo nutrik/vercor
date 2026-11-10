@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import ast
-import io
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import jax.numpy as jnp
 import numpy as np
 import pytest
-import torch
-import xarray as xr
 
 from tests.assertions import assert_allclose_compact
-from vercor import Clock, Coupler, RectilinearGrid
+from vercor import Clock, Coupler, Exchange, RectilinearGrid, RuntimeOptions
 from vercor.components import (
     CallableComponent,
     ComponentSpec,
@@ -23,47 +20,22 @@ from vercor.components import (
     StepResult,
 )
 from vercor.fields import _flatten_field_items
-from vercor.output import OutputTarget
+from vercor.dtypes import DTypePolicy
+from vercor.regridding import bilinear, conservative
+from vercor.topology import SurfaceMaskPolicy
 from vercor.recipes import (
     ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
 )
-from vercor.setups.gallery import camulator_with_veros
 
 
 @pytest.mark.fast_always
 @pytest.mark.parametrize(
     "names", [("ATM", "OCN", "LND"), ("air-model", "water-model", "terrain-model")]
 )
-def test_camulator_veros_gallery_composes_through_fake_native_boundary(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
+def test_host_workflow_preserves_payload_precision_and_surface_masks(
     names: tuple[str, str, str],
 ) -> None:
-    """Exercise the unavailable CAMulator gallery through a finite host fake."""
-
-    # Actual file-backed initial diagnostics; model construction remains fake.
-    diagnostic_path = tmp_path / "native-initial.nc"
-    xr.Dataset(
-        {
-            name: (("time", "latitude", "longitude"), np.full((1, 2, 2), value))
-            for name, value in (
-                ("TS", 280.0),
-                ("FSNS", 21600 * 100.0),
-                ("FLNS", -21600 * 3.0),
-            )
-        },
-        coords={"time": [datetime(1981, 1, 3)]},
-    ).to_netcdf(diagnostic_path, engine="h5netcdf")
-    monkeypatch.setenv("VERCOR_CAMULATOR_WATER_VAPOR_VARIABLE", "VAPOR")
-    monkeypatch.setenv("VERCOR_CAMULATOR_INITIAL_DIAGNOSTICS", str(diagnostic_path))
-    monkeypatch.setattr(
-        camulator_with_veros,
-        "open",
-        lambda path: io.StringIO(
-            "data:\n  variables: [U, V, T, VAPOR]\npredict:\n  start_datetime: '1981-01-03 00:00:00'\n"
-        ),
-        raising=False,
-    )
+    """Advance host payloads through the generic atmosphere/ocean/land boundary."""
 
     ocean_mask = np.asarray([[1.0, 0.0], [0.0, 1.0]])
     land_mask = 1.0 - ocean_mask
@@ -121,7 +93,7 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
     def setup_atmosphere(component: Any, context: Any) -> SetupResult:
         _ = component
         assert context.dtype.enable_x64 is False
-        return SetupResult(payload=torch.zeros((), dtype=torch.float32))
+        return SetupResult(payload=np.zeros((), dtype=np.float32))
 
     def step_atmosphere(
         fields: Any,
@@ -129,10 +101,11 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         payload: Any | None,
     ) -> StepResult:
         _ = fields, context
-        assert isinstance(payload, torch.Tensor)
-        assert bool(torch.all(torch.isfinite(payload)))
+        assert isinstance(payload, np.ndarray)
+        assert payload.dtype == np.float32
+        assert bool(np.isfinite(payload).all())
         native_steps.append(int(payload.item()))
-        return StepResult(payload=payload + 1.0)
+        return StepResult(payload=np.asarray(payload + 1.0, dtype=np.float32))
 
     atmosphere = CallableComponent(
         names[0],
@@ -147,64 +120,44 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         ),
     )
 
-    monkeypatch.setattr(camulator_with_veros, "make_veros_gcm", lambda **_: ocean)
-
-    def make_atmosphere(*, config: Any) -> Any:
-        assert config.water_vapor_variable == "VAPOR"
-        assert config.initial_diagnostics["time"] == datetime(1981, 1, 3)
-        assert_allclose_compact(config.initial_diagnostics["TS"], 280.0)
-        assert_allclose_compact(config.initial_diagnostics["FSNS"], 21600 * 100.0)
-        assert_allclose_compact(config.initial_diagnostics["FLNS"], -21600 * 3.0)
-        return atmosphere
-
-    monkeypatch.setattr(camulator_with_veros, "make_camulator_gcm", make_atmosphere)
-    monkeypatch.setattr(
-        camulator_with_veros,
-        "make_camulator_land",
-        lambda *args, **kwargs: land,
-    )
-
-    real_clock = Clock
-    real_coupler = Coupler
-    captured: dict[str, Any] = {}
-
-    monkeypatch.setattr(
-        camulator_with_veros,
-        "Clock",
-        lambda *args, **kwargs: real_clock(
-            start=kwargs["start"],
-            dt_seconds=21600.0,
-            steps=2,
-            calendar=kwargs["calendar"],
+    coupler = Coupler(
+        clock=Clock(start=datetime(1981, 1, 3), dt_seconds=21600.0, steps=2),
+        components=(ocean, land, atmosphere),
+        exchanges=(
+            Exchange(
+                atmosphere.name,
+                ocean.name,
+                ATMOSPHERE_TO_OCEAN_BULK_FORCING_FIELDS,
+                quantity="intensive",
+                regridder_factory=bilinear,
+            ),
+            Exchange(
+                ocean.name,
+                atmosphere.name,
+                ("sea_surface_temperature",),
+                quantity="source_flux",
+                regridder_factory=conservative,
+            ),
+            Exchange(
+                land.name,
+                atmosphere.name,
+                ("land_surface_temperature",),
+                quantity="source_flux",
+                regridder_factory=conservative,
+            ),
         ),
-    )
-    monkeypatch.setattr(
-        camulator_with_veros,
-        "OutputTarget",
-        lambda _: OutputTarget(
-            tmp_path,
-            write_period=False,
-            write_final_fields=False,
-            write_snapshots=False,
+        run_order=(ocean.name, land.name, atmosphere.name),
+        runtime=RuntimeOptions(
+            dtype=DTypePolicy(enable_x64=False),
+            topology=SurfaceMaskPolicy(
+                atmosphere=atmosphere.name, ocean=ocean.name, land=land.name
+            ),
         ),
+        log_level="error",
     )
-
-    class _RecordingCoupler:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            self.coupler = real_coupler(*args, **kwargs)
-            captured["coupler"] = self.coupler
-
-        def run(self, *, output: OutputTarget) -> Any:
-            final_state = self.coupler.run(output=output)
-            captured["final_state"] = final_state
-            return final_state
-
-    monkeypatch.setattr(camulator_with_veros, "Coupler", _RecordingCoupler)
-
-    camulator_with_veros.run_setup(loglevel="error", float_type="float32")
+    final_state = coupler.run()
 
     assert native_steps == [0, 1]
-    coupler = cast(Coupler, captured["coupler"])
     topology = coupler._ensure_prepared().topology_maps
     assert_allclose_compact(
         topology.binary_masks[f"{atmosphere.name}->{ocean.name}"], ocean_mask
@@ -213,7 +166,6 @@ def test_camulator_veros_gallery_composes_through_fake_native_boundary(
         topology.binary_masks[f"{land.name}->{atmosphere.name}"], land_mask
     )
 
-    final_state = captured["final_state"]
     views = final_state.components((ocean.name, land.name, atmosphere.name))
     for view in views.values():
         assert view.grid is not None

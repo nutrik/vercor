@@ -756,9 +756,6 @@ python -m examples.run_slab_driver
 python -m examples.custom_component_wrapping
 ```
 
-Warn that CAMulator paths and checkpoints are machine-specific and must be
-reconfigured.
-
 Create `docs/how-to/backends.rst` with a comparison table:
 
 | setting | behavior | valid components |
@@ -803,8 +800,7 @@ Create `docs/troubleshooting.rst` with five sections:
 5. `Output fails under JIT or differentiation`
 
 For each, use `Symptom`, `Cause`, and `Action` paragraphs and cross-reference
-the relevant full guide. State that CAMulator has no documented compatible
-dependency pin.
+the relevant full guide.
 
 - [ ] **Step 6: Run operational-guide checks**
 
@@ -925,11 +921,11 @@ module headings:
 
 `docs/api/setups-physics-types.rst` documents:
 
-- `CAMulatorConfig`, `JAXGCMConfig`, `JCMLandAtmosphereConfig`,
+- `JAXGCMConfig`, `JCMLandAtmosphereConfig`,
   `JCMLandAtmosphereSetup`, `JCMInputs`, `Spinup`, `VerosConfig`,
   `load_jcm_inputs`, `make_slab_atmosphere`, `make_slab_land`,
   `make_slab_ocean`, `make_slab_seaice`, `make_jcm_land_atmosphere`,
-  `make_camulator_gcm`, `make_camulator_land`, `make_era5_atmosphere`,
+  `make_era5_atmosphere`,
   `make_era5_land`, `make_era5_ocean`, `make_erainterim_ocean`,
   `make_jax_gcm`, `make_jcm_land`, and `make_veros_gcm` from
   `vercor.setups`;
@@ -1092,7 +1088,7 @@ Keep:
 - the minimal slab-ocean example sourced from the same public calls as
   `docs/_examples/quickstart.py`;
 - the current `0.4.3` stability/migration note;
-- a short optional-dependency warning for CAMulator; and
+
 - links labelled `Researcher guide`, `Developer guide`, `Python API`, and
   `Plugin authoring`.
 

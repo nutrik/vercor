@@ -4,9 +4,9 @@
 
 **Goal:** Complete-by-default component period output with selective extraction and bounded streaming means.
 
-**Architecture:** Existing output contexts carry selection; the shared immutable accumulator handles ordinary samples and reduced sums/counts. Bundled providers unite native and canonical state. CAMulator reduces each native prediction immediately and retains its endpoint separately.
+**Architecture:** Existing output contexts carry selection; the shared immutable accumulator handles ordinary samples and reduced sums/counts. Bundled providers unite native and canonical state.
 
-**Tech Stack:** Python, JAX, NumPy/PyTorch, h5netcdf, pytest, Black, flake8, mypy, GitHub CLI; isolated scipy312 native stack.
+**Tech Stack:** Python, JAX, NumPy, h5netcdf, pytest, Black, flake8, mypy, GitHub CLI; isolated scipy312 native stack.
 
 **Spec:** `docs/superpowers/specs/2026-11-03-selective-streaming-output-design.md`
 
@@ -50,16 +50,6 @@
 - [x] Run these tests RED, then implement selection and completeness in existing provider owners.
 - [x] Run native/provider/scanned output regression tests including dimensions, metadata and endpoint snapshots.
 
-### Task 3: Streaming CAMulator native reductions
-
-**Files:** `vercor/setups/_external/camulator_runtime.py`, `camulator_output.py`, `camulator_gcm_state.py`, `camulator.py`; `tests/test_camulator_component_kernels.py`.
-
-**Interfaces:** Payload replaces prediction histories with an optional `_OutputAccumulator`. `run_camulator_prediction_block` accepts a native prediction callback; mandatory exchange mapping sums decoded fields per native step; selected native output accumulates only when requested. Provider returns stored sums with `reduction_counts`; snapshots decode endpoint prediction.
-
-- [x] Write failing tests for exact native finite sums/counts, no stack/cat trajectory, selective channels before host conversion, disabled output and nonlinear exchange equivalence.
-- [x] Run RED, then replace history storage with callback-based streaming, preserving direct helper callers and immutable setup resources.
-- [x] Run all CAMulator and shared/native output tests; check output on/off/repeated continuation and fixed reducer storage.
-
 ### Task 4: Review, documentation and delivery
 
 **Files:** `DESIGN.md`, `DEPENDENCIES.md`, applicable researcher/API output docs, `PROGRESS.md`, this spec/plan and public signature expectations.
@@ -75,7 +65,7 @@
 - Initial scipy3.14 baseline aborted all workers. First scipy312 run mixed stock/AD and used unwritable native asset locks. Corrected isolated stock baseline: 1701 passed, 3 warnings, 258.63 s, with `VEROS_ASSET_DIR=/private/tmp/vercor-veros170-assets`, `PYTHONPATH=/private/tmp/vercor-veros170-stack:$PWD`, scipy312 interpreter, `--fast -m 'not veros_autodiff'`, four workers. Installed environments unchanged.
 
 - Final-source regression repair: empty nodal-shape tuple avoids a native JCM typed-struct formatter's None-indexing error while leaving reshapes/channel extraction deferred. Focused native/temporal repair33 passed; integrated focused136 passed. Updated old allowlist/history expectations explicitly; numerical/unit/endpoint assertions retained.
-- Independent final review found two Important excess-work issues. Both failed first, then passed: temperature-only Veris output bypasses albedo diagnosis; rescaled CAMulator output reuses mandatory native decoding and transfers only selected channels. No deferred code minors. Actual CREDIT/model/GPU performance remains unmeasured; analytic inference stand-ins retain real mapping/output paths and no GPU throughput claim is made.
+- Independent final review reproduced and resolved two excess-work issues. Temperature-only Veris output bypasses albedo diagnosis. No deferred code findings; GPU throughput remains unmeasured.
 - Full final stock2703 and isolated exact-fork AD18 passed, zero failures/errors/skips. Exact collected-node comparison proves2721/2721 tests covered across disjoint stock/AD lanes. All327 source/test SHA256 values match the final gate-start snapshot. Combined branch coverage92.52610684387676%; raw lane files/hashes preserved. Black327, repository flake8zero, mypy327, compileall, strictSphinx and diff checks passed. Fast precommit check1742 passed, zero failures/errors/skips. Machine evidence: /private/tmp/vercor-output-final-results.json; logs/XML/coverage/source hashes share that prefix.
 - Failed approaches retained: scipy3.14 worker abort before tests; initial mixed stock/AD stack and home asset locks; None as native nodal-format sentinel; literal source-format factory test and previous native-history assertions. Installed model environments, physical constants and numerical tolerances were not changed.
 

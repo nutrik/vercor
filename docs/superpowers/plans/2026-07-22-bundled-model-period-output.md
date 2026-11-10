@@ -15,7 +15,7 @@
 - Default period files contain exactly the component's declared `ComponentSpec.outputs`; input-only and exchanged-only fields are excluded.
 - Do not change `ComponentSpec` defaults, public factory signatures, external/native providers, snapshot behavior, or final-field output.
 - Use the existing public `OutputSpec` and `PeriodOutput` contracts and the existing private runtime-field provider; do not introduce another provider or writer lifecycle.
-- Keep optional JCM, Veros, and CAMulator imports lazy and preserve the dependency-free slab boundary.
+- Keep optional JCM and Veros imports lazy and preserve the dependency-free slab boundary.
 - Use test-driven development and update `PROGRESS.md` and `DEPENDENCIES.md` as required by `AGENTS.md`.
 - Do not tag, push, publish, or create a release.
 

@@ -159,7 +159,7 @@ The audit covers all implemented numerical owners, including:
 - flux, vertical-coordinate, grid-geometry, and mask utilities;
 - JCM field preparation, stepping, output mapping, and real coupled execution;
 - Veros forcing preparation, stepping, field extraction, and coupled paths;
-- CAMulator JAX preprocessing, field mapping, and wind-filter kernels; and
+
 - common forcing selection, dtype normalization, and immutable runtime state
   paths that participate in differentiation.
 

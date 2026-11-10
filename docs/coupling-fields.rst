@@ -10,8 +10,8 @@ Lowest-model-level air
 ----------------------
 
 The bulk meteorology contract uses colocated air at ``model_level_height``
-(metres above the surface). ERA5, JCM and compatible CAMulator inputs provide
-the following horizontal fields. JCM and CAMulator map these to
+(metres above the surface). ERA5 and JCM provide
+the following horizontal fields. JCM maps these to
 ``(latitude, longitude)`` arrays.
 
 .. list-table:: Air exchange-key migration
@@ -56,8 +56,6 @@ The former ``pressure`` key had different ranks in different adapters:
 * JCM exports ``air_pressure_3d`` in Pa with shape
   ``(sigma_level, latitude, longitude)``. Native sigma order is preserved;
   the final level supplies the lowest-level thermodynamic calculations.
-* CAMulator exports ``model_level_air_pressure`` in Pa with shape
-  ``(latitude, longitude)`` for its lowest hybrid-sigma level.
 * ``surface_pressure`` remains the distinct horizontal surface pressure in Pa.
 
 These are renamed existing arrays; the migration adds no pressure export.
@@ -66,9 +64,8 @@ JCM's phase-only mapper keyword is ``near_surface_air_temperature``, formerly
 native grid, with no specified 2 m height. It partitions precipitation into
 rain and snow before transposition/remapping. The six air fields above still
 use the bottom sigma-center state for bulk fluxes; phase temperature does not
-replace them. Native JCM and CAMulator variable names remain unchanged at their
-translation boundaries. CAMulator humidity requires a declared vapor-specific
-channel; total water ``Qtot`` cannot substitute for vapor.
+replace them. Native JCM variable names remain unchanged at their
+translation boundaries.
 
 Recipes and setup names
 -----------------------
@@ -133,9 +130,6 @@ The public grid-mask helpers migrate as follows:
 They retain the existing complementary land/ocean topology and 0.001 support threshold.
 The first returns ocean fraction, land fraction and land binary support on the
 atmosphere grid; the last returns land binary support and land fraction.
-CAMulator's private ``prepare_camulator_sst_input`` becomes
-``prepare_camulator_surface_temperature_input``: its input is rescaled combined
-land/ocean surface temperature, rather than SST alone.
 
 Fluxes, coverage and geometry
 -----------------------------
@@ -232,13 +226,6 @@ The resumable native dynamics, physics cache, exact clock and
 categorical fields retain their endpoint values. Applied marine boundary fields
 use the final physics date, one native step before the dynamics endpoint.
 
-CAMulator averages every native window's mapped state and radiation fields
-across the coupling block. Native FSNS/FLNS energies
-are divided by the native duration; downward longwave is reconstructed using
-each prediction's surface emission before averaging. Prescribed CAMulator land
-still supplies the interval-start temperature. Native CREDIT checkpoint
-compatibility remains a separate validation requirement.
-
 Veris integrates total ocean heat, mass, salt and concentration-weighted face
 stress at every native step. Ice fraction, temperature and diagnosed albedo
 are native-step means; component and route coverage use the exported mean ice
@@ -267,7 +254,6 @@ sampling and reduction inside their native adapters.
 
 Native diagnostic output and exchanged state/rate means have separate sampling meanings.
 JCM's native output provider samples endpoint physics, while exchanged surface
-fluxes are native-interval means. CAMulator period output retains every native
-prediction. A period mean of endpoint native diagnostics need not reproduce the
+fluxes are native-interval means. A period mean of endpoint native diagnostics need not reproduce the
 interval-integrated exchanged budget; use the canonical transferred fields
 when checking that budget.

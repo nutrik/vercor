@@ -16,7 +16,6 @@ import pytest
 from vercor.cli import cli
 
 _BUNDLED_SETUP_NAMES = (
-    "camulator_with_veros",
     "custom_component_wrapping",
     "data_driver",
     "jcm_with_era5data",

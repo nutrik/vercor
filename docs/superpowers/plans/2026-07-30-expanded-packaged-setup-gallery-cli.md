@@ -1186,7 +1186,6 @@ git commit -m "feat: configure gallery setup runtime options"
 ### Task 5: Adopt the explicit contract across the remaining gallery
 
 **Files:**
-- Modify: `vercor/setups/gallery/run_camulator_with_veros.py`
 - Modify: `vercor/setups/gallery/run_data_driver.py`
 - Modify: `vercor/setups/gallery/run_jcm_with_slab.py`
 - Modify: `vercor/setups/gallery/run_jcm_with_veros.py`
@@ -1209,7 +1208,6 @@ Add:
     (
         "custom_component_wrapping",
         "profile_runtime",
-        "run_camulator_with_veros",
         "run_data_driver",
         "run_jcm_with_era5data",
         "run_jcm_with_slab",

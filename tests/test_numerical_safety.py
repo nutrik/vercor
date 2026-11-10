@@ -11,7 +11,6 @@ from tests.assertions import assert_array_equal_compact, assert_finite_jvp_vjp
 from vercor._numerical_safety import (
     replace_missing_nan,
     require_active_finite,
-    require_strictly_positive,
     safe_masked_divide,
 )
 from vercor.exceptions import CouplerError
@@ -135,23 +134,6 @@ def test_active_finite_contract_reports_compiled_failure() -> None:
 
     with pytest.raises(JaxRuntimeError, match="compiled field.*active domain"):
         jax.jit(checked_sum)(jnp.asarray([1.0, jnp.nan])).block_until_ready()
-
-
-@pytest.mark.parametrize("bad_value", [0.0, -1.0, jnp.nan, jnp.inf, -jnp.inf])
-def test_strictly_positive_rejects_non_positive_or_non_finite_values(
-    bad_value: float,
-) -> None:
-    with pytest.raises(CouplerError, match="strictly positive finite"):
-        require_strictly_positive(jnp.asarray([1.0, bad_value]), owner="test scale")
-
-
-def test_strictly_positive_reports_compiled_failure() -> None:
-    def checked_sum(values: jax.Array) -> jax.Array:
-        require_strictly_positive(values, owner="compiled scale")
-        return jnp.sum(values)
-
-    with pytest.raises(JaxRuntimeError, match="compiled scale.*strictly positive"):
-        jax.jit(checked_sum)(jnp.asarray([1.0, 0.0])).block_until_ready()
 
 
 def test_replace_missing_nan_fills_nan_and_preserves_finite_values() -> None:

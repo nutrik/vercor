@@ -2348,9 +2348,9 @@ def test_run_accepts_default_runtime_component() -> None:
     assert tuple(final_state.components()) == ("ATM",)
 
 
-def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
-    grid = make_test_grid(name="camulator")
-    camulator_land = CallableComponent(
+def test_scanned_runtime_rejects_host_land_runtime_boundary() -> None:
+    grid = make_test_grid(name="host-land")
+    host_land = CallableComponent(
         name="LND",
         grid=grid,
         step=lambda fields, context, payload: {},
@@ -2367,7 +2367,7 @@ def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
     )
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1),
-        components=(cast(Any, camulator_land),),
+        components=(cast(Any, host_land),),
         run_order=("LND",),
     )
 
@@ -2380,9 +2380,9 @@ def test_scanned_runtime_rejects_camulator_land_runtime_boundary() -> None:
         run_scanned_coupler(coupler, state)
 
 
-def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
-    grid = make_test_grid(name="camulator-gcm")
-    camulator = CallableComponent(
+def test_scanned_runtime_rejects_host_atmosphere_runtime_boundary() -> None:
+    grid = make_test_grid(name="host-atmosphere")
+    host_atmosphere = CallableComponent(
         name="ATM",
         grid=grid,
         step=lambda fields, context, payload: {},
@@ -2394,7 +2394,7 @@ def test_scanned_runtime_rejects_camulator_gcm_runtime_boundary() -> None:
     )
     coupler = Coupler(
         clock=Clock(start=datetime(2000, 1, 1), dt_seconds=3600.0, steps=1),
-        components=(cast(Any, camulator),),
+        components=(cast(Any, host_atmosphere),),
         run_order=("ATM",),
     )
 

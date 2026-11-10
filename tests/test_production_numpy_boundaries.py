@@ -11,9 +11,6 @@ ALLOWED_NUMPY_BOUNDARIES = {
     "vercor/dtypes.py",
     "vercor/forcing_data.py",
     "vercor/_host_arrays.py",
-    "vercor/setups/_external/camulator_output.py",
-    # Native latest-input decoding/diagnostic validation only; meteorology is JAX.
-    "vercor/setups/_external/camulator_fields.py",
     "vercor/setups/_external/veros_data.py",
     # Host observation validation/SciPy interface; the differentiated loss is JAX.
     "vercor/setups/gallery/veris_calibration.py",

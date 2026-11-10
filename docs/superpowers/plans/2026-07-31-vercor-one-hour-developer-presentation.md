@@ -17,7 +17,7 @@
 - Qualify differentiability as applying to output-free JAX workflows; do not claim that output-enabled, host-side, or mixed-backend execution is differentiable.
 - State that compiled execution requires stable payload PyTree structure, leaf shapes, and dtypes.
 - Treat physics values as traced inputs and precision/execution policy as static configuration.
-- Describe CAMulator compatibility as optional and not currently pinned.
+
 - Make no unsupported performance or scalability claims.
 - Use at least 50 pt for the deck title, 35 pt for slide titles, 24 pt for subheads, and 16 pt for body text.
 - Add a complete talk track, pacing, transition, and `[Sources]` block to the notes of every substantive slide.
@@ -75,7 +75,7 @@ Create `source-notes.txt` with 22 numbered sections. Record the exact repository
 20-22: AGENTS.md testing principles; DESIGN.md sections 6-9; PROGRESS.md Current Status and Durable Constraints; README.md Documentation
 ```
 
-For each section, write `claim | source path | source heading | qualification`. Explicitly qualify output, host execution, compiled payload structure, published-version, and CAMulator claims.
+For each section, write `claim | source path | source heading | qualification`. Explicitly qualify output, host execution, compiled payload structure, and published-version claims.
 
 - [ ] **Step 3: Write the complete deck content record**
 
@@ -100,12 +100,12 @@ Use the approved slide sequence verbatim for each title unless shortening is nec
 Run:
 
 ```bash
-rg -n "fully differentiable|output-enabled.*differentiat|host.*differentiat|mixed.*differentiat|speedup|benchmark|scalab|CAMulator|0\.4\.3|development-only|PyTree|dtype" \
+rg -n "fully differentiable|output-enabled.*differentiat|host.*differentiat|mixed.*differentiat|speedup|benchmark|scalab|0\.4\.3|development-only|PyTree|dtype" \
   .codex/vercor-one-hour-developer-presentation/deck-content.txt \
   .codex/vercor-one-hour-developer-presentation/source-notes.txt
 ```
 
-Expected: no absolute differentiability or unsupported performance claim; every output, host, mixed-backend, CAMulator, version, PyTree, and dtype claim includes the approved qualification.
+Expected: no absolute differentiability or unsupported performance claim; every output, host, mixed-backend, version, PyTree, and dtype claim includes the approved qualification.
 
 - [ ] **Step 5: Create the Earth-system graph in Mermaid Chart**
 
@@ -461,7 +461,7 @@ Read all audience-facing text and speaker notes in order. Confirm the deck:
 - qualifies output-free JAX differentiation correctly;
 - does not imply host or mixed-backend differentiation;
 - states the stable PyTree/shape/dtype requirement;
-- describes CAMulator as optional and unpinned;
+
 - makes no unsupported performance claim;
 - provides a concrete four-contract wrapper and staged validation path.
 ```

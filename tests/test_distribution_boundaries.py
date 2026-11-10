@@ -1475,7 +1475,6 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
     gallery_names = {
         "vercor/setups/gallery/custom_component_wrapping.py",
         "vercor/setups/gallery/profile_runtime.py",
-        "vercor/setups/gallery/camulator_with_veros.py",
         "vercor/setups/gallery/data_driver.py",
         "vercor/setups/gallery/jcm_with_era5data.py",
         "vercor/setups/gallery/jcm_with_slab.py",

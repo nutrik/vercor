@@ -29,7 +29,7 @@ Status: approved on 2026-10-19 for subagent-driven execution.
 ## Review focus
 
 1. A missing or stale runtime payload must never fall back to mutable setup state; Task 3 tests this with conflicting setup and runtime values.
-2. Non-six-hour native CAMulator steps must preserve fixed radiation rates and signs; Task 5 covers 1, 3, and 6 hours and multiple native substeps.
+
 3. Initial tensors may have history and forcing channels but no radiation diagnostics or vapor species; Task 6 covers the latest frame, exact timestamp, missing channels, and total-water rejection.
 4. A component swap at a fractional coast may double-weight a preweighted field or invalidate stored imports; Task 7 covers unequal/evolving/zero coverage, conservation, and AD through the public coupler.
 5. An apparently duplicate test may protect a different precision, artifact, backend, or derivative; Task 8 records surviving assertions and retains these distinctions.
@@ -106,42 +106,9 @@ and tests have not changed, while retaining the required pre-commit fast gate.
 - [x] Correct the three kernels and docstrings. Update prior tests that mirror incorrect algebra while retaining their JIT/AD and shape assertions; introduce no new fitted coefficients.
 - [x] Run slab kernels, component model, JCM/slab gallery, and runtime integration tests, then commit gates and a physics correction commit.
 
-### Task 5: Native CAMulator radiation duration
-
-**Files:** Modify `vercor/setups/_external/{camulator_fields,camulator_runtime,camulator_gcm_state}.py`, `tests/test_camulator_component_kernels.py`, and the CAMulator field audit documentation.
-
-**Interfaces:** Add required keyword `native_step_seconds: float` to `map_camulator_prediction_arrays` and `map_camulator_prediction_to_runtime_fields`, preserving their existing arguments. Derive it from the existing native model timestep; retain the accumulated-energy and downward-positive training contract.
-
-- [x] Parameterize the existing mapper test at `3600`, `10800`, and `21600 s`, supplying shortwave energy `100*seconds J/m2` and net longwave energy `-3*seconds J/m2`. Expect `100 W/m2` shortwave and `sigma*TS**4-3 W/m2` downward longwave. Observe non-six-hour failures.
-- [x] Add zero/negative duration rejection before array arithmetic and a runtime case with two native substeps per coupling interval; rate conversion must use each native duration, not the coupling duration.
-- [x] Thread the native duration through existing resources and mapping calls; replace both fixed `21600` divisors. Preserve source signs and surface-emission placement exactly once.
-- [x] Run CAMulator mapping/runtime, shared bulk, and hypsometric tests, then commit gates and the duration fix commit. Cite the pinned upstream energy contract in active docs.
-
-### Task 6: Authentic CAMulator startup and vapor capability
-
-**Files:** Modify `vercor/setups/config.py`, `vercor/setups/_external/{camulator,camulator_gcm_state,camulator_fields,camulator_contracts,camulator_runtime}.py`, `vercor/setups/gallery/run_camulator_with_veros.py`, CAMulator tests, public signature contracts, and native setup documentation.
-
-**Interfaces:** Add `CAMulatorConfig.initial_diagnostics: Mapping[str, object] | None = None` and `water_vapor_variable: str | None = None`. The mapping contains `time` and required absent native `TS/FSNS/FLNS`; own its mutable values defensively. Setup uses the existing cursor's effective initial time. Both initial input and prediction accessors must provide the declared vapor channel; `Qtot` is rejected as total water.
-
-The pure shared kernel has signature
-`_map_camulator_air_fields(constants: PhysicalConstants, *, reference_pressure: float, hyai: object, hybi: object, hyam: object, hybm: object, u_wind: object, v_wind: object, temperature_3d: object, water_vapor_3d: object, surface_pressure: object) -> dict[str, jax.Array]`.
-The host initialization mapper is
-`map_camulator_initial_runtime_fields(resources: CAMulatorGCMSetupState, model_state: torch.Tensor, cursor: CamulatorRuntimeCursor, constants: PhysicalConstants) -> dict[str, jax.Array]`;
-use annotation-only imports for the resource type to avoid an import cycle.
-The resource constructor receives the two new config declarations, and the
-prediction wrapper receives the selected vapor variable plus Task 5's duration.
-
-- [x] Before implementation, add config ownership tests and setup regressions using a history-bearing normalized input tensor with distinct latest-frame meteorology. The transformer exposes separate input/output inverse methods; assert only the input method is called during setup and the stepper/cursor/native state do not advance.
-- [x] Add explicit diagnostics at the selected initial time and require exact mapped temperature, vapor humidity, pressure, height, density, winds, and radiation. Feed those exports to the existing bulk closure on wet cells and assert finite, physically directed nonzero forcing.
-- [x] Add missing/mismatched timestamp, missing diagnostic, wrong shape, nonfinite active value, absent vapor declaration, `Qtot`, missing input channel, and missing prediction channel cases. Confirm they fail before coupling or native advancement. Preserve optional-dependency-free config access and lazy factory import behavior.
-- [x] Factor the existing array mapper's meteorology into one pure `_map_camulator_air_fields` owner accepting traced `PhysicalConstants` plus native arrays. Prediction and initial mapping reuse it; keep host tensor decoding outside the JIT kernel and use the latest history frame explicitly.
-- [x] Build initial fields in the existing setup lifecycle from decoded native state and explicit diagnostics. Remove the test-only zero initializer, keep runtime payload ownership unchanged, and validate the new vapor and diagnostic declarations with component-scoped errors.
-- [x] Update the gallery to load timestamp-matched diagnostics from its native initial-condition data and name a real configured vapor channel. A total-water-only checkpoint must report the missing physical capability; do not substitute a saturation law or reference weather.
-- [x] Run CAMulator config/field/setup/output/runtime and optional-import cases, public signatures, and installed artifact boundaries. Clearly separate boundary tests from unavailable native CREDIT/checkpoint execution. Run commit gates and commit this native boundary correction.
-
 ### Task 7: Honest prescribed contracts and interchangeable components
 
-**Files:** Modify `vercor/setups/_data/{era5_atmosphere,era5_land,era5_ocean,erainterim_ocean}.py`, `vercor/setups/_external/camulator_land.py`, `vercor/recipes.py`, affected gallery routes, and their contract tests. Create `tests/test_component_interchangeability.py` before any new production behavior.
+**Files:** Modify `vercor/setups/_data/{era5_atmosphere,era5_land,era5_ocean,erainterim_ocean}.py`, `vercor/recipes.py`, affected gallery routes, and their contract tests. Create `tests/test_component_interchangeability.py` before any new production behavior.
 
 **Interfaces:** Prescribed model outputs remain prescribed. General `DataComponent` imports and forwarding remain supported; a data gallery that deliberately displays imports declares that diagnostic role explicitly. Valid swaps use public component/spec/exchange APIs and identical physical field meaning.
 
@@ -172,7 +139,7 @@ prediction wrapper receives the selected vapor variable plus Task 5's duration.
 - [x] Run full stock tests and fast tests with actual stock Veros >=1.7.0. Run the exact fork's native AD suites in a separate process with verified PEP 610 provenance; combine coverage and enforce the current 90% project gate without changing exclusions.
 - [x] Run strict Sphinx, build wheel/sdist, check metadata with Twine, and run installed wheel/sdist, extension runtime/typing, and CLI-copy probes outside the checkout.
 - [x] Run a short real JCM/Veros/Veris coupled gallery from the final built wheel. Check finite saved fields, exact native step count, route quantities, field signs/units, output ownership, and evolving ice/coastal coverage.
-- [x] Review the complete branch diff against every original numbered requirement. Record native CAMulator limits explicitly; stand-in tests are not native model validation. Fix any discovered discrepancy at its first source and repeat only the affected and final required gates.
+
 - [x] Complete the removal/test assertion maps and final gate receipt, update progress within 180 lines, stage only intended paths, commit the delivery record, and verify branch, SHA, clean status, and logical commit history with Git/GitHub CLI. Do not publish or push.
 
 ## Plan self-review

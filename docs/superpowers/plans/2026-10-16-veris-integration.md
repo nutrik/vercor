@@ -56,7 +56,7 @@ changes a public declaration or adds a private module; keep the root six exports
 
 During implementation activate the existing Python 3.12 environment named
 `scipy`: `conda activate /private/tmp/vercor-time-ci/envs/scipy`. The default
-Python 3.14 `scipy` aborts importing Torch with duplicate OpenMP initialization.
+Python 3.14 `scipy` aborts importing an optional native dependency with duplicate OpenMP initialization.
 Network/cache/localhost permission needs are environmental; use approved tool
 escalation rather than skip or alter affected tests.
 

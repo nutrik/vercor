@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -9,18 +9,12 @@ from typing import Any
 import jax.numpy as jnp
 import pytest
 
-from vercor.calendar import DateTime360, DateTime365
 from vercor.components import ComponentSpec
 from vercor.setups._time_helpers import (
     align_model_timestep,
     assign_model_timestep_alignment,
-    runtime_forcing_index,
     run_logged_spinup,
     grid_field_defaults,
-)
-import vercor.setups._external.camulator_forcing as camulator_forcing_module
-from vercor.setups._external.camulator_forcing import (
-    initialize_camulator_forcing_cursor,
 )
 from tests._coverage_support import make_test_grid
 from vercor.output import OutputSpec, PeriodOutput
@@ -52,15 +46,6 @@ class _RecordingLogger:
     def isEnabledFor(self, level: int) -> bool:
         _ = level
         return True
-
-
-class _TimeIndex:
-    def __init__(self, loc: int | slice) -> None:
-        self.loc = loc
-
-    def get_loc(self, value: object) -> int | slice:
-        _ = value
-        return self.loc
 
 
 def test_align_model_timestep_returns_coupling_timestep_and_substeps() -> None:
@@ -97,10 +82,6 @@ def test_assign_model_timestep_alignment_sets_common_state_attributes() -> None:
     assert state.coupling_timestep == timedelta(days=1)
     assert state.model_timestep == timedelta(hours=6)
     assert state.model_substeps == 4
-
-
-def test_runtime_forcing_index_uses_start_counter_and_model_substeps() -> None:
-    assert runtime_forcing_index(start_ix=7, timestep_counter=3, model_substeps=4) == 19
 
 
 def test_run_logged_spinup_logs_each_step_and_returns_callback_result() -> None:
@@ -354,111 +335,6 @@ def test_make_jcm_land_atmosphere_replaces_only_missing_forcing(
     assert isinstance(replaced, ExtendedJAXGCMConfig)
     assert replaced.extension is extension_token
     assert replaced.forcing_data is caller_forcing
-
-
-def test_initialize_camulator_forcing_cursor_requires_explicit_mismatch_policy() -> (
-    None
-):
-    logger = _RecordingLogger()
-    forcing_start = datetime(2000, 1, 1, 6)
-    dynamic_ds = SimpleNamespace(indexes={"time": _TimeIndex(slice(7, 9))})
-
-    with pytest.raises(ValueError, match="forcing start.*coupler start"):
-        initialize_camulator_forcing_cursor(
-            conf={"predict": {"start_datetime": forcing_start}},
-            dynamic_ds=dynamic_ds,
-            coupler_start_datetime=datetime(2000, 1, 1),
-            logger=logger,
-            time_alignment="strict",
-        )
-
-    cursor = initialize_camulator_forcing_cursor(
-        conf={"predict": {"start_datetime": forcing_start}},
-        dynamic_ds=dynamic_ds,
-        coupler_start_datetime=datetime(2000, 1, 1),
-        logger=logger,
-        time_alignment="forcing_start",
-    )
-
-    assert cursor.start_ix == 7
-    assert cursor.init_str == "2000-01-01T06Z"
-    assert cursor.init_datetime == forcing_start
-    assert logger.infos == [
-        "Starting integration at time index: 7",
-        "Starting integration at time index: 7",
-    ]
-    assert logger.warnings == []
-
-
-def test_initialize_camulator_forcing_cursor_accepts_integer_index() -> None:
-    logger = _RecordingLogger()
-    dynamic_ds = SimpleNamespace(indexes={"time": _TimeIndex(3)})
-
-    cursor = initialize_camulator_forcing_cursor(
-        conf={"predict": {"start_datetime": "2000-01-01 00:00:00"}},
-        dynamic_ds=dynamic_ds,
-        coupler_start_datetime=datetime(2000, 1, 1),
-        logger=logger,
-        time_alignment="strict",
-    )
-
-    assert cursor.start_ix == 3
-    assert cursor.init_str == "2000-01-01T00Z"
-    assert logger.warnings == []
-
-
-@pytest.mark.fast_always
-@pytest.mark.parametrize(
-    "coupler_start",
-    (
-        DateTime360(2000, 1, 1, 0, 0, 0, 0),
-        DateTime365(2000, 1, 1, 0, 0, 0, 0),
-    ),
-)
-@pytest.mark.parametrize("time_alignment", ("strict", "forcing_start"))
-def test_initialize_camulator_forcing_cursor_rejects_model_calendar_clocks(
-    coupler_start: DateTime360 | DateTime365,
-    time_alignment: str,
-) -> None:
-    logger = _RecordingLogger()
-    forcing_start = datetime(2000, 1, 1)
-    dynamic_ds = SimpleNamespace(indexes={"time": _TimeIndex(0)})
-
-    with pytest.raises(ValueError, match="standard-library datetime"):
-        initialize_camulator_forcing_cursor(
-            conf={"predict": {"start_datetime": forcing_start}},
-            dynamic_ds=dynamic_ds,
-            coupler_start_datetime=coupler_start,
-            logger=logger,
-            time_alignment=time_alignment,  # type: ignore[arg-type]
-        )
-
-    assert logger.infos == []
-
-
-def test_camulator_runtime_cursor_initializes_indexes_and_advances() -> None:
-    logger = _RecordingLogger()
-    forcing_start = datetime(2000, 1, 1)
-    dynamic_ds = SimpleNamespace(indexes={"time": _TimeIndex(4)})
-    cursor = camulator_forcing_module.CamulatorRuntimeCursor.initialize(
-        conf={"predict": {"start_datetime": forcing_start}},
-        dynamic_ds=dynamic_ds,
-        coupler_start_datetime=forcing_start,
-        model_substeps=3,
-        logger=logger,
-        time_alignment="strict",
-    )
-
-    assert cursor.start_ix == 4
-    assert cursor.init_datetime == forcing_start
-    assert cursor.init_str == "2000-01-01T00Z"
-    assert cursor.timestep_counter == 0
-    assert cursor.current_index() == 4
-
-    advanced = cursor.advanced()
-    assert advanced.timestep_counter == cursor.timestep_counter + 1
-    assert cursor.timestep_counter == 0
-    assert advanced.current_index() == 7
 
 
 def test_make_jcm_land_atmosphere_patches_mask_and_options(

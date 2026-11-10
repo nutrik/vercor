@@ -547,12 +547,7 @@ compatibility adapters; use the current researcher and developer guides.
 Third-party plugins should depend on `vercor>=0.4.0,<0.5` and use the documented
 stable extension modules.
 
-## Known limitations
-
-CAMulator requires a separately installed compatible MILES-CREDIT environment;
-an exact compatible release is not yet pinned. CAMulator spinup is not
-implemented. No legacy compatibility adapter namespace is included.
-````
+```
 
 - [ ] **Step 4: Move the active release guide to 0.4.1**
 
