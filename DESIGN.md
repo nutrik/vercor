@@ -211,6 +211,10 @@ backend inputs and results receive the same check. Validation covers:
 
 Runtime assertions remain transform-safe. A structurally exact foreign state
 is accepted; a changed coordinate, dtype, field, payload schema, or mask is not.
+Finite-value and mask checks compile only invalid-count arithmetic, retaining
+static shape checks and error reporting at their existing boundaries. These
+small kernels inline into enclosing JAX programs and reuse eager executables
+across fields with the same array schema, without field-owner strings in keys.
 Active runtime fields are finite at preparation, exchange, component-step, and
 send boundaries. NaN remains a missing-data sentinel only outside the
 applicable component or route mask; infinity is always invalid. Masked

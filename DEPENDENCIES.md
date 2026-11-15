@@ -7,6 +7,15 @@ earlier layer. Imports guarded only by `TYPE_CHECKING` are annotation edges and
 are not runtime-order constraints. Public owner facades are listed separately
 from their concrete private implementations.
 
+Runtime performance changes retain these layers. Numerical safety owns private
+compiled invalid-count arithmetic, with static shape checks and eager/transformed
+error reporting at its existing boundaries. Count kernels inline into enclosing
+compiled programs; exchange-mask ownership and refresh policy remain unchanged
+after the reuse candidate failed its compiled-control measurement. Backend plan
+validation takes the expected identity
+before scanning rejection paths. The gallery profiler and developer benchmarks
+consume these owners without adding runtime dependencies or public protocols.
+
 Layer 2's `vercor/_averaging.py` owns common sum/count arithmetic for output and
 native exchange loops. Its immutable native accumulator uses a scalar count;
 output keeps per-cell finite counts. No field selection, clock, native-model or
