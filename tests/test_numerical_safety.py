@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import jax
 import jax.numpy as jnp
 import pytest
@@ -14,6 +16,79 @@ from vercor._numerical_safety import (
     safe_masked_divide,
 )
 from vercor.exceptions import CouplerError
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("kind", ["finite", "binary", "fractional"])
+def test_fixed_schema_checks_reuse_count_arithmetic(
+    monkeypatch: pytest.MonkeyPatch, dtype: Any, kind: str
+) -> None:
+    """Changing values and owner names must reuse one count executable."""
+    import vercor._numerical_safety as safety
+
+    jax.clear_caches()
+    count_calls = 0
+    original = jnp.count_nonzero
+
+    def observed_count(*args: Any, **kwargs: Any) -> Any:
+        nonlocal count_calls
+        count_calls += 1
+        return original(*args, **kwargs)
+
+    first = jnp.ones((2, 3, 7), dtype=dtype)
+    second = jnp.zeros_like(first)
+    active = jnp.ones((3, 7), dtype=dtype)
+    monkeypatch.setattr(jnp, "count_nonzero", observed_count)
+
+    def check(values: jax.Array, owner: str) -> None:
+        if kind == "finite":
+            safety.require_active_finite(values, active_mask=active, owner=owner)
+        else:
+            safety.require_mask_values(values, owner=owner, binary=kind == "binary")
+
+    check(first, "first field")
+    first_count = count_calls
+    assert first_count > 0
+    check(second, "different field")
+    assert (
+        count_calls == first_count
+    ), "ERROR fixed-schema checks retraced count arithmetic"
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("transform", ["checkify", "jit-checkify", "checkify-jit"])
+@pytest.mark.parametrize("conditional", [False, True])
+def test_count_fusion_preserves_nested_checkify_errors(
+    dtype: Any, transform: str, conditional: bool
+) -> None:
+    """Count-only JIT must not move the established host-error boundary."""
+    from jax.experimental import checkify
+
+    def checked(values: jax.Array) -> jax.Array:
+        require_active_finite(
+            values,
+            active_mask=None,
+            owner="boundary field",
+            conditional_callback=conditional,
+        )
+        return values
+
+    function: Any = checkify.checkify(checked)
+    if transform == "jit-checkify":
+        function = jax.jit(function)
+    elif transform == "checkify-jit":
+        function = checkify.checkify(jax.jit(checked))
+    valid = jnp.asarray([1.0, 2.0], dtype=dtype)
+    jax.block_until_ready(function(valid))
+    jax.effects_barrier()
+    expected = (
+        CouplerError if transform == "checkify" and not conditional else JaxRuntimeError
+    )
+    with pytest.raises(expected, match="boundary field.*active domain"):
+        jax.block_until_ready(function(valid.at[1].set(jnp.nan)))
+        jax.effects_barrier()
 
 
 @pytest.mark.fast_always

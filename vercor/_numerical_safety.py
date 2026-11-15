@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 import jax
@@ -10,14 +11,15 @@ import jax.numpy as jnp
 from vercor.exceptions import CouplerError
 
 
-def _broadcast_active_mask(
+def _validated_active_mask(
     values: jax.Array,
     active_mask: Any | None,
     owner: str,
-) -> jax.Array:
+) -> jax.Array | None:
+    """Validate static mask layout before compiling its numeric predicates."""
     if active_mask is None:
-        return jnp.ones(values.shape, dtype=bool)
-    mask = jnp.asarray(active_mask) > 0
+        return None
+    mask = jnp.asarray(active_mask)
     if mask.ndim > values.ndim or (
         mask.ndim > 0 and values.shape[slice(-mask.ndim, None)] != mask.shape
     ):
@@ -25,8 +27,31 @@ def _broadcast_active_mask(
             f"{owner} active mask shape {mask.shape} is not a trailing suffix "
             f"of value shape {values.shape}."
         )
-    reshaped = jnp.reshape(mask, (1,) * (values.ndim - mask.ndim) + mask.shape)
-    return jnp.broadcast_to(reshaped, values.shape)
+    return mask
+
+
+@partial(jax.jit, inline=True)
+def _active_invalid_count(
+    values: jax.Array, active_mask: jax.Array | None
+) -> jax.Array:
+    """Fuse eager count arithmetic and inline it into enclosing JAX programs."""
+    finite = jnp.isfinite(values)
+    if active_mask is None:
+        return jnp.count_nonzero(~finite)
+    active = jnp.reshape(
+        active_mask > 0, (1,) * (values.ndim - active_mask.ndim) + active_mask.shape
+    )
+    valid = finite | (~active & jnp.isnan(values))
+    return jnp.count_nonzero(~valid)
+
+
+@partial(jax.jit, static_argnames=("binary",), inline=True)
+def _mask_invalid_count(values: jax.Array, *, binary: bool) -> jax.Array:
+    """Count invalid mask values with the static binary/fractional policy."""
+    valid = (
+        ((values == 0) | (values == 1)) if binary else ((values >= 0) & (values <= 1))
+    )
+    return jnp.count_nonzero(~jnp.isfinite(values) | ~valid)
 
 
 def _raise_for_invalid_count(count: Any, owner: str, requirement: str) -> None:
@@ -76,9 +101,8 @@ def require_active_finite(
     """
 
     array = jnp.asarray(values)
-    active = _broadcast_active_mask(array, active_mask, owner)
-    valid = jnp.isfinite(array) | (~active & jnp.isnan(array))
-    invalid_count = jnp.count_nonzero(~valid)
+    active = _validated_active_mask(array, active_mask, owner)
+    invalid_count = _active_invalid_count(array, active)
     requirement = "finite values in the active domain and no infinity elsewhere"
     _require_zero(
         invalid_count, owner, requirement, conditional_callback=conditional_callback
@@ -88,9 +112,8 @@ def require_active_finite(
 def require_mask_values(values: Any, *, owner: str, binary: bool) -> None:
     """Validate finite binary or fractional mask values, including under JIT."""
     array = jnp.asarray(values)
-    valid = ((array == 0) | (array == 1)) if binary else ((array >= 0) & (array <= 1))
     _require_zero(
-        jnp.count_nonzero(~jnp.isfinite(array) | ~valid),
+        _mask_invalid_count(array, binary=binary),
         owner,
         "finite binary {0, 1} values" if binary else "finite fractional [0, 1] values",
     )
