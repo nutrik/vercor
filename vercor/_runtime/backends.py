@@ -339,6 +339,12 @@ class _RuntimeDriverAdapter:
                 "RuntimeDriver.run_step plan must be a StepPlan; "
                 f"got {type(plan).__name__}."
             )
+        # Valid plans are the common path. Scanning the consumed prefix first
+        # makes one n-step chunk perform n(n-1)/2 identity comparisons.
+        if self._cursor < len(self._chunk.steps):
+            expected = self._chunk.steps[self._cursor]
+            if plan is expected:
+                return expected
         consumed = self._chunk.steps[: self._cursor]
         if any(plan is candidate for candidate in consumed):
             raise CouplerError(
@@ -350,8 +356,6 @@ class _RuntimeDriverAdapter:
                 "RuntimeDriver.run_step plan is outside the active execution chunk."
             )
         expected = self._chunk.steps[self._cursor]
-        if plan is expected:
-            return expected
         future = self._chunk.steps[self._cursor + 1 :]  # noqa: E203
         if any(plan is candidate for candidate in future):
             raise CouplerError(
