@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import statistics
 import time
-from typing import Any, Sequence
+from typing import Any, Literal, Sequence
 
 import jax
 
@@ -37,19 +37,21 @@ from vercor.topology import SurfaceMaskPolicy
 
 @dataclass(frozen=True)
 class RuntimeProfileResult:
-    """Synchronized setup, cold invocation and precompiled runtime timings."""
+    """Synchronized setup, first invocation and repeated-run timings."""
 
     run_seconds: float
     final_state_leaves: int
     setup_seconds: float
     warm_run_seconds: tuple[float, ...]
+    backend: Literal["host", "jax"] = "jax"
+    invocation: Literal["api", "outer-jit"] = "outer-jit"
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Return the command-line parser for the runtime profiling harness."""
 
     parser = argparse.ArgumentParser(
-        description="Profile VerCOR's pure JAX scanned runtime on a synthetic slab coupler."
+        description="Profile VerCOR's host or JAX runtime on a synthetic slab coupler."
     )
     parser.add_argument(
         "--steps", type=int, default=24, help="Number of runtime steps."
@@ -80,14 +82,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--trace-dir", type=Path, help="Export a separate warm Perfetto/XProf trace."
     )
+    parser.add_argument("--backend", choices=("host", "jax"), default="jax")
+    parser.add_argument(
+        "--invocation",
+        choices=("api", "outer-jit"),
+        help="Measure ordinary calls or a retained outer JIT; defaults to API for host and outer JIT for JAX.",
+    )
     parser.add_argument("--json", action="store_true", help="Print timings as JSON.")
     return parser
 
 
 def _block_until_ready(value: Any) -> Any:
-    for leaf in jax.tree_util.tree_leaves(value):
-        if hasattr(leaf, "block_until_ready"):
-            leaf.block_until_ready()
+    jax.block_until_ready(value)
+    jax.effects_barrier()
     return value
 
 
@@ -98,8 +105,9 @@ def build_slab_coupler(
     grid_ny: int,
     log_level: int | str,
     dtype: DTypePolicy | None = None,
+    backend: Literal["host", "jax"] = "jax",
 ) -> Coupler:
-    """Build and initialize a small pure-JAX slab coupler for profiling."""
+    """Build a small slab coupler with an explicit runtime execution lane."""
 
     atm_grid = RectilinearGrid.uniform(
         "profile-atm-grid",
@@ -174,6 +182,7 @@ def build_slab_coupler(
         run_order=(ocn.name, atm.name, lnd.name, ice.name),
         runtime=RuntimeOptions(
             dtype=DTypePolicy() if dtype is None else dtype,
+            backend=backend,
             topology=SurfaceMaskPolicy(
                 atmosphere=atm.name, ocean=ocn.name, land=lnd.name
             ),
@@ -191,17 +200,31 @@ def profile_runtime(
     dtype: DTypePolicy | None = None,
     repeats: int = 5,
     trace_dir: Path | None = None,
+    backend: Literal["host", "jax"] = "jax",
+    invocation: Literal["api", "outer-jit"] | None = None,
 ) -> RuntimeProfileResult:
     """Time setup and cold/warm execution; capture a separate optional trace.
 
-    Warm invocations reuse an outer JIT of the output-free run, measuring the
-    compiled scan rather than rebuilding its Python orchestration. Each starts
-    from the same immutable initial state. Every timing waits for completion;
-    trace instrumentation is excluded from all reported execution timings.
+    API invocations include Python orchestration and run-local executor setup.
+    An outer JIT measures a retained compiled output-free run instead; this is
+    the backward-compatible default for JAX. Host always uses ordinary calls.
+    Each invocation starts from the same immutable initial state. Timings wait
+    for arrays and callbacks; separate trace capture is never timed.
     """
 
     if repeats < 1:
         raise ValueError("repeats must be at least 1")
+    if backend not in ("host", "jax"):
+        raise ValueError("backend must be host or jax")
+    mode = (
+        invocation
+        if invocation is not None
+        else ("api" if backend == "host" else "outer-jit")
+    )
+    if mode not in ("api", "outer-jit"):
+        raise ValueError("invocation must be api or outer-jit")
+    if mode == "outer-jit" and backend != "jax":
+        raise ValueError("outer-jit invocation requires the jax backend")
     setup_start = time.perf_counter()
     coupler = build_slab_coupler(
         steps=steps,
@@ -209,10 +232,11 @@ def profile_runtime(
         grid_ny=grid_ny,
         log_level=log_level,
         dtype=dtype,
+        backend=backend,
     )
     runtime_state = _block_until_ready(coupler.initial_state())
     setup_seconds = time.perf_counter() - setup_start
-    run = jax.jit(coupler.run)
+    run = jax.jit(coupler.run) if mode == "outer-jit" else coupler.run
 
     start = time.perf_counter()
     final_state = _block_until_ready(run(runtime_state))
@@ -233,11 +257,15 @@ def profile_runtime(
         final_state_leaves=len(jax.tree_util.tree_leaves(final_state)),
         setup_seconds=setup_seconds,
         warm_run_seconds=tuple(warm_times),
+        backend=backend,
+        invocation=mode,
     )
 
 
 def _format_result(result: RuntimeProfileResult) -> Sequence[str]:
     lines = [
+        f"backend={result.backend}",
+        f"invocation={result.invocation}",
         f"setup_s={result.setup_seconds:.6f}",
         f"cold_run_s={result.run_seconds:.6f}",
         f"warm_median_s={statistics.median(result.warm_run_seconds):.6f}",
@@ -276,6 +304,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         dtype=DTypePolicy(enable_x64=args.float_type == "float64"),
         repeats=args.repeats,
         trace_dir=args.trace_dir,
+        backend=args.backend,
+        invocation=args.invocation,
     )
     if args.json:
         print(json.dumps(asdict(result)))
