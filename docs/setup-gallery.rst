@@ -30,7 +30,7 @@ Example:
      - None
      - No
    * - ``profile_runtime``
-     - Profile a synthetic slab coupling run.
+     - Profile host/API-JAX and retained-JIT slab coupling.
      - None
      - No
    * - ``slab_driver``
