@@ -56,4 +56,6 @@
 - [x] Document before/after timing distributions, dispatch/synchronization, vectorization and limitations.
 - [x] Run full stock and exact-fork AD suites, appropriate GPU tests, Black, strict Flake8, mypy, compileall, strict Sphinx and whitespace checks.
 - [x] Obtain independent final review; resolve consequential findings with regression tests.
-- [ ] Commit small tested units and push current branch; verify exact remote SHA and clean worktree.
+- [x] Commit small tested units and push current branch; verify exact remote SHA and clean worktree.
+
+Delivery verified on 2026-11-16 at `5ad45e07d87aac4468887b2d14f5b787ec8081a9`: origin and local HEAD match with a clean worktree. The final handoff records the subsequent documentation closure commit. All 2,713 collected tests are covered by the stock and exact-fork AD lanes; combined branch-enabled coverage is 94.11018%.
