@@ -60,6 +60,43 @@ def _resolve(component: api.Component, fields: dict[str, Any]) -> Any:
     return resolve_component_masks(component, fields, _DTYPE)
 
 
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+def test_parent_support_count_reuses_fixed_schema_arithmetic(
+    monkeypatch: pytest.MonkeyPatch, dtype: Any
+) -> None:
+    """Repeated mask resolution must reuse count kernels without caching values."""
+    from vercor._runtime.component_masks import resolve_component_masks
+
+    jax.clear_caches()
+    component = _component()
+    policy = DTypePolicy(enable_x64=dtype == jnp.float64)
+    active = jnp.asarray([[1, 1, 0], [1, 0, 0]], dtype=dtype)
+    area = active * jnp.asarray(0.5, dtype=dtype)
+    updated = area.at[0, 0].set(0.75)
+    invalid = area.at[0, 2].set(0.5)
+    calls = 0
+    original = jnp.count_nonzero
+
+    def count(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(jnp, "count_nonzero", count)
+    resolve_component_masks(component, {"active": active, "area": area}, policy)
+    first_calls = calls
+    assert first_calls > 0
+    result = resolve_component_masks(
+        component, {"active": active, "area": updated}, policy
+    )
+    np.testing.assert_array_equal(result[1], updated)
+    assert (
+        calls == first_calls
+    ), "ERROR parent support arithmetic retraced for changed values"
+    with pytest.raises(CouplerError, match="CICE.*area.*parent binary support"):
+        resolve_component_masks(component, {"active": active, "area": invalid}, policy)
+
+
 @pytest.mark.parametrize("field", ["binary_field", "fractional_field"])
 @pytest.mark.parametrize("value", ["", " ", 123])
 def test_mask_spec_rejects_invalid_field_names(field: str, value: Any) -> None:

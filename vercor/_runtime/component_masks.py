@@ -7,8 +7,10 @@ weights remain static; continuous fractions remain traced for first-order AD.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from functools import partial
 from typing import TYPE_CHECKING
 
+import jax
 import jax.numpy as jnp
 
 from vercor._numerical_safety import _require_zero, require_mask_values
@@ -18,6 +20,12 @@ from vercor.types import RuntimeArray
 
 if TYPE_CHECKING:
     from vercor.components.contracts import Component
+
+
+@partial(jax.jit, inline=True)
+def _outside_support_count(parent: RuntimeArray, value: RuntimeArray) -> jax.Array:
+    """Fuse support comparisons without moving their host error boundary."""
+    return jnp.count_nonzero((jnp.asarray(parent) == 0) & (value != 0))
 
 
 def resolve_component_masks(
@@ -60,7 +68,7 @@ def resolve_component_masks(
             )
         require_mask_values(value, owner=owner, binary=binary)
         _require_zero(
-            jnp.count_nonzero((jnp.asarray(parent) == 0) & (value != 0)),
+            _outside_support_count(parent, value),
             owner,
             "mask support within the parent binary support",
         )

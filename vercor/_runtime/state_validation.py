@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import jax
@@ -416,6 +417,19 @@ def _validate_grid_array(
         )
 
 
+@partial(jax.jit, static_argnames=("binary",), inline=True)
+def _concrete_mask_predicates(
+    mask: jax.Array, *, binary: bool
+) -> tuple[jax.Array, jax.Array]:
+    """Fuse finite/range reductions while leaving both error checks with callers."""
+    valid = (
+        jnp.logical_or(mask == 0, mask == 1)
+        if binary
+        else jnp.logical_and(mask >= 0, mask <= 1)
+    )
+    return jnp.all(jnp.isfinite(mask)), jnp.all(valid)
+
+
 def _validate_concrete_mask_values(
     mask: Any,
     *,
@@ -424,15 +438,9 @@ def _validate_concrete_mask_values(
 ) -> None:
     """Validate concrete mask finiteness and binary/fractional range."""
 
-    all_finite = jnp.all(jnp.isfinite(mask))
+    all_finite, all_valid = _concrete_mask_predicates(jnp.asarray(mask), binary=binary)
     _require_true(all_finite, f"{owner} must contain only finite values.")
-    if binary:
-        valid = jnp.logical_or(mask == 0, mask == 1)
-        range_text = "values in {0, 1}"
-    else:
-        valid = jnp.logical_and(mask >= 0, mask <= 1)
-        range_text = "values in [0, 1]"
-    all_valid = jnp.all(valid)
+    range_text = "values in {0, 1}" if binary else "values in [0, 1]"
     _require_true(all_valid, f"{owner} must contain only {range_text}.")
 
 

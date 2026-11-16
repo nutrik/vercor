@@ -20,6 +20,45 @@ from vercor.exceptions import CouplerError
 
 @pytest.mark.fast_always
 @pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+@pytest.mark.parametrize("binary", [False, True])
+def test_state_mask_predicates_reuse_arithmetic_and_preserve_error_order(
+    monkeypatch: pytest.MonkeyPatch, dtype: Any, binary: bool
+) -> None:
+    """State masks retain finite-first errors and read values after warm-up."""
+    from vercor._runtime.state_validation import _validate_concrete_mask_values
+
+    jax.clear_caches()
+    first = jnp.ones((2, 3), dtype=dtype)
+    second = jnp.zeros_like(first)
+    invalid = first.at[0, 0].set(jnp.inf).at[1, 1].set(2.0)
+    calls = 0
+    original = jnp.all
+
+    def all_values(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(jnp, "all", all_values)
+    _validate_concrete_mask_values(first, owner="first mask", binary=binary)
+    first_calls = calls
+    assert first_calls > 0
+    _validate_concrete_mask_values(second, owner="other mask", binary=binary)
+    assert (
+        calls == first_calls
+    ), "ERROR state mask predicates retraced for changed owner/values"
+    with pytest.raises(
+        CouplerError, match="invalid mask must contain only finite values"
+    ):
+        _validate_concrete_mask_values(invalid, owner="invalid mask", binary=binary)
+    with pytest.raises(CouplerError, match="range mask must contain only values"):
+        _validate_concrete_mask_values(
+            invalid.at[0, 0].set(0), owner="range mask", binary=binary
+        )
+
+
+@pytest.mark.fast_always
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
 @pytest.mark.parametrize("kind", ["finite", "binary", "fractional"])
 def test_fixed_schema_checks_reuse_count_arithmetic(
     monkeypatch: pytest.MonkeyPatch, dtype: Any, kind: str
