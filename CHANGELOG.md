@@ -24,6 +24,10 @@ versioning; pre-releases may still refine new contracts.
 
 ### Changed
 
+- Compile bilinear corner accumulation and vector projection, parent-support
+  counts and state-mask predicates to reduce eager CPU/CUDA dispatch while
+  preserving numerical checks and interpolation behavior. Add isolated state
+  validation and compiled scalar/vector remapping benchmark controls.
 - Standardize the Veros adapter on `global_4deg` and remove ACC support,
   `VerosConfig.setup`, the ACC JAX adapter, and the internal-forcing bypass.
   Remove `setup=` from configuration calls; remaining positional arguments

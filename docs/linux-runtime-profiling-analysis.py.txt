@@ -1,0 +1,296 @@
+"""Audit saved paired workloads and export the Linux CPU/CUDA study.
+
+Run from the repository root after reproducing the matrix/capture directory
+layout described in linux-runtime-profiling.rst. This reads saved results and
+arrays; it does not run or time simulation code.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import statistics
+from typing import Any
+
+import numpy as np
+
+
+def plot_speedups(matrices: dict[str, Any], output: Path, preview: Path) -> None:
+    """Plot paired warm medians and ranges relative to each backend's baseline."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    labels = {
+        "bilinear": "Scalar remapping",
+        "vector": "Vector remapping",
+        "state": "State validation",
+        "refresh": "Mask refresh",
+        "host": "Host run",
+        "jax_api": "JAX API",
+        "jax_jit": "Retained JAX",
+        "output_host": "Host output",
+        "output_jax": "JAX output",
+    }
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 5.7), layout="constrained")
+    handles = []
+    for ax, grid in zip(axes, ("32x16", "128x64")):
+        cases = [
+            name
+            for name in labels
+            if name in matrices[f"matrix-cpu-{grid}"][0]["speedups"]
+        ]
+        ax.axvspan(1 / 1.05, 1.05, color="0.85", alpha=0.7, zorder=0)
+        ax.axvline(1, color="0.4", linewidth=0.8, zorder=1)
+        for lane_index, lane in enumerate(("cpu", "gpu")):
+            color = "#0072B2" if lane == "cpu" else "#D55E00"
+            for dtype_index, dtype in enumerate(("float64", "float32")):
+                records = [
+                    r
+                    for r in matrices[f"matrix-{lane}-{grid}"]
+                    if r["precision"] == dtype
+                ]
+                offset = (2 * lane_index + dtype_index - 1.5) * 0.12
+                for row, case in enumerate(cases):
+                    values = [r["speedups"][case] for r in records]
+                    middle = statistics.median(values)
+                    handle = ax.errorbar(
+                        middle,
+                        row + offset,
+                        xerr=[[middle - min(values)], [max(values) - middle]],
+                        color=color,
+                        marker="o" if dtype_index == 0 else "s",
+                        markerfacecolor=color if dtype_index == 0 else "white",
+                        markersize=4,
+                        linewidth=1.1,
+                        capsize=2,
+                        label=(
+                            f"{lane.upper()} fp{64 if dtype_index == 0 else 32}"
+                            if row == 0
+                            else None
+                        ),
+                    )
+                    if grid == "32x16" and row == 0:
+                        handles.append(handle)
+        ax.set_yticks(range(len(cases)), labels=[labels[name] for name in cases])
+        ax.invert_yaxis()
+        ax.set_xscale("log")
+        ax.set_xlim(0.85, 11)
+        ax.set_xticks([1, 2, 4, 8], labels=["1×", "2×", "4×", "8×"])
+        ax.set_xlabel("Baseline duration / candidate duration")
+        ax.set_title(grid.replace("x", " × ") + " grid")
+        ax.grid(axis="x", color="0.9", linewidth=0.6)
+        ax.spines[["top", "right"]].set_visible(False)
+    fig.suptitle("Warm speedup on CPU and CUDA", fontsize=14)
+    fig.legend(
+        handles,
+        [h.get_label() for h in handles],
+        loc="outside lower center",
+        ncols=4,
+        frameon=False,
+    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output, metadata={"Date": None, "Creator": "VerCOR profiling"})
+    if output.suffix.lower() == ".svg":
+        output.write_text(
+            "\n".join(line.rstrip() for line in output.read_text().splitlines()) + "\n"
+        )
+    fig.savefig(preview, dpi=160)
+    plt.close(fig)
+
+
+def source_hash(directory: Path) -> str:
+    """Hash package sources using the benchmark's path/content convention."""
+    digest = hashlib.sha256()
+    for path in sorted((directory / "vercor").rglob("*.py")):
+        digest.update(str(path.relative_to(directory)).encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def audit_arrays(record: dict[str, Any]) -> dict[str, Any]:
+    """Independently compare every cold/warm numeric leaf and its representation."""
+    paths = {
+        variant: Path(record[variant]["options"]["directory"]) / "outputs.npz"
+        for variant in ("baseline", "candidate")
+    }
+    compared = exact = byte_exact = 0
+    differences: dict[str, dict[str, Any]] = {}
+    with np.load(paths["baseline"]) as left, np.load(paths["candidate"]) as right:
+        assert set(left.files) == set(right.files)
+        for key in left.files:
+            a, b = left[key], right[key]
+            assert a.shape == b.shape and a.dtype == b.dtype, key
+            compared += 1
+            byte_exact += int(a.tobytes() == b.tobytes())
+            if np.array_equal(a, b, equal_nan=True):
+                exact += 1
+                continue
+            case = key.split("/")[0]
+            assert case in ("bilinear", "bilinear_jit", "vector", "vector_jit") or (
+                record["lane"] == "gpu" and case == "remap"
+            ), key
+            single = record["precision"] == "float32"
+            np.testing.assert_allclose(
+                a,
+                b,
+                rtol=3e-6 if single else 1e-12,
+                atol=1e-6 if single else 1e-14,
+                equal_nan=True,
+                err_msg=key,
+            )
+            finite = np.isfinite(a) & np.isfinite(b)
+            absolute = np.abs(a[finite] - b[finite])
+            relative = absolute / np.maximum(np.abs(a[finite]), np.finfo(a.dtype).tiny)
+            item = differences.setdefault(
+                case, {"arrays": 0, "max_absolute": 0.0, "max_relative": 0.0}
+            )
+            item["arrays"] += 1
+            item["max_absolute"] = max(
+                item["max_absolute"], float(absolute.max(initial=0))
+            )
+            item["max_relative"] = max(
+                item["max_relative"], float(relative.max(initial=0))
+            )
+    assert compared == record["arrays"]["compared"]
+    assert exact == record["arrays"]["exact"]
+    return {
+        "compared": compared,
+        "numeric_exact_including_nan": exact,
+        "byte_exact": byte_exact,
+        "differences": differences,
+    }
+
+
+def main() -> None:
+    """Validate all comparisons, export their evidence and draw the figure."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path("test_logs/linux-runtime"))
+    parser.add_argument(
+        "--output", type=Path, default=Path("docs/linux-runtime-profiling-results.json")
+    )
+    parser.add_argument(
+        "--figure", type=Path, default=Path("docs/_images/linux-runtime-speedups.svg")
+    )
+    args = parser.parse_args()
+    root = args.root.resolve()
+    manifest = json.loads((root / "variants.json").read_text())
+    for variant in ("baseline", "candidate"):
+        assert source_hash(root / f"{variant}-source") == manifest[variant]["sha256"]
+    harness_hash = hashlib.sha256((root / "harness.py").read_bytes()).hexdigest()
+    result: dict[str, Any] = {
+        "baseline_revision": manifest["baseline"].get(
+            "revision", "e15efe0604429be4c33c78e4c3cc1904a295c728"
+        ),
+        "sources": manifest,
+        "harness_sha256": harness_hash,
+        "environment": (root / "environment.txt").read_text().splitlines(),
+        "matrices": {},
+        "control_outliers": [],
+        "profiles": {},
+        "verification": {"status": "pending"},
+    }
+    totals = {"compared": 0, "numeric_exact_including_nan": 0, "byte_exact": 0}
+    metadata_files = 0
+    for lane in ("cpu", "gpu"):
+        for nx, ny in ((32, 16), (128, 64)):
+            name = f"matrix-{lane}-{nx}x{ny}"
+            records = json.loads((root / name / "summary.json").read_text())
+            assert {(r["precision"], r["pair"]) for r in records} == {
+                (dtype, pair) for dtype in ("float32", "float64") for pair in range(3)
+            }
+            assert len(records) == 6
+            for record in records:
+                assert record["lane"] == lane and record["grid"] == [nx, ny]
+                assert (
+                    record["baseline"]["cases"].keys()
+                    == record["candidate"]["cases"].keys()
+                )
+                for variant in ("baseline", "candidate"):
+                    sample = record[variant]
+                    assert sample["source"]["sha256"] == manifest[variant]["sha256"]
+                    assert sample["source"]["harness_sha256"] == harness_hash
+                    assert sample["environment"]["jax_backend"] == (
+                        "cpu" if lane == "cpu" else "gpu"
+                    )
+                    for case in sample["cases"].values():
+                        assert len(case["warm_seconds"]) == 9
+                        assert all(value > 0 for value in case["warm_seconds"])
+                        assert (
+                            statistics.median(case["warm_seconds"])
+                            == case["median_seconds"]
+                        )
+                for case in record["baseline"]["cases"]:
+                    left = record["baseline"]["cases"][case]
+                    right = record["candidate"]["cases"][case]
+                    assert (
+                        record["speedups"][case]
+                        == left["median_seconds"] / right["median_seconds"]
+                    )
+                    if case.startswith("output"):
+                        a, b = (
+                            left["metadata"]["artifacts"],
+                            right["metadata"]["artifacts"],
+                        )
+                        assert a == b
+                        metadata_files += sum(len(files) for files in a)
+                for target in ("bilinear", "vector", "state", "refresh", "host"):
+                    assert record["speedups"][target] >= 1.05, (
+                        name,
+                        record["precision"],
+                        target,
+                    )
+                record["independent_array_audit"] = audit_arrays(record)
+                for key in totals:
+                    totals[key] += record["independent_array_audit"][key]
+            for dtype in ("float32", "float64"):
+                selected = [r for r in records if r["precision"] == dtype]
+                for case in selected[0]["speedups"]:
+                    values = [r["speedups"][case] for r in selected]
+                    slow = [
+                        r["pair"] for r in selected if r["speedups"][case] < 1 / 1.05
+                    ]
+                    assert len(slow) < 2, (name, dtype, case, values)
+                    if slow:
+                        result["control_outliers"].append(
+                            {
+                                "matrix": name,
+                                "precision": dtype,
+                                "case": case,
+                                "speedups": values,
+                                "pairs_slower_than_5_percent": slow,
+                            }
+                        )
+            result["matrices"][name] = records
+    result["array_audit"] = totals
+    result["matching_netcdf_metadata_files"] = metadata_files
+    result["comparison_tolerances"] = {
+        "unchanged_arithmetic": "exact, allowing NaN equality; GPU scatter-add checked separately",
+        "float32_remapping": {"rtol": 3e-6, "atol": 1e-6},
+        "float64_remapping": {"rtol": 1e-12, "atol": 1e-14},
+    }
+    for lane in ("cpu", "gpu"):
+        result["profiles"][lane] = json.loads(
+            (root / f"{lane}-paired-captures" / "analysis.json").read_text()
+        )
+    verification = root / "final-verification.json"
+    if verification.exists():
+        result["verification"] = json.loads(verification.read_text())
+    args.output.write_text(json.dumps(result, indent=2) + "\n")
+    plot_speedups(result["matrices"], args.figure, root / "speedups-preview.png")
+    print(
+        json.dumps(
+            {
+                "arrays": totals,
+                "netcdf_metadata_files": metadata_files,
+                "output": str(args.output),
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,110 @@
+"""Export XProf tools and Perfetto SQL metrics for paired captures."""
+
+import argparse
+import csv
+import hashlib
+import io
+import json
+import platform
+import sys
+from urllib.request import urlopen
+from pathlib import Path
+import subprocess
+from xprof.convert import _pywrap_profiler_plugin as xprof
+from perfetto.prebuilts.manifests.trace_processor_shell import (
+    TRACE_PROCESSOR_SHELL_MANIFEST,
+)
+
+parser = argparse.ArgumentParser()
+parser.add_argument("capture_root", type=Path)
+parser.add_argument("--processor", type=Path)
+args = parser.parse_args()
+root = args.capture_root.resolve()
+entry = next(
+    e
+    for e in TRACE_PROCESSOR_SHELL_MANIFEST
+    if e.get("platform") == sys.platform and platform.machine() in e.get("machine", [])
+)
+processor = args.processor or root.parent / "tools" / "trace_processor_v59.1"
+if not processor.exists():
+    data = urlopen(entry["url"]).read()
+    assert hashlib.sha256(data).hexdigest() == entry["sha256"]
+    processor.parent.mkdir(parents=True, exist_ok=True)
+    processor.write_bytes(data)
+assert hashlib.sha256(processor.read_bytes()).hexdigest() == entry["sha256"]
+processor.chmod(processor.stat().st_mode | 0o100)
+processor = processor.resolve()
+summary = {}
+for variant in ("baseline", "candidate"):
+    process = json.loads((root / variant / "results.json").read_text())
+    source = process["source"]
+    summary[variant] = {
+        "source": source,
+        "environment": process["environment"],
+        "cases": {},
+    }
+    for case in sorted((root / variant / "traces").iterdir()):
+        if not case.is_dir():
+            continue
+        paths = sorted(case.rglob("*.xplane.pb"))
+        traces = sorted(case.rglob("perfetto_trace.json.gz"))
+        assert len(paths) == 1 and len(traces) == 1, case
+        tools = ("overview_page", "framework_op_stats", "trace_viewer")
+        if process["environment"]["jax_backend"] == "gpu":
+            tools += ("kernel_stats", "memory_profile")
+        entry = {"tools": {}}
+        for tool in tools:
+            data, ok = xprof.xspace_to_tools_data(paths, tool, {})
+            (case / (tool + ".json")).write_bytes(data)
+            entry["tools"][tool] = {"ok": ok, "bytes": len(data)}
+            assert ok and data, (case, tool)
+            if tool == "kernel_stats":
+                table = json.loads(data)
+                ids = [col["id"] for col in table["cols"]]
+                rows = [
+                    dict(zip(ids, [cell.get("v") for cell in row["c"]]))
+                    for row in table["rows"]
+                ]
+                entry["gpu_kernel_occurrences"] = sum(
+                    row["occurrences"] for row in rows
+                )
+                entry["gpu_kernel_duration_us"] = sum(
+                    row["total_duration_us"] for row in rows
+                )
+                entry["top_gpu_kernels"] = rows[:5]
+        query = """SELECT name, COUNT(*) AS calls, ROUND(SUM(dur)/1e6,6) AS total_ms
+                 FROM slice WHERE name GLOB '*ExecutePrepare*' OR name GLOB '*Memcpy*'
+                 OR name GLOB '*Launch*' OR name GLOB '*backend_compile*'
+                 OR name GLOB '*Compiler::Compile*' GROUP BY name ORDER BY calls DESC"""
+        result = subprocess.run(
+            [str(processor), "--query-string", query, str(traces[0])],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        (case / "perfetto-metrics.csv").write_text(result.stdout)
+        rows = list(csv.DictReader(io.StringIO(result.stdout)))
+        entry["perfetto"] = [
+            {
+                "name": row["name"],
+                "calls": int(row["calls"]),
+                "total_ms": float(row["total_ms"]),
+            }
+            for row in rows
+        ]
+        summary[variant]["cases"][case.name] = entry
+        print(
+            variant,
+            case.name,
+            "CPU preparations",
+            next(
+                (
+                    r["calls"]
+                    for r in entry["perfetto"]
+                    if r["name"] == "CommonPjRtLoadedExecutable::ExecutePrepare"
+                ),
+                None,
+            ),
+            flush=True,
+        )
+(root / "analysis.json").write_text(json.dumps(summary, indent=2) + "\n")

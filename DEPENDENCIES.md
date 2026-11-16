@@ -16,6 +16,13 @@ validation takes the expected identity
 before scanning rejection paths. The gallery profiler and developer benchmarks
 consume these owners without adding runtime dependencies or public protocols.
 
+The Linux CPU/CUDA follow-up keeps the same import layers. Component-mask
+resolution owns its inline parent-support count; central state validation owns
+inline finite/range predicates with the existing two error checks. Bilinear
+interpolation owns reusable four-corner scalar/Cartesian-vector accumulation
+and projects vectors in its existing finishing kernel. Source guards and safe
+division checks remain outside the newly compiled arithmetic.
+
 Layer 2's `vercor/_averaging.py` owns common sum/count arithmetic for output and
 native exchange loops. Its immutable native accumulator uses a scalar count;
 output keeps per-cell finite counts. No field selection, clock, native-model or

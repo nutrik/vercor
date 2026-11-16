@@ -268,7 +268,7 @@ components in Python. Host, compiled, and custom execution share receive,
 step, send, cancellation, state validation, and output boundaries.
 
 For fixed array schemas, VerCOR-owned JAX work retains its compiled functions
-throughout a run. Bilinear extrapolation kernels and the native Veris transition
+throughout a run. Bilinear accumulation/extrapolation kernels and the native Veris transition
 retain stable JIT boundaries on host, mixed and custom-driver execution too.
 Initial compilation per schedule/kernel is expected. Separate runs create
 run-local executors; new shapes, dtypes, static configuration or user-created

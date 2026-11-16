@@ -51,6 +51,7 @@ PROJECT_RESOURCE_PAGES = (
     "source-coupling-audit",
     "interface-wrapper-audit",
     "jax-compilation-audit",
+    "linux-runtime-profiling",
 )
 
 

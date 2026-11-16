@@ -30,6 +30,10 @@ _READTHEDOCS_CONFIG_PATH = Path(".readthedocs.yaml")
 _READTHEDOCS_CONFIG_REFERENCE = re.compile(
     r"https://docs\.readthedocs\.io/en/stable/config-file/" + "v" + r"2\.html"
 )
+_PROFILING_PROVENANCE_PATH = Path("docs/linux-runtime-profiling-results.json")
+_PINNED_EXTERNAL_DISTRIBUTION_REFERENCE = re.compile(
+    r'(?<=")grpc-google-iam-' + "v" + r"1(?===\d)"
+)
 FORBIDDEN_VERCOR_MAJOR = re.compile(r"\bVerCOR [" + "1234" + r"](?:\b|\.)")
 _RELEASE_SHORTHAND = r"(?<![\d.])(?:[12]\.0|3\." + r"[01]|4\.0|[1234]\.x)(?![\d.])"
 _RELEASE_SHORTHAND_TOKEN = re.compile(_RELEASE_SHORTHAND, flags=re.IGNORECASE)
@@ -343,22 +347,28 @@ def test_pre_v0_4_matcher_rejects_legacy_migration_paths(minor: int) -> None:
 
 
 def _forbidden_api_tokens(relative_path: Path, line: str) -> tuple[str, ...]:
-    """Return stale API tokens while preserving the interpolator's numeric vector."""
+    """Reject stale API tokens, preserving scoped external and numeric references."""
 
     matches = tuple(FORBIDDEN_API_TOKEN.finditer(line))
+    reference_spans: tuple[tuple[int, int], ...] = ()
     if relative_path == _READTHEDOCS_CONFIG_PATH:
         reference_spans = tuple(
             (match.start(), match.end())
             for match in _READTHEDOCS_CONFIG_REFERENCE.finditer(line)
         )
-        matches = tuple(
-            match
-            for match in matches
-            if not any(
-                start <= match.start() and match.end() <= end
-                for start, end in reference_spans
-            )
+    elif relative_path == _PROFILING_PROVENANCE_PATH:
+        reference_spans = tuple(
+            (match.start(), match.end())
+            for match in _PINNED_EXTERNAL_DISTRIBUTION_REFERENCE.finditer(line)
         )
+    matches = tuple(
+        match
+        for match in matches
+        if not any(
+            start <= match.start() and match.end() <= end
+            for start, end in reference_spans
+        )
+    )
     tokens = tuple(match.group() for match in matches)
     if relative_path != _NUMERICAL_VECTOR_PATH:
         return tokens
@@ -1008,6 +1018,40 @@ def test_readthedocs_reference_does_not_hide_a_stale_api_token() -> None:
     )
 
     assert _forbidden_api_tokens(Path(".readthedocs.yaml"), line) == ("v" + "2",)
+
+
+@pytest.mark.fast_always
+def test_profiling_provenance_allows_pinned_external_distribution(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _run_integrated_scanner_for_line(
+        monkeypatch,
+        tmp_path,
+        relative_path=Path("docs/linux-runtime-profiling-results.json"),
+        line='    "grpc-google-iam-' + "v" + '1==0.14.6",',
+    )
+
+
+@pytest.mark.fast_always
+def test_external_distribution_reference_does_not_hide_a_stale_api_token() -> None:
+    line = '"grpc-google-iam-' + "v" + "1==0.14.6; stale " + "v" + '1 API"'
+    assert _forbidden_api_tokens(
+        Path("docs/linux-runtime-profiling-results.json"), line
+    ) == ("v" + "1",)
+
+
+@pytest.mark.fast_always
+def test_external_distribution_exception_stays_in_profiling_provenance() -> None:
+    line = '"grpc-google-iam-' + "v" + '1==0.14.6"'
+    assert _forbidden_api_tokens(Path("docs/history.md"), line) == ("v" + "1",)
+
+
+@pytest.mark.fast_always
+def test_profiling_provenance_rejects_unreviewed_api_distribution() -> None:
+    line = '"vercor-' + "v" + '1==0.4.6"'
+    assert _forbidden_api_tokens(
+        Path("docs/linux-runtime-profiling-results.json"), line
+    ) == ("v" + "1",)
 
 
 @pytest.mark.fast_always
