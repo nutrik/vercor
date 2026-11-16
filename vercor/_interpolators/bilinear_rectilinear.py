@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, cast
 
 import jax
@@ -206,7 +207,17 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         valid = _extrapolation.valid_scalar_source_mask(
             src_array, self.src_mask, conditional_callback=False
         )
+        num, weight = self._accumulate_scalar(src_array, valid)
+        if self.nan_renorm:
+            out = safe_masked_divide(
+                num, weight, where=weight > 0.0, inactive_value=jnp.nan
+            )
+            return out, weight
+        return jnp.where(weight, num, jnp.nan), jnp.where(weight, 1.0, 0.0)
 
+    @partial(jax.jit, inline=True)
+    def _accumulate_scalar(self, src_array: Array, valid: Array) -> tuple[Array, Array]:
+        """Fuse four-corner gathers and weights, leaving division checks eager."""
         v00 = src_array[self.j0, self.i0]
         v10 = src_array[self.j0, self.i1]
         v01 = src_array[self.j1, self.i0]
@@ -229,13 +240,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             wsum = w00 + w10 + w01 + w11
 
             num = w00 * valid_v00 + w10 * valid_v10 + w01 * valid_v01 + w11 * valid_v11
-            out = safe_masked_divide(
-                num,
-                wsum,
-                where=wsum > 0.0,
-                inactive_value=jnp.nan,
-            )
-            return out, wsum
+            return num, wsum
 
         num = (
             self.w00 * valid_v00
@@ -244,9 +249,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
             + self.w11 * valid_v11
         )
         all_ok = m00 & m10 & m01 & m11
-        out = jnp.where(all_ok, num, jnp.nan)
-        wsum = jnp.where(all_ok, 1.0, 0.0)
-        return out, wsum
+        return num, all_ok
 
     def _extrapolate_scalar(self, src: Array, src_mask: Array | None) -> Array:
         """Extrapolate source values already aligned with the internal mask."""
@@ -300,6 +303,25 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
                 f" provided {u_src_array.shape}, {v_src_array.shape}"
             )
 
+        num, weight, valid = self._accumulate_vector(u_src_array, v_src_array)
+        if self.nan_renorm:
+            vt3 = safe_masked_divide(
+                num, weight, where=weight > 0.0, inactive_value=jnp.nan
+            )
+            need = ~jnp.isfinite(vt3[..., 0])
+        else:
+            vt3 = jnp.where(weight[..., None], num, jnp.nan)
+            need = ~weight
+        return cast(
+            tuple[Any, Any],
+            self._finish_vector(u_src_array, v_src_array, valid, need, vt3),
+        )
+
+    @partial(jax.jit, inline=True)
+    def _accumulate_vector(
+        self, u_src_array: Array, v_src_array: Array
+    ) -> tuple[Array, Array, Array]:
+        """Fuse Cartesian conversion and vectorized four-corner accumulation."""
         valid = (
             jnp.asarray(self.src_mask, dtype=bool)
             & jnp.isfinite(u_src_array)
@@ -333,13 +355,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
                 + w01[..., None] * jnp.where(m01[..., None], v01, 0.0)
                 + w11[..., None] * jnp.where(m11[..., None], v11, 0.0)
             )
-            vt3 = safe_masked_divide(
-                num,
-                wsum,
-                where=wsum > 0.0,
-                inactive_value=jnp.nan,
-            )
-            need = ~jnp.isfinite(vt3[..., 0])
+            return num, wsum, valid
         else:
             num = (
                 self.w00[..., None] * v00
@@ -348,16 +364,7 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
                 + self.w11[..., None] * v11
             )
             all_ok = m00 & m10 & m01 & m11
-            vt3 = jnp.where(all_ok[..., None], num, jnp.nan)
-            need = ~all_ok
-
-        vt3_for_projection = jnp.where(need[..., None], 0.0, vt3)
-        u_t = jnp.sum(vt3_for_projection * self._e_east_t, axis=-1)
-        v_t = jnp.sum(vt3_for_projection * self._e_north_t, axis=-1)
-        return cast(
-            tuple[Any, Any],
-            self._finish_vector(u_src_array, v_src_array, valid, need, u_t, v_t),
-        )
+            return num, all_ok, valid
 
     @jax.jit
     def _finish_vector(
@@ -366,10 +373,12 @@ class BilinearRectilinearInterpolator(PyTreeNodeMixin):
         v_src_array: Array,
         valid: Array,
         need: Array,
-        u_t: Array,
-        v_t: Array,
+        vt3: Array,
     ) -> tuple[Any, Any]:
         """Reuse vector extrapolation without changing source error boundaries."""
+        vt3_for_projection = jnp.where(need[..., None], 0.0, vt3)
+        u_t = jnp.sum(vt3_for_projection * self._e_east_t, axis=-1)
+        v_t = jnp.sum(vt3_for_projection * self._e_north_t, axis=-1)
 
         def apply_vector_extrapolation(_: None) -> tuple[Array, Array]:
             u_fill = self._extrapolate_scalar(u_src_array, valid)

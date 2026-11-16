@@ -47,6 +47,62 @@ def _nonrenormalizing_missing_scalar_interpolator() -> BilinearRectilinearInterp
     )
 
 
+@pytest.mark.fast_always
+@pytest.mark.parametrize("enable_x64", [False, True])
+@pytest.mark.parametrize("vector", [False, True])
+@pytest.mark.parametrize("nan_renorm", [False, True])
+def test_warm_bilinear_neutralization_reuses_compiled_arithmetic(
+    monkeypatch: pytest.MonkeyPatch, enable_x64: bool, vector: bool, nan_renorm: bool
+) -> None:
+    """Warm remapping must fuse corner neutralization, without freezing inputs."""
+    with jax.enable_x64(enable_x64):
+        interp = _scalar_interp(
+            [0.0, 1.0],
+            [0.0, 1.0],
+            [0.25],
+            [0.75],
+            periodic_longitude=False,
+            nan_renorm=nan_renorm,
+        )
+        source = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
+
+        def apply(value: jax.Array) -> Any:
+            return (
+                interp.apply_vector(value, value * 0.5)
+                if vector
+                else interp.apply_scalar(value)
+            )
+
+        first = jax.block_until_ready(apply(source))
+        updated = source + 1.0
+        where_calls = 0
+        original = jnp.where
+
+        def where(*args: Any, **kwargs: Any) -> Any:
+            nonlocal where_calls
+            where_calls += 1
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(jnp, "where", where)
+        second = jax.block_until_ready(apply(updated))
+        assert (
+            where_calls <= 3
+        ), "ERROR corner neutralization still executes eagerly on warm calls"
+        first_leaves = jax.tree_util.tree_leaves(first)
+        second_leaves = jax.tree_util.tree_leaves(second)
+        assert all(
+            np.max(np.abs(np.asarray(b) - np.asarray(a))) > 0
+            for a, b in zip(first_leaves, second_leaves)
+        )
+        reset = jax.block_until_ready(apply(source))
+        for actual, expected in zip(jax.tree_util.tree_leaves(reset), first_leaves):
+            assert_array_equal_compact(actual, expected)
+        if not vector:
+            assert_allclose_compact(
+                second, [[3.75]], rtol=0, atol=1e-6 if not enable_x64 else 1e-14
+            )
+
+
 def test_init_rejects_non_monotonic_longitude() -> None:
     lon_src = np.array([0.0, 2.0, 1.0])
     lat_src = np.array([0.0, 1.0])
