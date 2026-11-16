@@ -1,4 +1,4 @@
-"""Synchronized CPU runtime comparisons, runnable against an archived VerCOR tree.
+"""Synchronized CPU/GPU comparisons, runnable against an archived VerCOR tree.
 
 Run with ``python -m benchmarks.benchmark_runtime --directory PATH``. Cold API
 and retained-JIT costs are separate cases. Every invocation resets immutable
@@ -51,6 +51,10 @@ CASE_NAMES = (
     "vector",
     "slab_host",
     "slab_jax",
+    "state",
+    "bilinear",
+    "bilinear_jit",
+    "vector_jit",
 )
 
 
@@ -397,16 +401,27 @@ def _regrid_case(name: str, args: argparse.Namespace) -> BenchmarkCase:
     target = _grid("target", max(2, args.grid_nx) + 1, max(2, args.grid_ny) + 1)
     x, y = jnp.meshgrid(jnp.deg2rad(source.longitude), jnp.deg2rad(source.latitude))
     seed = _synchronize(jnp.sin(x) * jnp.cos(y) + 2)
-    if name == "vector":
+    if name in ("bilinear", "bilinear_jit", "vector", "vector_jit"):
         from vercor.regridding import bilinear, VectorRegridder
 
         remapper = cast(VectorRegridder, bilinear(source, target))
         _synchronize((source, target, cast(Any, remapper).interpolator))
         v = _synchronize(jnp.cos(x) - jnp.sin(y))
+        vector = name.startswith("vector")
+        outer_jit = name.endswith("jit")
+
+        def apply(u: Any, v: Any) -> Any:
+            return remapper.regrid_vector(u, v) if vector else remapper.regrid(u)
+
+        callback = jax.jit(apply) if outer_jit else apply
         return BenchmarkCase(
             name,
-            lambda: remapper.regrid_vector(seed, v),
-            {"target_shape": target.shape},
+            lambda: callback(seed, v),
+            {
+                "target_shape": target.shape,
+                "invocation": "outer-jit" if outer_jit else "api",
+            },
+            batch_size=10 if outer_jit else 1,
         )
     from vercor._interpolators.conservative_remap_rectilinear import (
         ConservativeRectilinearRemapper,
@@ -437,7 +452,7 @@ def build_case(name: str, args: argparse.Namespace) -> BenchmarkCase:
         return _plan_case()
     if name in ("finite", "finite_jit"):
         return _finite_case(name, args)
-    if name in ("remap", "vector"):
+    if name in ("remap", "bilinear", "bilinear_jit", "vector", "vector_jit"):
         return _regrid_case(name, args)
     backend = "host" if name.endswith("host") or name == "host" else "jax"
     if name.startswith("output") or name.startswith("irregular"):
@@ -461,13 +476,23 @@ def build_case(name: str, args: argparse.Namespace) -> BenchmarkCase:
             constants=original.constants,
             log_level="ERROR",
         )
-    elif name in ("refresh", "refresh_jit", "host", "jax_api", "jax_jit"):
+    elif name in ("refresh", "refresh_jit", "host", "jax_api", "jax_jit", "state"):
         coupler = _dynamic_coupler(args, backend)
     else:
         raise ValueError(f"unknown case: {name}")
     if name.startswith("output"):
         return _output_case(name, args, coupler)
     seed = _synchronize(coupler.initial_state())
+    if name == "state":
+        from vercor._runtime.preparation import validate_runtime_state
+
+        prepared = coupler._ensure_prepared()
+
+        def validate() -> Any:
+            validate_runtime_state(seed, prepared=prepared)
+            return seed
+
+        return BenchmarkCase(name, validate, {"validation_only": True})
     if name.startswith("refresh"):
         from vercor._runtime.exchange_masks import refresh_runtime_masks
 

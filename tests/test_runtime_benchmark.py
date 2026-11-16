@@ -220,3 +220,36 @@ def test_output_case_rejects_existing_invocation_root(tmp_path: Path) -> None:
         Path("0000"),
         Path("0000/stale.nc"),
     ]
+
+
+@pytest.mark.parametrize("name", ["state", "bilinear", "bilinear_jit", "vector_jit"])
+def test_linux_controls_reset_numeric_inputs(name: str, tmp_path: Path) -> None:
+    """Central validation and eager/compiled remapping must be measurable alone."""
+    benchmark = _module()
+    args = benchmark.build_parser().parse_args(
+        [
+            "--directory",
+            str(tmp_path),
+            "--case",
+            name,
+            "--grid-nx",
+            "3",
+            "--grid-ny",
+            "3",
+        ]
+    )
+    case = benchmark.build_case(name, args)
+    first = benchmark._numeric_leaves(benchmark._synchronize(case.invoke()))
+    second = benchmark._numeric_leaves(benchmark._synchronize(case.invoke()))
+    assert first
+    assert first.keys() == second.keys()
+    for key in first:
+        np.testing.assert_array_equal(first[key], second[key])
+    if name == "state":
+        assert case.metadata["validation_only"] is True
+    else:
+        assert all(array.shape == (4, 4) for array in first.values())
+        assert len(first) == (2 if name == "vector_jit" else 1)
+        assert case.metadata["invocation"] == (
+            "outer-jit" if name.endswith("jit") else "api"
+        )
