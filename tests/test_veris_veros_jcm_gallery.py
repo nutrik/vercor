@@ -233,11 +233,11 @@ def test_precision_is_selected_before_native_factory(
         pass
 
     def factory(**kwargs: Any) -> Any:
-        assert jax.config.jax_enable_x64
+        assert jax.config.read("jax_enable_x64")
         raise FactoryReached
 
     monkeypatch.setattr(module, "make_veris_veros", factory)
-    previous = jax.config.jax_enable_x64
+    previous = jax.config.read("jax_enable_x64")
     try:
         jax.config.update("jax_enable_x64", False)
         with pytest.raises(FactoryReached):
