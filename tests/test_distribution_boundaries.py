@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import shlex
 import shutil
+import site
 import subprocess
 import sys
 import tarfile
@@ -1596,16 +1597,56 @@ def test_built_distributions_run_external_extension_fixture_outside_checkout(
         f"stderr:\n{console_install.stderr}"
     )
 
-    console_workflow = tmp_path / "installed-console-workflow"
-    console_workflow.mkdir()
-    version_probe = subprocess.run(
-        [str(installed_console), "--version"],
-        cwd=console_workflow,
+    # A nested uv venv inherits the bare base interpreter's site packages,
+    # rather than its parent venv's dependencies. Add dependency directories
+    # after installation; a .pth path entry does not process the parent's
+    # editable-install .pth files and the child's installed wheel stays first.
+    purelib_probe = subprocess.run(
+        [
+            str(venv_python),
+            "-c",
+            "import sysconfig; print(sysconfig.get_path('purelib'))",
+        ],
+        cwd=tmp_path,
         env=console_environment,
         check=True,
         capture_output=True,
         text=True,
     )
+    child_site = Path(purelib_probe.stdout.strip())
+    (child_site / "vercor_test_runtime_dependencies.pth").write_text(
+        "\n".join(site.getsitepackages()) + "\n", encoding="utf-8"
+    )
+
+    console_workflow = tmp_path / "installed-console-workflow"
+    console_workflow.mkdir()
+    owner_probe = subprocess.run(
+        [
+            str(venv_python),
+            "-c",
+            "from pathlib import Path; import vercor; print(Path(vercor.__file__).resolve())",
+        ],
+        cwd=console_workflow,
+        env=console_environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert (
+        owner_probe.returncode == 0
+    ), f"ERROR installed wheel import failed: {owner_probe.stderr[-1500:]}"
+    assert Path(owner_probe.stdout.strip()).is_relative_to(console_venv.resolve())
+    version_probe = subprocess.run(
+        [str(installed_console), "--version"],
+        cwd=console_workflow,
+        env=console_environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert (
+        version_probe.returncode == 0
+    ), f"ERROR installed console failed: {version_probe.stderr[-1500:]}"
     assert version_probe.stdout.strip() == f"vercor, version {EXPECTED_VERSION}"
     listing_probe = subprocess.run(
         [str(installed_console), "show-setups"],
@@ -1951,8 +1992,12 @@ print(json.dumps({{
         text=True,
     )
     mypy_evidence = mypy.stdout + mypy.stderr
-    assert str(PROJECT_ROOT) not in mypy_evidence
-    assert str(target) in mypy_evidence
+    # The active interpreter and dependencies may live in PROJECT_ROOT/.venv;
+    # reject resolution of project sources while requiring both installed owners.
+    for source_path in (PROJECT_ROOT / "vercor", EXTERNAL_EXTENSION_FIXTURE_ROOT):
+        assert str(source_path) not in mypy_evidence
+    for package in ("vercor", "external_extension_test_fixture"):
+        assert str(target / package) in mypy_evidence
 
 
 @pytest.mark.fast_always
