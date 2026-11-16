@@ -28,3 +28,9 @@ authoring and released versions.
    source-coupling-audit
    interface-wrapper-audit
    jax-compilation-audit
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Performance studies
+
+   linux-runtime-profiling

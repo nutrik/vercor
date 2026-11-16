@@ -1,0 +1,264 @@
+"""Run fresh paired VerCOR source comparisons; traces are separate invocations."""
+
+from pathlib import Path
+import argparse
+import hashlib
+import io
+import shutil
+import tarfile
+import json
+import os
+import platform
+import subprocess
+import sys
+import numpy as np
+
+
+def _source_hash(directory: Path) -> str:
+    """Hash every imported package source using the harness convention."""
+    digest = hashlib.sha256()
+    for path in sorted((directory / "vercor").rglob("*.py")):
+        digest.update(str(path.relative_to(directory)).encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _prepare(root: Path, repo: Path, baseline: str) -> None:
+    """Archive baseline and current source into a new, never overwritten root."""
+    revision = subprocess.check_output(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            baseline + "^{commit}",
+        ],
+        text=True,
+    ).strip()
+    archive = subprocess.check_output(
+        ["git", "-C", str(repo), "archive", "--format=tar", revision, "vercor"]
+    )
+    environment = subprocess.check_output(
+        [sys.executable, "-m", "pip", "freeze", "--all"], cwd=repo, text=True
+    )
+    root.mkdir(parents=True, exist_ok=False)
+    baseline_root = root / "baseline-source"
+    baseline_root.mkdir()
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as bundle:
+        bundle.extractall(baseline_root, filter="data")
+    shutil.copytree(
+        repo / "vercor",
+        root / "candidate-source" / "vercor",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
+    shutil.copyfile(repo / "benchmarks" / "benchmark_runtime.py", root / "harness.py")
+    manifest = {
+        name: {"sha256": _source_hash(root / f"{name}-source")}
+        for name in ("baseline", "candidate")
+    }
+    manifest["baseline"]["revision"] = revision
+    (root / "variants.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (root / "environment.txt").write_text(environment)
+
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--lane", choices=("cpu", "gpu"), required=True)
+parser.add_argument("--root", type=Path, required=True)
+parser.add_argument("--nx", type=int, default=32)
+parser.add_argument("--ny", type=int, default=16)
+parser.add_argument("--case", action="append", dest="cases")
+parser.add_argument("--resume", action="store_true")
+parser.add_argument("--prepare", action="store_true")
+parser.add_argument("--repo", type=Path, default=Path.cwd())
+parser.add_argument("--baseline", default="e15efe0604429be4c33c78e4c3cc1904a295c728")
+args = parser.parse_args()
+root = args.root.resolve()
+repo = args.repo.resolve()
+if args.prepare:
+    _prepare(root, repo, args.baseline)
+harness = root / "harness.py"
+records = []
+manifest = json.loads((root / "variants.json").read_text())
+for variant in ("baseline", "candidate"):
+    assert (
+        _source_hash(root / f"{variant}-source") == manifest[variant]["sha256"]
+    ), variant
+for precision in ("float64", "float32"):
+    for pair in range(3):
+        order = (
+            ("baseline", "candidate") if pair % 2 == 0 else ("candidate", "baseline")
+        )
+        pair_results = {}
+        for source in order:
+            directory = (
+                root
+                / f"matrix-{args.lane}-{args.nx}x{args.ny}"
+                / precision
+                / f"pair-{pair}"
+                / source
+            )
+            completed = directory.exists()
+            if completed and not args.resume:
+                raise FileExistsError(directory)
+            if not completed:
+                directory.mkdir(parents=True, exist_ok=False)
+            env = dict(
+                os.environ,
+                OMP_NUM_THREADS="1",
+                OPENBLAS_NUM_THREADS="1",
+                XLA_PYTHON_CLIENT_PREALLOCATE="false",
+                JAX_PLATFORMS="cpu" if args.lane == "cpu" else "cuda,cpu",
+                CUDA_VISIBLE_DEVICES="0",
+                PYTHONPATH=str(root / f"{source}-source"),
+            )
+            env.pop("LD_LIBRARY_PATH", None)
+            command = [
+                sys.executable,
+                str(harness),
+                "--directory",
+                str(directory),
+                "--dtype",
+                precision,
+                "--steps",
+                "7",
+                "--repeats",
+                "9",
+                "--grid-nx",
+                str(args.nx),
+                "--grid-ny",
+                str(args.ny),
+            ]
+            for case in args.cases or ():
+                command.extend(("--case", case))
+            print(
+                json.dumps(
+                    {
+                        "start": str(directory),
+                        "hostname": platform.node(),
+                        "affinity": sorted(os.sched_getaffinity(0)),
+                    }
+                ),
+                flush=True,
+            )
+            if not completed:
+                with (directory / "process.log").open("w") as log:
+                    subprocess.run(
+                        command,
+                        env=env,
+                        cwd=repo,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        check=True,
+                    )
+            else:
+                assert (directory / "outputs.npz").is_file() and (
+                    directory / "results.json"
+                ).is_file(), directory
+                print(
+                    json.dumps({"reused_completed_process": str(directory)}), flush=True
+                )
+            result = json.loads((directory / "results.json").read_text())
+            expected = {
+                "dtype": precision,
+                "steps": 7,
+                "repeats": 9,
+                "grid_nx": args.nx,
+                "grid_ny": args.ny,
+                "cases": args.cases,
+                "trace": False,
+            }
+            assert all(
+                result["options"][key] == value for key, value in expected.items()
+            ), result["options"]
+            assert result["source"]["sha256"] == manifest[source]["sha256"], result[
+                "source"
+            ]
+            assert (
+                result["source"]["harness_sha256"]
+                == hashlib.sha256(harness.read_bytes()).hexdigest()
+            )
+            pair_results[source] = (directory, result)
+            print(json.dumps({"finished": str(directory)}), flush=True)
+        left_dir, left = pair_results["baseline"]
+        right_dir, right = pair_results["candidate"]
+        exact = 0
+        maximum_relative = 0.0
+        maximum_absolute = 0.0
+        nonexact_cases = set()
+        with (
+            np.load(left_dir / "outputs.npz") as la,
+            np.load(right_dir / "outputs.npz") as ra,
+        ):
+            assert set(la.files) == set(ra.files)
+            for key in la.files:
+                a, b = la[key], ra[key]
+                assert a.shape == b.shape and a.dtype == b.dtype, key
+                if np.array_equal(a, b, equal_nan=True):
+                    exact += 1
+                    continue
+                case = key.split("/")[0]
+                allowed = ("bilinear", "bilinear_jit", "vector", "vector_jit")
+                assert case in allowed or (args.lane == "gpu" and case == "remap"), key
+                tolerance = 3e-6 if precision == "float32" else 1e-12
+                np.testing.assert_allclose(
+                    a,
+                    b,
+                    rtol=tolerance,
+                    atol=1e-6 if precision == "float32" else 1e-14,
+                    equal_nan=True,
+                    err_msg=key,
+                )
+                nonexact_cases.add(case)
+                finite = np.isfinite(a) & np.isfinite(b)
+                absolute = np.abs(a[finite] - b[finite])
+                if absolute.size:
+                    maximum_absolute = max(maximum_absolute, float(np.max(absolute)))
+                    relative = absolute / np.maximum(
+                        np.abs(a[finite]), np.finfo(a.dtype).tiny
+                    )
+                    maximum_relative = max(maximum_relative, float(np.max(relative)))
+            compared = len(la.files)
+        for name in left["cases"]:
+            if name.startswith("output"):
+                assert (
+                    left["cases"][name]["metadata"]["artifacts"]
+                    == right["cases"][name]["metadata"]["artifacts"]
+                )
+        speedups = {
+            name: left["cases"][name]["median_seconds"]
+            / right["cases"][name]["median_seconds"]
+            for name in left["cases"]
+        }
+        record = {
+            "lane": args.lane,
+            "grid": [args.nx, args.ny],
+            "precision": precision,
+            "pair": pair,
+            "order": order,
+            "baseline": left,
+            "candidate": right,
+            "arrays": {
+                "compared": compared,
+                "exact": exact,
+                "nonexact_cases": sorted(nonexact_cases),
+                "max_absolute": maximum_absolute,
+                "max_relative": maximum_relative,
+            },
+            "speedups": speedups,
+        }
+        records.append(record)
+        output = root / f"matrix-{args.lane}-{args.nx}x{args.ny}" / "summary.json"
+        output.write_text(json.dumps(records, indent=2) + "\n")
+        print(
+            json.dumps(
+                {
+                    "pair_complete": pair,
+                    "precision": precision,
+                    "arrays": record["arrays"],
+                    "speedups": speedups,
+                }
+            ),
+            flush=True,
+        )
