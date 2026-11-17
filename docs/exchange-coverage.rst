@@ -172,32 +172,12 @@ fluxes warm the mixed layer; the independent ocean restoring tendency is
 latent heat (evaporation) dries soil and positive latent heat wets it.
 The latent and moisture coefficients remain toy closures and do not certify
 a physical water budget.
-Released models and the dependency exception
---------------------------------------------
+Released coupled models
+-----------------------
 
-The Veris extra selects tag ``v0.2.1``, commit
-``6e3b56ee14922f4bae760d57772f610078aa1886``. JCM is pinned to ``3.0.0`` and
-Dinosaur is at least ``1.5.0``. Veris requires JAX >=0.11.2; JCM declares
-``jax>=0.10,<0.11``. These upstream constraints have no common solution.
-
-The reviewed combined validation lane uses exactly JAX 0.11.2. From the checkout:
-
-.. code-block:: console
-
-   conda activate scipy
-   python tools/install_coupled_models.py
-
-The installer resolves every other JCM base requirement normally, installs the
-released JCM wheel without resolving its incompatible upper bound, and requires
-``pip check`` to report exactly that one known mismatch. Other conflicts fail.
-Normal JCM-only and Veris-only extras retain their upstream constraints; the
-combined extras are not presented as normally resolvable.
-
-Acceptance uses released native model rollouts, independent surface/output
-checks, conservation, JIT/JVP/VJP and finite differences, plus separate stock and
-exact-fork Veros test processes. This establishes the tested functional coupling;
-it does not certify long-term climate behavior or remove the upstream metadata
-conflict. Final commands and results are recorded in ``PROGRESS.md``.
+Veris 0.2.3 requires JAX 0.10.2 or later. JCM 3.0.0 requires JAX 0.10 or
+later and below 0.11. The combined extras resolve with JAX 0.10.2.
+See :doc:`researchers/getting-started` for installation commands.
 
 Earlier exchange-mask acceptance on 2026-10-19 passed 2,209 full stock tests,
 1,284 fast tests and

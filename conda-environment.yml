@@ -7,13 +7,6 @@ channels:
 dependencies:
     - python=3.13
     - pip>=24.0
-    - click
-    - numpy
-    - scipy
-    - h5netcdf
-    - h5py
-    - xarray
-    - matplotlib>=3.8.1
-    - jax
+    # Resolve the model stack together so pip never replaces Conda packages.
     - pip:
-        - -e .[jcm,veros]
+        - -e .[jcm,veros,veris]

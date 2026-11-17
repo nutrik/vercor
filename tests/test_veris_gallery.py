@@ -12,6 +12,7 @@ import sys
 from typing import Any
 
 from click.testing import CliRunner
+from packaging.version import Version
 import pytest
 import yaml
 
@@ -134,13 +135,13 @@ def test_gallery_run_contract_and_cli_copy(
 
 
 @pytest.mark.fast_always
-def test_native_ci_installs_and_verifies_pinned_veris() -> None:
+def test_native_ci_installs_released_veris() -> None:
     workflow = yaml.safe_load(Path(".github/workflows/python-package.yml").read_text())
     quality = workflow["jobs"]["quality"]
     commands = "\n".join(step.get("run", "") for step in quality["steps"])
-    assert "python tools/install_coupled_models.py" in commands
-    assert quality["env"]["VERIS_COMMIT"] == "6e3b56ee14922f4bae760d57772f610078aa1886"
-    assert 'distribution("veris")' in commands and "VERIS_COMMIT" in commands
+    assert quality["env"]["VERIS_VERSION"] == "0.2.3"
+    install = 'python -m pip install ".[dev,jcm,veros,veris]" "veris==${VERIS_VERSION}"'
+    assert install in commands
     assert "not veros_autodiff" in commands
     assert (
         workflow["jobs"]["veros-autodiff"]["env"]["VEROS_AD_COMMIT"]
@@ -148,10 +149,9 @@ def test_native_ci_installs_and_verifies_pinned_veris() -> None:
     )
     ad = workflow["jobs"]["veros-autodiff"]
     ad_commands = "\n".join(step.get("run", "") for step in ad["steps"])
-    assert ad["env"]["VERIS_COMMIT"] == quality["env"]["VERIS_COMMIT"]
-    assert "python tools/install_coupled_models.py" in ad_commands
+    assert ad["env"]["VERIS_VERSION"] == quality["env"]["VERIS_VERSION"]
+    assert install in ad_commands
     assert "tests/test_veris_prognostic_autodiff.py" in ad_commands
-    assert 'distribution("veris")' in ad_commands
 
 
 @pytest.mark.fast_always
@@ -159,12 +159,8 @@ def test_native_validation_uses_released_model_versions() -> None:
     """Catch accidentally validating against an older native development tree."""
     pytest.importorskip("veris")
     pytest.importorskip("jcm")
-    assert importlib.metadata.version("veris") == "0.2.1"
+    assert Version(importlib.metadata.version("veris")) >= Version("0.2.3")
     assert importlib.metadata.version("jcm") == "3.0.0"
-    record = json.loads(
-        importlib.metadata.distribution("veris").read_text("direct_url.json") or "{}"
-    )
-    assert record["vcs_info"]["commit_id"] == "6e3b56ee14922f4bae760d57772f610078aa1886"
 
 
 @pytest.mark.slow

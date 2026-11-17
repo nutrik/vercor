@@ -37,16 +37,10 @@ to install VerCOR with the optional
 
 For standalone Veris with prescribed Veros ocean data, install a source checkout
 containing the integration with ``python -m pip install ".[veris,veros]"``.
-The ``veris`` extra pins the maintained standalone native model; ``veros``
+The ``veris`` extra installs the standalone native model. The ``veros`` extra
 provides the setup-only global ocean geometry and climatology. The gallery
 ``veris_dataveros_era5`` supplies ERA5 forcing and uses the standard
 ``vercor copy-setup`` and ``vercor run`` commands (see :doc:`../setup-gallery`).
-
-The combined JCM/Veris lane uses released JCM 3.0.0 and Veris v0.2.1.
-Their upstream JAX requirements conflict. From this checkout, use
-``python tools/install_coupled_models.py`` for the reviewed JAX 0.11.2 override;
-normal installation of the combined extras cannot resolve. See
-:doc:`../exchange-coverage` for the exact exception and validation scope.
 
 If you want to install a specific release version execute:
 
@@ -76,24 +70,31 @@ Using Conda (multi-platform)
 
        $ conda activate vercor
 
-Using pip (Linux / OSX)
-+++++++++++++++++++++++
+Using pip or uv (Linux / macOS)
+++++++++++++++++++++++++++++++++
 
-1. Clone the repository:
+Run these commands from the cloned repository to install VerCOR with JCM,
+Veros, and Veris in a virtual environment.
 
-   .. code-block:: console
+.. code-block:: console
 
-      git clone https://github.com/nutrik/vercor.git
+   python -m venv .venv
+   source .venv/bin/activate
+   python -m pip install ".[jcm,veros,veris]"
+   python -m pip check
 
-2. Install VerCOR in editable mode, preferably in a virtual environment::
+Use these commands to create a separate environment with uv.
 
-      $ pip install -e .
+.. code-block:: console
 
-   The ``-e`` flag ensures that changes to the code are immediately reflected without reinstalling.
+   uv venv --python 3.13 .venv-uv
+   uv pip install --python .venv-uv/bin/python ".[jcm,veros,veris]"
+   uv pip check --python .venv-uv/bin/python
+   source .venv-uv/bin/activate
 
-3. Optionally install JCM and Veros::
-
-      $ pip install -e ".[jcm,veros]"
+Use ``.`` for the base package or add ``-e`` for an editable source install.
+The Conda file creates a Python environment and installs VerCOR in editable
+mode with the same three extras. Pip resolves the whole model stack together.
 
 Setting up a coupled run
 ------------------------

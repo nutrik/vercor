@@ -1,11 +1,10 @@
 Veris–Veros–JCM coupling validation
 ===================================
 
-Current release integration (2026-10-19) uses Veris v0.2.1 and JCM 3.0.0,
-Gregorian clocks and nine routes. JCM 3 removed separate land turbulent channels;
-the unused prescribed-land import route is removed. The record below describes
-the preceding integration; :doc:`exchange-coverage` documents current contracts
-and the reviewed dependency exception.
+The 2026-10-19 integration used Veris v0.2.1 and JCM 3.0.0, Gregorian clocks,
+and nine routes. JCM 3 removed separate land turbulent channels and the unused
+prescribed-land import route. See :doc:`exchange-coverage` for the current
+model requirements and exchange contracts.
 
 This record concerns the functional coupling in ``veris_veros_jcm.py``.
 The execution order is LND, CICE (native Veris), OCN (prognostic Veros), ATM
@@ -147,9 +146,8 @@ native Veros variables outside the measured interval. Compare matching distribut
 Configure ``VEROS_ASSET_DIR`` to a writable cache when the default native asset
 directory is read-only. The local validation used checksum-verified copies of
 the two native forcing files and isolated Python 3.12 stock/fork targets, leaving
-installed environments unchanged. It retains the existing reviewed JCM 3.0.0 /
-JAX 0.11.2 dependency exception required by Veris 0.2.1; see
-:doc:`exchange-coverage` and ``tools/install_coupled_models.py``.
+installed environments unchanged. Those measurements used Veris 0.2.1 with
+JAX 0.11.2 under the JCM 3.0.0 dependency override in effect at the time.
 
 Longitude-wrap geometry repair (2026-10-30)
 ------------------------------------------------------------

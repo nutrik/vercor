@@ -5,10 +5,8 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timedelta
 import json
-from pathlib import Path
 import subprocess
 import sys
-import tomllib
 from types import ModuleType
 from typing import Any
 
@@ -288,14 +286,6 @@ def test_paired_factory_initializes_once_and_shares_grid(
     with pytest.raises(ValueError, match="distinct"):
         paired.make_veris_verosdata(ocean_name="CICE")
     assert calls == [True]
-
-
-def test_optional_dependency_pins_veris_release() -> None:
-    metadata = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
-    extras = metadata["project"]["optional-dependencies"]
-    assert extras["veris"] == [
-        "veris @ git+https://github.com/team-ocean/veris.git@v0.2.1"
-    ]
 
 
 @pytest.mark.parametrize("after_step", [False, True])
