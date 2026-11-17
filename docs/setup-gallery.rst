@@ -248,7 +248,7 @@ From a source checkout containing this integration, install and copy the setup:
    vercor copy-setup veris_dataveros_era5 --to ~/vercor-setups/veris_dataveros_era5
    vercor run ~/vercor-setups/veris_dataveros_era5/veris_dataveros_era5.py --loglevel info --float-type float64
 
-The native revision is pinned by the ``veris`` extra. Native integration uses
+The ``veris`` extra installs the released native model. Native integration uses
 one-hour coupled dynamics/thermodynamics steps inside daily coupling intervals.
 The default experiment starts with native zero ice and writes monthly native
 ice variables plus final runtime/snapshot files. ``VerisConfig.initial_conditions``

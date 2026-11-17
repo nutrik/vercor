@@ -86,6 +86,7 @@ def build_coupler(
             config=veris_config
             or VerisConfig(
                 atmosphere_forcing="model_level",
+                custom_parameters={"nEVPsteps": 80, "useAdaptiveEVP": True},
                 output=OutputSpec(period=PeriodOutput(frequency="month")),
             ),
             ocean_config=ocean_config

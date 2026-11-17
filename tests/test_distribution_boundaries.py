@@ -175,9 +175,7 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
 
     assert extras["veros"] == ["veros>=1.7.0"]
     assert extras["jcm"] == ["dinosaur>=1.5.0", "jcm==3.0.0"]
-    assert extras["veris"] == [
-        "veris @ git+https://github.com/team-ocean/veris.git@v0.2.1"
-    ]
+    assert extras["veris"] == ["veris>=0.2.3"]
     assert extras["veros_ad"] == [
         f"veros @ git+{VEROS_AD_REPOSITORY}@{VEROS_AD_COMMIT}"
     ]
@@ -215,13 +213,15 @@ def test_runtime_metadata_separates_test_and_development_dependencies() -> None:
 
 @pytest.mark.fast_always
 def test_conda_environment_reuses_project_optional_dependency_policy() -> None:
-    """Keep JCM and Veros constraints owned by project metadata."""
+    """Resolve the same coupled model extras in Conda and pip environments."""
     environment = yaml.safe_load(
         (PROJECT_ROOT / "conda-environment.yml").read_text(encoding="utf-8")
     )
-    pip_dependencies = environment["dependencies"][-1]
-
-    assert pip_dependencies == {"pip": ["-e .[jcm,veros]"]}
+    assert environment["dependencies"] == [
+        "python=3.13",
+        "pip>=24.0",
+        {"pip": ["-e .[jcm,veros,veris]"]},
+    ]
 
 
 @pytest.mark.fast_always
@@ -1187,10 +1187,11 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
     assert autodiff["runs-on"] == "ubuntu-latest"
     assert autodiff["env"] == {
         "VEROS_AD_COMMIT": VEROS_AD_COMMIT,
-        "VERIS_COMMIT": jobs["quality"]["env"]["VERIS_COMMIT"],
+        "VERIS_VERSION": jobs["quality"]["env"]["VERIS_VERSION"],
     }
     assert install_index < verify_index < rollout_index
-    assert "python tools/install_coupled_models.py" in install["run"]
+    assert 'python -m pip install ".[dev,jcm,veros,veris]"' in install["run"]
+    assert "python -m pip check" in install["run"]
     assert "ipdb==0.13.13" in install["run"]
     assert f'"git+{VEROS_AD_REPOSITORY}@${{VEROS_AD_COMMIT}}"' in install["run"]
     assert "--no-deps" in install["run"]
@@ -1206,7 +1207,8 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
         "-q -n0 -m veros_autodiff --tb=short "
         "--cov=vercor --cov-branch --cov-report= --cov-fail-under=0"
     )
-    assert "python tools/install_coupled_models.py" in quality_commands
+    assert 'python -m pip install ".[dev,jcm,veros,veris]"' in quality_commands
+    assert "python -m pip check" in quality_commands
     for stock_step in (stock_full, stock_coverage):
         assert '-m "not veros_autodiff"' in stock_step["run"]
     assert "combined-coverage" in jobs["publish-release"]["needs"]
@@ -1364,7 +1366,8 @@ def test_ci_quality_job_enforces_static_gates_and_collects_stock_coverage() -> N
 
     assert checkout.get("with", {}).get("fetch-depth") == 0
     assert setup["with"]["python-version"] == "3.12"
-    assert "python tools/install_coupled_models.py" in commands
+    assert 'python -m pip install ".[dev,jcm,veros,veris]"' in commands
+    assert "python -m pip check" in commands
     assert "black --check vercor tests" in commands
     assert "flake8 ." in commands
     assert "--exit-zero" not in commands
