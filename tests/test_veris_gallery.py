@@ -151,7 +151,7 @@ def test_native_ci_installs_released_veris() -> None:
     ad_commands = "\n".join(step.get("run", "") for step in ad["steps"])
     assert ad["env"]["VERIS_VERSION"] == quality["env"]["VERIS_VERSION"]
     assert install in ad_commands
-    assert "tests/test_veris_prognostic_autodiff.py" in ad_commands
+    assert "python -m pytest tests/ -q -n0 -m veros_autodiff" in ad_commands
 
 
 @pytest.mark.fast_always

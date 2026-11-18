@@ -225,7 +225,7 @@ def test_conda_environment_reuses_project_optional_dependency_policy() -> None:
 
 
 @pytest.mark.fast_always
-def test_pytest_defaults_use_measured_parallel_policy() -> None:
+def test_pytest_defaults_use_stock_veros_and_measured_parallel_policy() -> None:
     metadata = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     )
@@ -235,6 +235,8 @@ def test_pytest_defaults_use_measured_parallel_policy() -> None:
         "-n4",
         "--dist=loadscope",
         "--max-worker-restart=0",
+        "-m",
+        "not veros_autodiff",
     ]
 
 
@@ -1136,7 +1138,7 @@ def test_ci_quality_job_installs_canonical_docs_environment() -> None:
     test_index = next(
         index
         for index, step in enumerate(quality_steps)
-        if step.get("name") == "Run full test suite"
+        if step.get("name") == "Run full stock test suite with coverage"
     )
 
     assert install_index < test_index
@@ -1156,17 +1158,10 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
     quality_steps = jobs["quality"]["steps"]
     quality_commands = "\n".join(step.get("run", "") for step in quality_steps)
     stock_full = next(
-        step for step in quality_steps if step.get("name") == "Run full test suite"
+        step
+        for step in quality_steps
+        if step.get("name") == "Run full stock test suite with coverage"
     )
-    stock_coverage = next(
-        (
-            step
-            for step in quality_steps
-            if step.get("name") == "Collect stock branch coverage"
-        ),
-        None,
-    )
-    assert stock_coverage is not None
     autodiff = jobs["veros-autodiff"]
     install_index, install = next(
         (index, step)
@@ -1202,15 +1197,12 @@ def test_ci_runs_veros_autodiff_in_an_exact_fork_lane() -> None:
     for capability in ("VerosState.copy", "safe_sqrt", "c_k", "c_eps"):
         assert capability in verify["run"]
     assert rollout["run"] == (
-        "python -m pytest tests/test_veros_autodiff_rollouts.py tests/test_veris_prognostic_autodiff.py "
-        "tests/test_veris_veros_jcm_autodiff.py tests/test_veros_float32.py "
-        "-q -n0 -m veros_autodiff --tb=short "
+        "python -m pytest tests/ -q -n0 -m veros_autodiff --tb=short "
         "--cov=vercor --cov-branch --cov-report= --cov-fail-under=0"
     )
     assert 'python -m pip install ".[dev,jcm,veros,veris]"' in quality_commands
     assert "python -m pip check" in quality_commands
-    for stock_step in (stock_full, stock_coverage):
-        assert '-m "not veros_autodiff"' in stock_step["run"]
+    assert '-m "not veros_autodiff"' in stock_full["run"]
     assert "combined-coverage" in jobs["publish-release"]["needs"]
 
 
@@ -1232,7 +1224,7 @@ def test_ci_combines_stock_and_autodiff_coverage_before_upload() -> None:
     quality_names = {step.get("name") for step in quality_steps}
     autodiff_names = {step.get("name") for step in autodiff_steps}
     assert {
-        "Collect stock branch coverage",
+        "Run full stock test suite with coverage",
         "Stage stock coverage data",
         "Upload stock coverage data",
     }.issubset(quality_names)
@@ -1245,7 +1237,7 @@ def test_ci_combines_stock_and_autodiff_coverage_before_upload() -> None:
     stock_collect_index, stock_collect = next(
         (index, step)
         for index, step in enumerate(quality_steps)
-        if step.get("name") == "Collect stock branch coverage"
+        if step.get("name") == "Run full stock test suite with coverage"
     )
     stock_stage_index, stock_stage = next(
         (index, step)
@@ -1373,11 +1365,15 @@ def test_ci_quality_job_enforces_static_gates_and_collects_stock_coverage() -> N
     assert "--exit-zero" not in commands
     assert "mypy vercor tests" in commands
     assert "compileall -q vercor tests" in commands
-    assert 'pytest tests/ -q -m "not veros_autodiff" --tb=short' in commands
-    assert "--cov=vercor" in commands
-    assert "--cov-branch" in commands
-    assert "--cov-fail-under=0" in commands
-    assert "--cov-fail-under=90" not in commands
+    pytest_commands = [
+        step["run"]
+        for step in quality["steps"]
+        if step.get("run", "").startswith("python -m pytest")
+    ]
+    assert pytest_commands == [
+        'python -m pytest tests/ -q -n2 -m "not veros_autodiff" --tb=short '
+        "--cov=vercor --cov-branch --cov-report= --cov-fail-under=0"
+    ]
 
 
 def test_distribution_helper_reuses_explicit_artifact_directory_without_building(
