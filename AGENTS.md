@@ -33,7 +33,7 @@ mypy vercor tests
 
 # Run Python tests
 pytest tests/ -v -n4 --dist=loadscope --max-worker-restart=0 --durations=25 --tb=short
-pytest tests/ -v -m "not slow" -v -n4 --dist=loadscope --max-worker-restart=0 --durations=25  # skip integration tests
+pytest tests/ -v -m "not slow and not veros_autodiff" -n4 --dist=loadscope --max-worker-restart=0 --durations=25
 
 # Do test coverage analysis
 pytest --cov=vercor tests/ -v -n4 --dist=loadscope --max-worker-restart=0 --durations=25 --tb=short

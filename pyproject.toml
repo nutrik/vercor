@@ -69,7 +69,7 @@ build-backend = "flit_core.buildapi"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q -n4 --dist=loadscope --max-worker-restart=0"
+addopts = '-q -n4 --dist=loadscope --max-worker-restart=0 -m "not veros_autodiff"'
 filterwarnings = [
   "ignore:jax.experimental.shard_map is deprecated in v0.8.0. Used jax.shard_map instead\\.:DeprecationWarning",
 ]

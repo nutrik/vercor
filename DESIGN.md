@@ -565,7 +565,9 @@ which contains native forcing and open-water face stresses.
 Tests are layered across pure numerical kernels, component contracts, routes,
 state, workflow/backend behavior, output behavior, optional setup boundaries,
 gradients, and installed distributions. `--fast` selects a deterministic
-development subset; the full suite runs before commit.
+development subset. Pytest selects stock tests by default. Use
+`-n0 -m veros_autodiff` in the separate fork environment for the native
+autodiff tests. Run both suites before committing changes that affect them.
 
 The numerical-safety matrix requires finite active primal/JIT, JVP, and VJP
 evidence for differentiable paths and fail-fast primal evidence at host-only
@@ -583,8 +585,10 @@ resolve the packaged `veros>=1.7.0` requirement. A dedicated serial job
 installs the public differentiable fork without dependencies at immutable commit
 `7a8c964cf00b5aa0713c995edd760643a431b3c9`, verifies its PEP 610 commit record
 and required runtime capabilities, and runs the multi-step rollout module.
-Both lanes collect relative-path branch data without applying a partial-suite
-threshold and upload distinct raw artifacts. A downstream job requires both
+The quality job runs the full stock suite once with branch coverage and two
+workers to limit concurrent native-model memory use. Both lanes collect
+relative-path branch data without applying a partial-suite threshold and
+upload distinct raw artifacts. A downstream job requires both
 artifacts, unions their executed lines and arcs with Coverage.py, enforces the
 90% project threshold, and sends one deterministic XML report to Codecov.
 Release publication depends on that combined gate, so neither stock
